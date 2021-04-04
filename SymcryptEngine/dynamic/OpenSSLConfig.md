@@ -1,0 +1,14 @@
+```
+openssl_conf = openssl_init
+
+[ openssl_init ]
+engines = engine_section
+
+[ engine_section ]
+symcrypt = symcrypt_section
+
+[ symcrypt_section ]
+engine_id = symcrypt
+dynamic_path = /usr/local/ssl/lib/engines-1.1/symcryptengine.so
+default_algorithms = ALL
+```
