@@ -10,7 +10,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-par
 
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
-include_directories(/home/akshay/SymCrypt/inc)
 
 # Set CMake variables that subsequent CMake scripts can check against
 set(CMAKE_SYSTEM_NAME Linux)

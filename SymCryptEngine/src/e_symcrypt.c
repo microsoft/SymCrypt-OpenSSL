@@ -69,7 +69,7 @@ static int bind_symcrypt_engine(ENGINE* e)
     PFN_eckey_set_public eckey_set_public_pfunc = NULL;
 
     if (!symcrypt_module_initialized) {
-        SymCryptModuleInit();
+        SymCryptModuleInit(SYMCRYPT_CODE_VERSION_API, SYMCRYPT_CODE_VERSION_MINOR, SYMCRYPT_CODE_VERSION_PATCH);
         symcrypt_module_initialized = 1;
     }
 
@@ -234,9 +234,6 @@ int SYMCRYPT_ENGINE_Initialize()
     return 1;
 }
 
-
-SYMCRYPT_ENVIRONMENT_GENERIC
-
 // Symcrypt requires memory allocation should be SYMCRYPT_ASYM_ALIGN_VALUE aligned.
 // To do this, we allocate more SYMCRYPT_ASYM_ALIGN_VALUE + 4 - 1 space. This ensures
 // that we can find a pointer which is SYMCRYPT_ASYM_ALIGN_VALUE aligned, which is
@@ -245,38 +242,60 @@ SYMCRYPT_ENVIRONMENT_GENERIC
 // When we release memory, we calculate p = res - offset to obtain the correct pointer
 // to free.
 
+// PVOID
+// SYMCRYPT_CALL
+// SymCryptCallbackAlloc(SIZE_T nBytes)
+// {
+//     PBYTE p, res = NULL;
+//     ULONG offset;
+
+//     p = (PBYTE)OPENSSL_zalloc(nBytes + SYMCRYPT_ASYM_ALIGN_VALUE + 4);
+//     if (!p)
+//     {
+//         goto cleanup;
+//     }
+
+//     res = (PBYTE) (((ULONG_PTR)p + 4 + SYMCRYPT_ASYM_ALIGN_VALUE - 1) & ~(SYMCRYPT_ASYM_ALIGN_VALUE - 1));
+//     offset = (ULONG)(res - p);
+//     *(ULONG *) &res[-4] = offset;
+
+// cleanup:
+//     return res;
+// }
+
+// VOID
+// SYMCRYPT_CALL
+// SymCryptCallbackFree(PVOID ptr)
+// {
+//     PBYTE p;
+//     ULONG offset;
+
+//     p = (PBYTE) ptr;
+//     offset = *(ULONG *) &p[-4];
+
+//     OPENSSL_free(p - offset);
+// }
+
 PVOID
 SYMCRYPT_CALL
-SymCryptCallbackAlloc(SIZE_T nBytes)
+SYMCRYPT_WEAK_SYMBOL
+SymCryptCallbackAlloc( SIZE_T nBytes )
 {
-    PBYTE p, res = NULL;
-    ULONG offset;
-
-    p = (PBYTE)OPENSSL_zalloc(nBytes + SYMCRYPT_ASYM_ALIGN_VALUE + 4);
-    if (!p)
+    PVOID ptr = NULL;
+    if(posix_memalign(&ptr, SYMCRYPT_ASYM_ALIGN_VALUE, nBytes) != 0)
     {
-        goto cleanup;
+        return NULL;
     }
 
-    res = (PBYTE) (((ULONG_PTR)p + 4 + SYMCRYPT_ASYM_ALIGN_VALUE - 1) & ~(SYMCRYPT_ASYM_ALIGN_VALUE - 1));
-    offset = (ULONG)(res - p);
-    *(ULONG *) &res[-4] = offset;
-
-cleanup:
-    return res;
+    return ptr;
 }
 
 VOID
 SYMCRYPT_CALL
-SymCryptCallbackFree(PVOID ptr)
+SYMCRYPT_WEAK_SYMBOL
+SymCryptCallbackFree( VOID * pMem )
 {
-    PBYTE p;
-    ULONG offset;
-
-    p = (PBYTE) ptr;
-    offset = *(ULONG *) &p[-4];
-
-    OPENSSL_free(p - offset);
+    free(pMem);
 }
 
 SYMCRYPT_ERROR
