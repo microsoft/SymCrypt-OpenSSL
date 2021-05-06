@@ -30,15 +30,14 @@ void _SYMCRYPT_log_bytes(
     const char *s,
     int len);
 
-
 #define SYMCRYPT_LOG_BYTES_DEBUG(description, s, len) \
-    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_DEBUG, __FUNCTION__, description, s, len)
+    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_DEBUG, __FUNCTION__, description, (const char*) s, len)
 
 #define SYMCRYPT_LOG_BYTES_INFO(description, s, len) \
-    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_INFO, __FUNCTION__, description, s, len)
+    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_INFO, __FUNCTION__, description, (const char*) s, len)
 
 #define SYMCRYPT_LOG_BYTES_ERROR(description, s, len) \
-    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_ERROR, __FUNCTION__, description, s, len)
+    _SYMCRYPT_log_bytes(SYMCRYPT_LOG_LEVEL_ERROR, __FUNCTION__, description, (const char*) s, len)
 
 
 void _SYMCRYPT_log_bignum(

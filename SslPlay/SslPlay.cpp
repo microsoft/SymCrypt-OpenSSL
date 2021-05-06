@@ -20,7 +20,7 @@ void printOpenSSLError(const char* description)
     return;
 }
 
-const char SeperatorLine[] = "-----------------------------------------------------------------------------------------\n";
+const char SeparatorLine[] = "-----------------------------------------------------------------------------------------\n";
 
 void printBytes(char* data, int len, const char* header)
 {
@@ -151,7 +151,6 @@ void TestRsaEncryptDecrypt(
     printf("\nTesting EVP_PKEY_encrypt* Functions\n\n");
     printf("Command EVP_PKEY_CTX_new\n");
     pEncryptContext = EVP_PKEY_CTX_new(encryptionKey, NULL);
-    //pEncryptContext = EVP_PKEY_CTX_new(pKey, NULL);
     if (pEncryptContext == NULL)
     {
         printOpenSSLError("");
@@ -248,7 +247,11 @@ end:
         OPENSSL_free(encryptedtext);
     if (decryptedtext)
         OPENSSL_free(decryptedtext);
-    printf("%s", SeperatorLine);
+    if (pEncryptContext)
+        EVP_PKEY_CTX_free(pEncryptContext);
+    if (pDecryptContext)
+        EVP_PKEY_CTX_free(pDecryptContext);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -362,7 +365,7 @@ end:
         EVP_PKEY_CTX_free(pVerifyContext);
     if (signature)
         OPENSSL_free(signature);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -607,7 +610,7 @@ end:
         EVP_CIPHER_CTX_free(rsaOpenCtx);
     if (decryptedMessage)
         OPENSSL_free(decryptedMessage);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -620,10 +623,8 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     EVP_PKEY_CTX* pKeyContext = NULL;
     BIO *privateBIO = NULL;
     EVP_PKEY *privateKey = NULL;
-    unsigned char *privateKeyChar = NULL;
     BIO *publicBIO = NULL;
     EVP_PKEY *publicKey = NULL;
-    unsigned char *publicKeyChar = NULL;
     char publicFileName[1024];
     char privateFileName[1024];
     FILE *fp = NULL;
@@ -663,8 +664,8 @@ void TestRsaEvp(int modulus, uint32_t exponent)
         printOpenSSLError("");
         goto end;
     }
-    EVP_PKEY_CTX_free(pKeyContext);
-    printf("%s", SeperatorLine);
+
+    printf("%s", SeparatorLine);
 
     //
     // Export Public Key
@@ -678,7 +679,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     fflush(fp);
     fclose(fp);
     BIO_free(publicBIO);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Export Private Key
@@ -692,7 +693,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     fflush(fp);
     fclose(fp);
     BIO_free(privateBIO);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Import Public Key
@@ -702,7 +703,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     publicKey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
     fflush(fp);
     fclose(fp);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Import Private Key
@@ -712,7 +713,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     privateKey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     fflush(fp);
     fclose(fp);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Encrypt/Decrypt
@@ -721,7 +722,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_PKCS1_OAEP_PADDING", RSA_PKCS1_OAEP_PADDING);
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_SSLV23_PADDING", RSA_SSLV23_PADDING);
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_NO_PADDING", RSA_NO_PADDING);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Sign/Verify
@@ -731,7 +732,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha256", EVP_sha256(), 32);
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha384", EVP_sha384(), 48);
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512(), 64);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // DigestSign/DigestVerify
@@ -745,7 +746,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     // PSS Padding goes to SymCryptRsaRawDecrypt which requires private key.
     // Have to understand the concept of symcrypt_rsa_pub_dec function all together
     TestRsaDigestSignVerify(privateKey, privateKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     //
     // Seal/Open
@@ -756,33 +757,32 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaSealOpen(publicKey, privateKey, "EVP_aes_128_ecb", EVP_aes_128_ecb());
     TestRsaSealOpen(publicKey, privateKey, "EVP_aes_192_ecb", EVP_aes_192_ecb());
     TestRsaSealOpen(publicKey, privateKey, "EVP_aes_256_ecb", EVP_aes_256_ecb());
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
 
     printf("\nCompleted Test RSA: Modulus: %d, Exponent: %d\n\n", modulus, exponent);
-    printf("%s", SeperatorLine);
-
+    printf("%s", SeparatorLine);
 
 end:
 
-    if (publicKeyChar)
-        OPENSSL_free(publicKeyChar);
-    if (privateKeyChar)
-        OPENSSL_free(privateKeyChar);
+    if (pKeyContext)
+        EVP_PKEY_CTX_free(pKeyContext);
+    if (pKey)
+        EVP_PKEY_free(pKey);
     if (publicKey)
         EVP_PKEY_free(publicKey);
     if (privateKey)
         EVP_PKEY_free(privateKey);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
 void TestRsaEvpAll()
 {
-    // TestRsaEvp(1024, 65537);
+    TestRsaEvp(1024, 65537);
     TestRsaEvp(2048, 65537);
-    // TestRsaEvp(3072, 65537);
-    // TestRsaEvp(4096, 65537);
-    printf("%s", SeperatorLine);
+    TestRsaEvp(3072, 65537);
+    TestRsaEvp(4096, 65537);
+    printf("%s", SeparatorLine);
 
 }
 
@@ -823,7 +823,7 @@ bool TestDigest(const char* digestname)
     printf("\n");
     result = true;
 end:
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return result;
 }
 
@@ -851,7 +851,7 @@ void TestDigests()
     for (i = 0; i < md_len; i++)
          printf("%02x", md1[i]);
     printf("\n");
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -886,10 +886,11 @@ int encrypt(const EVP_CIPHER *cipher, unsigned char *plaintext, int plaintext_le
         printOpenSSLError("");
         goto end;
     }
+    printf("len %d\n", len);
     ciphertext_len += len;
 end:
     EVP_CIPHER_CTX_free(ctx);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return ciphertext_len;
 }
 
@@ -928,7 +929,7 @@ int decrypt(const EVP_CIPHER *cipher, unsigned char *ciphertext, int ciphertext_
 
 end:
     EVP_CIPHER_CTX_free(ctx);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return plaintext_len;
 }
 
@@ -989,7 +990,7 @@ bool TestAesCipher(
 end:
     /* Clean up */
     EVP_cleanup();
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return result;
 }
 
@@ -1009,7 +1010,7 @@ void TestAesCbc()
     TestAesCipher("EVP_aes_256_cbc", EVP_aes_256_cbc(), key, 32, iv, 16, plaintext, plaintext_len);
 
 
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -1029,26 +1030,25 @@ void TestAesEcb()
     TestAesCipher("EVP_aes_256_ecb", EVP_aes_256_ecb(), key, 32, iv, 16, plaintext, plaintext_len);
 
 
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
 void TestAesXts()
 {
     unsigned char plaintext[8192];
-    int plaintext_len = 67;
-    unsigned char iv[16];
-    unsigned char key[32];
+    int plaintext_len = 64;
+    unsigned char iv[8];
+    unsigned char key[64];
 
-    while(!RAND_bytes(key, 32));
-    while(!RAND_bytes(iv, 16));
+    while(!RAND_bytes(key, 64));
+    while(!RAND_bytes(iv, 8));
     while(!RAND_bytes(plaintext, plaintext_len));
 
-    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 16, iv, 4, plaintext, plaintext_len);
-    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 32, iv, 4, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 32, iv, 8, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 64, iv, 8, plaintext, plaintext_len);
 
-
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -1119,7 +1119,7 @@ int encrypt_gcm(
         printOpenSSLError("");
         goto end;
     }
-    //ciphertext_len += len;
+    ciphertext_len += len;
     /* Get the tag */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag)) {
         printOpenSSLError("");
@@ -1128,7 +1128,7 @@ int encrypt_gcm(
     /* Clean up */
     EVP_CIPHER_CTX_free(ctx);
 end:
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return ciphertext_len;
 }
 
@@ -1194,7 +1194,7 @@ int decrypt_gcm(
     }
 end:
 
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return 0;
 }
 
@@ -1239,7 +1239,7 @@ void TestAesGcmCipher(
          printf("PlainText and DecryptedText match\n");
     }
 
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -1253,7 +1253,7 @@ TestAesGcmGeneric()
     unsigned char aad[32];
 
     while(!RAND_bytes(key, 32));
-    while(!RAND_bytes(iv, 16));
+    while(!RAND_bytes(iv, 12));
     while(!RAND_bytes(aad, 32));
     while(!RAND_bytes(plaintext, plaintext_len));
 
@@ -1264,7 +1264,7 @@ TestAesGcmGeneric()
     // Test Nist Curves
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), gcm_key, 32, gcm_iv, 12, gcm_aad, 16, gcm_pt, 16);
 
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -1273,8 +1273,8 @@ void TestCiphers()
     TestAesCbc();
     TestAesEcb();
     TestAesGcmGeneric();
-    //TestAesXts();
-    printf("%s", SeperatorLine);
+    TestAesXts();
+    printf("%s", SeparatorLine);
 
 }
 
@@ -1342,7 +1342,7 @@ void TestHKDF(void)
         printBytes((char *)out, outlen, "Output KDF");
         printBytes((char *)expected, expectedlen, "Expected KDF");
 
-        if ((outlen != expectedlen) || 
+        if ((outlen != expectedlen) ||
             (memcmp(out, expected, expectedlen) != 0)) {
             printf("\n KDF didn't derive the expected values\n");
         }
@@ -1353,7 +1353,7 @@ void TestHKDF(void)
 
  end:
     EVP_PKEY_CTX_free(pctx);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 
@@ -1399,7 +1399,7 @@ void TestTls1Prf(void)
             goto end;
         }
 
-        if ((outlen != expectedlen) || 
+        if ((outlen != expectedlen) ||
             (memcmp(out, expected, expectedlen) != 0)) {
             printf("TLS1Prf didn't derive the expected values\n");
         }
@@ -1410,7 +1410,7 @@ void TestTls1Prf(void)
 
 end:
     EVP_PKEY_CTX_free(pctx);
-    printf("%s", SeperatorLine);
+    printf("%s", SeparatorLine);
     return;
 }
 

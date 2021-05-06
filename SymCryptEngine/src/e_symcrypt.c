@@ -45,7 +45,7 @@ int symcrypt_destroy(ENGINE* e)
 static int engine_set_defaults(ENGINE* e)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    if (!ENGINE_set_default_digests(e)
+    if (   !ENGINE_set_default_digests(e)
         || !ENGINE_set_default_ciphers(e)
         || !ENGINE_set_default_pkey_meths(e)
         || !ENGINE_set_default_RSA(e)
@@ -88,8 +88,7 @@ static int bind_symcrypt_engine(ENGINE* e)
 
     /* Setup RSA_METHOD */
     rsa_symcrypt_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, 0);
-    RSA_meth_set1_name(symcrypt_rsa_method, "Symcrypt RSA Method");
-    if (!RSA_meth_set_pub_enc(symcrypt_rsa_method, symcrypt_rsa_pub_enc)
+    if (   !RSA_meth_set_pub_enc(symcrypt_rsa_method, symcrypt_rsa_pub_enc)
         || !RSA_meth_set_pub_dec(symcrypt_rsa_method, symcrypt_rsa_pub_dec)
         || !RSA_meth_set_priv_enc(symcrypt_rsa_method, symcrypt_rsa_priv_enc)
         || !RSA_meth_set_priv_dec(symcrypt_rsa_method, symcrypt_rsa_priv_dec)
@@ -137,7 +136,7 @@ static int bind_symcrypt_engine(ENGINE* e)
                              symcrypt_eckey_verify_sig);
 
     // /* Setup DSA METHOD */
-    // if (!DSA_meth_set_sign(symcrypt_dsa_method, symcrypt_dsa_sign)
+    // if (   !DSA_meth_set_sign(symcrypt_dsa_method, symcrypt_dsa_sign)
     //     || !DSA_meth_set_sign_setup(symcrypt_dsa_method, symcrypt_dsa_sign_setup)
     //     || !DSA_meth_set_verify(symcrypt_dsa_method, symcrypt_dsa_verify)
     //     || !DSA_meth_set_init(symcrypt_dsa_method, symcrypt_dsa_init)
@@ -148,7 +147,7 @@ static int bind_symcrypt_engine(ENGINE* e)
     // }
 
     // /* Setup DH METHOD */
-    // if (!DH_meth_set_generate_key(symcrypt_dh_method, symcrypt_dh_generate_key)
+    // if (   !DH_meth_set_generate_key(symcrypt_dh_method, symcrypt_dh_generate_key)
     //     || !DH_meth_set_compute_key(symcrypt_dh_method, symcrypt_dh_compute_key)
     //     || !DH_meth_set_bn_mod_exp(symcrypt_dh_method, symcrypt_dh_bn_mod_exp)
     //     || !DH_meth_set_init(symcrypt_dh_method, symcrypt_dh_init)
@@ -232,70 +231,6 @@ int SYMCRYPT_ENGINE_Initialize()
     SYMCRYPT_LOG_DEBUG(NULL);
     engine_load_symcrypt_int();
     return 1;
-}
-
-// Symcrypt requires memory allocation should be SYMCRYPT_ASYM_ALIGN_VALUE aligned.
-// To do this, we allocate more SYMCRYPT_ASYM_ALIGN_VALUE + 4 - 1 space. This ensures
-// that we can find a pointer which is SYMCRYPT_ASYM_ALIGN_VALUE aligned, which is
-// res in the code.  We have set aside 4 bytes space to store the offset between p,
-// which is returned from BCryptAlloc, and res. That is, offset = p - offset. Later,
-// When we release memory, we calculate p = res - offset to obtain the correct pointer
-// to free.
-
-// PVOID
-// SYMCRYPT_CALL
-// SymCryptCallbackAlloc(SIZE_T nBytes)
-// {
-//     PBYTE p, res = NULL;
-//     ULONG offset;
-
-//     p = (PBYTE)OPENSSL_zalloc(nBytes + SYMCRYPT_ASYM_ALIGN_VALUE + 4);
-//     if (!p)
-//     {
-//         goto cleanup;
-//     }
-
-//     res = (PBYTE) (((ULONG_PTR)p + 4 + SYMCRYPT_ASYM_ALIGN_VALUE - 1) & ~(SYMCRYPT_ASYM_ALIGN_VALUE - 1));
-//     offset = (ULONG)(res - p);
-//     *(ULONG *) &res[-4] = offset;
-
-// cleanup:
-//     return res;
-// }
-
-// VOID
-// SYMCRYPT_CALL
-// SymCryptCallbackFree(PVOID ptr)
-// {
-//     PBYTE p;
-//     ULONG offset;
-
-//     p = (PBYTE) ptr;
-//     offset = *(ULONG *) &p[-4];
-
-//     OPENSSL_free(p - offset);
-// }
-
-PVOID
-SYMCRYPT_CALL
-SYMCRYPT_WEAK_SYMBOL
-SymCryptCallbackAlloc( SIZE_T nBytes )
-{
-    PVOID ptr = NULL;
-    if(posix_memalign(&ptr, SYMCRYPT_ASYM_ALIGN_VALUE, nBytes) != 0)
-    {
-        return NULL;
-    }
-
-    return ptr;
-}
-
-VOID
-SYMCRYPT_CALL
-SYMCRYPT_WEAK_SYMBOL
-SymCryptCallbackFree( VOID * pMem )
-{
-    free(pMem);
 }
 
 SYMCRYPT_ERROR

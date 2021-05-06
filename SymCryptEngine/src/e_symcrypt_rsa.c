@@ -8,7 +8,7 @@ extern "C" {
 
 typedef struct _SYMCRYPT_RSA_KEY_CONTEXT {
     int initialized;
-    char* data;
+    unsigned char* data;
     PSYMCRYPT_RSAKEY key;
 } SYMCRYPT_RSA_KEY_CONTEXT;
 
@@ -147,7 +147,7 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
             return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
         }
         // SYMCRYPT_LOG_DEBUG("SymCryptRsaRawEncrypt");
-        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawEncrypt Input", from, flen > cbModuls ? cbModuls : flen);        
+        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawEncrypt Input", from, flen > cbModuls ? cbModuls : flen);
         // SymError = SymCryptRsaRawEncrypt(
         //                keyCtx->key,
         //                from,
@@ -473,7 +473,7 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
 
     switch (type) {
     case NID_md5:
-        SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_DEBUG("NID_md5");
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -581,6 +581,7 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
 CommonReturn:
     return cbResult;
 err:
+    cbResult = 0;
     goto CommonReturn;
 }
 
@@ -712,6 +713,7 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
 CommonReturn:
     return cbResult;
 err:
+    cbResult = 0;
     goto CommonReturn;
 }
 
@@ -764,7 +766,7 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     SymcryptRsaParam.version = 1;               // Version of the parameters structure
     SymcryptRsaParam.nBitsOfModulus = bits;     // Number of bits in the modulus
     SymcryptRsaParam.nPrimes = 2;               // Number of primes
-    SymcryptRsaParam.nPubExp = 1;               // Number of public exponents 
+    SymcryptRsaParam.nPubExp = 1;               // Number of public exponents
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if (keyCtx->key == NULL)
     {
@@ -804,8 +806,8 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
-    keyCtx->data  = (char *)OPENSSL_zalloc(cbAllocSize);
-    if (keyCtx->data  == NULL)
+    keyCtx->data = OPENSSL_zalloc(cbAllocSize);
+    if (keyCtx->data == NULL)
     {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
@@ -1038,8 +1040,8 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
         cbAllocSize += cbPrivateExponent;
     }
 
-    keyCtx->data  = (char *)OPENSSL_zalloc(cbAllocSize);
-    if (keyCtx->data  == NULL) {
+    keyCtx->data = OPENSSL_zalloc(cbAllocSize);
+    if (keyCtx->data == NULL) {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
     }

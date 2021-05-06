@@ -81,8 +81,13 @@ int symcrypt_pkey_methods(ENGINE *e, EVP_PKEY_METHOD **pmeth,
 void symcrypt_destroy_pkey_methods(void)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    EVP_PKEY_meth_free(_symcrypt_pkey_hkdf);
-    EVP_PKEY_meth_free(_symcrypt_pkey_tls1_prf);
+
+    // It seems that explicitly freeing these methods in the destroy method causes a double free
+    // (seen in SslPlay with sanitizers on, or in OpenSSL applications using the engine)
+    // For now just don't free these methods here, but keep an eye out for memory leaks
+
+    // EVP_PKEY_meth_free(_symcrypt_pkey_hkdf);
+    // EVP_PKEY_meth_free(_symcrypt_pkey_tls1_prf);
     _symcrypt_pkey_hkdf = NULL;
     _symcrypt_pkey_tls1_prf = NULL;
 }

@@ -40,7 +40,7 @@ target_include_directories(e_symcrypt PUBLIC ../inc)
 target_include_directories(e_symcrypt PRIVATE ../src)
 target_include_directories (e_symcrypt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-set_target_properties(e_symcrypt PROPERTIES PREFIX "")
+# set_target_properties(e_symcrypt PROPERTIES PREFIX "")
 set_target_properties(e_symcrypt PROPERTIES OUTPUT_NAME "symcryptengine")
 
 target_link_directories(e_symcrypt PUBLIC ${CMAKE_SOURCE_DIR})

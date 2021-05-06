@@ -143,7 +143,7 @@ void _SYMCRYPT_log_bignum(
         return;
     }
 
-    _SYMCRYPT_log_bytes(trace_level, func, description, string, length);
+    _SYMCRYPT_log_bytes(trace_level, func, description, (const char*) string, length);
     OPENSSL_free(string);
     return;
 }
