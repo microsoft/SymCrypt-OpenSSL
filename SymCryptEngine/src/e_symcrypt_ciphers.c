@@ -14,7 +14,6 @@ struct cipher_cbc_ctx {
 
 struct cipher_ecb_ctx {
     int enc;                     /* COP_ENCRYPT or COP_DECRYPT */
-    unsigned char iv[SYMCRYPT_AES_BLOCK_SIZE];
     SYMCRYPT_AES_EXPANDED_KEY key;
 };
 
@@ -26,7 +25,7 @@ struct cipher_xts_ctx {
 
 #define SYMCRYPT_GCM_IV_LENGTH      12
 
-struct cipher_ctx_gcm {
+struct cipher_gcm_ctx {
     int enc;                     /* COP_ENCRYPT or COP_DECRYPT */
     unsigned char iv[SYMCRYPT_GCM_IV_LENGTH];
     SYMCRYPT_GCM_STATE state;
@@ -45,8 +44,14 @@ static int symcrypt_cipher_nids[] = {
     NID_aes_192_ecb,
     NID_aes_256_ecb,
 
-    NID_aes_128_xts,
-    NID_aes_256_xts,
+    // Disabling XTS for now.
+    // EVP API provides tweaks of 16B, while in SymCrypt we take 8B tweaks.
+    // Need to read up on the spec to determine if we can safely truncate the provided tweak from
+    // the EVP API.
+    // Also need to push the FIPS mode XTS flag into the SymCrypt API, and expose an XTS key copy
+    // method
+    // NID_aes_128_xts,
+    // NID_aes_256_xts,
 
     NID_aes_128_gcm,
     NID_aes_192_gcm,
@@ -55,10 +60,13 @@ static int symcrypt_cipher_nids[] = {
 
 int symcrypt_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
 int symcrypt_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
+static int symcrypt_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 
 #define AES_128_KEY_SIZE 16
 #define AES_192_KEY_SIZE 24
 #define AES_256_KEY_SIZE 32
+#define AES_CBC_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE|EVP_CIPH_CUSTOM_COPY \
+                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_ALWAYS_CALL_INIT)
 
 /* AES128 - CBC */
 static EVP_CIPHER *_hidden_aes_128_cbc = NULL;
@@ -68,9 +76,10 @@ static const EVP_CIPHER *symcrypt_aes_128_cbc(void)
     if (_hidden_aes_128_cbc == NULL
         && ((_hidden_aes_128_cbc = EVP_CIPHER_meth_new(NID_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_cbc,16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_cbc, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_cbc, AES_CBC_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_128_cbc, symcrypt_aes_cbc_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_cbc, symcrypt_aes_cbc_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_cbc, symcrypt_aes_cbc_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_cbc, sizeof(struct cipher_cbc_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_cbc);
@@ -87,9 +96,10 @@ static const EVP_CIPHER *symcrypt_aes_192_cbc(void)
     if (_hidden_aes_192_cbc == NULL
         && ((_hidden_aes_192_cbc = EVP_CIPHER_meth_new(NID_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_cbc,16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_cbc, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_cbc, AES_CBC_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_192_cbc, symcrypt_aes_cbc_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_cbc, symcrypt_aes_cbc_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_cbc, symcrypt_aes_cbc_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_cbc, sizeof(struct cipher_cbc_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_cbc);
@@ -106,9 +116,10 @@ static const EVP_CIPHER *symcrypt_aes_256_cbc(void)
     if (_hidden_aes_256_cbc == NULL
         && ((_hidden_aes_256_cbc = EVP_CIPHER_meth_new(NID_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_cbc,16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_cbc, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_cbc, AES_CBC_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_256_cbc, symcrypt_aes_cbc_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_cbc, symcrypt_aes_cbc_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_cbc, symcrypt_aes_cbc_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_cbc, sizeof(struct cipher_cbc_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_cbc);
@@ -119,6 +130,8 @@ static const EVP_CIPHER *symcrypt_aes_256_cbc(void)
 
 int symcrypt_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
 int symcrypt_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
+static int symcrypt_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+#define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY)
 
 /* AES128 - ecb */
 static EVP_CIPHER *_hidden_aes_128_ecb = NULL;
@@ -128,9 +141,10 @@ static const EVP_CIPHER *symcrypt_aes_128_ecb(void)
     if (_hidden_aes_128_ecb == NULL
         && ((_hidden_aes_128_ecb = EVP_CIPHER_meth_new(NID_aes_128_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_ecb,16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ecb, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ecb, AES_ECB_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ecb, symcrypt_aes_ecb_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ecb, symcrypt_aes_ecb_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ecb, symcrypt_aes_ecb_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_ecb, sizeof(struct cipher_ecb_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_ecb);
@@ -147,9 +161,10 @@ static const EVP_CIPHER *symcrypt_aes_192_ecb(void)
     if (_hidden_aes_192_ecb == NULL
         && ((_hidden_aes_192_ecb = EVP_CIPHER_meth_new(NID_aes_192_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_ecb,16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ecb, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ecb, AES_ECB_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ecb, symcrypt_aes_ecb_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ecb, symcrypt_aes_ecb_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ecb, symcrypt_aes_ecb_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_ecb, sizeof(struct cipher_ecb_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_ecb);
@@ -166,9 +181,10 @@ static const EVP_CIPHER *symcrypt_aes_256_ecb(void)
     if (_hidden_aes_256_ecb == NULL
         && ((_hidden_aes_256_ecb = EVP_CIPHER_meth_new(NID_aes_256_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_ecb, 16)
-            || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ecb, EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE)
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ecb, AES_ECB_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ecb, symcrypt_aes_ecb_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ecb, symcrypt_aes_ecb_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ecb, symcrypt_aes_ecb_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_ecb, sizeof(struct cipher_ecb_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_ecb);
@@ -180,9 +196,9 @@ static const EVP_CIPHER *symcrypt_aes_256_ecb(void)
 
 int symcrypt_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
 int symcrypt_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-#define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1 \
-                | EVP_CIPH_CUSTOM_IV | EVP_CIPH_FLAG_CUSTOM_CIPHER \
-                | EVP_CIPH_XTS_MODE )
+static int symcrypt_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+#define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_XTS_MODE|EVP_CIPH_CUSTOM_COPY \
+                        |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER)
 
 /* AES128 - XTS */
 static EVP_CIPHER *_hidden_aes_128_xts = NULL;
@@ -191,10 +207,11 @@ static const EVP_CIPHER *symcrypt_aes_128_xts(void)
     SYMCRYPT_LOG_DEBUG(NULL);
     if (_hidden_aes_128_xts == NULL
         && ((_hidden_aes_128_xts = EVP_CIPHER_meth_new(NID_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE * 2)) == NULL
-            || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, 8)
+            || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, 16)
             || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_xts, AES_XTS_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_128_xts, symcrypt_aes_xts_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_xts, symcrypt_aes_xts_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_xts, symcrypt_aes_xts_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_xts, sizeof(struct cipher_xts_ctx))))
     {
         SYMCRYPT_LOG_ERROR("CIPHER Initialization Failed");
@@ -211,10 +228,11 @@ static const EVP_CIPHER *symcrypt_aes_256_xts(void)
     SYMCRYPT_LOG_DEBUG(NULL);
     if (_hidden_aes_256_xts == NULL
         && ((_hidden_aes_256_xts = EVP_CIPHER_meth_new(NID_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE * 2)) == NULL
-            || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, 8)
+            || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, 16)
             || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_xts, AES_XTS_FLAGS)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_256_xts, symcrypt_aes_xts_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_xts, symcrypt_aes_xts_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_xts, symcrypt_aes_xts_ctrl)
             || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_xts, sizeof(struct cipher_xts_ctx))))
     {
         SYMCRYPT_LOG_ERROR("CIPHER Initialization Failed");
@@ -227,11 +245,9 @@ static const EVP_CIPHER *symcrypt_aes_256_xts(void)
 int symcrypt_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
 int symcrypt_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int symcrypt_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
-#define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1 \
-                | EVP_CIPH_CUSTOM_IV | EVP_CIPH_FLAG_CUSTOM_CIPHER \
-                | EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CTRL_INIT \
-                | EVP_CIPH_FLAG_AEAD_CIPHER \
-                | EVP_CIPH_GCM_MODE)
+#define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
+                        |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER|EVP_CIPH_ALWAYS_CALL_INIT \
+                        |EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
 
 /* AES128 - GCM */
 static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
@@ -245,7 +261,7 @@ static const EVP_CIPHER *symcrypt_aes_128_gcm(void)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, symcrypt_aes_gcm_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, symcrypt_aes_gcm_cipher)
             || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_gcm, symcrypt_aes_gcm_ctrl)
-            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_gcm, sizeof(struct cipher_ctx_gcm))))
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_gcm, sizeof(struct cipher_gcm_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_gcm);
         _hidden_aes_128_gcm = NULL;
@@ -265,7 +281,7 @@ static const EVP_CIPHER *symcrypt_aes_192_gcm(void)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, symcrypt_aes_gcm_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, symcrypt_aes_gcm_cipher)
             || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_gcm, symcrypt_aes_gcm_ctrl)
-            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_gcm, sizeof(struct cipher_ctx_gcm))))
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_gcm, sizeof(struct cipher_gcm_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_gcm);
         _hidden_aes_192_gcm = NULL;
@@ -285,7 +301,7 @@ static const EVP_CIPHER *symcrypt_aes_256_gcm(void)
             || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, symcrypt_aes_gcm_init_key)
             || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, symcrypt_aes_gcm_cipher)
             || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_gcm, symcrypt_aes_gcm_ctrl)
-            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_gcm, sizeof(struct cipher_ctx_gcm))))
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_gcm, sizeof(struct cipher_gcm_ctx))))
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_gcm);
         _hidden_aes_256_gcm = NULL;
@@ -303,8 +319,8 @@ void symcrypt_destroy_ciphers(void)
     EVP_CIPHER_meth_free(_hidden_aes_128_ecb);
     EVP_CIPHER_meth_free(_hidden_aes_192_ecb);
     EVP_CIPHER_meth_free(_hidden_aes_256_ecb);
-    EVP_CIPHER_meth_free(_hidden_aes_128_xts);
-    EVP_CIPHER_meth_free(_hidden_aes_256_xts);
+    // EVP_CIPHER_meth_free(_hidden_aes_128_xts);
+    // EVP_CIPHER_meth_free(_hidden_aes_256_xts);
     EVP_CIPHER_meth_free(_hidden_aes_128_gcm);
     EVP_CIPHER_meth_free(_hidden_aes_192_gcm);
     EVP_CIPHER_meth_free(_hidden_aes_256_gcm);
@@ -326,14 +342,17 @@ int symcrypt_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     int ok = 1;
-    if (!cipher) {
+    if (!cipher)
+    {
         /* We are returning a list of supported nids */
         *nids = symcrypt_cipher_nids;
         return (sizeof(symcrypt_cipher_nids))
                / sizeof(symcrypt_cipher_nids[0]);
     }
+
     /* We are being asked for a specific cipher */
-    switch (nid) {
+    switch (nid)
+    {
     case NID_aes_128_cbc:
         *cipher = symcrypt_aes_128_cbc();
         break;
@@ -352,12 +371,12 @@ int symcrypt_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
     case NID_aes_256_ecb:
         *cipher = symcrypt_aes_256_ecb();
         break;
-    case NID_aes_128_xts:
-        *cipher = symcrypt_aes_128_xts();
-        break;
-    case NID_aes_256_xts:
-        *cipher = symcrypt_aes_256_xts();
-        break;
+    // case NID_aes_128_xts:
+    //     *cipher = symcrypt_aes_128_xts();
+    //     break;
+    // case NID_aes_256_xts:
+    //     *cipher = symcrypt_aes_256_xts();
+    //     break;
     case NID_aes_128_gcm:
         *cipher = symcrypt_aes_128_gcm();
         break;
@@ -384,11 +403,29 @@ int symcrypt_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_LOG_DEBUG("Encryption?: %d", enc);
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     cipherCtx->enc = enc;
-    if (iv) {
+    if (iv)
+    {
         memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
+        SYMCRYPT_LOG_BYTES_DEBUG("Saved IV", cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx));
     }
-    SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+    else
+    {
+        memset(cipherCtx->iv, 0, EVP_CIPHER_CTX_iv_length(ctx));
+        SYMCRYPT_LOG_DEBUG("Zero IV");
+    }
+
+    if (key)
+    {
+        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if (SymError != SYMCRYPT_NO_ERROR)
+        {
+            SYMCRYPT_LOG_DEBUG("ERROR: SymCryptAesExpandKey failed. SymError = %d ", SymError);
+            return 0;
+        }
+        SYMCRYPT_LOG_BYTES_DEBUG("key", key, EVP_CIPHER_CTX_key_length(ctx));
+    }
     return 1;
 }
 
@@ -396,10 +433,13 @@ int symcrypt_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_LOG_DEBUG("in: %x, out: %x, Input Length: %ld", in, out, inl);
+    SYMCRYPT_LOG_DEBUG("in: %lx, out: %lx, Input Length: %ld", in, out, inl);
+    SYMCRYPT_LOG_BYTES_DEBUG("pre in", in, inl);
+    SYMCRYPT_LOG_BYTES_DEBUG("pre out", out, inl);
     int ret = 0;
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    SYMCRYPT_LOG_DEBUG("cipherCtx->key: %x, cipherCtx->iv: %x", cipherCtx->key, cipherCtx->iv);
+    SYMCRYPT_LOG_BYTES_DEBUG("cipherCtx", cipherCtx, sizeof(struct cipher_cbc_ctx));
+    SYMCRYPT_LOG_BYTES_DEBUG("cipherCtx->iv", &cipherCtx->iv, 16);
     if (cipherCtx->enc)
     {
         SymCryptAesCbcEncrypt(&cipherCtx->key, cipherCtx->iv, in, out, inl);
@@ -408,9 +448,37 @@ int symcrypt_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
     {
         SymCryptAesCbcDecrypt(&cipherCtx->key, cipherCtx->iv, in, out, inl);
     }
+    SYMCRYPT_LOG_BYTES_DEBUG("post in", in, inl);
+    SYMCRYPT_LOG_BYTES_DEBUG("post out", out, inl);
+    SYMCRYPT_LOG_BYTES_DEBUG("cipherCtx->iv", &cipherCtx->iv, 16);
     ret = 1;
 end:
     return ret;
+}
+
+static int symcrypt_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    void *ptr)
+{
+    SYMCRYPT_LOG_DEBUG(NULL);
+    SYMCRYPT_LOG_DEBUG("type: %d, arg: %d", type, arg);
+    struct cipher_cbc_ctx *srcCtx;
+    struct cipher_cbc_ctx *dstCtx;
+    switch(type)
+    {
+    case EVP_CTRL_COPY:
+        // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
+        // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
+        // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        srcCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(                  ctx);
+        dstCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
+        SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
+        break;
+    default:
+        SYMCRYPT_LOG_DEBUG("Unexpected ctrl type");
+        return 0;
+    }
+    return 1;
 }
 
 /*
@@ -419,12 +487,24 @@ end:
 int symcrypt_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                              const unsigned char *iv, int enc)
 {
-    // SYMCRYPT_LOG_DEBUG(NULL);
-    // SYMCRYPT_LOG_DEBUG("Encryption?: %d", enc);
+    SYMCRYPT_LOG_DEBUG(NULL);
+    SYMCRYPT_LOG_DEBUG("Encryption?: %d", enc);
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     cipherCtx->enc = enc;
-    //memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
-    SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+    if (iv)
+    {
+        SYMCRYPT_LOG_DEBUG("Unexpected non-NULL iv - ignored");
+    }
+    if (key)
+    {
+        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if (SymError != SYMCRYPT_NO_ERROR)
+        {
+            SYMCRYPT_LOG_DEBUG("ERROR: SymCryptAesExpandKey failed. SymError = %d ", SymError);
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -450,6 +530,31 @@ end:
     return ret;
 }
 
+static int symcrypt_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    void *ptr)
+{
+    SYMCRYPT_LOG_DEBUG(NULL);
+    SYMCRYPT_LOG_DEBUG("type: %d, arg: %d", type, arg);
+    struct cipher_cbc_ctx *srcCtx;
+    struct cipher_cbc_ctx *dstCtx;
+    switch(type)
+    {
+    case EVP_CTRL_COPY:
+        // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
+        // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
+        // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        srcCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(                  ctx);
+        dstCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
+        SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
+        break;
+    default:
+        SYMCRYPT_LOG_DEBUG("Unexpected ctrl type");
+        return 0;
+    }
+    return 1;
+}
+
 /*
  * AES-XTS Implementation
  */
@@ -458,13 +563,28 @@ int symcrypt_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_LOG_DEBUG("Encryption?: %d, EVP_CIPHER_CTX_iv_length: %d", enc, EVP_CIPHER_CTX_iv_length(ctx));
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     cipherCtx->enc = enc;
     if(iv)
     {
-        memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
+        memcpy(cipherCtx->iv, iv, 8); // copy only the first 8B
+        // check bytes 8-15 are all zero?
     }
-    SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+    else
+    {
+        SYMCRYPT_LOG_DEBUG("ERROR: No iv (tweak) provided to xts init");
+        return 0;
+    }
+    if(key)
+    {
+        SymError = SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if (SymError != SYMCRYPT_NO_ERROR)
+        {
+            SYMCRYPT_LOG_DEBUG("ERROR: SymCryptXtsAesExpandKey failed. SymError = %d ", SymError);
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -514,6 +634,32 @@ end:
     return ret;
 }
 
+static int symcrypt_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    void *ptr)
+{
+    SYMCRYPT_LOG_DEBUG(NULL);
+    SYMCRYPT_LOG_DEBUG("type: %d, arg: %d", type, arg);
+    switch(type)
+    {
+    case EVP_CTRL_COPY:
+        // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
+        // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
+        // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        SYMCRYPT_LOG_ERROR("No copy method currently implemented");
+        // We need a SymCryptXtsKeyCopy function for this as we don't have explicit control over the AES key
+        // struct here
+        // srcCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(                  ctx);
+        // dstCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
+        // SymCryptXtsKeyCopy(&srcCtx->key, &dstCtx->key);
+        return 0;
+    default:
+        SYMCRYPT_LOG_DEBUG("Unexpected ctrl type");
+        return 0;
+    }
+    return 1;
+}
+
 /*
  * AES-GCM Implementation
  */
@@ -523,9 +669,10 @@ int symcrypt_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_LOG_DEBUG("Encryption?: %d", enc);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    struct cipher_ctx_gcm *cipherCtx = (struct cipher_ctx_gcm *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     cipherCtx->enc = enc;
-    if (iv) {
+    if (iv)
+    {
         memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
         SYMCRYPT_LOG_BYTES_DEBUG("Saved IV", cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx));
     }
@@ -551,7 +698,7 @@ int symcrypt_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
     int ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_LOG_DEBUG("Input Length: %ld", inl);
-    struct cipher_ctx_gcm *cipherCtx = (struct cipher_ctx_gcm *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     if (out == NULL && in != NULL && inl > 0)
     {
         // Auth Data Passed in
@@ -615,9 +762,12 @@ static int symcrypt_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_LOG_DEBUG("type: %d, arg: %d", type, arg);
-    struct cipher_ctx_gcm *cipherCtx = (struct cipher_ctx_gcm *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    struct cipher_gcm_ctx *dstCtx;
     unsigned char *iv = NULL;
-    switch(type) {
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    switch(type)
+    {
     case EVP_CTRL_INIT:
         iv = (unsigned char *)EVP_CIPHER_CTX_iv(ctx);
         if (iv)
@@ -630,18 +780,36 @@ static int symcrypt_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         *(int *)ptr = SYMCRYPT_GCM_IV_LENGTH;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // Symcrypt only support SYMCRYPT_GCM_IV_LENGTH
+        // Symcrypt only supports SYMCRYPT_GCM_IV_LENGTH
+        if(arg != SYMCRYPT_GCM_IV_LENGTH)
+        {
+            SYMCRYPT_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SYMCRYPT_GCM_IV_LENGTH);
+            return 0;
+        }
         break;
     case EVP_CTRL_AEAD_SET_TAG:
         if (arg <= 0 || arg > 16 || EVP_CIPHER_CTX_encrypting(ctx))
+        {
             return 0;
+        }
         memcpy(cipherCtx->tag, ptr, arg);
         cipherCtx->taglen = arg;
         break;
     case EVP_CTRL_AEAD_GET_TAG:
         if (arg <= 0 || arg > 16 || !EVP_CIPHER_CTX_encrypting(ctx))
+        {
             return 0;
+        }
         memcpy(ptr, cipherCtx->tag, cipherCtx->taglen);
+        break;
+    case EVP_CTRL_COPY:
+        // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
+        // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
+        // We must explicitly copy the GCM structs using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        dstCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
+        SymCryptGcmKeyCopy(&cipherCtx->key, &dstCtx->key);
+        SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
         break;
     default:
         break;

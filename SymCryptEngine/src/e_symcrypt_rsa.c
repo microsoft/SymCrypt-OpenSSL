@@ -41,7 +41,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
     cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
     SYMCRYPT_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld", from, flen, cbModuls);
 
-    switch (padding) {
+    switch (padding)
+    {
     case RSA_PKCS1_PADDING:
         SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Encrypt");
         SymError = SymCryptRsaPkcs1Encrypt(
@@ -87,7 +88,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc) {
+            if (!pfn_rsa_meth_pub_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
                 return -1;
             }
@@ -96,7 +98,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc) {
+            if (!pfn_rsa_meth_priv_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
                 return -1;
             }
@@ -109,7 +112,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc) {
+            if (!pfn_rsa_meth_pub_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
                 return -1;
             }
@@ -118,7 +122,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc) {
+            if (!pfn_rsa_meth_priv_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
                 return -1;
             }
@@ -131,7 +136,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc) {
+            if (!pfn_rsa_meth_pub_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
                 return -1;
             }
@@ -140,7 +146,8 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc) {
+            if (!pfn_rsa_meth_priv_enc)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
                 return -1;
             }
@@ -201,11 +208,13 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
 
     SYMCRYPT_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld, to: %X", from, flen, cbModuls, to);
 
-    if (from == NULL) {
+    if (from == NULL)
+    {
         goto err;
     }
 
-    switch (padding) {
+    switch (padding)
+    {
     case RSA_PKCS1_PADDING:
         SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Decrypt");
         SymError = SymCryptRsaPkcs1Decrypt(
@@ -251,7 +260,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec) {
+            if (!pfn_rsa_meth_pub_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
                 return -1;
             }
@@ -260,7 +270,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec) {
+            if (!pfn_rsa_meth_priv_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
                 return -1;
             }
@@ -273,7 +284,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec) {
+            if (!pfn_rsa_meth_pub_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
                 return -1;
             }
@@ -282,7 +294,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec) {
+            if (!pfn_rsa_meth_priv_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
                 return -1;
             }
@@ -296,7 +309,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
         {
             pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec) {
+            if (!pfn_rsa_meth_pub_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
                 return -1;
             }
@@ -305,7 +319,8 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
         else
         {
             pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec) {
+            if (!pfn_rsa_meth_priv_dec)
+            {
                 SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
                 return -1;
             }
@@ -347,12 +362,15 @@ int symcrypt_rsa_priv_enc(int flen, const unsigned char* from,
     SYMCRYPT_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
@@ -370,12 +388,15 @@ int symcrypt_rsa_priv_dec(int flen, const unsigned char* from,
     SYMCRYPT_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
@@ -394,12 +415,15 @@ int symcrypt_rsa_pub_enc(int flen, const unsigned char* from,
     SYMCRYPT_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
@@ -419,12 +443,15 @@ int symcrypt_rsa_pub_dec(int flen, const unsigned char* from,
     SYMCRYPT_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
@@ -448,12 +475,15 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
 
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
@@ -471,7 +501,8 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
         goto err;
     }
 
-    switch (type) {
+    switch (type)
+    {
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
         SymError = SymCryptRsaPkcs1Sign(
@@ -596,19 +627,23 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
 
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0) {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0) {
+    if (keyCtx->initialized == 0)
+    {
+        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        {
             goto err;
         }
     }
 
     cbModuls = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModuls;
-    switch (dtype) {
+    switch (dtype)
+    {
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
         SymError = SymCryptRsaPkcs1Verify(
@@ -755,11 +790,13 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     BIGNUM *rsa_dmq1 = NULL;
     BIGNUM *rsa_iqmp = NULL;
 
-    if(keyCtx == NULL) {
+    if(keyCtx == NULL)
+    {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized != 0) {
+    if (keyCtx->initialized != 0)
+    {
         symcrypt_rsa_free_key_context(keyCtx);
     }
 
@@ -885,22 +922,17 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     }
 
     // Set these values
-    if ((rsa_n = BN_new()) == NULL)
+    if (((rsa_n = BN_new()) == NULL) ||
+        ((rsa_e = BN_new()) == NULL) ||
+        ((rsa_p = BN_secure_new()) == NULL) ||
+        ((rsa_q = BN_secure_new()) == NULL) ||
+        ((rsa_dmp1 = BN_secure_new()) == NULL) ||
+        ((rsa_dmq1 = BN_secure_new()) == NULL) ||
+        ((rsa_iqmp = BN_secure_new()) == NULL) ||
+        ((rsa_d = BN_secure_new()) == NULL))
+    {
         goto err;
-    if ((rsa_e = BN_new()) == NULL)
-        goto err;
-    if ((rsa_p = BN_secure_new()) == NULL)
-        goto err;
-    if ((rsa_q = BN_secure_new()) == NULL)
-        goto err;
-    if ((rsa_dmp1 = BN_secure_new()) == NULL)
-        goto err;
-    if ((rsa_dmq1 = BN_secure_new()) == NULL)
-        goto err;
-    if ((rsa_iqmp = BN_secure_new()) == NULL)
-        goto err;
-    if ((rsa_d = BN_secure_new()) == NULL)
-        goto err;
+    }
 
     BN_bin2bn(pbPublicExp, cbPublicExp, rsa_e);
     BN_bin2bn(pbModulus, cbModulus, rsa_n);
@@ -950,7 +982,7 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_LOG_DEBUG("RSA Address: %X", rsa);
-    SYMCRYPT_LOG_DEBUG("Key Intialized: %X, %d", &keyCtx->initialized, keyCtx->initialized);
+    SYMCRYPT_LOG_DEBUG("Key Initialized: %X, %d", &keyCtx->initialized, keyCtx->initialized);
     int ret = 0;
     UINT64  pubExp64;
     PBYTE   pbPublicExp = NULL;
@@ -992,11 +1024,19 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
+    if (RSA_get_version(rsa) != RSA_ASN1_VERSION_DEFAULT)
+    {
+        // Currently only support normal two-prime RSA with SymCrypt Engine
+        SYMCRYPT_LOG_ERROR("Unsupported RSA version");
+        goto err;
+    }
+
     RSA_get0_key(rsa, &rsa_n, &rsa_e, &rsa_d);
     RSA_get0_factors(rsa, &rsa_p, &rsa_q);
     RSA_get0_crt_params(rsa, &rsa_dmp1, &rsa_dmq1, &rsa_iqmp);
 
-    if (rsa_n == NULL || rsa_e == NULL) {
+    if (rsa_n == NULL || rsa_e == NULL)
+    {
         SYMCRYPT_LOG_ERROR("Not enough Parameters");
         goto err;
     }
@@ -1007,29 +1047,34 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     cbModulus = BN_num_bytes(rsa_n);
     cbAllocSize += cbModulus;
     // Prime1 - May not be present
-    if (rsa_p) {
+    if (rsa_p)
+    {
         pcbPrimes[0] = BN_num_bytes(rsa_p);
         cbAllocSize += pcbPrimes[0];
         nPrimes++;
     }
     // Prime2 - May not be present
-    if (rsa_q) {
+    if (rsa_q)
+    {
         pcbPrimes[1] = BN_num_bytes(rsa_q);
         cbAllocSize += pcbPrimes[1];
         nPrimes++;
     }
     // Exponent1 - May not be present
-    if (rsa_dmp1) {
+    if (rsa_dmp1)
+    {
         pcbCrtExponents[0] = BN_num_bytes(rsa_dmp1);
         cbAllocSize += pcbCrtExponents[0];
     }
     // Exponent2 - May not be present
-    if (rsa_dmq1) {
+    if (rsa_dmq1)
+    {
         pcbCrtExponents[1] = BN_num_bytes(rsa_dmq1);
         cbAllocSize += pcbCrtExponents[1];
     }
     // Coefficient - May not be present
-    if (rsa_iqmp) {
+    if (rsa_iqmp)
+    {
         cbCrtCoefficient = BN_num_bytes(rsa_iqmp);
         cbAllocSize += cbCrtCoefficient;
     }
@@ -1041,7 +1086,8 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     }
 
     keyCtx->data = OPENSSL_zalloc(cbAllocSize);
-    if (keyCtx->data == NULL) {
+    if (keyCtx->data == NULL)
+    {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
     }
@@ -1056,32 +1102,38 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     pbCurrent += cbModulus;
     BN_bn2bin(rsa_n, pbModulus);
 
-    if (rsa_p) {
+    if (rsa_p)
+    {
         ppbPrimes[0] = pbCurrent;
         pbCurrent += pcbPrimes[0];
         BN_bn2bin(rsa_p, ppbPrimes[0]);
     }
-    if (rsa_q) {
+    if (rsa_q)
+    {
         ppbPrimes[1] = pbCurrent;
         pbCurrent += pcbPrimes[1];
         BN_bn2bin(rsa_q, ppbPrimes[1]);
     }
-    if (rsa_dmp1) {
+    if (rsa_dmp1)
+    {
         ppbCrtExponents[0] = pbCurrent;
         pbCurrent += pcbCrtExponents[0];
         BN_bn2bin(rsa_dmp1, ppbCrtExponents[0]);
     }
-    if (rsa_dmq1) {
+    if (rsa_dmq1)
+    {
         ppbCrtExponents[1] = pbCurrent;
         pbCurrent += pcbCrtExponents[1];
         BN_bn2bin(rsa_dmq1, ppbCrtExponents[1]);
     }
-    if (rsa_iqmp) {
+    if (rsa_iqmp)
+    {
         pbCrtCoefficient = pbCurrent;
         pbCurrent += cbCrtCoefficient;
         BN_bn2bin(rsa_iqmp, pbCrtCoefficient);
     }
-    if (rsa_d) {
+    if (rsa_d)
+    {
         pbPrivateExponent = pbCurrent;
         pbCurrent += cbPrivateExponent;
         BN_bn2bin(rsa_d, pbPrivateExponent);
@@ -1156,7 +1208,8 @@ int symcrypt_rsa_mod_exp(BIGNUM* r0, const BIGNUM* i, RSA* rsa,
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_mod_exp pfn_rsa_meth_mod_exp = RSA_meth_get_mod_exp(ossl_rsa_meth);
 
-    if (!pfn_rsa_meth_mod_exp) {
+    if (!pfn_rsa_meth_mod_exp)
+    {
         return 0;
     }
     return pfn_rsa_meth_mod_exp(r0, i, rsa, ctx);
@@ -1179,7 +1232,8 @@ int symcrypt_rsa_bn_mod_exp(BIGNUM* r,
     SYMCRYPT_LOG_DEBUG(NULL);
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_bn_mod_exp pfn_rsa_meth_bn_mod_exp = RSA_meth_get_bn_mod_exp(ossl_rsa_meth);
-    if (!pfn_rsa_meth_bn_mod_exp) {
+    if (!pfn_rsa_meth_bn_mod_exp)
+    {
         return 0;
     }
     return pfn_rsa_meth_bn_mod_exp(r, a, p, m, ctx, m_ctx);
@@ -1190,7 +1244,8 @@ int symcrypt_rsa_init(RSA *rsa)
     SYMCRYPT_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
-    if (!keyCtx) {
+    if (!keyCtx)
+    {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
     }
@@ -1209,10 +1264,12 @@ err:
 void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    if (keyCtx->data) {
+    if (keyCtx->data)
+    {
         OPENSSL_free(keyCtx->data);
     }
-    if (keyCtx->key) {
+    if (keyCtx->key)
+    {
         SymCryptRsakeyFree(keyCtx->key);
     }
     keyCtx->initialized = 0;

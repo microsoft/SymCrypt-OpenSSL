@@ -38,7 +38,7 @@ typedef int (*PFN_eckey_compute_key)(unsigned char **psec,
 
 typedef struct _SYMCRYPT_ECC_KEY_CONTEXT {
     int initialized;
-    char* data;
+    unsigned char* data;
     PSYMCRYPT_ECKEY key;
 } SYMCRYPT_ECC_KEY_CONTEXT;
 
