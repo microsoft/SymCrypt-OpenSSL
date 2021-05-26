@@ -1,3 +1,7 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include "e_symcrypt_digests.h"
 #include "e_symcrypt_helpers.h"
 #include <symcrypt.h>

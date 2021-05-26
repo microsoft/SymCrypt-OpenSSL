@@ -1,3 +1,7 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include "e_symcrypt_dh.h"
 
 #ifdef __cplusplus

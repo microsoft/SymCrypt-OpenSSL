@@ -1,3 +1,7 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include "e_symcrypt.h"
 #include <openssl/rsa.h>
 #include <symcrypt.h>

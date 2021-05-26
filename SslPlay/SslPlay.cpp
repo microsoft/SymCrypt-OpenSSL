@@ -1,4 +1,7 @@
+//
 // SslPlay.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
 #include <iostream>

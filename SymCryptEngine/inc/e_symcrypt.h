@@ -1,7 +1,10 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/ossl_typ.h>
 #include <openssl/crypto.h>
 #include <openssl/engine.h>
-
 
 #ifdef __cplusplus
 extern "C" {
