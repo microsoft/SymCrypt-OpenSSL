@@ -26,6 +26,7 @@ add_library(e_symcrypt SHARED
     ../src/e_symcrypt_pkey_meths.c
     ../src/e_symcrypt_rand.c
     ../src/e_symcrypt_rsa.c
+    ../src/e_symcrypt_rsapss.c
     ../src/e_symcrypt_hkdf.c
     ../src/e_symcrypt_tls1prf.c
     ../src/e_symcrypt_helpers.c

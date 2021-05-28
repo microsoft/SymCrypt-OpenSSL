@@ -91,11 +91,11 @@ static int bind_symcrypt_engine(ENGINE* e)
     }
 
     /* Setup RSA_METHOD */
-    rsa_symcrypt_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, 0);
+    rsa_symcrypt_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL);
     if (   !RSA_meth_set_pub_enc(symcrypt_rsa_method, symcrypt_rsa_pub_enc)
-        || !RSA_meth_set_pub_dec(symcrypt_rsa_method, symcrypt_rsa_pub_dec)
-        || !RSA_meth_set_priv_enc(symcrypt_rsa_method, symcrypt_rsa_priv_enc)
         || !RSA_meth_set_priv_dec(symcrypt_rsa_method, symcrypt_rsa_priv_dec)
+        || !RSA_meth_set_priv_enc(symcrypt_rsa_method, symcrypt_rsa_priv_enc)
+        || !RSA_meth_set_pub_dec(symcrypt_rsa_method, symcrypt_rsa_pub_dec)
         || !RSA_meth_set_mod_exp(symcrypt_rsa_method, symcrypt_rsa_mod_exp)
         || !RSA_meth_set_bn_mod_exp(symcrypt_rsa_method, symcrypt_rsa_bn_mod_exp)
         || !RSA_meth_set_init(symcrypt_rsa_method, symcrypt_rsa_init)
@@ -108,7 +108,7 @@ static int bind_symcrypt_engine(ENGINE* e)
         goto memerr;
     }
 
-    eckey_symcrypt_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, 0);
+    eckey_symcrypt_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 
     /* Setup EC_METHOD */
     // Need to get existing methods so that we can set Init and Finish which will

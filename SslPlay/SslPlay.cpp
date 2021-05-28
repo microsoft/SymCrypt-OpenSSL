@@ -301,6 +301,15 @@ void TestRsaSignVerify(
         printOpenSSLError("");
         goto end;
     }
+    if (padding == RSA_PKCS1_PSS_PADDING)
+    {
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSignContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        {
+            printOpenSSLError("");
+            goto end;
+        }
+    }
     /* Determine buffer length */
     printf("Command EVP_PKEY_sign\n");
     if (EVP_PKEY_sign(pSignContext, NULL, &signature_len, message_digest, message_digest_len) <= 0) {
@@ -350,6 +359,15 @@ void TestRsaSignVerify(
     if (EVP_PKEY_CTX_set_signature_md(pVerifyContext, digest) <= 0) {
         printOpenSSLError("");
         goto end;
+    }
+    if (padding == RSA_PKCS1_PSS_PADDING)
+    {
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerifyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        {
+            printOpenSSLError("");
+            goto end;
+        }
     }
     printf("Command EVP_PKEY_verify\n");
     ret = EVP_PKEY_verify(pVerifyContext, signature, signature_len, message_digest, message_digest_len);
@@ -617,55 +635,45 @@ end:
     return;
 }
 
-
-void TestRsaEvp(int modulus, uint32_t exponent)
+int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, char* privateFileName, EVP_PKEY** publicKey, EVP_PKEY** privateKey)
 {
-    printf("\nTest RSA: Modulus: %d, Exponent: %d\n\n", modulus, exponent);
     BIGNUM* exponent_bn = NULL;
     EVP_PKEY* pKey = NULL;
     EVP_PKEY_CTX* pKeyContext = NULL;
     BIO *privateBIO = NULL;
-    EVP_PKEY *privateKey = NULL;
     BIO *publicBIO = NULL;
-    EVP_PKEY *publicKey = NULL;
-    char publicFileName[1024];
-    char privateFileName[1024];
     FILE *fp = NULL;
-
-    // Initialize Data
-    sprintf(publicFileName, "%s_%d.pem", "public",  modulus);
-    sprintf(privateFileName, "%s_%d.pem", "private",  modulus);
+    int ret = 0;
 
     //
     // Generate RSA Key
     //
-    printf("\nTesting EVP_PKEY_keygen* Functions\n\n");
     printf("Command EVP_PKEY_CTX_new_id\n");
-    pKeyContext = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    pKeyContext = EVP_PKEY_CTX_new_id(id, NULL);
     if (pKeyContext == NULL) {
         printOpenSSLError("");
-        goto end;
+        goto err;
     }
     printf("Command EVP_PKEY_keygen_init\n");
     if (EVP_PKEY_keygen_init(pKeyContext) <= 0) {
         printOpenSSLError("");
-        goto end;
+        goto err;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_keygen_bits\n");
     if (EVP_PKEY_CTX_set_rsa_keygen_bits(pKeyContext, modulus) <= 0) {
         printOpenSSLError("");
-        goto end;
+        goto err;
     }
     exponent_bn = BN_new();
     BN_set_word(exponent_bn, exponent);
     if (EVP_PKEY_CTX_set_rsa_keygen_pubexp(pKeyContext, exponent_bn) <= 0) {
         printOpenSSLError("");
-        goto end;
+        goto err;
     }
     printf("Command EVP_PKEY_keygen\n");
     if (EVP_PKEY_keygen(pKeyContext, &pKey) != 1) {
         printOpenSSLError("");
-        goto end;
+        goto err;
     }
 
     printf("%s", SeparatorLine);
@@ -703,7 +711,7 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     printf("\nTesting Importing Public Key\n\n");
     fp = fopen(publicFileName, "r");
-    publicKey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
+    *publicKey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
     fflush(fp);
     fclose(fp);
     printf("%s", SeparatorLine);
@@ -713,10 +721,51 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     printf("\nTesting Importing Private Key\n\n");
     fp = fopen(privateFileName, "r");
-    privateKey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+    *privateKey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     fflush(fp);
     fclose(fp);
     printf("%s", SeparatorLine);
+
+    end:
+
+    if (pKeyContext)
+        EVP_PKEY_CTX_free(pKeyContext);
+    if (pKey)
+        EVP_PKEY_free(pKey);
+    return ret;
+
+    err:
+    ret = -1;
+    goto end;
+}
+
+void TestRsaEvp(int modulus, uint32_t exponent)
+{
+    printf("\nTest RSA: Modulus: %d, Exponent: %d\n\n", modulus, exponent);
+    EVP_PKEY *privateKey = NULL;
+    EVP_PKEY *privateKeyPss = NULL;
+    EVP_PKEY *publicKey = NULL;
+    EVP_PKEY *publicKeyPss = NULL;
+    char publicFileName[1024];
+    char publicPssFileName[1024];
+    char privateFileName[1024];
+    char privatePssFileName[1024];
+
+    // Initialize Data
+    sprintf(publicFileName, "%s_%d.pem", "public",  modulus);
+    sprintf(privateFileName, "%s_%d.pem", "private",  modulus);
+    sprintf(publicPssFileName, "%s_pss_%d.pem", "public",  modulus);
+    sprintf(privatePssFileName, "%s_pss_%d.pem", "private",  modulus);
+
+    printf("\nTesting EVP_PKEY_keygen* Functions\n\n");
+    if( CreateKeys(EVP_PKEY_RSA, modulus, exponent, publicFileName, privateFileName, &publicKey, &privateKey) )
+    {
+        goto end;
+    }
+    if( CreateKeys(EVP_PKEY_RSA_PSS, modulus, exponent, publicPssFileName, privatePssFileName, &publicKeyPss, &privateKeyPss) )
+    {
+        goto end;
+    }
 
     //
     // Encrypt/Decrypt
@@ -737,6 +786,10 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512(), 64);
     printf("%s", SeparatorLine);
 
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256(), 32);
+    printf("%s", SeparatorLine);
+
     //
     // DigestSign/DigestVerify
     //
@@ -746,9 +799,6 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha384", EVP_sha384());
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512());
 
-    // PSS Padding goes to SymCryptRsaRawDecrypt which requires private key.
-    // Have to understand the concept of symcrypt_rsa_pub_dec function all together
-    TestRsaDigestSignVerify(privateKey, privateKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
     printf("%s", SeparatorLine);
 
     //
@@ -767,14 +817,14 @@ void TestRsaEvp(int modulus, uint32_t exponent)
 
 end:
 
-    if (pKeyContext)
-        EVP_PKEY_CTX_free(pKeyContext);
-    if (pKey)
-        EVP_PKEY_free(pKey);
     if (publicKey)
         EVP_PKEY_free(publicKey);
     if (privateKey)
         EVP_PKEY_free(privateKey);
+    if (publicKeyPss)
+        EVP_PKEY_free(publicKeyPss);
+    if (privateKeyPss)
+        EVP_PKEY_free(privateKeyPss);
     printf("%s", SeparatorLine);
     return;
 }

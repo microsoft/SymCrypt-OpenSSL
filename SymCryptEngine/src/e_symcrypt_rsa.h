@@ -49,6 +49,14 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e, BN_GENCB* cb);
 int symcrypt_rsa_init(RSA *rsa);
 int symcrypt_rsa_finish(RSA *rsa);
 
+typedef struct _SYMCRYPT_RSA_KEY_CONTEXT {
+    int initialized;
+    unsigned char* data;
+    PSYMCRYPT_RSAKEY key;
+} SYMCRYPT_RSA_KEY_CONTEXT;
+
+int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
+
 #ifdef __cplusplus
 }
 #endif

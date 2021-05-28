@@ -13,7 +13,7 @@ include_directories(~/SymCrypt/inc)
 # add_link_options(-fsanitize=undefined)
 # add_link_options(-fno-sanitize-recover=all)
 
-# add_subdirectory (SymCryptEngine/static)
+add_subdirectory (SymCryptEngine/static)
 add_subdirectory (SymCryptEngine/dynamic)
 add_subdirectory (SslPlay)
 
