@@ -5,7 +5,7 @@ The SymCrypt Engine for OpenSSL allows the use of OpenSSL with [SymCrypt](https:
 **Important note:** The code in this repository is currently undergoing validation for use in Microsoft-internal products. At this time, it has not been tested for use in other environments and should not be considered production-ready.
 
 # Building Instructions
-## Comple Instructions
+## Compilation Instructions
 ```
 cmake -DOPENSSL_ROOT_DIR=/usr/local/ssl -DOPENSSL_LIBRARIES=/usr/local/ssl/lib .
 make
