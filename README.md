@@ -2,6 +2,8 @@
 
 The SymCrypt Engine for OpenSSL allows the use of OpenSSL with [SymCrypt](https://github.com/Microsoft/SymCrypt) as the provider for core cryptographic operations. It leverages the [OpenSSL engine interface](https://www.openssl.org/docs/man1.0.2/man3/engine.html) to override the cryptographic implementations in OpenSSL's libcrypto.so with SymCrypt's implementations. The primary motivation for this is to support FIPS certification, as vanilla OpenSSL 1.1.1 does not have a FIPS-certified cryptographic module.
 
+**Important note:** The code in this repository is currently undergoing validation for use in Microsoft-internal products. At this time, it has not been tested for use in other environments and should not be considered production-ready.
+
 # Building Instructions
 ## Comple Instructions
 ```
