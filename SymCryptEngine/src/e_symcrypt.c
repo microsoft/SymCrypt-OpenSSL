@@ -37,6 +37,7 @@ int symcrypt_destroy(ENGINE* e)
     symcrypt_destroy_pkey_methods();
     RSA_meth_free(symcrypt_rsa_method);
     symcrypt_rsa_method = NULL;
+    symcrypt_destroy_ecc_curves();
     EC_KEY_METHOD_free(symcrypt_eckey_method);
     symcrypt_eckey_method = NULL;
     // DSA_meth_free(symcrypt_dsa_method);

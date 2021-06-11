@@ -44,6 +44,8 @@ int symcrypt_eckey_verify(int type, const unsigned char* dgst, int dgst_len,
 int symcrypt_eckey_verify_sig(const unsigned char* dgst, int dgst_len,
                               const ECDSA_SIG* sig, EC_KEY* eckey);
 
+void symcrypt_destroy_ecc_curves(void);
+
 #ifdef __cplusplus
 }
 #endif

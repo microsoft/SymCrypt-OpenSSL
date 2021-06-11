@@ -48,7 +48,7 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
-        ((rsa = EVP_PKEY_get1_RSA(pkey)) == NULL) )
+        ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
         SYMCRYPT_LOG_ERROR("Failed to get RSA key from ctx");
         return -2;
@@ -203,6 +203,7 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
     }
 
 CommonReturn:
+    symcrypt_rsa_free_key_context(&localKeyCtx);
     return cbResult;
 err:
     cbResult = 0;
@@ -244,7 +245,7 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
-        ((rsa = EVP_PKEY_get1_RSA(pkey)) == NULL) )
+        ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
         SYMCRYPT_LOG_ERROR("Failed to get RSA key from ctx");
         return -2;
@@ -399,6 +400,7 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
     cbResult = 1;
 
 CommonReturn:
+    symcrypt_rsa_free_key_context(&localKeyCtx);
     return cbResult;
 err:
     cbResult = 0;

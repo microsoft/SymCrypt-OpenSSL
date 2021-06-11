@@ -35,7 +35,10 @@ void printBytes(char* data, int len, const char* header)
      printf("\n\n");
 }
 
-void TestEccSign(EC_KEY* key)
+// Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
+#define SYMCRYPT_ECDSA_MAX_DER_SIGNATURE_LEN 139
+
+void TestEcdsa(EC_KEY* key)
 {
     unsigned char testHash[] = {
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31,
@@ -43,40 +46,66 @@ void TestEccSign(EC_KEY* key)
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31,
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31
     };
-    unsigned char resultBytes[128] = { 0 };
+    unsigned char resultBytes[SYMCRYPT_ECDSA_MAX_DER_SIGNATURE_LEN] = { 0 };
     bool result = true;
     int currentIteration = 0;
     unsigned int signatureBytesCount = sizeof(resultBytes);
+    ECDSA_SIG* ecdsaSig = NULL;
     printf("Command ECDSA_sign\n");
-    if (!ECDSA_sign(0, testHash, sizeof(testHash), resultBytes, &signatureBytesCount, key))
+    if( !ECDSA_sign(0, testHash, sizeof(testHash), resultBytes, &signatureBytesCount, key) )
     {
         printOpenSSLError("ECDSA_sign failed\n");
         goto end;
     }
     printf("Command ECDSA_verify\n");
-    if (ECDSA_verify(0, testHash, sizeof(testHash), resultBytes, signatureBytesCount, key) != 1)
+    if( ECDSA_verify(0, testHash, sizeof(testHash), resultBytes, signatureBytesCount, key) != 1 )
     {
         printOpenSSLError("ECDSA_verify failed\n");
         goto end;
     }
     else
     {
-        printf("Ecc Verify Succeeded\n");
+        printf("ECDSA_verify Succeeded\n");
+    }
+    printf("Command ECDSA_do_sign\n");
+    ecdsaSig = ECDSA_do_sign(testHash, sizeof(testHash), key);
+    if( ecdsaSig == NULL )
+    {
+        printOpenSSLError("ECDSA_do_sign failed\n");
+        goto end;
+    }
+    printf("Command ECDSA_do_verify\n");
+    if( ECDSA_do_verify(testHash, sizeof(testHash), ecdsaSig, key) != 1 ){
+        printOpenSSLError("ECDSA_do_verify failed\n");
+        goto end;
+    }
+    else
+    {
+        printf("ECDSA_do_verify Succeeded\n");
     }
 end:
+    if( ecdsaSig )
+        ECDSA_SIG_free(ecdsaSig);
+    return;
+}
+
+void TestEccCurve(int nid)
+{
+    EC_KEY* key = NULL;
+    printf("Command EC_KEY_new_by_curve_name\n");
+    key = EC_KEY_new_by_curve_name(nid);
+    printf("Command EC_KEY_generate_key\n");
+    EC_KEY_generate_key(key);
+    TestEcdsa(key);
+    EC_KEY_free(key);
     return;
 }
 
 void TestEcc()
 {
-    EC_KEY* key = NULL;
-    printf("Command EC_KEY_new_by_curve_name\n");
-    key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-    printf("Command EC_KEY_generate_key\n");
-    EC_KEY_generate_key(key);
-    TestEccSign(key);
-    EC_KEY_free(key);
-    return;
+    TestEccCurve(NID_X9_62_prime256v1);
+    TestEccCurve(NID_secp384r1);
+    TestEccCurve(NID_secp521r1);
 }
 
 /*
@@ -1482,7 +1511,7 @@ int main(int argc, char** argv)
     TestHKDF();
     TestTls1Prf();
     TestRsaEvpAll();
-    // TestEcc();
+    TestEcc();
 
     BIO_free(bio_err);
     return 1;

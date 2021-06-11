@@ -10,7 +10,6 @@
 extern "C" {
 #endif
 
-void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
 int rsa_symcrypt_idx = -1;
 
 typedef int (*PFN_RSA_meth_pub_enc)(int flen, const unsigned char* from,
@@ -733,6 +732,7 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
+    keyCtx->cbData = cbAllocSize;
     keyCtx->data = OPENSSL_zalloc(cbAllocSize);
     if( keyCtx->data == NULL )
     {
@@ -975,6 +975,7 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
         cbAllocSize += cbPrivateExponent;
     }
 
+    keyCtx->cbData = cbAllocSize;
     keyCtx->data = OPENSSL_zalloc(cbAllocSize);
     if( keyCtx->data == NULL )
     {
@@ -1132,7 +1133,6 @@ int symcrypt_rsa_bn_mod_exp(
 int symcrypt_rsa_init(RSA *rsa)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
     if( !keyCtx )
     {
@@ -1140,8 +1140,7 @@ int symcrypt_rsa_init(RSA *rsa)
         return 0;
     }
 
-    ret = RSA_set_ex_data(rsa, rsa_symcrypt_idx, keyCtx);
-    if( ret == 0 )
+    if( RSA_set_ex_data(rsa, rsa_symcrypt_idx, keyCtx) == 0 )
     {
         SYMCRYPT_LOG_ERROR("RSA_set_ex_data failed");
         return 0;
@@ -1155,7 +1154,7 @@ void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     SYMCRYPT_LOG_DEBUG(NULL);
     if( keyCtx->data )
     {
-        OPENSSL_free(keyCtx->data);
+        OPENSSL_clear_free(keyCtx->data, keyCtx->cbData);
     }
     if( keyCtx->key )
     {

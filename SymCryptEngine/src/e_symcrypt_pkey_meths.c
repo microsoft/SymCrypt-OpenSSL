@@ -53,6 +53,7 @@ static int symcrypt_pkey_rsa_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig,
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     int padding;
+    int cbSalt = RSA_PSS_SALTLEN_DIGEST;
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
@@ -62,7 +63,17 @@ static int symcrypt_pkey_rsa_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig,
 
     if( padding == RSA_PKCS1_PSS_PADDING )
     {
-        return symcrypt_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
+        if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
+        {
+            SYMCRYPT_LOG_ERROR("Failed to get cbSalt");
+            return -2;
+        }
+        if( cbSalt != RSA_PSS_SALTLEN_AUTO )
+        {
+
+            return symcrypt_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
+        }
+        SYMCRYPT_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
     }
 
     return _openssl_pkey_rsa_verify(ctx, sig, siglen, tbs, tbslen);

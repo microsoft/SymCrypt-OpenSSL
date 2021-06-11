@@ -51,11 +51,16 @@ int symcrypt_rsa_finish(RSA *rsa);
 
 typedef struct _SYMCRYPT_RSA_KEY_CONTEXT {
     int initialized;
-    unsigned char* data;
+    // Pointer to memory buffer holding private/public key data as it is transferred between OpenSSL
+    // and SymCrypt formats
+    // Must be cleared before freeing (using OPENSSL_clear_free)
+    PBYTE data;
+    SIZE_T cbData;
     PSYMCRYPT_RSAKEY key;
 } SYMCRYPT_RSA_KEY_CONTEXT;
 
 int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
+void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
 
 #ifdef __cplusplus
 }
