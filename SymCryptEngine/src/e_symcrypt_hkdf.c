@@ -197,6 +197,25 @@ static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
     return ret;
 }
 
+static unsigned char *HKDF(const EVP_MD *evp_md,
+                           const unsigned char *salt, size_t salt_len,
+                           const unsigned char *key, size_t key_len,
+                           const unsigned char *info, size_t info_len,
+                           unsigned char *okm, size_t okm_len)
+{
+    unsigned char prk[EVP_MAX_MD_SIZE];
+    unsigned char *ret;
+    size_t prk_len;
+
+    if (!HKDF_Extract(evp_md, salt, salt_len, key, key_len, prk, &prk_len))
+        return NULL;
+
+    ret = HKDF_Expand(evp_md, prk, prk_len, info, info_len, okm, okm_len);
+    OPENSSL_cleanse(prk, sizeof(prk));
+
+    return ret;
+}
+
 PCSYMCRYPT_MAC
 SymCryptMacAlgorithm(
     const EVP_MD *evp_md)
@@ -214,7 +233,6 @@ SymCryptMacAlgorithm(
         return SymCryptHmacSha512Algorithm;
     // if (type == NID_AES_CMC)
     //     return SymCryptAesCmacAlgorithm;
-    SYMCRYPT_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
@@ -231,10 +249,6 @@ int symcrypt_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
         return 0;
     }
     symcrypt_mac_algo = SymCryptMacAlgorithm(symcrypt_hkdf_context->md);
-    if( symcrypt_mac_algo == NULL )
-    {
-        return 0;
-    }
     if (symcrypt_hkdf_context->key == NULL) {
         SYMCRYPT_LOG_ERROR("Missing Key");
         return 0;
@@ -242,20 +256,37 @@ int symcrypt_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 
     switch (symcrypt_hkdf_context->mode) {
     case EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND:
-        SymError = SymCryptHkdf(
-            symcrypt_mac_algo,
-            symcrypt_hkdf_context->key,
-            symcrypt_hkdf_context->key_len,
-            symcrypt_hkdf_context->salt,
-            symcrypt_hkdf_context->salt_len,
-            symcrypt_hkdf_context->info,
-            symcrypt_hkdf_context->info_len,
-            key,
-            *keylen);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( symcrypt_mac_algo != NULL )
         {
-            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
-            return 0;
+            SymError = SymCryptHkdf(
+                symcrypt_mac_algo,
+                symcrypt_hkdf_context->key,
+                symcrypt_hkdf_context->key_len,
+                symcrypt_hkdf_context->salt,
+                symcrypt_hkdf_context->salt_len,
+                symcrypt_hkdf_context->info,
+                symcrypt_hkdf_context->info_len,
+                key,
+                *keylen);
+            if (SymError != SYMCRYPT_NO_ERROR)
+            {
+                SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
+                return 0;
+            }
+        }
+        else
+        {
+            SYMCRYPT_LOG_INFO("SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(symcrypt_hkdf_context->md));
+
+            return HKDF(
+                symcrypt_hkdf_context->md,
+                symcrypt_hkdf_context->salt,
+                symcrypt_hkdf_context->salt_len,
+                symcrypt_hkdf_context->key,
+                symcrypt_hkdf_context->key_len,
+                symcrypt_hkdf_context->info,
+                symcrypt_hkdf_context->info_len,
+                key, *keylen) != NULL;
         }
         return 1;
     case EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY:

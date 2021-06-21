@@ -15,7 +15,7 @@ extern "C" {
 
 int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
 {
-    SYMCRYPT_LOG_INFO(NULL);
+    SYMCRYPT_LOG_DEBUG(NULL);
     BN_ULONG cbModuls = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
@@ -74,7 +74,7 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
         return -2;
     }
 
-    SYMCRYPT_LOG_INFO("cbSalt= %d", cbSalt);
+    SYMCRYPT_LOG_DEBUG("cbSalt= %d", cbSalt);
     if( symcrypt_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
     {
         SYMCRYPT_LOG_ERROR("Failed to initialize localKeyCtx");
@@ -98,6 +98,12 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
     {
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( tbslen != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssSign(
                        localKeyCtx.key,
                        tbs,
@@ -118,6 +124,12 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
         break;
     case NID_sha1:
         SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( tbslen != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssSign(
                        localKeyCtx.key,
                        tbs,
@@ -138,6 +150,11 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
         break;
     case NID_sha256:
         SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( tbslen != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssSign(
                        localKeyCtx.key,
                        tbs,
@@ -159,6 +176,11 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
         break;
     case NID_sha384:
         SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( tbslen != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssSign(
                        localKeyCtx.key,
                        tbs,
@@ -179,6 +201,11 @@ int symcrypt_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, 
         break;
     case NID_sha512:
         SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( tbslen != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssSign(
                        localKeyCtx.key,
                        tbs,
@@ -212,7 +239,7 @@ err:
 
 int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
 {
-    SYMCRYPT_LOG_INFO(NULL);
+    SYMCRYPT_LOG_DEBUG(NULL);
     BN_ULONG cbModuls = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
@@ -276,7 +303,7 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
         return -2;
     }
 
-    SYMCRYPT_LOG_INFO("cbSalt= %d", cbSalt);
+    SYMCRYPT_LOG_DEBUG("cbSalt= %d", cbSalt);
 
     if( symcrypt_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
     {
@@ -286,10 +313,10 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
 
     cbModuls = SymCryptRsakeySizeofModulus(localKeyCtx.key);
     cbResult = cbModuls;
-    SYMCRYPT_LOG_INFO("tbslen= %d", tbslen);
+    SYMCRYPT_LOG_DEBUG("tbslen= %d", tbslen);
     if( sig == NULL )
     {
-        SYMCRYPT_LOG_INFO("sig NOT present");
+        SYMCRYPT_LOG_DEBUG("sig NOT present");
         goto err;
     }
 
@@ -298,7 +325,13 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
     switch( dtype )
     {
     case NID_md5:
-        SYMCRYPT_LOG_INFO("NID_md5");
+        SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( tbslen != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssVerify(
                        localKeyCtx.key,
                        tbs,
@@ -317,7 +350,13 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
         }
         break;
     case NID_sha1:
-        SYMCRYPT_LOG_INFO("NID_sha1");
+        SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( tbslen != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssVerify(
                        localKeyCtx.key,
                        tbs,
@@ -336,7 +375,12 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
         }
         break;
     case NID_sha256:
-        SYMCRYPT_LOG_INFO("NID_sha256");
+        SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( tbslen != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssVerify(
                        localKeyCtx.key,
                        tbs,
@@ -355,7 +399,12 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
         }
         break;
     case NID_sha384:
-        SYMCRYPT_LOG_INFO("NID_sha384");
+        SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( tbslen != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssVerify(
                        localKeyCtx.key,
                        tbs,
@@ -374,7 +423,12 @@ int symcrypt_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t s
         }
         break;
     case NID_sha512:
-        SYMCRYPT_LOG_INFO("NID_sha512");
+        SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( tbslen != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPssVerify(
                        localKeyCtx.key,
                        tbs,

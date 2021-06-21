@@ -26,7 +26,6 @@ typedef int (*PFN_RSA_meth_pub_dec)(int flen, const unsigned char* from,
 typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding);
 
-
 int symcrypt_rsa_pub_enc(int flen, const unsigned char* from,
     unsigned char* to, RSA* rsa,
     int padding)
@@ -366,8 +365,41 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
 
     switch( type )
     {
+    case NID_md5_sha1:
+        SYMCRYPT_LOG_DEBUG("NID_md5_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != 36 )
+        {
+            SYMCRYPT_LOG_ERROR("m_length == %d", m_length);
+            goto err;
+        }
+
+        SymError = SymCryptRsaPkcs1Sign(
+                       keyCtx->key,
+                       m,
+                       m_length > cbModuls ? cbModuls : m_length,
+                       NULL,
+                       0,
+                       SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       sigret,
+                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       &cbResult);
+
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            goto err;
+        }
+        break;
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -388,6 +420,12 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
         break;
     case NID_sha1:
         SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -408,6 +446,11 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
         break;
     case NID_sha256:
         SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( m_length != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -429,6 +472,11 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
         break;
     case NID_sha384:
         SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( m_length != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -449,6 +497,11 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
         break;
     case NID_sha512:
         SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( m_length != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -521,8 +574,40 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
     cbResult = cbModuls;
     switch( dtype )
     {
+    case NID_md5_sha1:
+        SYMCRYPT_LOG_DEBUG("NID_md5_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != 36 )
+        {
+            SYMCRYPT_LOG_ERROR("m_length == %d", m_length);
+            goto err;
+        }
+
+        SymError = SymCryptRsaPkcs1Verify(
+                       keyCtx->key,
+                       m,
+                       m_length > cbModuls ? cbModuls : m_length,
+                       sigbuf,
+                       siglen,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       NULL,
+                       0,
+                       0);
+
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            goto err;
+        }
+        break;
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -542,6 +627,12 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
         break;
     case NID_sha1:
         SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -561,6 +652,11 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
         break;
     case NID_sha256:
         SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( m_length != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -579,6 +675,11 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
         break;
     case NID_sha384:
         SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( m_length != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -598,6 +699,11 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
         break;
     case NID_sha512:
         SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( m_length != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -1092,7 +1198,7 @@ CommonReturn:
     return ret;
 
 err:
-    SYMCRYPT_LOG_DEBUG("symcrypt_initialize_rsa_key failed.");
+    SYMCRYPT_LOG_ERROR("symcrypt_initialize_rsa_key failed.");
     symcrypt_rsa_free_key_context(keyCtx);
     ret = 0;
     goto CommonReturn;

@@ -128,25 +128,46 @@ int symcrypt_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keyle
         SYMCRYPT_LOG_ERROR("Missing Digest");
         return 0;
     }
-    symcrypt_mac_algo = GetSymCryptMacAlgorithm(key_context->md);
-    if( symcrypt_mac_algo == NULL )
-    {
-        return 0;
-    }
+
     if (key_context->secret == NULL) {
         SYMCRYPT_LOG_ERROR("Missing Secret");
         return 0;
     }
-    SymError = SymCryptTlsPrf1_2(
-        symcrypt_mac_algo,
-        key_context->secret,
-        key_context->secret_length,
-        NULL,
-        0,
-        key_context->seed,
-        key_context->seed_length,
-        key,
-        *keylen);
+
+    if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
+    {
+        // Special case to use TlsPrf1_1 to handle md5_sha1
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SymError = SymCryptTlsPrf1_1(
+            key_context->secret,
+            key_context->secret_length,
+            NULL,
+            0,
+            key_context->seed,
+            key_context->seed_length,
+            key,
+            *keylen);
+    }
+    else
+    {
+        symcrypt_mac_algo = GetSymCryptMacAlgorithm(key_context->md);
+        if( symcrypt_mac_algo == NULL )
+        {
+            return 0;
+        }
+
+        SymError = SymCryptTlsPrf1_2(
+            symcrypt_mac_algo,
+            key_context->secret,
+            key_context->secret_length,
+            NULL,
+            0,
+            key_context->seed,
+            key_context->seed_length,
+            key,
+            *keylen);
+    }
+
     if (SymError != SYMCRYPT_NO_ERROR)
     {
         SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);

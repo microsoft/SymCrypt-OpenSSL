@@ -26,8 +26,8 @@ static const char* engine_symcrypt_id = "symcrypt";
 static const char* engine_symcrypt_name = "Symcrypt Engine";
 static EC_KEY_METHOD* symcrypt_eckey_method = NULL;
 static RSA_METHOD* symcrypt_rsa_method = NULL;
-static DSA_METHOD* symcrypt_dsa_method = NULL;
-static DH_METHOD* symcrypt_dh_method = NULL;
+// static DSA_METHOD* symcrypt_dsa_method = NULL;
+// static DH_METHOD* symcrypt_dh_method = NULL;
 
 int symcrypt_destroy(ENGINE* e)
 {
@@ -80,13 +80,14 @@ static int bind_symcrypt_engine(ENGINE* e)
 
     symcrypt_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
     symcrypt_rsa_method = RSA_meth_new("Symcrypt RSA Method", 0);
-    symcrypt_dsa_method = DSA_meth_dup(DSA_OpenSSL());
-    symcrypt_dh_method = DH_meth_dup(DH_OpenSSL());
+    // symcrypt_dsa_method = DSA_meth_dup(DSA_OpenSSL());
+    // symcrypt_dh_method = DH_meth_dup(DH_OpenSSL());
 
-    if (!symcrypt_rsa_method ||
-        !symcrypt_eckey_method ||
-        !symcrypt_dsa_method ||
-        !symcrypt_dh_method)
+    if( !symcrypt_rsa_method
+     || !symcrypt_eckey_method
+     // || !symcrypt_dsa_method
+     // || !symcrypt_dh_method
+        )
     {
         goto memerr;
     }
