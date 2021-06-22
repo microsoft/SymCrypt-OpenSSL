@@ -3,6 +3,7 @@
 //
 
 #include "e_symcrypt.h"
+#include <symcrypt.h>
 #include <string.h>
 
 #ifdef __cplusplus
@@ -59,6 +60,22 @@ void _SYMCRYPT_log_bignum(
 #define SYMCRYPT_LOG_BIGNUM_ERROR(description, s, len) \
     _SYMCRYPT_log_bignum(SYMCRYPT_LOG_LEVEL_ERROR, __FUNCTION__, description, bn)
 
+
+void _SYMCRYPT_log_SYMCRYPT_ERROR(
+    int trace_level,
+    const char *func,
+    char *description,
+    SYMCRYPT_ERROR symError);
+
+
+#define SYMCRYPT_LOG_SYMERROR_DEBUG(description, symError) \
+    _SYMCRYPT_log_SYMCRYPT_ERROR(SYMCRYPT_LOG_LEVEL_DEBUG, __FUNCTION__, description, symError)
+
+#define SYMCRYPT_LOG_SYMERROR_INFO(description, symError) \
+    _SYMCRYPT_log_SYMCRYPT_ERROR(SYMCRYPT_LOG_LEVEL_INFO, __FUNCTION__, description, symError)
+
+#define SYMCRYPT_LOG_SYMERROR_ERROR(description, symError) \
+    _SYMCRYPT_log_SYMCRYPT_ERROR(SYMCRYPT_LOG_LEVEL_ERROR, __FUNCTION__, description, symError)
 
 #ifdef __cplusplus
 }

@@ -26,8 +26,8 @@ static const char* engine_symcrypt_id = "symcrypt";
 static const char* engine_symcrypt_name = "Symcrypt Engine";
 static EC_KEY_METHOD* symcrypt_eckey_method = NULL;
 static RSA_METHOD* symcrypt_rsa_method = NULL;
-static DSA_METHOD* symcrypt_dsa_method = NULL;
-static DH_METHOD* symcrypt_dh_method = NULL;
+// static DSA_METHOD* symcrypt_dsa_method = NULL;
+// static DH_METHOD* symcrypt_dh_method = NULL;
 
 int symcrypt_destroy(ENGINE* e)
 {
@@ -37,6 +37,7 @@ int symcrypt_destroy(ENGINE* e)
     symcrypt_destroy_pkey_methods();
     RSA_meth_free(symcrypt_rsa_method);
     symcrypt_rsa_method = NULL;
+    symcrypt_destroy_ecc_curves();
     EC_KEY_METHOD_free(symcrypt_eckey_method);
     symcrypt_eckey_method = NULL;
     // DSA_meth_free(symcrypt_dsa_method);
@@ -79,23 +80,24 @@ static int bind_symcrypt_engine(ENGINE* e)
 
     symcrypt_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
     symcrypt_rsa_method = RSA_meth_new("Symcrypt RSA Method", 0);
-    symcrypt_dsa_method = DSA_meth_dup(DSA_OpenSSL());
-    symcrypt_dh_method = DH_meth_dup(DH_OpenSSL());
+    // symcrypt_dsa_method = DSA_meth_dup(DSA_OpenSSL());
+    // symcrypt_dh_method = DH_meth_dup(DH_OpenSSL());
 
-    if (!symcrypt_rsa_method ||
-        !symcrypt_eckey_method ||
-        !symcrypt_dsa_method ||
-        !symcrypt_dh_method)
+    if( !symcrypt_rsa_method
+     || !symcrypt_eckey_method
+     // || !symcrypt_dsa_method
+     // || !symcrypt_dh_method
+        )
     {
         goto memerr;
     }
 
     /* Setup RSA_METHOD */
-    rsa_symcrypt_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, 0);
+    rsa_symcrypt_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL);
     if (   !RSA_meth_set_pub_enc(symcrypt_rsa_method, symcrypt_rsa_pub_enc)
-        || !RSA_meth_set_pub_dec(symcrypt_rsa_method, symcrypt_rsa_pub_dec)
-        || !RSA_meth_set_priv_enc(symcrypt_rsa_method, symcrypt_rsa_priv_enc)
         || !RSA_meth_set_priv_dec(symcrypt_rsa_method, symcrypt_rsa_priv_dec)
+        || !RSA_meth_set_priv_enc(symcrypt_rsa_method, symcrypt_rsa_priv_enc)
+        || !RSA_meth_set_pub_dec(symcrypt_rsa_method, symcrypt_rsa_pub_dec)
         || !RSA_meth_set_mod_exp(symcrypt_rsa_method, symcrypt_rsa_mod_exp)
         || !RSA_meth_set_bn_mod_exp(symcrypt_rsa_method, symcrypt_rsa_bn_mod_exp)
         || !RSA_meth_set_init(symcrypt_rsa_method, symcrypt_rsa_init)
@@ -108,7 +110,7 @@ static int bind_symcrypt_engine(ENGINE* e)
         goto memerr;
     }
 
-    eckey_symcrypt_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, 0);
+    eckey_symcrypt_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 
     /* Setup EC_METHOD */
     // Need to get existing methods so that we can set Init and Finish which will

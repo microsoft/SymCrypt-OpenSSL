@@ -18,39 +18,39 @@
 extern "C" {
 #endif
 
+// RAND_seed() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
 static int symcrypt_rand_seed(const void *buf, int num)
 {
-    //SYMCRYPT_LOG_DEBUG(NULL);
-    RAND_METHOD *ossl_rand = RAND_OpenSSL();
-    return ossl_rand->seed(buf, num);
+    SymCryptProvideEntropy(buf, num);
+    return 1;
 }
 
+// RAND_bytes() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
 static int symcrypt_rand_bytes(unsigned char *buf, int num)
 {
-    //SYMCRYPT_LOG_DEBUG(NULL);
-    RAND_METHOD *ossl_rand = RAND_OpenSSL();
-    return ossl_rand->bytes(buf, num);
+    SymCryptRandom(buf, num);
+    return 1;
 }
 
+// RAND_add() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
 static int symcrypt_rand_add(const void *buf, int num, double randomness)
 {
-    //SYMCRYPT_LOG_DEBUG(NULL);
-    RAND_METHOD *ossl_rand = RAND_OpenSSL();
-    return ossl_rand->add(buf, num, randomness);
+    SymCryptProvideEntropy(buf, num);
+    return 1;
 }
 
+// RAND_pseudo_bytes() returns 1 if the bytes generated are cryptographically strong, 0 otherwise.
+// Since an error internally is fatal, we always return 1 here.
 static int symcrypt_rand_pseudorand(unsigned char *buf, int num)
 {
-    //SYMCRYPT_LOG_DEBUG(NULL);
-    RAND_METHOD *ossl_rand = RAND_OpenSSL();
-    return ossl_rand->pseudorand(buf, num);
+    SymCryptRandom(buf, num);
+    return 1;
 }
 
+// RAND_status() returns 1 if the PRNG has been seeded with enough data, 0 otherwise. Since we guarantee this, we return 1.
 static int symcrypt_rand_status(void)
 {
-    //SYMCRYPT_LOG_DEBUG(NULL);
-    RAND_METHOD *ossl_rand = RAND_OpenSSL();
-    return ossl_rand->status();
+    return 1;
 }
 
 RAND_METHOD _symcrypt_rand_meth = {
@@ -64,7 +64,6 @@ RAND_METHOD _symcrypt_rand_meth = {
 
 RAND_METHOD *symcrypt_rand_method(void)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
     return &_symcrypt_rand_meth;
 }
 

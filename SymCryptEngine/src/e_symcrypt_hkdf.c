@@ -51,7 +51,7 @@ void symcrypt_hkdf_cleanup(EVP_PKEY_CTX *ctx)
     OPENSSL_clear_free(symcrypt_hkdf_context->key, symcrypt_hkdf_context->key_len);
     OPENSSL_cleanse(symcrypt_hkdf_context->info, symcrypt_hkdf_context->info_len);
     OPENSSL_free(symcrypt_hkdf_context);
-    return;
+    EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
 int symcrypt_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
@@ -98,6 +98,7 @@ int symcrypt_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         symcrypt_hkdf_context->info_len += p1;
         return 1;
     default:
+        SYMCRYPT_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
         return -2;
     }
 }
@@ -196,6 +197,25 @@ static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
     return ret;
 }
 
+static unsigned char *HKDF(const EVP_MD *evp_md,
+                           const unsigned char *salt, size_t salt_len,
+                           const unsigned char *key, size_t key_len,
+                           const unsigned char *info, size_t info_len,
+                           unsigned char *okm, size_t okm_len)
+{
+    unsigned char prk[EVP_MAX_MD_SIZE];
+    unsigned char *ret;
+    size_t prk_len;
+
+    if (!HKDF_Extract(evp_md, salt, salt_len, key, key_len, prk, &prk_len))
+        return NULL;
+
+    ret = HKDF_Expand(evp_md, prk, prk_len, info, info_len, okm, okm_len);
+    OPENSSL_cleanse(prk, sizeof(prk));
+
+    return ret;
+}
+
 PCSYMCRYPT_MAC
 SymCryptMacAlgorithm(
     const EVP_MD *evp_md)
@@ -236,20 +256,37 @@ int symcrypt_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 
     switch (symcrypt_hkdf_context->mode) {
     case EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND:
-        SymError = SymCryptHkdf(
-            symcrypt_mac_algo,
-            symcrypt_hkdf_context->key,
-            symcrypt_hkdf_context->key_len,
-            symcrypt_hkdf_context->salt,
-            symcrypt_hkdf_context->salt_len,
-            symcrypt_hkdf_context->info,
-            symcrypt_hkdf_context->info_len,
-            key,
-            *keylen);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( symcrypt_mac_algo != NULL )
         {
-            SYMCRYPT_LOG_DEBUG("ERROR: SymCryptHkdf failed. SymError = %d ", SymError);
-            return 0;
+            SymError = SymCryptHkdf(
+                symcrypt_mac_algo,
+                symcrypt_hkdf_context->key,
+                symcrypt_hkdf_context->key_len,
+                symcrypt_hkdf_context->salt,
+                symcrypt_hkdf_context->salt_len,
+                symcrypt_hkdf_context->info,
+                symcrypt_hkdf_context->info_len,
+                key,
+                *keylen);
+            if (SymError != SYMCRYPT_NO_ERROR)
+            {
+                SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
+                return 0;
+            }
+        }
+        else
+        {
+            SYMCRYPT_LOG_INFO("SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(symcrypt_hkdf_context->md));
+
+            return HKDF(
+                symcrypt_hkdf_context->md,
+                symcrypt_hkdf_context->salt,
+                symcrypt_hkdf_context->salt_len,
+                symcrypt_hkdf_context->key,
+                symcrypt_hkdf_context->key_len,
+                symcrypt_hkdf_context->info,
+                symcrypt_hkdf_context->info_len,
+                key, *keylen) != NULL;
         }
         return 1;
     case EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY:
@@ -266,7 +303,7 @@ int symcrypt_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
         //     symcrypt_hkdf_context->salt_len);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SYMCRYPT_LOG_DEBUG("ERROR: SymCryptHkdfExpandKey failed. SymError = %d ", SymError);
+        //     SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", SymError);
         //     return 0;
         // }
 
@@ -294,7 +331,7 @@ int symcrypt_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
         //                     *keylen);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SYMCRYPT_LOG_DEBUG("ERROR: SymCryptHkdfExpandKey failed. SymError = %d ", SymError);
+        //     SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", SymError);
         //     return 0;
         // }
         // return 1;

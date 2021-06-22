@@ -10,18 +10,7 @@
 extern "C" {
 #endif
 
-typedef struct _SYMCRYPT_RSA_KEY_CONTEXT {
-    int initialized;
-    unsigned char* data;
-    PSYMCRYPT_RSAKEY key;
-} SYMCRYPT_RSA_KEY_CONTEXT;
-
-int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
-void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx);
 int rsa_symcrypt_idx = -1;
-
-#define SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL     1
-#define SYMCRYPT_RSA_METHOD_PRIVATE_KEY_CALL    2
 
 typedef int (*PFN_RSA_meth_pub_enc)(int flen, const unsigned char* from,
                          unsigned char* to, RSA* rsa,
@@ -30,22 +19,42 @@ typedef int (*PFN_RSA_meth_pub_enc)(int flen, const unsigned char* from,
 typedef int (*PFN_RSA_meth_priv_enc)(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding);
 
-int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx, int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa, int padding)
+typedef int (*PFN_RSA_meth_pub_dec)(int flen, const unsigned char* from,
+                         unsigned char* to, RSA* rsa,
+                         int padding);
+
+typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
+                        unsigned char *to, RSA *rsa, int padding);
+
+int symcrypt_rsa_pub_enc(int flen, const unsigned char* from,
+    unsigned char* to, RSA* rsa,
+    int padding)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    int ret = 0;
     BN_ULONG cbModuls = 0;
     BN_ULONG cbResult = 0;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
-    PFN_RSA_meth_priv_enc pfn_rsa_meth_priv_enc = NULL;
+    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
+
+    if( keyCtx == NULL )
+    {
+        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
+        goto err;
+    }
+    if( keyCtx->initialized == 0 )
+    {
+        if( symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        {
+            goto err;
+        }
+    }
 
     cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
     SYMCRYPT_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld", from, flen, cbModuls);
 
-    switch (padding)
+    switch( padding )
     {
     case RSA_PKCS1_PADDING:
         SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Encrypt");
@@ -59,9 +68,9 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
                        cbModuls,
                        &cbResult);
         SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_ERROR("SymCryptRsaPkcs1Encrypt failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Encrypt failed", SymError);
             goto err;
         }
         break;
@@ -80,160 +89,125 @@ int symcrypt_rsa_encrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
                        cbModuls,
                        &cbResult);
         SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_ERROR("SymCryptRsaOaepEncrypt failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaOaepEncrypt failed", SymError);
             goto err;
         }
         break;
-    case RSA_SSLV23_PADDING:
-        SYMCRYPT_LOG_INFO("RSA_SSLV23_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
-        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
-        {
-            pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
-        }
-        else
-        {
-            pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
-        }
-        break;
-    case RSA_X931_PADDING:
-        SYMCRYPT_LOG_INFO("RSA_X931_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
-        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
-        {
-            pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
-        }
-        else
-        {
-            pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
-        }
-        break;
     case RSA_NO_PADDING:
-        SYMCRYPT_LOG_INFO("RSA_NO_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
-        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
-        {
-            pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
-        }
-        else
-        {
-            pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_enc)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
-        }
-        // SYMCRYPT_LOG_DEBUG("SymCryptRsaRawEncrypt");
-        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawEncrypt Input", from, flen > cbModuls ? cbModuls : flen);
-        // SymError = SymCryptRsaRawEncrypt(
-        //                keyCtx->key,
-        //                from,
-        //                flen > cbModuls ? cbModuls : flen,
-        //                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        //                0,
-        //                to,
-        //                cbModuls);
-        // cbResult = cbModuls;
-        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawEncrypt Output", to, cbModuls);
-        // SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        // if (SymError != SYMCRYPT_NO_ERROR)
-        // {
-        //     SYMCRYPT_LOG_ERROR("SymCryptRsaRawEncrypt failed. SymError = %ld", SymError);
-        //     goto err;
-        // }
-        break;
-    default:
-        SYMCRYPT_LOG_ERROR("Unknown Padding: %d", padding);
-        goto err;
-    }
-
-CommonReturn:
-    return cbResult;
-err:
-    goto CommonReturn;
-}
-
-typedef int (*PFN_RSA_meth_pub_dec)(int flen, const unsigned char* from,
-                         unsigned char* to, RSA* rsa,
-                         int padding);
-
-typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
-                        unsigned char *to, RSA *rsa, int padding);
-
-int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx,
-        int flen, const unsigned char* from,
-        unsigned char* to, RSA* rsa, int padding)
-{
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    BN_ULONG cbModuls = 0;
-    BN_ULONG cbResult = 0;
-    const RSA_METHOD *ossl_rsa_meth = NULL;
-    PFN_RSA_meth_pub_dec pfn_rsa_meth_pub_dec = NULL;
-    PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
-
-    SYMCRYPT_LOG_DEBUG("SymCryptRsakeySizeofModulus");
-    cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
-    cbResult = cbModuls;
-
-    SYMCRYPT_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld, to: %X", from, flen, cbModuls, to);
-
-    if (from == NULL)
-    {
-        goto err;
-    }
-
-    switch (padding)
-    {
-    case RSA_PKCS1_PADDING:
-        SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Decrypt");
-        SymError = SymCryptRsaPkcs1Decrypt(
+        SYMCRYPT_LOG_DEBUG("SymCryptRsaRawEncrypt");
+        SymError = SymCryptRsaRawEncrypt(
                        keyCtx->key,
                        from,
                        flen > cbModuls ? cbModuls : flen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
+                       cbModuls);
+        cbResult = cbModuls;
+        SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaRawEncrypt failed", SymError);
+            goto err;
+        }
+        break;
+    case RSA_SSLV23_PADDING:
+        SYMCRYPT_LOG_INFO("RSA_SSLV23_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
+        if( !pfn_rsa_meth_pub_enc )
+        {
+            SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
+            return -1;
+        }
+        cbResult = pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
+        break;
+    case RSA_X931_PADDING:
+        SYMCRYPT_LOG_INFO("RSA_X931_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
+        if( !pfn_rsa_meth_pub_enc )
+        {
+            SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
+            goto err;
+        }
+        cbResult = pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
+        break;
+    default:
+        SYMCRYPT_LOG_INFO("Unknown Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
+        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
+        if( !pfn_rsa_meth_pub_enc )
+        {
+            SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_enc failed");
+            goto err;
+        }
+        cbResult = pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
+        break;
+    }
+
+CommonReturn:
+    return cbResult;
+err:
+    cbResult = -1;
+    goto CommonReturn;
+}
+
+int symcrypt_rsa_priv_dec(int flen, const unsigned char* from,
+    unsigned char* to, RSA* rsa, int padding)
+{
+    SYMCRYPT_LOG_DEBUG(NULL);
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    BN_ULONG cbModuls = 0;
+    BN_ULONG cbResult = 0;
+    const RSA_METHOD *ossl_rsa_meth = NULL;
+    PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
+    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
+
+    if( keyCtx == NULL )
+    {
+        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
+        goto err;
+    }
+    if( keyCtx->initialized == 0 )
+    {
+        if( symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        {
+            goto err;
+        }
+    }
+
+    SYMCRYPT_LOG_DEBUG("SymCryptRsakeySizeofModulus");
+    cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbResult = cbModuls;
+
+    SYMCRYPT_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld, to: %X", from, flen, cbModuls, to);
+    SYMCRYPT_LOG_DEBUG("SymCryptRsakeyHasPrivateKey %d", SymCryptRsakeyHasPrivateKey(keyCtx->key));
+
+    if( from == NULL )
+    {
+        goto err;
+    }
+
+    switch( padding )
+    {
+    case RSA_PKCS1_PADDING:
+        SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Decrypt");
+        SymError = SymCryptRsaPkcs1Decrypt(
+                       keyCtx->key,
+                       from,
+                       flen,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       0,
+                       to,
                        flen > cbModuls ? cbModuls : flen,
                        &cbResult);
         SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_ERROR("SymCryptRsaPkcs1Decrypt failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Decrypt failed", SymError);
             goto err;
         }
         break;
@@ -252,111 +226,68 @@ int symcrypt_rsa_decrypt(int rsa_method_context, SYMCRYPT_RSA_KEY_CONTEXT *keyCt
                        flen > cbModuls ? cbModuls : flen,
                        &cbResult);
         SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_ERROR("SymCryptRsaOaepDecrypt failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaOaepDecrypt failed", SymError);
+            goto err;
+        }
+        break;
+    case RSA_NO_PADDING:
+        SYMCRYPT_LOG_DEBUG("SymCryptRsaRawDecrypt");
+        SymError = SymCryptRsaRawDecrypt(
+                       keyCtx->key,
+                       from,
+                       flen > cbModuls ? cbModuls : flen,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       0,
+                       to,
+                       cbModuls);
+        cbResult = cbModuls;
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsaRawDecrypt failed", SymError);
             goto err;
         }
         break;
     case RSA_SSLV23_PADDING:
         SYMCRYPT_LOG_INFO("RSA_SSLV23_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
+        pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
+        if( !pfn_rsa_meth_priv_dec )
         {
-            pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
+            SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
+            goto err;
         }
-        else
-        {
-            pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
-        }
+        cbResult = pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
         break;
     case RSA_X931_PADDING:
-        SYMCRYPT_LOG_INFO("RSA_SSLV23_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+        SYMCRYPT_LOG_INFO("RSA_X931_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
+        pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
+        if( !pfn_rsa_meth_priv_dec )
         {
-            pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
+            SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
+            goto err;
         }
-        else
-        {
-            pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
-        }
-        goto err;
-        break;
-    case RSA_NO_PADDING:
-        SYMCRYPT_LOG_INFO("RSA_NO_PADDING equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
-        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        if (rsa_method_context == SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL)
-        {
-            pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_pub_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_set_pub_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
-        }
-        else
-        {
-            pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-            if (!pfn_rsa_meth_priv_dec)
-            {
-                SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
-                return -1;
-            }
-            return pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
-        }
-        // SYMCRYPT_LOG_DEBUG("SymCryptRsaRawDecrypt");
-        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawDecrypt Input", from, flen > cbModuls ? cbModuls : flen);
-        // SymError = SymCryptRsaRawDecrypt(
-        //                keyCtx->key,
-        //                from,
-        //                flen > cbModuls ? cbModuls : flen,
-        //                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        //                0,
-        //                to,
-        //                cbModuls);
-        // cbResult = cbModuls;
-        // SYMCRYPT_LOG_BYTES_DEBUG("SymCryptRsaRawDecrypt Output", to, flen > cbModuls ? cbModuls : flen);
-        // SYMCRYPT_LOG_DEBUG("cbResult: %ld", cbResult);
-        // if (SymError != SYMCRYPT_NO_ERROR)
-        // {
-        //     SYMCRYPT_LOG_ERROR("SymCryptRsaRawDecrypt failed. SymError = %ld", SymError);
-        //     goto err;
-        // }
+        cbResult = pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
         break;
     default:
-        SYMCRYPT_LOG_ERROR("Unknown Padding: %d", padding);
-        goto err;
+        SYMCRYPT_LOG_INFO("Unknown Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
+        ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
+        if( !pfn_rsa_meth_priv_dec )
+        {
+            SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_dec failed");
+            goto err;
+        }
+        cbResult = pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
+        break;
     }
 
 CommonReturn:
     return cbResult;
 err:
+    cbResult = -1;
     goto CommonReturn;
 }
 
@@ -364,108 +295,35 @@ int symcrypt_rsa_priv_enc(int flen, const unsigned char* from,
     unsigned char* to, RSA* rsa, int padding)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
-    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL)
-    {
-        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
-        goto err;
-    }
-    if (keyCtx->initialized == 0)
-    {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
-        {
-            goto err;
-        }
-    }
-    ret = symcrypt_rsa_encrypt(SYMCRYPT_RSA_METHOD_PRIVATE_KEY_CALL, keyCtx, flen, from, to, rsa, padding);
+    SYMCRYPT_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+    const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
+    PFN_RSA_meth_priv_enc pfn_rsa_meth_priv_enc = NULL;
 
-CommonReturn:
-    return ret;
-err:
-    goto CommonReturn;
+    pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
+    if( !pfn_rsa_meth_priv_enc )
+    {
+        SYMCRYPT_LOG_ERROR("RSA_meth_get_priv_enc failed");
+        return -1;
+    }
+    return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
 }
-
-int symcrypt_rsa_priv_dec(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa, int padding)
-{
-    SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
-    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL)
-    {
-        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
-        goto err;
-    }
-    if (keyCtx->initialized == 0)
-    {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
-        {
-            goto err;
-        }
-    }
-    ret = symcrypt_rsa_decrypt(SYMCRYPT_RSA_METHOD_PRIVATE_KEY_CALL, keyCtx, flen, from, to, rsa, padding);
-
-CommonReturn:
-    return ret;
-err:
-    goto CommonReturn;
-}
-
-int symcrypt_rsa_pub_enc(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa,
-    int padding)
-{
-    SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
-    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL)
-    {
-        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
-        goto err;
-    }
-    if (keyCtx->initialized == 0)
-    {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
-        {
-            goto err;
-        }
-    }
-    ret = symcrypt_rsa_encrypt(SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL, keyCtx, flen, from, to, rsa, padding);
-
-CommonReturn:
-    return ret;
-err:
-    goto CommonReturn;
-}
-
 
 int symcrypt_rsa_pub_dec(int flen, const unsigned char* from,
     unsigned char* to, RSA* rsa,
     int padding)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
-    SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
-    if(keyCtx == NULL)
-    {
-        SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
-        goto err;
-    }
-    if (keyCtx->initialized == 0)
-    {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
-        {
-            goto err;
-        }
-    }
-    ret = symcrypt_rsa_decrypt(SYMCRYPT_RSA_METHOD_PUBLIC_KEY_CALL, keyCtx, flen, from, to, rsa, padding);
+    SYMCRYPT_LOG_INFO("RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+    const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
+    PFN_RSA_meth_pub_dec pfn_rsa_meth_pub_dec = NULL;
 
-CommonReturn:
-    return ret;
-err:
-    goto CommonReturn;
-
+    pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
+    if( !pfn_rsa_meth_pub_dec )
+    {
+        SYMCRYPT_LOG_ERROR("RSA_meth_get_pub_dec failed");
+        return -1;
+    }
+    return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
 }
 
 int symcrypt_rsa_sign(int type, const unsigned char* m,
@@ -479,14 +337,14 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
 
-    if(keyCtx == NULL)
+    if( keyCtx == NULL )
     {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0)
+    if( keyCtx->initialized == 0 )
     {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        if( symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto err;
         }
@@ -495,20 +353,53 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
     cbModuls = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModuls;
     SYMCRYPT_LOG_DEBUG("m_length= %d", m_length);
-    if (siglen != NULL)
+    if( siglen != NULL )
     {
         *siglen = cbResult;
     }
-    if(sigret == NULL)
+    if( sigret == NULL )
     {
         SYMCRYPT_LOG_DEBUG("sigret NOT present");
-        goto err;
+        goto CommonReturn; // Not error - this can be called with NULL parameter for siglen
     }
 
-    switch (type)
+    switch( type )
     {
+    case NID_md5_sha1:
+        SYMCRYPT_LOG_DEBUG("NID_md5_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != 36 )
+        {
+            SYMCRYPT_LOG_ERROR("m_length == %d", m_length);
+            goto err;
+        }
+
+        SymError = SymCryptRsaPkcs1Sign(
+                       keyCtx->key,
+                       m,
+                       m_length > cbModuls ? cbModuls : m_length,
+                       NULL,
+                       0,
+                       SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       sigret,
+                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       &cbResult);
+
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            goto err;
+        }
+        break;
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -521,14 +412,20 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
                        siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
                        &cbResult);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Sign failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
             goto err;
         }
         break;
     case NID_sha1:
         SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -541,14 +438,19 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
                        siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
                        &cbResult);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Sign failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
             goto err;
         }
         break;
     case NID_sha256:
         SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( m_length != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -561,15 +463,20 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
                        siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
                        &cbResult);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Sign failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
             goto err;
         }
 
         break;
     case NID_sha384:
         SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( m_length != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -582,14 +489,19 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
                        siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
                        &cbResult);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Sign failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
             goto err;
         }
         break;
     case NID_sha512:
         SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( m_length != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
@@ -602,14 +514,26 @@ int symcrypt_rsa_sign(int type, const unsigned char* m,
                        siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
                        &cbResult);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1Sign failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
             goto err;
         }
         break;
     default:
-        SYMCRYPT_LOG_DEBUG("Unknown type, %d", type);
+        SYMCRYPT_LOG_ERROR("Unknown type: %d. Size: %d.", type, m_length);
+
+        // It seems the default implementation from OpenSSL does not set up the sign method so
+        // we cannot just call RSA_meth_get_sign as in en/decrypt cases.
+        // SYMCRYPT_LOG_INFO("Unknown type: %d. Forwarding to OpenSSL. Size: %d.", type, m_length);
+        // ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        // pfn_rsa_meth_sign = RSA_meth_get_sign(ossl_rsa_meth);
+        // if( !pfn_rsa_meth_sign )
+        // {
+        //     SYMCRYPT_LOG_ERROR("RSA_meth_get_sign failed");
+        //     goto err;
+        // }
+        // return pfn_rsa_meth_sign(type, m, m_length, sigret, siglen, rsa);
         goto err;
     }
 
@@ -630,15 +554,17 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_symcrypt_idx);
+    // const RSA_METHOD *ossl_rsa_meth = NULL;
+    // PFN_RSA_meth_verify pfn_rsa_meth_verify = NULL;
 
-    if(keyCtx == NULL)
+    if( keyCtx == NULL )
     {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized == 0)
+    if( keyCtx->initialized == 0 )
     {
-        if (symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0)
+        if( symcrypt_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto err;
         }
@@ -646,10 +572,42 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
 
     cbModuls = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModuls;
-    switch (dtype)
+    switch( dtype )
     {
+    case NID_md5_sha1:
+        SYMCRYPT_LOG_DEBUG("NID_md5_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != 36 )
+        {
+            SYMCRYPT_LOG_ERROR("m_length == %d", m_length);
+            goto err;
+        }
+
+        SymError = SymCryptRsaPkcs1Verify(
+                       keyCtx->key,
+                       m,
+                       m_length > cbModuls ? cbModuls : m_length,
+                       sigbuf,
+                       siglen,
+                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                       NULL,
+                       0,
+                       0);
+
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            goto err;
+        }
+        break;
     case NID_md5:
         SYMCRYPT_LOG_DEBUG("NID_md5");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != 16 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -661,14 +619,20 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
                        SYMCRYPT_MD5_OID_COUNT,
                        0);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1verify failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
             goto err;
         }
         break;
     case NID_sha1:
         SYMCRYPT_LOG_DEBUG("NID_sha1");
+        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != 20 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -680,14 +644,19 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
                        SYMCRYPT_SHA1_OID_COUNT,
                        0);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1verify failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
             goto err;
         }
         break;
     case NID_sha256:
         SYMCRYPT_LOG_DEBUG("NID_sha256");
+        if( m_length != 32 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -698,14 +667,19 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
                        SymCryptSha256OidList,
                        SYMCRYPT_SHA256_OID_COUNT,
                        0);
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1verify failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
             goto err;
         }
         break;
     case NID_sha384:
         SYMCRYPT_LOG_DEBUG("NID_sha384");
+        if( m_length != 48 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -717,14 +691,19 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
                        SYMCRYPT_SHA384_OID_COUNT,
                        0);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1verify failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
             goto err;
         }
         break;
     case NID_sha512:
         SYMCRYPT_LOG_DEBUG("NID_sha512");
+        if( m_length != 64 )
+        {
+            goto err;
+        }
+
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
@@ -736,14 +715,26 @@ int symcrypt_rsa_verify(int dtype, const unsigned char* m,
                        SYMCRYPT_SHA512_OID_COUNT,
                        0);
 
-        if (SymError != SYMCRYPT_NO_ERROR)
+        if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SYMCRYPT_LOG_DEBUG("SymCryptRsaPkcs1verify failed. SymError = %ld", SymError);
+            SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
             goto err;
         }
         break;
     default:
-        SYMCRYPT_LOG_DEBUG("Unknown type, %d", dtype);
+        SYMCRYPT_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, m_length);
+
+        // It seems the default implementation from OpenSSL does not set up the verify method so
+        // we cannot just call RSA_meth_get_verify as in en/decrypt cases.
+        // SYMCRYPT_LOG_INFO("Unknown dtype: %d. Forwarding to OpenSSL. Size: %d.", dtype, m_length);
+        // ossl_rsa_meth = RSA_PKCS1_OpenSSL();
+        // pfn_rsa_meth_verify = RSA_meth_get_verify(ossl_rsa_meth);
+        // if( !pfn_rsa_meth_verify )
+        // {
+        //     SYMCRYPT_LOG_ERROR("RSA_meth_get_verify failed");
+        //     goto err;
+        // }
+        // return pfn_rsa_meth_verify(dtype, m, m_length, sigbuf, siglen, rsa);
         goto err;
     }
 
@@ -794,12 +785,12 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     BIGNUM *rsa_dmq1 = NULL;
     BIGNUM *rsa_iqmp = NULL;
 
-    if(keyCtx == NULL)
+    if( keyCtx == NULL )
     {
         SYMCRYPT_LOG_ERROR("SymCrypt Context Not Found.");
         goto err;
     }
-    if (keyCtx->initialized != 0)
+    if( keyCtx->initialized != 0 )
     {
         symcrypt_rsa_free_key_context(keyCtx);
     }
@@ -809,7 +800,7 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     SymcryptRsaParam.nPrimes = 2;               // Number of primes
     SymcryptRsaParam.nPubExp = 1;               // Number of public exponents
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-    if (keyCtx->key == NULL)
+    if( keyCtx->key == NULL )
     {
         SYMCRYPT_LOG_DEBUG("SymCryptRsakeyAllocate failed");
         goto err;
@@ -817,9 +808,9 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     SYMCRYPT_LOG_DEBUG("SymCryptRsakeyAllocate completed");
     pubExp64 = BN_get_word(e);
     SymError = SymCryptRsakeyGenerate(keyCtx->key, pPubExp64, 1, 0);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_ERROR("SymCryptRsakeyAllocate failed. SymError = %d ", SymError);
+        SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsakeyAllocate failed", SymError);
         goto err;
     }
     SYMCRYPT_LOG_DEBUG("SymCryptRsakeyGenerate completed");
@@ -847,8 +838,9 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
+    keyCtx->cbData = cbAllocSize;
     keyCtx->data = OPENSSL_zalloc(cbAllocSize);
-    if (keyCtx->data == NULL)
+    if( keyCtx->data == NULL )
     {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
@@ -895,16 +887,16 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
                    nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_ERROR("SymCryptRsakeyGetValue failed. SymError = %ld", SymError);
+        SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsakeyGetValue failed", SymError);
         goto err;
     }
 
     SymError = SymCryptStoreMsbFirstUint64(pubExp64, pbPublicExp, cbPublicExp);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_ERROR("SymCryptStoreMsbFirstUint64 failed. SymError = %ld", SymError);
+        SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptStoreMsbFirstUint64 failed", SymError);
         goto err;
     }
 
@@ -919,14 +911,14 @@ int symcrypt_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
                     cbPrivateExponent,
                     SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                     0);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_ERROR("SymCryptRsakeyGetCrtValue failed. SymError = %ld", SymError);
+        SYMCRYPT_LOG_SYMERROR_ERROR("SymCryptRsakeyGetCrtValue failed", SymError);
         goto err;
     }
 
     // Set these values
-    if (((rsa_n = BN_new()) == NULL) ||
+    if( ((rsa_n = BN_new()) == NULL ) ||
         ((rsa_e = BN_new()) == NULL) ||
         ((rsa_p = BN_secure_new()) == NULL) ||
         ((rsa_q = BN_secure_new()) == NULL) ||
@@ -1028,7 +1020,7 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
-    if (RSA_get_version(rsa) != RSA_ASN1_VERSION_DEFAULT)
+    if( RSA_get_version(rsa) != RSA_ASN1_VERSION_DEFAULT )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
         SYMCRYPT_LOG_ERROR("Unsupported RSA version");
@@ -1039,7 +1031,7 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     RSA_get0_factors(rsa, &rsa_p, &rsa_q);
     RSA_get0_crt_params(rsa, &rsa_dmp1, &rsa_dmq1, &rsa_iqmp);
 
-    if (rsa_n == NULL || rsa_e == NULL)
+    if( rsa_n == NULL || rsa_e == NULL )
     {
         SYMCRYPT_LOG_ERROR("Not enough Parameters");
         goto err;
@@ -1051,46 +1043,47 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     cbModulus = BN_num_bytes(rsa_n);
     cbAllocSize += cbModulus;
     // Prime1 - May not be present
-    if (rsa_p)
+    if( rsa_p )
     {
         pcbPrimes[0] = BN_num_bytes(rsa_p);
         cbAllocSize += pcbPrimes[0];
         nPrimes++;
     }
     // Prime2 - May not be present
-    if (rsa_q)
+    if( rsa_q )
     {
         pcbPrimes[1] = BN_num_bytes(rsa_q);
         cbAllocSize += pcbPrimes[1];
         nPrimes++;
     }
     // Exponent1 - May not be present
-    if (rsa_dmp1)
+    if( rsa_dmp1 )
     {
         pcbCrtExponents[0] = BN_num_bytes(rsa_dmp1);
         cbAllocSize += pcbCrtExponents[0];
     }
     // Exponent2 - May not be present
-    if (rsa_dmq1)
+    if( rsa_dmq1 )
     {
         pcbCrtExponents[1] = BN_num_bytes(rsa_dmq1);
         cbAllocSize += pcbCrtExponents[1];
     }
     // Coefficient - May not be present
-    if (rsa_iqmp)
+    if( rsa_iqmp )
     {
         cbCrtCoefficient = BN_num_bytes(rsa_iqmp);
         cbAllocSize += cbCrtCoefficient;
     }
     // PrivateExponent - May not be present
-    if (rsa_d)
+    if( rsa_d )
     {
         cbPrivateExponent = BN_num_bytes(rsa_d);
         cbAllocSize += cbPrivateExponent;
     }
 
+    keyCtx->cbData = cbAllocSize;
     keyCtx->data = OPENSSL_zalloc(cbAllocSize);
-    if (keyCtx->data == NULL)
+    if( keyCtx->data == NULL )
     {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
         goto err;
@@ -1106,37 +1099,37 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     pbCurrent += cbModulus;
     BN_bn2bin(rsa_n, pbModulus);
 
-    if (rsa_p)
+    if( rsa_p )
     {
         ppbPrimes[0] = pbCurrent;
         pbCurrent += pcbPrimes[0];
         BN_bn2bin(rsa_p, ppbPrimes[0]);
     }
-    if (rsa_q)
+    if( rsa_q )
     {
         ppbPrimes[1] = pbCurrent;
         pbCurrent += pcbPrimes[1];
         BN_bn2bin(rsa_q, ppbPrimes[1]);
     }
-    if (rsa_dmp1)
+    if( rsa_dmp1 )
     {
         ppbCrtExponents[0] = pbCurrent;
         pbCurrent += pcbCrtExponents[0];
         BN_bn2bin(rsa_dmp1, ppbCrtExponents[0]);
     }
-    if (rsa_dmq1)
+    if( rsa_dmq1 )
     {
         ppbCrtExponents[1] = pbCurrent;
         pbCurrent += pcbCrtExponents[1];
         BN_bn2bin(rsa_dmq1, ppbCrtExponents[1]);
     }
-    if (rsa_iqmp)
+    if( rsa_iqmp )
     {
         pbCrtCoefficient = pbCurrent;
         pbCurrent += cbCrtCoefficient;
         BN_bn2bin(rsa_iqmp, pbCrtCoefficient);
     }
-    if (rsa_d)
+    if( rsa_d )
     {
         pbPrivateExponent = pbCurrent;
         pbCurrent += cbPrivateExponent;
@@ -1152,12 +1145,19 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     SYMCRYPT_LOG_BYTES_DEBUG("SymCrypt pbCrtCoefficient", pbCrtCoefficient, cbCrtCoefficient);
     SYMCRYPT_LOG_BYTES_DEBUG("SymCrypt pbPrivateExponent", pbPrivateExponent, cbPrivateExponent);
 
+    if( nPrimes != 0 && nPrimes != 2 )
+    {
+        // Currently only support normal two-prime RSA with SymCrypt Engine
+        SYMCRYPT_LOG_ERROR("Unsupported RSA version");
+        goto err;
+    }
+
     SymcryptRsaParam.version = 1;
     SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-    SymcryptRsaParam.nPrimes = 2;
+    SymcryptRsaParam.nPrimes = nPrimes;
     SymcryptRsaParam.nPubExp = 1;
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-    if (keyCtx->key == NULL)
+    if( keyCtx->key == NULL )
     {
         SYMCRYPT_LOG_ERROR("SymCryptRsakeyAllocate failed");
         goto err;
@@ -1165,9 +1165,9 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
     SYMCRYPT_LOG_DEBUG("SymCryptRsakeyAllocate completed");
 
     SymError = SymCryptLoadMsbFirstUint64(pbPublicExp, cbPublicExp, &pubExp64);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_DEBUG("SymCryptLoadMsbFirstUint64 failed. SymError = %ld", SymError);
+        SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptLoadMsbFirstUint64 failed", SymError);
         goto err;
     }
 
@@ -1182,11 +1182,13 @@ int symcrypt_initialize_rsa_key(RSA* rsa, SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0,
                    keyCtx->key);
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SYMCRYPT_LOG_DEBUG("SymCryptRsakeySetValue failed. SymError = %ld", SymError);
+        SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptRsakeySetValue failed", SymError);
         goto err;
     }
+
+    SYMCRYPT_LOG_DEBUG("SymCryptRsakeyHasPrivateKey %d", SymCryptRsakeyHasPrivateKey(keyCtx->key));
 
     keyCtx->initialized = 1;
 
@@ -1196,48 +1198,39 @@ CommonReturn:
     return ret;
 
 err:
-    SYMCRYPT_LOG_DEBUG("symcrypt_initialize_rsa_key failed.");
+    SYMCRYPT_LOG_ERROR("symcrypt_initialize_rsa_key failed.");
     symcrypt_rsa_free_key_context(keyCtx);
     ret = 0;
     goto CommonReturn;
 }
 
-typedef int (*PFN_RSA_meth_mod_exp) (BIGNUM* r0, const BIGNUM* i, RSA* rsa,
-    BN_CTX* ctx);
+typedef int (*PFN_RSA_meth_mod_exp) (BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx);
 
-int symcrypt_rsa_mod_exp(BIGNUM* r0, const BIGNUM* i, RSA* rsa,
-    BN_CTX* ctx)
+int symcrypt_rsa_mod_exp(BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_mod_exp pfn_rsa_meth_mod_exp = RSA_meth_get_mod_exp(ossl_rsa_meth);
 
-    if (!pfn_rsa_meth_mod_exp)
+    if( !pfn_rsa_meth_mod_exp )
     {
         return 0;
     }
     return pfn_rsa_meth_mod_exp(r0, i, rsa, ctx);
 }
 
-typedef int (*PFN_RSA_meth_bn_mod_exp) (BIGNUM* r,
-    const BIGNUM* a,
-    const BIGNUM* p,
-    const BIGNUM* m,
-    BN_CTX* ctx,
-    BN_MONT_CTX* m_ctx);
+typedef int (*PFN_RSA_meth_bn_mod_exp) (
+        BIGNUM* r, const BIGNUM* a, const BIGNUM* p, const BIGNUM* m, BN_CTX* ctx, BN_MONT_CTX* m_ctx);
 
-int symcrypt_rsa_bn_mod_exp(BIGNUM* r,
-    const BIGNUM* a,
-    const BIGNUM* p,
-    const BIGNUM* m,
-    BN_CTX* ctx,
-    BN_MONT_CTX* m_ctx)
+int symcrypt_rsa_bn_mod_exp(
+        BIGNUM* r, const BIGNUM* a, const BIGNUM* p, const BIGNUM* m, BN_CTX* ctx, BN_MONT_CTX* m_ctx)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_bn_mod_exp pfn_rsa_meth_bn_mod_exp = RSA_meth_get_bn_mod_exp(ossl_rsa_meth);
-    if (!pfn_rsa_meth_bn_mod_exp)
+    if( !pfn_rsa_meth_bn_mod_exp )
     {
+        SYMCRYPT_LOG_ERROR("RSA_meth_get_bn_mod_exp failed");
         return 0;
     }
     return pfn_rsa_meth_bn_mod_exp(r, a, p, m, ctx, m_ctx);
@@ -1246,33 +1239,30 @@ int symcrypt_rsa_bn_mod_exp(BIGNUM* r,
 int symcrypt_rsa_init(RSA *rsa)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    int ret = 0;
     SYMCRYPT_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
-    if (!keyCtx)
+    if( !keyCtx )
     {
         SYMCRYPT_LOG_ERROR("OPENSSL_zalloc failed");
-        goto err;
+        return 0;
     }
-    RSA_set_ex_data(rsa, rsa_symcrypt_idx, keyCtx);
 
-    ret = 1;
+    if( RSA_set_ex_data(rsa, rsa_symcrypt_idx, keyCtx) == 0 )
+    {
+        SYMCRYPT_LOG_ERROR("RSA_set_ex_data failed");
+        return 0;
+    }
 
-CommonReturn:
-    return ret;
-
-err:
-    ret = 0;
-    goto CommonReturn;
+    return 1;
 }
 
 void symcrypt_rsa_free_key_context(SYMCRYPT_RSA_KEY_CONTEXT *keyCtx)
 {
     SYMCRYPT_LOG_DEBUG(NULL);
-    if (keyCtx->data)
+    if( keyCtx->data )
     {
-        OPENSSL_free(keyCtx->data);
+        OPENSSL_clear_free(keyCtx->data, keyCtx->cbData);
     }
-    if (keyCtx->key)
+    if( keyCtx->key )
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
