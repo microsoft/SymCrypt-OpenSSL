@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(symcrypt_engine_dynamic)
+project(sc_ossl_engine_dynamic)
 
 set(DEFAULT_BUILD_TYPE "Release")
 
@@ -16,37 +16,35 @@ add_compile_options(-D_AMD64_)
 add_compile_options(-DDBG)
 add_compile_options(-O3)
 
-add_library(e_symcrypt SHARED
-    ../src/e_symcrypt.c
-    ../src/e_symcrypt_ciphers.c
-    ../src/e_symcrypt_dh.c
-    ../src/e_symcrypt_digests.c
-    ../src/e_symcrypt_dsa.c
-    ../src/e_symcrypt_ecc.c
-    ../src/e_symcrypt_pkey_meths.c
-    ../src/e_symcrypt_rand.c
-    ../src/e_symcrypt_rsa.c
-    ../src/e_symcrypt_rsapss.c
-    ../src/e_symcrypt_hkdf.c
-    ../src/e_symcrypt_tls1prf.c
-    ../src/e_symcrypt_helpers.c
+add_library(sc_ossl_dynamic SHARED
+    ../src/sc_ossl.c
+    ../src/sc_ossl_ciphers.c
+    ../src/sc_ossl_dh.c
+    ../src/sc_ossl_digests.c
+    ../src/sc_ossl_dsa.c
+    ../src/sc_ossl_ecc.c
+    ../src/sc_ossl_pkey_meths.c
+    ../src/sc_ossl_rand.c
+    ../src/sc_ossl_rsa.c
+    ../src/sc_ossl_rsapss.c
+    ../src/sc_ossl_hkdf.c
+    ../src/sc_ossl_tls1prf.c
+    ../src/sc_ossl_helpers.c
 )
 
-set_target_properties(e_symcrypt PROPERTIES PUBLIC_HEADER ../inc/e_symcrypt.h)
+set_target_properties(sc_ossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/sc_ossl.h)
+# target_link_libraries(sc_ossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})
+target_include_directories(sc_ossl_dynamic PUBLIC ../inc)
+target_include_directories(sc_ossl_dynamic PRIVATE ../src)
+target_include_directories (sc_ossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# target_link_libraries(symcryptengine ${OPENSSL_CRYPTO_LIBRARY})
+# set_target_properties(sc_ossl_dynamic PROPERTIES PREFIX "")
+set_target_properties(sc_ossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
-target_include_directories(e_symcrypt PUBLIC ../inc)
-target_include_directories(e_symcrypt PRIVATE ../src)
-target_include_directories (e_symcrypt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_directories(sc_ossl_dynamic PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(sc_ossl_dynamic PUBLIC symcrypt)
 
-# set_target_properties(e_symcrypt PROPERTIES PREFIX "")
-set_target_properties(e_symcrypt PROPERTIES OUTPUT_NAME "symcryptengine")
-
-target_link_directories(e_symcrypt PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(e_symcrypt PUBLIC symcrypt)
-
-install(TARGETS e_symcrypt
+install(TARGETS sc_ossl_dynamic
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 

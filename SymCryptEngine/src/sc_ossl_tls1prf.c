@@ -2,8 +2,8 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "e_symcrypt.h"
-#include "e_symcrypt_helpers.h"
+#include "sc_ossl.h"
+#include "sc_ossl_helpers.h"
 #include <symcrypt.h>
 #include <openssl/kdf.h>
 
@@ -23,24 +23,24 @@ typedef struct {
     /* Buffer of concatenated seed data */
     unsigned char seed[TLS1_PRF_MAXBUF];
     size_t seed_length;
-} SYMCRYPT_TLS1_PRF_PKEY_CTX;
+} SC_OSSL_TLS1_PRF_PKEY_CTX;
 
-int symcrypt_tls1prf_init(EVP_PKEY_CTX *ctx)
+int sc_ossl_tls1prf_init(EVP_PKEY_CTX *ctx)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_TLS1_PRF_PKEY_CTX *key_context = NULL;
+    SC_OSSL_LOG_DEBUG(NULL);
+    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
-        SYMCRYPT_LOG_ERROR("Memory Allocation Error");
+        SC_OSSL_LOG_ERROR("Memory Allocation Error");
         return 0;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
     return 1;
 }
 
-void symcrypt_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
+void sc_ossl_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_TLS1_PRF_PKEY_CTX *key_context = (SYMCRYPT_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SC_OSSL_LOG_DEBUG(NULL);
+    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     if (key_context == NULL) {
         return;
     }
@@ -50,10 +50,10 @@ void symcrypt_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-int symcrypt_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
+int sc_ossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_TLS1_PRF_PKEY_CTX *key_context = (SYMCRYPT_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SC_OSSL_LOG_DEBUG(NULL);
+    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
     switch (type) {
     case EVP_PKEY_CTRL_TLS_MD:
@@ -81,15 +81,15 @@ int symcrypt_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         key_context->seed_length += p1;
         return 1;
     default:
-        SYMCRYPT_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
+        SC_OSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
         return -2;
     }
 }
 
-int symcrypt_tls1prf_derive_init(EVP_PKEY_CTX *ctx)
+int sc_ossl_tls1prf_derive_init(EVP_PKEY_CTX *ctx)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_TLS1_PRF_PKEY_CTX *key_context = (SYMCRYPT_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SC_OSSL_LOG_DEBUG(NULL);
+    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(key_context->secret, key_context->secret_length);
     OPENSSL_cleanse(key_context->seed, key_context->seed_length);
     memset(key_context, 0, sizeof(*key_context));
@@ -100,7 +100,7 @@ PCSYMCRYPT_MAC
 GetSymCryptMacAlgorithm(
     const EVP_MD *evp_md)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
+    SC_OSSL_LOG_DEBUG(NULL);
     int type = EVP_MD_type(evp_md);
 
     if (type == NID_sha1)
@@ -113,31 +113,31 @@ GetSymCryptMacAlgorithm(
         return SymCryptHmacSha512Algorithm;
     // if (type == NID_AES_CMC)
     //     return SymCryptAesCmacAlgorithm;
-    SYMCRYPT_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SC_OSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
-int symcrypt_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+int sc_ossl_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 {
-    SYMCRYPT_LOG_DEBUG(NULL);
-    SYMCRYPT_TLS1_PRF_PKEY_CTX *key_context = (SYMCRYPT_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_MAC symcrypt_mac_algo = NULL;
+    SC_OSSL_LOG_DEBUG(NULL);
+    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
 
     if (key_context->md == NULL) {
-        SYMCRYPT_LOG_ERROR("Missing Digest");
+        SC_OSSL_LOG_ERROR("Missing Digest");
         return 0;
     }
 
     if (key_context->secret == NULL) {
-        SYMCRYPT_LOG_ERROR("Missing Secret");
+        SC_OSSL_LOG_ERROR("Missing Secret");
         return 0;
     }
 
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
-        SYMCRYPT_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         SymError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,
@@ -150,14 +150,14 @@ int symcrypt_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keyle
     }
     else
     {
-        symcrypt_mac_algo = GetSymCryptMacAlgorithm(key_context->md);
-        if( symcrypt_mac_algo == NULL )
+        sc_ossl_mac_algo = GetSymCryptMacAlgorithm(key_context->md);
+        if( sc_ossl_mac_algo == NULL )
         {
             return 0;
         }
 
         SymError = SymCryptTlsPrf1_2(
-            symcrypt_mac_algo,
+            sc_ossl_mac_algo,
             key_context->secret,
             key_context->secret_length,
             NULL,
@@ -170,7 +170,7 @@ int symcrypt_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keyle
 
     if (SymError != SYMCRYPT_NO_ERROR)
     {
-        SYMCRYPT_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
+        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
         return 0;
     }
     return 1;
