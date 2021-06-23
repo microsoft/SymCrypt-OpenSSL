@@ -50,7 +50,7 @@ int sc_ossl_destroy(ENGINE* e)
 static int engine_set_defaults(ENGINE* e)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    if (   !ENGINE_set_default_digests(e)
+    if(    !ENGINE_set_default_digests(e)
         || !ENGINE_set_default_ciphers(e)
         || !ENGINE_set_default_pkey_meths(e)
         || !ENGINE_set_default_RSA(e)
@@ -73,7 +73,8 @@ static int bind_sc_ossl_engine(ENGINE* e)
     PFN_eckey_set_private eckey_set_private_pfunc = NULL;
     PFN_eckey_set_public eckey_set_public_pfunc = NULL;
 
-    if (!sc_ossl_module_initialized) {
+    if( !sc_ossl_module_initialized )
+    {
         SymCryptModuleInit(SYMCRYPT_CODE_VERSION_API, SYMCRYPT_CODE_VERSION_MINOR, SYMCRYPT_CODE_VERSION_PATCH);
         sc_ossl_module_initialized = 1;
     }
@@ -164,7 +165,7 @@ static int bind_sc_ossl_engine(ENGINE* e)
     // }
 
     // Engine initialization
-    if (!ENGINE_set_id(e, engine_sc_ossl_id)
+    if(    !ENGINE_set_id(e, engine_sc_ossl_id)
         || !ENGINE_set_name(e, engine_sc_ossl_name)
         || !ENGINE_set_destroy_function(e, sc_ossl_destroy)
         || !ENGINE_set_EC(e, sc_ossl_eckey_method)
@@ -181,7 +182,8 @@ static int bind_sc_ossl_engine(ENGINE* e)
     }
 
     // Set Engine as default
-    if (!engine_set_defaults(e)) {
+    if( !engine_set_defaults(e) )
+    {
         return 0;
     }
 
@@ -194,10 +196,14 @@ memerr:
 # ifndef OPENSSL_NO_DYNAMIC_ENGINE
 static int bind_helper(ENGINE *e, const char *id)
 {
-    if (id && (strcmp(id, engine_sc_ossl_id) != 0))
+    if( id && (strcmp(id, engine_sc_ossl_id) != 0) )
+    {
         return 0;
-    if (!bind_sc_ossl_engine(e))
+    }
+    if( !bind_sc_ossl_engine(e) )
+    {
         return 0;
+    }
     return 1;
 }
 
@@ -209,11 +215,11 @@ static ENGINE* engine_sc_ossl(void)
 {
     SC_OSSL_LOG_DEBUG(NULL);
     ENGINE* ret = ENGINE_new();
-    if (ret == NULL)
+    if( ret == NULL )
     {
         return NULL;
     }
-    if (!bind_sc_ossl_engine(ret))
+    if( !bind_sc_ossl_engine(ret) )
     {
         ENGINE_free(ret);
         return NULL;
@@ -221,22 +227,30 @@ static ENGINE* engine_sc_ossl(void)
     return ret;
 }
 
-void engine_load_sc_ossl_int(void)
+int engine_load_sc_ossl_int(void)
 {
     SC_OSSL_LOG_DEBUG(NULL);
+    int retVal = 1;
     ENGINE* symcryptEngine = engine_sc_ossl();
-    if (!symcryptEngine)
-        return;
-    ENGINE_add(symcryptEngine);
+    if( !symcryptEngine )
+    {
+        goto err;
+    }
+    retVal = ENGINE_add(symcryptEngine);
     ENGINE_free(symcryptEngine);
     ERR_clear_error();
+
+end:
+    return retVal;
+err:
+    retVal = 0;
+    goto end;
 }
 
 int SC_OSSL_ENGINE_Initialize()
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    engine_load_sc_ossl_int();
-    return 1;
+    return engine_load_sc_ossl_int();
 }
 
 SYMCRYPT_ERROR
@@ -247,7 +261,7 @@ SymCryptCallbackRandom(
 {
     SYMCRYPT_ERROR status = SYMCRYPT_NO_ERROR;
 
-    if (!RAND_bytes(pbBuffer, cbBuffer))
+    if( !RAND_bytes(pbBuffer, cbBuffer) )
     {
         status = SYMCRYPT_EXTERNAL_FAILURE;
     }
