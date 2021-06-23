@@ -2,34 +2,34 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "e_symcrypt_helpers.h"
+#include "sc_ossl_helpers.h"
 #include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define SYMCRYPT_ENGINE_TRACELOG_PARA_LENGTH        256
+#define SC_OSSL_ENGINE_TRACELOG_PARA_LENGTH        256
 
-#define     SYMCRYPT_LOG_LEVEL_PREFIX_ERROR     "ERROR"
-#define     SYMCRYPT_LOG_LEVEL_PREFIX_INFO      "INFO"
-#define     SYMCRYPT_LOG_LEVEL_PREFIX_DEBUG     "DEBUG"
+#define     SC_OSSL_LOG_LEVEL_PREFIX_ERROR     "ERROR"
+#define     SC_OSSL_LOG_LEVEL_PREFIX_INFO      "INFO"
+#define     SC_OSSL_LOG_LEVEL_PREFIX_DEBUG     "DEBUG"
 
 
-static int _traceLogLevel = SYMCRYPT_LOG_LEVEL_INFO;
+static int _traceLogLevel = SC_OSSL_LOG_LEVEL_INFO;
 static char *_traceLogFilename = NULL;
 
-void SYMCRYPT_ENGINE_set_trace_level(int trace_level)
+void SC_OSSL_ENGINE_set_trace_level(int trace_level)
 {
-    if( trace_level >= SYMCRYPT_LOG_LEVEL_OFF &&
-        trace_level <= SYMCRYPT_LOG_LEVEL_DEBUG )
+    if( trace_level >= SC_OSSL_LOG_LEVEL_OFF &&
+        trace_level <= SC_OSSL_LOG_LEVEL_DEBUG )
     {
         _traceLogLevel = trace_level;
     }
     return;
 }
 
-void SYMCRYPT_ENGINE_set_trace_log_filename(const char *filename)
+void SC_OSSL_ENGINE_set_trace_log_filename(const char *filename)
 {
     if( _traceLogFilename )
     {
@@ -64,12 +64,12 @@ static void _close_trace_log_filename(FILE *fp)
     return;
 }
 
-void _SYMCRYPT_log(
+void _sc_ossl_log(
     int trace_level,
     const char *func,
     const char *format, ...)
 {
-    char paraBuf[SYMCRYPT_ENGINE_TRACELOG_PARA_LENGTH];
+    char paraBuf[SC_OSSL_ENGINE_TRACELOG_PARA_LENGTH];
     FILE *fp = NULL;
     va_list args;
     va_start(args, format);
@@ -82,14 +82,14 @@ void _SYMCRYPT_log(
 
     switch( trace_level )
     {
-        case SYMCRYPT_LOG_LEVEL_ERROR:
-            trace_level_prefix = SYMCRYPT_LOG_LEVEL_PREFIX_ERROR;
+        case SC_OSSL_LOG_LEVEL_ERROR:
+            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_ERROR;
             break;
-        case SYMCRYPT_LOG_LEVEL_INFO:
-            trace_level_prefix = SYMCRYPT_LOG_LEVEL_PREFIX_INFO;
+        case SC_OSSL_LOG_LEVEL_INFO:
+            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_INFO;
             break;
-        case SYMCRYPT_LOG_LEVEL_DEBUG:
-            trace_level_prefix = SYMCRYPT_LOG_LEVEL_PREFIX_DEBUG;
+        case SC_OSSL_LOG_LEVEL_DEBUG:
+            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_DEBUG;
         default:
             break;
     }
@@ -111,7 +111,7 @@ void _SYMCRYPT_log(
     return;
 }
 
-void _SYMCRYPT_log_bytes(
+void _sc_ossl_log_bytes(
     int trace_level,
     const char *func,
     char *description,
@@ -123,14 +123,14 @@ void _SYMCRYPT_log_bytes(
         return;
     }
     FILE *fp = NULL;
-    _SYMCRYPT_log(trace_level, func, description);
+    _sc_ossl_log(trace_level, func, description);
     fp = _open_trace_log_filename();
     BIO_dump_fp(fp, s, len);
     _close_trace_log_filename(fp);
     return;
 }
 
-void _SYMCRYPT_log_bignum(
+void _sc_ossl_log_bignum(
     int trace_level,
     const char *func,
     char *description,
@@ -167,12 +167,12 @@ void _SYMCRYPT_log_bignum(
         return;
     }
 
-    _SYMCRYPT_log_bytes(trace_level, func, description, (const char*) string, length);
+    _sc_ossl_log_bytes(trace_level, func, description, (const char*) string, length);
     OPENSSL_free(string);
     return;
 }
 
-void _SYMCRYPT_log_SYMCRYPT_ERROR(
+void _sc_ossl_log_SYMCRYPT_ERROR(
     int trace_level,
     const char *func,
     char *description,
@@ -181,67 +181,67 @@ void _SYMCRYPT_log_SYMCRYPT_ERROR(
     switch( symError  )
     {
         case SYMCRYPT_NO_ERROR:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_NO_ERROR (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_NO_ERROR (%d)", description, symError);
             break;
         case SYMCRYPT_UNUSED:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_UNUSED (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_UNUSED (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_KEY_SIZE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_KEY_SIZE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_KEY_SIZE (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_BLOCK_SIZE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_BLOCK_SIZE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_BLOCK_SIZE (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_DATA_SIZE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_DATA_SIZE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_DATA_SIZE (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_NONCE_SIZE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_NONCE_SIZE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_NONCE_SIZE (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_TAG_SIZE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_TAG_SIZE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_TAG_SIZE (%d)", description, symError);
             break;
         case SYMCRYPT_WRONG_ITERATION_COUNT:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_WRONG_ITERATION_COUNT (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_ITERATION_COUNT (%d)", description, symError);
             break;
         case SYMCRYPT_AUTHENTICATION_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_AUTHENTICATION_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_AUTHENTICATION_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_EXTERNAL_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_EXTERNAL_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_EXTERNAL_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_FIPS_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_FIPS_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_FIPS_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_HARDWARE_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_HARDWARE_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_HARDWARE_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_NOT_IMPLEMENTED:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_NOT_IMPLEMENTED (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_NOT_IMPLEMENTED (%d)", description, symError);
             break;
         case SYMCRYPT_INVALID_BLOB:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_INVALID_BLOB (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_BLOB (%d)", description, symError);
             break;
         case SYMCRYPT_BUFFER_TOO_SMALL:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_BUFFER_TOO_SMALL (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_BUFFER_TOO_SMALL (%d)", description, symError);
             break;
         case SYMCRYPT_INVALID_ARGUMENT:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_INVALID_ARGUMENT (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_ARGUMENT (%d)", description, symError);
             break;
         case SYMCRYPT_MEMORY_ALLOCATION_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_MEMORY_ALLOCATION_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_MEMORY_ALLOCATION_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE (%d)", description, symError);
             break;
         case SYMCRYPT_INCOMPATIBLE_FORMAT:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_INCOMPATIBLE_FORMAT (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_INCOMPATIBLE_FORMAT (%d)", description, symError);
             break;
         case SYMCRYPT_VALUE_TOO_LARGE:
-            _SYMCRYPT_log(trace_level, func, "%s - SYMCRYPT_VALUE_TOO_LARGE (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - SYMCRYPT_VALUE_TOO_LARGE (%d)", description, symError);
             break;
         default:
-            _SYMCRYPT_log(trace_level, func, "%s - UNKNOWN SYMCRYPT_ERROR (%d)", description, symError);
+            _sc_ossl_log(trace_level, func, "%s - UNKNOWN SYMCRYPT_ERROR (%d)", description, symError);
             break;
     }
 }

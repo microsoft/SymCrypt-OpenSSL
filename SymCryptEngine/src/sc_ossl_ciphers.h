@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "e_symcrypt.h"
+#include "sc_ossl.h"
 #include <symcrypt.h>
 #include <string.h>
 
@@ -11,11 +11,11 @@ extern "C" {
 #endif
 
 
-int symcrypt_ciphers(ENGINE *, const EVP_CIPHER **,
+int sc_ossl_ciphers(ENGINE *, const EVP_CIPHER **,
                             const int **, int);
 
 
-void symcrypt_destroy_ciphers(void);
+void sc_ossl_destroy_ciphers(void);
 
 #ifdef __cplusplus
 }

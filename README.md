@@ -7,9 +7,9 @@ API, the best effort is made to fall-back to the default OpenSSL implementation 
 call completely, as re-routing to OpenSSL's implementation is not always easy, and as with any project we have to prioritize!
 
 The known cases where the Engine will currently fail rather than fallback to the default OpenSSL implementation are:
-a) Use of an AES-GCM IV which is not 12-bytes (192-bits)
-b) Use of unsupported digests in RSA signatures and TLS PRF
-c) Use of multi-prime (more than 2-prime) RSA
+1. Use of an AES-GCM IV which is not 12-bytes (192-bits)
+2. Use of unsupported digests in RSA signatures and TLS PRF
+3. Use of multi-prime (more than 2-prime) RSA
 
 **Important note:** The code in this repository is currently undergoing validation for use in Microsoft-internal products. At this time, it has not been tested for use in other environments and should not be considered production-ready.
 

@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "e_symcrypt.h"
+#include "sc_ossl.h"
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 #include <openssl/md4.h>
@@ -13,10 +13,10 @@
 extern "C" {
 #endif
 
-int symcrypt_digests(ENGINE *e, const EVP_MD **digest,
+int sc_ossl_digests(ENGINE *e, const EVP_MD **digest,
                           const int **nids, int nid);
 
-void symcrypt_destroy_digests(void);
+void sc_ossl_destroy_digests(void);
 
 #ifdef __cplusplus
 }

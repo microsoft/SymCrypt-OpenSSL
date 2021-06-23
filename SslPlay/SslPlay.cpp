@@ -11,7 +11,7 @@
 #include <openssl/ecdsa.h>
 #include <openssl/obj_mac.h>
 #include <openssl/kdf.h>
-#include "e_symcrypt.h"
+#include "sc_ossl.h"
 
 BIO *bio_err = NULL;
 
@@ -36,7 +36,7 @@ void printBytes(char* data, int len, const char* header)
 }
 
 // Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
-#define SYMCRYPT_ECDSA_MAX_DER_SIGNATURE_LEN 139
+#define SC_OSSL_ECDSA_MAX_DER_SIGNATURE_LEN 139
 
 void TestEcdsa(EC_KEY* key)
 {
@@ -46,7 +46,7 @@ void TestEcdsa(EC_KEY* key)
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31,
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31
     };
-    unsigned char resultBytes[SYMCRYPT_ECDSA_MAX_DER_SIGNATURE_LEN] = { 0 };
+    unsigned char resultBytes[SC_OSSL_ECDSA_MAX_DER_SIGNATURE_LEN] = { 0 };
     bool result = true;
     int currentIteration = 0;
     unsigned int signatureBytesCount = sizeof(resultBytes);
@@ -1498,12 +1498,12 @@ end:
 
 int main(int argc, char** argv)
 {
-    int symcrypt_log_level_debug = SYMCRYPT_LOG_LEVEL_ERROR;
+    int sc_ossl_log_level_debug = SC_OSSL_LOG_LEVEL_ERROR;
     if (argc >= 2) {
-         symcrypt_log_level_debug = atoi(argv[1]);
-        SYMCRYPT_ENGINE_set_trace_level(symcrypt_log_level_debug);
+         sc_ossl_log_level_debug = atoi(argv[1]);
+        SC_OSSL_ENGINE_set_trace_level(sc_ossl_log_level_debug);
     }
-    SYMCRYPT_ENGINE_Initialize();
+    SC_OSSL_ENGINE_Initialize();
     bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
 
     TestDigests();

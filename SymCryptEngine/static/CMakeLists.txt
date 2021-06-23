@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(symcrypt_engine)
+project(sc_ossl_engine)
 
 set(DEFAULT_BUILD_TYPE "Release")
 
@@ -31,30 +31,30 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mssse3 -mxsave -maes -mpclmul -msha -mrdrnd
 set(CMAKE_ASM_FLAGS "-x assembler-with-cpp")
 
 
-add_library(symcryptengine STATIC
-    ../src/e_symcrypt.c
-    ../src/e_symcrypt_ciphers.c
-    ../src/e_symcrypt_dh.c
-    ../src/e_symcrypt_digests.c
-    ../src/e_symcrypt_dsa.c
-    ../src/e_symcrypt_ecc.c
-    ../src/e_symcrypt_pkey_meths.c
-    ../src/e_symcrypt_rand.c
-    ../src/e_symcrypt_rsa.c
-    ../src/e_symcrypt_rsapss.c
-    ../src/e_symcrypt_hkdf.c
-    ../src/e_symcrypt_tls1prf.c
-    ../src/e_symcrypt_helpers.c
+add_library(sc_ossl STATIC
+    ../src/sc_ossl.c
+    ../src/sc_ossl_ciphers.c
+    ../src/sc_ossl_dh.c
+    ../src/sc_ossl_digests.c
+    ../src/sc_ossl_dsa.c
+    ../src/sc_ossl_ecc.c
+    ../src/sc_ossl_pkey_meths.c
+    ../src/sc_ossl_rand.c
+    ../src/sc_ossl_rsa.c
+    ../src/sc_ossl_rsapss.c
+    ../src/sc_ossl_hkdf.c
+    ../src/sc_ossl_tls1prf.c
+    ../src/sc_ossl_helpers.c
 )
 
-set_target_properties(symcryptengine PROPERTIES PUBLIC_HEADER ../inc/e_symcrypt.h)
-# target_link_libraries(symcryptengine ${OPENSSL_CRYPTO_LIBRARY})
-target_include_directories(symcryptengine PUBLIC ../inc)
-target_include_directories(symcryptengine PRIVATE ../src)
-target_include_directories (symcryptengine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_target_properties(sc_ossl PROPERTIES PUBLIC_HEADER ../inc/sc_ossl.h)
+# target_link_libraries(sc_ossl ${OPENSSL_CRYPTO_LIBRARY})
+target_include_directories(sc_ossl PUBLIC ../inc)
+target_include_directories(sc_ossl PRIVATE ../src)
+target_include_directories (sc_ossl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 
-install(TARGETS symcryptengine
+install(TARGETS sc_ossl
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
