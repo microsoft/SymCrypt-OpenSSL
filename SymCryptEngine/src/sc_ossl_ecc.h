@@ -16,9 +16,9 @@ typedef int (*PFN_eckey_set_group)(EC_KEY *key, const EC_GROUP *grp);
 typedef int (*PFN_eckey_set_private)(EC_KEY *key, const BIGNUM *priv_key);
 typedef int (*PFN_eckey_set_public)(EC_KEY *key, const EC_POINT *pub_key);
 
-int sc_ossl_eckey_init(EC_KEY *key);
+// int sc_ossl_eckey_init(EC_KEY *key);
 void sc_ossl_eckey_finish(EC_KEY *key);
-// int sc_ossl_eckey_copy(EC_KEY *dest, const EC_KEY *src);
+// int sc_ossl_eckey_copy(EC_KEY *dst, const EC_KEY *src);
 // int sc_ossl_eckey_set_group(EC_KEY *key, const EC_GROUP *grp);
 // int sc_ossl_eckey_set_private(EC_KEY *key, const BIGNUM *priv_key);
 // int sc_ossl_eckey_set_public(EC_KEY *key, const EC_POINT *pub_key);

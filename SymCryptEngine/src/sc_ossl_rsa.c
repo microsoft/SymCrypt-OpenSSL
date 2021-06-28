@@ -1274,8 +1274,15 @@ int sc_ossl_rsa_finish(RSA *rsa)
 {
     SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
-    sc_ossl_rsa_free_key_context(keyCtx);
-    RSA_set_ex_data(rsa, rsa_sc_ossl_idx, NULL);
+    if( keyCtx )
+    {
+        if( keyCtx->initialized == 1 )
+        {
+            sc_ossl_rsa_free_key_context(keyCtx);
+        }
+        OPENSSL_free(keyCtx);
+        RSA_set_ex_data(rsa, rsa_sc_ossl_idx, NULL);
+    }
     return 1;
 }
 

@@ -40,6 +40,8 @@ int sc_ossl_destroy(ENGINE* e)
     sc_ossl_destroy_ecc_curves();
     EC_KEY_METHOD_free(sc_ossl_eckey_method);
     sc_ossl_eckey_method = NULL;
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, rsa_sc_ossl_idx);
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, eckey_sc_ossl_idx);
     // DSA_meth_free(sc_ossl_dsa_method);
     // sc_ossl_dsa_method = NULL;
     // DH_meth_free(sc_ossl_dh_method);
@@ -68,10 +70,6 @@ static int engine_set_defaults(ENGINE* e)
 static int bind_sc_ossl_engine(ENGINE* e)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    PFN_eckey_copy eckey_copy_pfunc = NULL;
-    PFN_eckey_set_group eckey_set_group_pfunc = NULL;
-    PFN_eckey_set_private eckey_set_private_pfunc = NULL;
-    PFN_eckey_set_public eckey_set_public_pfunc = NULL;
 
     if( !sc_ossl_module_initialized )
     {
@@ -94,8 +92,8 @@ static int bind_sc_ossl_engine(ENGINE* e)
     }
 
     /* Setup RSA_METHOD */
-    rsa_sc_ossl_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL);
-    if (   !RSA_meth_set_pub_enc(sc_ossl_rsa_method, sc_ossl_rsa_pub_enc)
+    if( (rsa_sc_ossl_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+        || !RSA_meth_set_pub_enc(sc_ossl_rsa_method, sc_ossl_rsa_pub_enc)
         || !RSA_meth_set_priv_dec(sc_ossl_rsa_method, sc_ossl_rsa_priv_dec)
         || !RSA_meth_set_priv_enc(sc_ossl_rsa_method, sc_ossl_rsa_priv_enc)
         || !RSA_meth_set_pub_dec(sc_ossl_rsa_method, sc_ossl_rsa_pub_dec)
@@ -111,25 +109,19 @@ static int bind_sc_ossl_engine(ENGINE* e)
         goto memerr;
     }
 
-    eckey_sc_ossl_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+    if( (eckey_sc_ossl_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
+    {
+        goto memerr;
+    }
 
     /* Setup EC_METHOD */
-    // Need to get existing methods so that we can set Init and Finish which will
-    // take care of ex_data initialization and freeing.
-    EC_KEY_METHOD_get_init(sc_ossl_eckey_method,
-                           NULL, // Init
-                           NULL, // Finish
-                           &eckey_copy_pfunc,
-                           &eckey_set_group_pfunc,
-                           &eckey_set_private_pfunc,
-                           &eckey_set_public_pfunc);
     EC_KEY_METHOD_set_init(sc_ossl_eckey_method,
-                           sc_ossl_eckey_init,
+                           NULL, // eckey_init - lazily initialize ex_data only when the engine needs to
                            sc_ossl_eckey_finish,
-                           eckey_copy_pfunc,
-                           eckey_set_group_pfunc,
-                           eckey_set_private_pfunc,
-                           eckey_set_public_pfunc);
+                           NULL, // eckey_copy
+                           NULL, // eckey_set_group
+                           NULL, // eckey_set_private
+                           NULL); // eckey_set_public
     EC_KEY_METHOD_set_keygen(sc_ossl_eckey_method,
                              sc_ossl_eckey_keygen);
     EC_KEY_METHOD_set_compute_key(sc_ossl_eckey_method,
