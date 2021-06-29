@@ -27,12 +27,6 @@ typedef int (*PFN_eckey_verify)(
 typedef int (*PFN_eckey_verify_sig)(
                             const unsigned char* dgst, int dgst_len,
                             const ECDSA_SIG* sig, EC_KEY* eckey);
-typedef int (*PFN_eckey_init)(EC_KEY *key);
-typedef void (*PFN_eckey_finish)(EC_KEY *key);
-typedef int (*PFN_eckey_copy)(EC_KEY *dest, const EC_KEY *src);
-typedef int (*PFN_eckey_set_group)(EC_KEY *key, const EC_GROUP *grp);
-typedef int (*PFN_eckey_set_private)(EC_KEY *key, const BIGNUM *priv_key);
-typedef int (*PFN_eckey_set_public)(EC_KEY *key, const EC_POINT *pub_key);
 
 typedef int (*PFN_eckey_keygen)(EC_KEY *key);
 typedef int (*PFN_eckey_compute_key)(unsigned char **psec,
@@ -60,8 +54,8 @@ int eckey_sc_ossl_idx = -1;
 // Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
 #define SC_OSSL_ECDSA_MAX_DER_SIGNATURE_LEN 139
 
-// Smallest supported curve is P256 => 32 * 2 byte SymCrypt signatures
-#define SC_OSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN 64
+// Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
+#define SC_OSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN 48
 // Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
 #define SC_OSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN 132
 
@@ -341,39 +335,10 @@ err:
     return res;
 }
 
-int sc_ossl_eckey_init(EC_KEY *key)
-{
-    SC_OSSL_LOG_DEBUG(NULL);
-    int res = 0; // fail
-
-    SC_OSSL_ECC_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
-    if( !keyCtx )
-    {
-        SC_OSSL_LOG_ERROR("OPENSSL_zalloc failed");
-        goto err;
-    }
-
-    if( EC_KEY_set_ex_data(key, eckey_sc_ossl_idx, keyCtx) == 0)
-    {
-        SC_OSSL_LOG_ERROR("EC_KEY_set_ex_data failed");
-        goto err;
-    }
-
-    res = 1; // success
-end:
-    return res;
-
-err:
-    if( keyCtx )
-    {
-        OPENSSL_free( keyCtx );
-    }
-    goto end;
-}
-
 void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
 {
     SC_OSSL_LOG_DEBUG(NULL);
+    keyCtx->initialized = 0;
     if( keyCtx->data )
     {
         SC_OSSL_LOG_DEBUG("OPENSSL_clear_free %lx %d", keyCtx->data, keyCtx->cbData);
@@ -384,7 +349,6 @@ void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
         SC_OSSL_LOG_DEBUG("SymCryptEckeyFree %lx", keyCtx->key);
         SymCryptEckeyFree(keyCtx->key);
     }
-    keyCtx->initialized = 0;
     return;
 }
 
@@ -397,27 +361,13 @@ void sc_ossl_eckey_finish(EC_KEY *key)
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, eckey_sc_ossl_idx);
     if( keyCtx )
     {
-        const EC_GROUP* ecgroup = EC_KEY_get0_group(key);
-        int groupNid = EC_GROUP_get_curve_name(ecgroup);
-
-        // Only free the key context if we actually handled it in the engine (NIST Prime curves)
-        switch( groupNid )
+        if( keyCtx->initialized == 1 )
         {
-        case NID_secp192r1:
-        case NID_secp224r1:
-        case NID_secp256r1:
-        case NID_secp384r1:
-        case NID_secp521r1:
             sc_ossl_ecc_free_key_context(keyCtx);
-            OPENSSL_free( keyCtx );
-            EC_KEY_set_ex_data(key, eckey_sc_ossl_idx, NULL);
-            break;
-        default:
-            // isn't our context to free
-            break;
         }
+        OPENSSL_free(keyCtx);
+        EC_KEY_set_ex_data(key, eckey_sc_ossl_idx, NULL);
     }
-    return;
 }
 
 #define SC_OSSL_ECC_GET_CONTEXT_FALLBACK (-1)
@@ -748,8 +698,21 @@ int sc_ossl_get_context_ex(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx, BO
 
     if( *ppKeyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
-        return SC_OSSL_ECC_GET_CONTEXT_ERROR;
+        SC_OSSL_ECC_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
+        if( !keyCtx )
+        {
+            SC_OSSL_LOG_ERROR("OPENSSL_zalloc failed");
+            return SC_OSSL_ECC_GET_CONTEXT_ERROR;
+        }
+
+        if( EC_KEY_set_ex_data(eckey, eckey_sc_ossl_idx, keyCtx) == 0)
+        {
+            SC_OSSL_LOG_ERROR("EC_KEY_set_ex_data failed");
+            OPENSSL_free(keyCtx);
+            return SC_OSSL_ECC_GET_CONTEXT_ERROR;
+        }
+
+        *ppKeyCtx = keyCtx;
     }
 
     if( (*ppKeyCtx)->initialized == 1 )
