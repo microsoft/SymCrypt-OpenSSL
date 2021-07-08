@@ -16,7 +16,7 @@ extern "C" {
 int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     size_t cbResult = 0;
@@ -81,8 +81,8 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
         return -2;
     }
 
-    cbModuls = SymCryptRsakeySizeofModulus(localKeyCtx.key);
-    cbResult = cbModuls;
+    cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
+    cbResult = cbModulus;
     SC_OSSL_LOG_DEBUG("tbslen= %d", tbslen);
     if( siglen != NULL )
     {
@@ -240,7 +240,7 @@ err:
 int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     size_t cbResult = 0;
@@ -311,8 +311,6 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
         return -2;
     }
 
-    cbModuls = SymCryptRsakeySizeofModulus(localKeyCtx.key);
-    cbResult = cbModuls;
     SC_OSSL_LOG_DEBUG("tbslen= %d", tbslen);
     if( sig == NULL )
     {
@@ -320,8 +318,8 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
         goto err;
     }
 
-    cbModuls = SymCryptRsakeySizeofModulus(localKeyCtx.key);
-    cbResult = cbModuls;
+    cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
+    cbResult = cbModulus;
     switch( dtype )
     {
     case NID_md5:
