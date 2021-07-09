@@ -26,13 +26,18 @@ typedef int (*PFN_RSA_meth_pub_dec)(int flen, const unsigned char* from,
 typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding);
 
+// The minimum PKCS1 padding is 11 bytes
+#define SC_OSSL_MIN_PKCS1_PADDING (11)
+// The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
+#define SC_OSSL_MIN_OAEP_PADDING (42)
+
 int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
     unsigned char* to, RSA* rsa,
     int padding)
 {
     SC_OSSL_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     BN_ULONG cbResult = 0;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
@@ -51,21 +56,30 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         }
     }
 
-    cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
-    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld", from, flen, cbModuls);
+    cbModulus= SymCryptRsakeySizeofModulus(keyCtx->key);
+    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModulus: %ld", from, flen, cbModulus);
+
+    if( from == NULL )
+    {
+        goto err;
+    }
 
     switch( padding )
     {
     case RSA_PKCS1_PADDING:
         SC_OSSL_LOG_DEBUG("SymCryptRsaPkcs1Encrypt");
+        if( flen > cbModulus - SC_OSSL_MIN_PKCS1_PADDING )
+        {
+            goto err;
+        }
         SymError = SymCryptRsaPkcs1Encrypt(
                        keyCtx->key,
                        from,
-                       flen > cbModuls ? cbModuls : flen,
+                       flen,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        to,
-                       cbModuls,
+                       cbModulus,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -76,17 +90,21 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         break;
     case RSA_PKCS1_OAEP_PADDING:
         SC_OSSL_LOG_DEBUG("SymCryptRsaOaepEncrypt");
+        if( flen > cbModulus - SC_OSSL_MIN_OAEP_PADDING )
+        {
+            goto err;
+        }
         SymError = SymCryptRsaOaepEncrypt(
                        keyCtx->key,
                        from,
-                       flen > cbModuls ? cbModuls : flen,
+                       flen,
                        SymCryptSha1Algorithm,
                        NULL,
                        0,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        to,
-                       cbModuls,
+                       cbModulus,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -97,15 +115,19 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         break;
     case RSA_NO_PADDING:
         SC_OSSL_LOG_DEBUG("SymCryptRsaRawEncrypt");
+        if( flen != cbModulus )
+        {
+            goto err;
+        }
         SymError = SymCryptRsaRawEncrypt(
                        keyCtx->key,
                        from,
-                       flen > cbModuls ? cbModuls : flen,
+                       flen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
-                       cbModuls);
-        cbResult = cbModuls;
+                       cbModulus);
+        cbResult = cbModulus;
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
@@ -160,7 +182,7 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
 {
     SC_OSSL_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     BN_ULONG cbResult = 0;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
@@ -180,13 +202,17 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
     }
 
     SC_OSSL_LOG_DEBUG("SymCryptRsakeySizeofModulus");
-    cbModuls= SymCryptRsakeySizeofModulus(keyCtx->key);
-    cbResult = cbModuls;
+    cbModulus= SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbResult = cbModulus;
 
-    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModuls: %ld, to: %X", from, flen, cbModuls, to);
+    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModulus: %ld, to: %X", from, flen, cbModulus, to);
     SC_OSSL_LOG_DEBUG("SymCryptRsakeyHasPrivateKey %d", SymCryptRsakeyHasPrivateKey(keyCtx->key));
 
     if( from == NULL )
+    {
+        goto err;
+    }
+    if( flen > cbModulus )
     {
         goto err;
     }
@@ -202,7 +228,7 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
-                       flen > cbModuls ? cbModuls : flen,
+                       cbModulus - SC_OSSL_MIN_PKCS1_PADDING,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -216,14 +242,14 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
         SymError = SymCryptRsaOaepDecrypt(
                        keyCtx->key,
                        from,
-                       flen > cbModuls ? cbModuls : flen,
+                       flen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        SymCryptSha1Algorithm,
                        NULL,
                        0,
                        0,
                        to,
-                       flen > cbModuls ? cbModuls : flen,
+                       cbModulus - SC_OSSL_MIN_OAEP_PADDING,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -237,12 +263,12 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
         SymError = SymCryptRsaRawDecrypt(
                        keyCtx->key,
                        from,
-                       flen > cbModuls ? cbModuls : flen,
+                       flen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
-                       cbModuls);
-        cbResult = cbModuls;
+                       cbModulus);
+        cbResult = cbModulus;
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawDecrypt failed", SymError);
@@ -332,7 +358,7 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
     const RSA* rsa)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -350,8 +376,8 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         }
     }
 
-    cbModuls = SymCryptRsakeySizeofModulus(keyCtx->key);
-    cbResult = cbModuls;
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbResult = cbModulus;
     SC_OSSL_LOG_DEBUG("m_length= %d", m_length);
     if( siglen != NULL )
     {
@@ -377,13 +403,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        NULL,
                        0,
                        SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -403,13 +429,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        SymCryptMd5OidList,
                        SYMCRYPT_MD5_OID_COUNT,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -429,13 +455,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        SymCryptSha1OidList,
                        SYMCRYPT_SHA1_OID_COUNT,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -454,13 +480,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        SymCryptSha256OidList,
                        SYMCRYPT_SHA256_OID_COUNT,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -480,13 +506,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        SymCryptSha384OidList,
                        SYMCRYPT_SHA384_OID_COUNT,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -505,13 +531,13 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        SymCryptSha512OidList,
                        SYMCRYPT_SHA512_OID_COUNT,
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModuls ? cbModuls : *siglen) : 0,
+                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -550,7 +576,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
     unsigned int siglen, const RSA* rsa)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    BN_ULONG cbModuls = 0;
+    BN_ULONG cbModulus = 0;
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -570,8 +596,8 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
     }
 
-    cbModuls = SymCryptRsakeySizeofModulus(keyCtx->key);
-    cbResult = cbModuls;
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbResult = cbModulus;
     switch( dtype )
     {
     case NID_md5_sha1:
@@ -586,7 +612,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -611,7 +637,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -636,7 +662,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -660,7 +686,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -683,7 +709,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -707,7 +733,7 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         SymError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
-                       m_length > cbModuls ? cbModuls : m_length,
+                       m_length > cbModulus ? cbModulus : m_length,
                        sigbuf,
                        siglen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,

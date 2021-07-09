@@ -1186,7 +1186,11 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     res = *pseclen;
 
 cleanup:
-    // Always free the temporary BIGNUMs and BN_CTX
+    // Always free the temporary pkPublic, BIGNUMs and BN_CTX
+    if( pkPublic )
+    {
+        SymCryptEckeyFree(pkPublic);
+    }
     if( ec_pub_x != NULL )
     {
         BN_free(ec_pub_x);
@@ -1203,10 +1207,6 @@ cleanup:
     return res;
 
 err:
-    if( pkPublic )
-    {
-        SymCryptEckeyFree(pkPublic);
-    }
     if( *psec )
     {
         OPENSSL_free(*psec);
