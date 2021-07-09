@@ -26,6 +26,11 @@ typedef int (*PFN_RSA_meth_pub_dec)(int flen, const unsigned char* from,
 typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding);
 
+// The minimum PKCS1 padding is 11 bytes
+#define SC_OSSL_MIN_PKCS1_PADDING (11)
+// The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
+#define SC_OSSL_MIN_OAEP_PADDING (42)
+
 int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
     unsigned char* to, RSA* rsa,
     int padding)
@@ -63,7 +68,7 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
     {
     case RSA_PKCS1_PADDING:
         SC_OSSL_LOG_DEBUG("SymCryptRsaPkcs1Encrypt");
-        if( flen > cbModulus - 11 )
+        if( flen > cbModulus - SC_OSSL_MIN_PKCS1_PADDING )
         {
             goto err;
         }
@@ -85,7 +90,7 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         break;
     case RSA_PKCS1_OAEP_PADDING:
         SC_OSSL_LOG_DEBUG("SymCryptRsaOaepEncrypt");
-        if( flen > cbModulus - 42 )
+        if( flen > cbModulus - SC_OSSL_MIN_OAEP_PADDING )
         {
             goto err;
         }
@@ -223,7 +228,7 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
-                       cbModulus - 11,
+                       cbModulus - SC_OSSL_MIN_PKCS1_PADDING,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -244,7 +249,7 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
                        0,
                        0,
                        to,
-                       cbModulus - 42,
+                       cbModulus - SC_OSSL_MIN_OAEP_PADDING,
                        &cbResult);
         SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
