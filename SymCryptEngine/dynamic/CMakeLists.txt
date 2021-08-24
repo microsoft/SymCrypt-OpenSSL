@@ -43,6 +43,7 @@ set_target_properties(sc_ossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
 target_link_directories(sc_ossl_dynamic PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(sc_ossl_dynamic PUBLIC symcrypt)
+target_link_libraries(sc_ossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 install(TARGETS sc_ossl_dynamic
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
