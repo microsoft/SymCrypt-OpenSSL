@@ -20,7 +20,7 @@ static int sc_ossl_digest_nids[] = {
 
 /* MD5 */
 static int sc_ossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx);
-static int sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data, size_t count);
+static int sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data, size_t count);
 static int sc_ossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_MD5_RESULT_SIZE) unsigned char *md);
 static int sc_ossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from);
 static EVP_MD *_hidden_md5_md = NULL;
@@ -50,7 +50,7 @@ static const EVP_MD *sc_ossl_digest_md5(void)
 
 /* SHA1 */
 static int sc_ossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx);
-static int sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data, size_t count);
+static int sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data, size_t count);
 static int sc_ossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA1_RESULT_SIZE) unsigned char *md);
 static int sc_ossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from);
 static EVP_MD *_hidden_sha1_md = NULL;
@@ -81,7 +81,7 @@ static const EVP_MD *sc_ossl_digest_sha1(void)
 
 /* SHA256 */
 static int sc_ossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx);
-static int sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data, size_t count);
+static int sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data, size_t count);
 static int sc_ossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA256_RESULT_SIZE) unsigned char *md);
 static int sc_ossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from);
 static EVP_MD *_hidden_sha256_md = NULL;
@@ -112,7 +112,7 @@ static const EVP_MD *sc_ossl_digest_sha256(void)
 
 /* SHA384 */
 static int sc_ossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx);
-static int sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data, size_t count);
+static int sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data, size_t count);
 static int sc_ossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA384_RESULT_SIZE) unsigned char *md);
 static int sc_ossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from);
 static EVP_MD *_hidden_sha384_md = NULL;
@@ -143,8 +143,8 @@ static const EVP_MD *sc_ossl_digest_sha384(void)
 
 /* SHA512 */
 static int sc_ossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx);
-static int sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data, size_t count);
-static int sc_ossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA256_RESULT_SIZE) unsigned char *md);
+static int sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data, size_t count);
+static int sc_ossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA512_RESULT_SIZE) unsigned char *md);
 static int sc_ossl_digest_sha512_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from);
 static EVP_MD *_hidden_sha512_md = NULL;
 static const EVP_MD *sc_ossl_digest_sha512(void)
@@ -250,7 +250,7 @@ static int sc_ossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
     return 1;
 }
 
-static int sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data,
+static int sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                              size_t count)
 {
     SC_OSSL_LOG_DEBUG("Count: %d", count);
@@ -316,7 +316,7 @@ static int sc_ossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
     return 1;
 }
 
-static int sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data,
+static int sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                               size_t count)
 {
     SC_OSSL_LOG_DEBUG("Count: %d", count);
@@ -383,7 +383,7 @@ static int sc_ossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
     return 1;
 }
 
-static int sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data,
+static int sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
     SC_OSSL_LOG_DEBUG("Count: %d", count);
@@ -449,7 +449,7 @@ static int sc_ossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
     return 1;
 }
 
-static int sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data,
+static int sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
     SC_OSSL_LOG_DEBUG("Count: %d", count);
@@ -515,7 +515,7 @@ static int sc_ossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
     return 1;
 }
 
-static int sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_(count) const void *data,
+static int sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
     SC_OSSL_LOG_DEBUG("Count: %d", count);
