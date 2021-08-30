@@ -19,21 +19,21 @@ extern "C" {
 #endif
 
 // RAND_seed() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static int sc_ossl_rand_seed(const void *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_seed(const void *buf, int num)
 {
     SymCryptProvideEntropy(buf, num);
     return 1;
 }
 
 // RAND_bytes() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static int sc_ossl_rand_bytes(unsigned char *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_bytes(unsigned char *buf, int num)
 {
     SymCryptRandom(buf, num);
     return 1;
 }
 
 // RAND_add() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static int sc_ossl_rand_add(const void *buf, int num, double randomness)
+static SCOSSL_STATUS sc_ossl_rand_add(const void *buf, int num, double randomness)
 {
     SymCryptProvideEntropy(buf, num);
     return 1;
@@ -41,14 +41,14 @@ static int sc_ossl_rand_add(const void *buf, int num, double randomness)
 
 // RAND_pseudo_bytes() returns 1 if the bytes generated are cryptographically strong, 0 otherwise.
 // Since an error internally is fatal, we always return 1 here.
-static int sc_ossl_rand_pseudorand(unsigned char *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_pseudorand(unsigned char *buf, int num)
 {
     SymCryptRandom(buf, num);
     return 1;
 }
 
 // RAND_status() returns 1 if the PRNG has been seeded with enough data, 0 otherwise. Since we guarantee this, we return 1.
-static int sc_ossl_rand_status(void)
+static SCOSSL_STATUS sc_ossl_rand_status(void)
 {
     return 1;
 }
