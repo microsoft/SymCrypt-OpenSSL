@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
+
 void* SC_OSSL_ENGINE_zalloc(size_t num);
 void* SC_OSSL_ENGINE_realloc(void *mem, size_t num);
 void SC_OSSL_ENGINE_free(void *mem);
