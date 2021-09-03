@@ -19,21 +19,21 @@ extern "C" {
 #endif
 
 // RAND_seed() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static SCOSSL_STATUS sc_ossl_rand_seed(const void *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_seed(_In_reads_bytes_(num) const void *buf, _In_ int num)
 {
     SymCryptProvideEntropy(buf, num);
     return 1;
 }
 
 // RAND_bytes() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static SCOSSL_STATUS sc_ossl_rand_bytes(unsigned char *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_bytes(_Out_writes_bytes_(num) unsigned char *buf, _In_ int num)
 {
     SymCryptRandom(buf, num);
     return 1;
 }
 
 // RAND_add() returns 1 on success, 0 otherwise. Since an error internally is fatal, we always return 1 here.
-static SCOSSL_STATUS sc_ossl_rand_add(const void *buf, int num, double randomness)
+static SCOSSL_STATUS sc_ossl_rand_add(_In_reads_bytes_(num) const void *buf, _In_ int num, _In_ double randomness)
 {
     SymCryptProvideEntropy(buf, num);
     return 1;
@@ -41,7 +41,7 @@ static SCOSSL_STATUS sc_ossl_rand_add(const void *buf, int num, double randomnes
 
 // RAND_pseudo_bytes() returns 1 if the bytes generated are cryptographically strong, 0 otherwise.
 // Since an error internally is fatal, we always return 1 here.
-static SCOSSL_STATUS sc_ossl_rand_pseudorand(unsigned char *buf, int num)
+static SCOSSL_STATUS sc_ossl_rand_pseudorand(_Out_writes_bytes_(num) unsigned char *buf, _In_ int num)
 {
     SymCryptRandom(buf, num);
     return 1;
