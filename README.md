@@ -21,8 +21,8 @@ Follow Linux build instructions from SymCrypt repository [SymCrypt](https://gith
 
 ```
 cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/libsymcrypt.so ./
-cmake .
-make
+cmake . -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>
+cmake --build .
 ```
 
 ## Run Samples
