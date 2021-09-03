@@ -31,11 +31,19 @@ typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
 // The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
 #define SC_OSSL_MIN_OAEP_PADDING (42)
 
-int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa,
-    int padding)
+// Public Encryption
+// Encrypts flen bytes at from using public key rsa and stores ciphertext in to.
+// Same parameters as RSA_public_encrypt
+// - flen must not be more than RSA_size(rsa) - 11 for the PKCS #1 v1.5 based padding modes, not more than RSA_size(rsa) - 42
+//   for RSA_PKCS1_OAEP_PADDING and exactly RSA_size(rsa) for RSA_NO_PADDING
+// - from and to may overlap
+// - padding is ones of RSA_PKCS1_PADDING, RSA_PKCS1_OAEP_PADDING, RSA_SSLV23_PADDING, or RSA_NO_PADDING
+// Returns size of encrypted data (RSA_size(rsa)), or -1 on error
+_Success_(return >= 0)
+int sc_ossl_rsa_pub_enc(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_ unsigned char* to, _In_ RSA* rsa,
+    _In_ int padding)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     BN_ULONG cbResult = 0;
@@ -57,7 +65,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
     }
 
     cbModulus= SymCryptRsakeySizeofModulus(keyCtx->key);
-    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModulus: %ld", from, flen, cbModulus);
 
     if( from == NULL )
     {
@@ -67,7 +74,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
     switch( padding )
     {
     case RSA_PKCS1_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaPkcs1Encrypt");
         if( flen > cbModulus - SC_OSSL_MIN_PKCS1_PADDING )
         {
             goto err;
@@ -81,7 +87,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
                        to,
                        cbModulus,
                        &cbResult);
-        SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Encrypt failed", SymError);
@@ -89,7 +94,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         }
         break;
     case RSA_PKCS1_OAEP_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaOaepEncrypt");
         if( flen > cbModulus - SC_OSSL_MIN_OAEP_PADDING )
         {
             goto err;
@@ -106,7 +110,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
                        to,
                        cbModulus,
                        &cbResult);
-        SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepEncrypt failed", SymError);
@@ -114,7 +117,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
         }
         break;
     case RSA_NO_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaRawEncrypt");
         if( flen != cbModulus )
         {
             goto err;
@@ -128,7 +130,6 @@ int sc_ossl_rsa_pub_enc(int flen, const unsigned char* from,
                        to,
                        cbModulus);
         cbResult = cbModulus;
-        SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawEncrypt failed", SymError);
@@ -177,10 +178,17 @@ err:
     goto CommonReturn;
 }
 
-int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa, int padding)
+// Private Decryption
+// Decrypts flen bytes at from using private key rsa and stores plaintext in to.
+// Same parameters as RSA_private_decrypt
+// - flen should be equal to RSA_size(rsa) but may be smaller, when leading zero bytes are in the ciphertext
+// - from and to may overlap
+// - padding is the mode used to encrypt the data
+// Returns size of recovered plaintext, or -1 on error.
+_Success_(return >= 0)
+int sc_ossl_rsa_priv_dec(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_ unsigned char* to, _In_ RSA* rsa, _In_ int padding)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     BN_ULONG cbResult = 0;
@@ -201,12 +209,8 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
         }
     }
 
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeySizeofModulus");
     cbModulus= SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModulus;
-
-    SC_OSSL_LOG_DEBUG("from: %X, flen: %d, cbModulus: %ld, to: %X", from, flen, cbModulus, to);
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeyHasPrivateKey %d", SymCryptRsakeyHasPrivateKey(keyCtx->key));
 
     if( from == NULL )
     {
@@ -220,7 +224,6 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
     switch( padding )
     {
     case RSA_PKCS1_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaPkcs1Decrypt");
         SymError = SymCryptRsaPkcs1Decrypt(
                        keyCtx->key,
                        from,
@@ -230,7 +233,6 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
                        to,
                        cbModulus - SC_OSSL_MIN_PKCS1_PADDING,
                        &cbResult);
-        SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Decrypt failed", SymError);
@@ -238,7 +240,6 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
         }
         break;
     case RSA_PKCS1_OAEP_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaOaepDecrypt");
         SymError = SymCryptRsaOaepDecrypt(
                        keyCtx->key,
                        from,
@@ -251,7 +252,6 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
                        to,
                        cbModulus - SC_OSSL_MIN_OAEP_PADDING,
                        &cbResult);
-        SC_OSSL_LOG_DEBUG("cbResult: %ld", cbResult);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepDecrypt failed", SymError);
@@ -259,7 +259,6 @@ int sc_ossl_rsa_priv_dec(int flen, const unsigned char* from,
         }
         break;
     case RSA_NO_PADDING:
-        SC_OSSL_LOG_DEBUG("SymCryptRsaRawDecrypt");
         SymError = SymCryptRsaRawDecrypt(
                        keyCtx->key,
                        from,
@@ -317,10 +316,13 @@ err:
     goto CommonReturn;
 }
 
-int sc_ossl_rsa_priv_enc(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa, int padding)
+// Private Encryption
+// Signs flen bytes at from using private key rsa and stores signature in to.
+// Returns size of signature, or -1 on error
+_Success_(return >= 0)
+int sc_ossl_rsa_priv_enc(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_ unsigned char* to, _In_ RSA* rsa, _In_ int padding)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_priv_enc pfn_rsa_meth_priv_enc = NULL;
@@ -334,11 +336,14 @@ int sc_ossl_rsa_priv_enc(int flen, const unsigned char* from,
     return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
 }
 
-int sc_ossl_rsa_pub_dec(int flen, const unsigned char* from,
-    unsigned char* to, RSA* rsa,
-    int padding)
+// Public Decryption
+// Recovers message digest from flen-bytes long signature at from using public key rsa and stores result in to.
+// Returns size of recovered message digest, or -1 on error.
+_Success_(return >= 0)
+int sc_ossl_rsa_pub_dec(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_ unsigned char* to, _In_ RSA* rsa,
+    _In_ int padding)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_LOG_INFO("RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_pub_dec pfn_rsa_meth_pub_dec = NULL;
@@ -352,12 +357,13 @@ int sc_ossl_rsa_pub_dec(int flen, const unsigned char* from,
     return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
 }
 
-int sc_ossl_rsa_sign(int type, const unsigned char* m,
-    unsigned int m_length,
-    unsigned char* sigret, unsigned int* siglen,
-    const RSA* rsa)
+// Signs the message digest m of size m_len using private key rsa using PKCS1-v1_5 and stores signature in sigret and
+// signature size in siglen. Type denotes the message digest algorithm used to generate m.
+// Returns 1 on success
+SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
+    _Out_ unsigned char* sigret, _Out_ unsigned int* siglen,
+    _In_ const RSA* rsa)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     BN_ULONG cbModulus = 0;
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -378,21 +384,18 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
 
     cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModulus;
-    SC_OSSL_LOG_DEBUG("m_length= %d", m_length);
     if( siglen != NULL )
     {
         *siglen = cbResult;
     }
     if( sigret == NULL )
     {
-        SC_OSSL_LOG_DEBUG("sigret NOT present");
         goto CommonReturn; // Not error - this can be called with NULL parameter for siglen
     }
 
     switch( type )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_DEBUG("NID_md5_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != 36 )
         {
@@ -419,7 +422,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_DEBUG("NID_md5");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != 16 )
         {
@@ -445,7 +447,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_DEBUG("NID_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != 20 )
         {
@@ -471,7 +472,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         }
         break;
     case NID_sha256:
-        SC_OSSL_LOG_DEBUG("NID_sha256");
         if( m_length != 32 )
         {
             goto err;
@@ -497,7 +497,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
 
         break;
     case NID_sha384:
-        SC_OSSL_LOG_DEBUG("NID_sha384");
         if( m_length != 48 )
         {
             goto err;
@@ -522,7 +521,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         }
         break;
     case NID_sha512:
-        SC_OSSL_LOG_DEBUG("NID_sha512");
         if( m_length != 64 )
         {
             goto err;
@@ -548,18 +546,6 @@ int sc_ossl_rsa_sign(int type, const unsigned char* m,
         break;
     default:
         SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, m_length);
-
-        // It seems the default implementation from OpenSSL does not set up the sign method so
-        // we cannot just call RSA_meth_get_sign as in en/decrypt cases.
-        // SC_OSSL_LOG_INFO("Unknown type: %d. Forwarding to OpenSSL. Size: %d.", type, m_length);
-        // ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        // pfn_rsa_meth_sign = RSA_meth_get_sign(ossl_rsa_meth);
-        // if( !pfn_rsa_meth_sign )
-        // {
-        //     SC_OSSL_LOG_ERROR("RSA_meth_get_sign failed");
-        //     goto err;
-        // }
-        // return pfn_rsa_meth_sign(type, m, m_length, sigret, siglen, rsa);
         goto err;
     }
 
@@ -570,12 +556,15 @@ err:
     goto CommonReturn;
 }
 
-int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
-    unsigned int m_length,
-    const unsigned char* sigbuf,
-    unsigned int siglen, const RSA* rsa)
+// Verifies that the signature sigbuf of size siglen matches a given message digest m of size m_len.
+// dtype denotes the message digest algorithm that was used to generate the signature. rsa is the signer's
+// public key.
+// Returns 1 on successful verification
+SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
+    _In_ unsigned int m_length,
+    _In_reads_bytes_(siglen) const unsigned char* sigbuf,
+    _In_ unsigned int siglen, _In_ const RSA* rsa)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     BN_ULONG cbModulus = 0;
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -601,7 +590,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
     switch( dtype )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_DEBUG("NID_md5_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != 36 )
         {
@@ -627,7 +615,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_DEBUG("NID_md5");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != 16 )
         {
@@ -652,7 +639,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_DEBUG("NID_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != 20 )
         {
@@ -677,7 +663,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
         break;
     case NID_sha256:
-        SC_OSSL_LOG_DEBUG("NID_sha256");
         if( m_length != 32 )
         {
             goto err;
@@ -700,7 +685,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
         break;
     case NID_sha384:
-        SC_OSSL_LOG_DEBUG("NID_sha384");
         if( m_length != 48 )
         {
             goto err;
@@ -724,7 +708,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         }
         break;
     case NID_sha512:
-        SC_OSSL_LOG_DEBUG("NID_sha512");
         if( m_length != 64 )
         {
             goto err;
@@ -749,18 +732,6 @@ int sc_ossl_rsa_verify(int dtype, const unsigned char* m,
         break;
     default:
         SC_OSSL_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, m_length);
-
-        // It seems the default implementation from OpenSSL does not set up the verify method so
-        // we cannot just call RSA_meth_get_verify as in en/decrypt cases.
-        // SC_OSSL_LOG_INFO("Unknown dtype: %d. Forwarding to OpenSSL. Size: %d.", dtype, m_length);
-        // ossl_rsa_meth = RSA_PKCS1_OpenSSL();
-        // pfn_rsa_meth_verify = RSA_meth_get_verify(ossl_rsa_meth);
-        // if( !pfn_rsa_meth_verify )
-        // {
-        //     SC_OSSL_LOG_ERROR("RSA_meth_get_verify failed");
-        //     goto err;
-        // }
-        // return pfn_rsa_meth_verify(dtype, m, m_length, sigbuf, siglen, rsa);
         goto err;
     }
 
@@ -773,10 +744,13 @@ err:
     goto CommonReturn;
 }
 
-int sc_ossl_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
-    BN_GENCB* cb)
+// Generates a 2-prime RSA key pair and stores it in rsa. Modulus will be of length bits,
+// the number of primes to form the modulus will be primes, and the public exponent will be e.
+// cb is an optional callback for progress of key generation that is unused in our implementation.
+// Returns 1 on success or 0 on error.
+SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, _In_ int bits, _In_ BIGNUM* e,
+    _In_opt_ BN_GENCB* cb)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     UINT64  pubExp64;
     PUINT64 pPubExp64 = &pubExp64;
     BN_ULONG publicExponent = 0;
@@ -828,10 +802,9 @@ int sc_ossl_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if( keyCtx->key == NULL )
     {
-        SC_OSSL_LOG_DEBUG("SymCryptRsakeyAllocate failed");
+        SC_OSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
         goto err;
     }
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeyAllocate completed");
     pubExp64 = BN_get_word(e);
     SymError = SymCryptRsakeyGenerate(keyCtx->key, pPubExp64, 1, 0);
     if( SymError != SYMCRYPT_NO_ERROR )
@@ -839,11 +812,10 @@ int sc_ossl_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeyAllocate failed", SymError);
         goto err;
     }
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeyGenerate completed");
 
     //
     // Fill rsa structures so that OpenSSL helper functions can import/export the
-    // structure to it's format.
+    // structure to its format.
     // CNG format for reference:
     // https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
     //
@@ -851,8 +823,6 @@ int sc_ossl_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbPrime1 = SymCryptRsakeySizeofPrime(keyCtx->key, 0);
     cbPrime2 = SymCryptRsakeySizeofPrime(keyCtx->key, 1);
-    SC_OSSL_LOG_DEBUG("cbPublicExp: %ld, cbModulus: %ld, cbPrime1: %ld, cbPrime2: %ld",
-        cbPublicExp, cbModulus, cbPrime1, cbPrime2);
 
     cbAllocSize =
         cbPublicExp +   // PublicExponent[cbPublicExp] // Big-endian.
@@ -988,7 +958,6 @@ int sc_ossl_rsa_keygen(RSA* rsa, int bits, BIGNUM* e,
     SC_OSSL_LOG_BIGNUM_DEBUG("d", rsa_d);
 
     keyCtx->initialized = 1;
-    SC_OSSL_LOG_DEBUG("sc_ossl_rsa_keygen completed");
     ret = 1;
 
 CommonReturn:
@@ -1000,11 +969,10 @@ err:
     goto CommonReturn;
 }
 
-int sc_ossl_initialize_rsa_key(RSA* rsa, SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
+// Initializes keyCtx from key rsa.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("RSA Address: %X", rsa);
-    SC_OSSL_LOG_DEBUG("Key Initialized: %X, %d", &keyCtx->initialized, keyCtx->initialized);
     int ret = 0;
     UINT64  pubExp64;
     PBYTE   pbPublicExp = NULL;
@@ -1188,7 +1156,6 @@ int sc_ossl_initialize_rsa_key(RSA* rsa, SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
         SC_OSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
         goto err;
     }
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeyAllocate completed");
 
     SymError = SymCryptLoadMsbFirstUint64(pbPublicExp, cbPublicExp, &pubExp64);
     if( SymError != SYMCRYPT_NO_ERROR )
@@ -1214,8 +1181,6 @@ int sc_ossl_initialize_rsa_key(RSA* rsa, SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
         goto err;
     }
 
-    SC_OSSL_LOG_DEBUG("SymCryptRsakeyHasPrivateKey %d", SymCryptRsakeyHasPrivateKey(keyCtx->key));
-
     keyCtx->initialized = 1;
 
     ret = 1;
@@ -1232,9 +1197,11 @@ err:
 
 typedef int (*PFN_RSA_meth_mod_exp) (BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx);
 
-int sc_ossl_rsa_mod_exp(BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx)
+// Used for CRT computations, used by default RSA implementations
+// ctx is a temporary BIGNUM variable
+// Returns 1 on success, or 0 on error
+SCOSSL_STATUS sc_ossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ RSA* rsa, _In_ BN_CTX* ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_mod_exp pfn_rsa_meth_mod_exp = RSA_meth_get_mod_exp(ossl_rsa_meth);
 
@@ -1248,10 +1215,13 @@ int sc_ossl_rsa_mod_exp(BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx)
 typedef int (*PFN_RSA_meth_bn_mod_exp) (
         BIGNUM* r, const BIGNUM* a, const BIGNUM* p, const BIGNUM* m, BN_CTX* ctx, BN_MONT_CTX* m_ctx);
 
-int sc_ossl_rsa_bn_mod_exp(
-        BIGNUM* r, const BIGNUM* a, const BIGNUM* p, const BIGNUM* m, BN_CTX* ctx, BN_MONT_CTX* m_ctx)
+// Used for CRT computations, used by default RSA implementations
+// r = a ^ p mod m
+// ctx is a temporary BIGNUM variable, while m_ctx is a Montgomery multiplication structure
+// Returns 1 on success, or 0 on error
+SCOSSL_STATUS sc_ossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p, 
+        _In_ const BIGNUM* m, _In_ BN_CTX* ctx, _In_ BN_MONT_CTX* m_ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_bn_mod_exp pfn_rsa_meth_bn_mod_exp = RSA_meth_get_bn_mod_exp(ossl_rsa_meth);
     if( !pfn_rsa_meth_bn_mod_exp )
@@ -1262,9 +1232,10 @@ int sc_ossl_rsa_bn_mod_exp(
     return pfn_rsa_meth_bn_mod_exp(r, a, p, m, ctx, m_ctx);
 }
 
-int sc_ossl_rsa_init(RSA *rsa)
+// Initializes a new RSA instance.
+// Returns 1 on success, or 0 on error
+SCOSSL_STATUS sc_ossl_rsa_init(_Inout_ RSA *rsa)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
     if( !keyCtx )
     {
@@ -1281,9 +1252,9 @@ int sc_ossl_rsa_init(RSA *rsa)
     return 1;
 }
 
-void sc_ossl_rsa_free_key_context(SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
+// Frees data and key of keyCtx
+void sc_ossl_rsa_free_key_context(_In_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( keyCtx->data )
     {
         OPENSSL_clear_free(keyCtx->data, keyCtx->cbData);
@@ -1296,9 +1267,10 @@ void sc_ossl_rsa_free_key_context(SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
     return;
 }
 
-int sc_ossl_rsa_finish(RSA *rsa)
+// Destroys instance of RSA object. The memory for rsa is not freed by this function.
+// Returns 1 on success
+SCOSSL_STATUS sc_ossl_rsa_finish(_In_ RSA *rsa)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
     if( keyCtx )
     {
