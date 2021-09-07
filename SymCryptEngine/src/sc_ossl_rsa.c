@@ -31,6 +31,14 @@ typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
 // The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
 #define SC_OSSL_MIN_OAEP_PADDING (42)
 
+// Hash digest lengths
+#define SC_OSSL_MD5_DIGEST_LENGTH (16)
+#define SC_OSSL_SHA1_DIGEST_LENGTH (20)
+#define SC_OSSL_MD5_SHA1_DIGEST_LENGTH (SC_OSSL_MD5_DIGEST_LENGTH + SC_OSSL_SHA1_DIGEST_LENGTH) //36
+#define SC_OSSL_SHA256_DIGEST_LENGTH (32)
+#define SC_OSSL_SHA384_DIGEST_LENGTH (48)
+#define SC_OSSL_SHA512_DIGEST_LENGTH (64)
+
 // Public Encryption
 // Encrypts flen bytes at from using public key rsa and stores ciphertext in to.
 // Same parameters as RSA_public_encrypt
@@ -40,9 +48,9 @@ typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
 // - padding is ones of RSA_PKCS1_PADDING, RSA_PKCS1_OAEP_PADDING, RSA_SSLV23_PADDING, or RSA_NO_PADDING
 // Returns size of encrypted data (RSA_size(rsa)), or -1 on error
 _Success_(return >= 0)
-int sc_ossl_rsa_pub_enc(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
-    _Out_ unsigned char* to, _In_ RSA* rsa,
-    _In_ int padding)
+int sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa,
+    int padding)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
@@ -186,8 +194,8 @@ err:
 // - padding is the mode used to encrypt the data
 // Returns size of recovered plaintext, or -1 on error.
 _Success_(return >= 0)
-int sc_ossl_rsa_priv_dec(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
-    _Out_ unsigned char* to, _In_ RSA* rsa, _In_ int padding)
+int sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_ unsigned char* to, _In_ RSA* rsa, int padding)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
@@ -320,8 +328,8 @@ err:
 // Signs flen bytes at from using private key rsa and stores signature in to.
 // Returns size of signature, or -1 on error
 _Success_(return >= 0)
-int sc_ossl_rsa_priv_enc(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
-    _Out_ unsigned char* to, _In_ RSA* rsa, _In_ int padding)
+int sc_ossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+    _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, _In_ padding)
 {
     SC_OSSL_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
@@ -340,9 +348,9 @@ int sc_ossl_rsa_priv_enc(_In_ int flen, _In_reads_bytes_(flen) const unsigned ch
 // Recovers message digest from flen-bytes long signature at from using public key rsa and stores result in to.
 // Returns size of recovered message digest, or -1 on error.
 _Success_(return >= 0)
-int sc_ossl_rsa_pub_dec(_In_ int flen, _In_reads_bytes_(flen) const unsigned char* from,
+int sc_ossl_rsa_pub_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_ unsigned char* to, _In_ RSA* rsa,
-    _In_ int padding)
+    int padding)
 {
     SC_OSSL_LOG_INFO("RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
@@ -360,8 +368,8 @@ int sc_ossl_rsa_pub_dec(_In_ int flen, _In_reads_bytes_(flen) const unsigned cha
 // Signs the message digest m of size m_len using private key rsa using PKCS1-v1_5 and stores signature in sigret and
 // signature size in siglen. Type denotes the message digest algorithm used to generate m.
 // Returns 1 on success
-SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
-    _Out_ unsigned char* sigret, _Out_ unsigned int* siglen,
+SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
+    _Out_writes_bytes_(siglen) unsigned char* sigret, _Out_ unsigned int* siglen,
     _In_ const RSA* rsa)
 {
     BN_ULONG cbModulus = 0;
@@ -397,7 +405,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
     {
     case NID_md5_sha1:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if( m_length != 36 )
+        if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
             goto err;
@@ -423,7 +431,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
         break;
     case NID_md5:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
-        if( m_length != 16 )
+        if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -448,7 +456,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
         break;
     case NID_sha1:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
-        if( m_length != 20 )
+        if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -472,7 +480,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
         }
         break;
     case NID_sha256:
-        if( m_length != 32 )
+        if( m_length != SC_OSSL_SHA256_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -497,7 +505,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
 
         break;
     case NID_sha384:
-        if( m_length != 48 )
+        if( m_length != SC_OSSL_SHA384_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -521,7 +529,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(_In_ int type, _In_reads_bytes_(m_length) const u
         }
         break;
     case NID_sha512:
-        if( m_length != 64 )
+        if( m_length != SC_OSSL_SHA512_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -560,10 +568,10 @@ err:
 // dtype denotes the message digest algorithm that was used to generate the signature. rsa is the signer's
 // public key.
 // Returns 1 on successful verification
-SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
-    _In_ unsigned int m_length,
+SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
+    unsigned int m_length,
     _In_reads_bytes_(siglen) const unsigned char* sigbuf,
-    _In_ unsigned int siglen, _In_ const RSA* rsa)
+    unsigned int siglen, _In_ const RSA* rsa)
 {
     BN_ULONG cbModulus = 0;
     size_t cbResult = 0;
@@ -591,7 +599,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
     {
     case NID_md5_sha1:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if( m_length != 36 )
+        if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
             goto err;
@@ -616,7 +624,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
         break;
     case NID_md5:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
-        if( m_length != 16 )
+        if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -640,7 +648,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
         break;
     case NID_sha1:
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
-        if( m_length != 20 )
+        if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -663,7 +671,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
         }
         break;
     case NID_sha256:
-        if( m_length != 32 )
+        if( m_length != SC_OSSL_SHA256_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -685,7 +693,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
         }
         break;
     case NID_sha384:
-        if( m_length != 48 )
+        if( m_length != SC_OSSL_SHA384_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -708,7 +716,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(_In_ int dtype, _In_reads_bytes_(m_length) cons
         }
         break;
     case NID_sha512:
-        if( m_length != 64 )
+        if( m_length != SC_OSSL_SHA512_DIGEST_LENGTH )
         {
             goto err;
         }
@@ -748,7 +756,7 @@ err:
 // the number of primes to form the modulus will be primes, and the public exponent will be e.
 // cb is an optional callback for progress of key generation that is unused in our implementation.
 // Returns 1 on success or 0 on error.
-SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, _In_ int bits, _In_ BIGNUM* e,
+SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     _In_opt_ BN_GENCB* cb)
 {
     UINT64  pubExp64;
@@ -939,24 +947,6 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, _In_ int bits, _In_ BIGNUM* e,
     RSA_set0_factors(rsa, rsa_p, rsa_q);
     RSA_set0_crt_params(rsa, rsa_dmp1, rsa_dmq1, rsa_iqmp);
 
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPublicExp", pbPublicExp, cbPublicExp);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbModulus", pbModulus, cbModulus);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbPrimes[0]", ppbPrimes[0], cbPrime1);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbPrimes[1]", ppbPrimes[1], cbPrime2);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbCrtExponents[0]", ppbCrtExponents[0], cbPrime1);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbCrtExponents[1]", ppbCrtExponents[1], cbPrime2);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbCrtCoefficient", pbCrtCoefficient, cbPrime1);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPrivateExponent", pbPrivateExponent, cbPrime1);
-
-    SC_OSSL_LOG_BIGNUM_DEBUG("e", rsa_e);
-    SC_OSSL_LOG_BIGNUM_DEBUG("n", rsa_n);
-    SC_OSSL_LOG_BIGNUM_DEBUG("p", rsa_p);
-    SC_OSSL_LOG_BIGNUM_DEBUG("q", rsa_q);
-    SC_OSSL_LOG_BIGNUM_DEBUG("dmp1", rsa_dmp1);
-    SC_OSSL_LOG_BIGNUM_DEBUG("dmq1", rsa_dmq1);
-    SC_OSSL_LOG_BIGNUM_DEBUG("iqmp", rsa_iqmp);
-    SC_OSSL_LOG_BIGNUM_DEBUG("d", rsa_d);
-
     keyCtx->initialized = 1;
     ret = 1;
 
@@ -1130,15 +1120,6 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
         BN_bn2bin(rsa_d, pbPrivateExponent);
     }
 
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPublicExp", pbPublicExp, cbPublicExp);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbModulus", pbModulus, cbModulus);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbPrimes[0]", ppbPrimes[0], pcbPrimes[0]);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbPrimes[1]", ppbPrimes[1], pcbPrimes[1]);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbCrtExponents[0]", ppbCrtExponents[0], pcbCrtExponents[0]);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt ppbCrtExponents[1]", ppbCrtExponents[1], pcbCrtExponents[1]);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbCrtCoefficient", pbCrtCoefficient, cbCrtCoefficient);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPrivateExponent", pbPrivateExponent, cbPrivateExponent);
-
     if( nPrimes != 0 && nPrimes != 2 )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
@@ -1269,7 +1250,7 @@ void sc_ossl_rsa_free_key_context(_In_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
 
 // Destroys instance of RSA object. The memory for rsa is not freed by this function.
 // Returns 1 on success
-SCOSSL_STATUS sc_ossl_rsa_finish(_In_ RSA *rsa)
+SCOSSL_STATUS sc_ossl_rsa_finish(_Inout_ RSA *rsa)
 {
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
     if( keyCtx )
