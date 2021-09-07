@@ -329,7 +329,7 @@ err:
 // Returns size of signature, or -1 on error
 _Success_(return >= 0)
 int sc_ossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
-    _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, _In_ padding)
+    _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, int padding)
 {
     SC_OSSL_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
