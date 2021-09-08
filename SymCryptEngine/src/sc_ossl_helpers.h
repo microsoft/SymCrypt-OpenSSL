@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
+typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For functions that return length on success and -1 on error
 
 void* SC_OSSL_ENGINE_zalloc(size_t num);
 void* SC_OSSL_ENGINE_realloc(void *mem, size_t num);
