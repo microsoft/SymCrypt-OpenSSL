@@ -46,6 +46,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
+    int res = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -173,8 +174,10 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         break;
     }
 
+    res = (cbResult <= INT_MAX) ? cbResult : -1;
+
 cleanup:
-    return cbResult;
+    return res;
 }
 
 SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
@@ -183,6 +186,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
+    int res = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -302,8 +306,10 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
         break;
     }
 
+    res = (cbResult <= INT_MAX) ? cbResult : -1;
+
 cleanup:
-    return cbResult;
+    return res;
 }
 
 SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
@@ -363,10 +369,6 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
     }
 
     cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
-    if( siglen != NULL )
-    {
-        *siglen = cbModulus;
-    }
     if( sigret == NULL || siglen == NULL )
     {
         goto cleanup;
@@ -391,7 +393,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -416,7 +418,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -441,7 +443,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -465,7 +467,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -490,7 +492,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -514,7 +516,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        0,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        sigret,
-                       siglen != NULL ? (*siglen > cbModulus ? cbModulus : *siglen) : 0,
+                       cbModulus,
                        &cbResult);
 
         if( SymError != SYMCRYPT_NO_ERROR )
@@ -528,6 +530,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
         goto cleanup;
     }
 
+    *siglen = cbResult;
     ret = 1;
 
 cleanup:
