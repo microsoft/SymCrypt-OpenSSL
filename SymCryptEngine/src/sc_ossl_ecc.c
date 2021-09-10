@@ -318,7 +318,7 @@ err:
     return res;
 }
 
-void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
+void sc_ossl_ecc_free_key_context(_Inout_ SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
 {
     keyCtx->initialized = 0;
     if( keyCtx->data )
@@ -335,7 +335,7 @@ void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
 #define NID_secp192r1 (NID_X9_62_prime192v1)
 #define NID_secp256r1 (NID_X9_62_prime256v1)
 
-void sc_ossl_eckey_finish(EC_KEY *key)
+void sc_ossl_eckey_finish(_Inout_ EC_KEY *key)
 {
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, eckey_sc_ossl_idx);
     if( keyCtx )
