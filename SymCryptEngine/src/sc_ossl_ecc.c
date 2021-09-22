@@ -702,9 +702,14 @@ int sc_ossl_get_context(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx)
     return sc_ossl_get_context_ex(eckey, ppKeyCtx, FALSE);
 }
 
-int sc_ossl_eckey_sign(int type, const unsigned char* dgst, int dlen,
-    unsigned char* sig, unsigned int* siglen,
-    const BIGNUM* kinv, const BIGNUM* r, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_sign(int type,
+                        _In_reads_bytes_(dlen) const unsigned char* dgst,
+                        int dlen,
+                        _Out_writes_bytes_(siglen) unsigned char* sig,
+                        _Out_ unsigned int* siglen,
+                        _In_opt_ const BIGNUM* kinv,
+                        _In_opt_ const BIGNUM* r,
+                        _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -757,9 +762,7 @@ int sc_ossl_eckey_sign(int type, const unsigned char* dgst, int dlen,
     return 1;
 }
 
-
-int sc_ossl_eckey_sign_setup(EC_KEY* eckey, BN_CTX* ctx_in, BIGNUM** kinvp,
-    BIGNUM** rp)
+SCOSSL_STATUS sc_ossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _Out_ BIGNUM** kinvp, _Out_ BIGNUM** rp)
 {
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
     const EC_KEY_METHOD* ossl_eckey_method = EC_KEY_OpenSSL();
@@ -785,10 +788,9 @@ int sc_ossl_eckey_sign_setup(EC_KEY* eckey, BN_CTX* ctx_in, BIGNUM** kinvp,
     }
 }
 
-
-ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
-    const BIGNUM* in_kinv, const BIGNUM* in_r,
-    EC_KEY* eckey)
+ECDSA_SIG* sc_ossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* dgst, int dgst_len,
+                                   _In_opt_ const BIGNUM* in_kinv, _In_opt_ const BIGNUM* in_r,
+                                   _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -851,7 +853,7 @@ ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
         }
         if( s != NULL )
         {
-            BN_free(r);
+            BN_free(s);
         }
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
         return NULL;
@@ -877,10 +879,8 @@ ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
     return returnSignature;
 }
 
-
-int sc_ossl_eckey_verify(
-    int type, const unsigned char* dgst, int dgstlen,
-    const unsigned char* sig, int siglen, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+                          _In_reads_bytes_(sig_len) const unsigned char* sigbuf, int sig_len, _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -901,7 +901,7 @@ int sc_ossl_eckey_verify(
         {
             return 0;
         }
-        return pfn_eckey_verify(type, dgst, dgstlen, sig, siglen, eckey);
+        return pfn_eckey_verify(type, dgst, dgst_len, sigbuf, sig_len, eckey);
     case SC_OSSL_ECC_GET_CONTEXT_SUCCESS:
         break;
     default:
@@ -910,7 +910,7 @@ int sc_ossl_eckey_verify(
     }
 
     cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement( keyCtx->key->pCurve );
-    if( sc_ossl_ecdsa_remove_der(sig, siglen, &buf[0], cbSymCryptSig) == 0 )
+    if( sc_ossl_ecdsa_remove_der(sigbuf, sig_len, &buf[0], cbSymCryptSig) == 0 )
     {
         SC_OSSL_LOG_ERROR("sc_ossl_ecdsa_remove_der failed");
         return 0;
@@ -919,7 +919,7 @@ int sc_ossl_eckey_verify(
     symError = SymCryptEcDsaVerify(
         keyCtx->key,
         dgst,
-        dgstlen,
+        dgst_len,
         buf,
         cbSymCryptSig,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -933,9 +933,8 @@ int sc_ossl_eckey_verify(
     return 1;
 }
 
-
-int sc_ossl_eckey_verify_sig(
-    const unsigned char* dgst, int dgst_len, const ECDSA_SIG* sig, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+                              _In_ const ECDSA_SIG* sig, _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -990,13 +989,13 @@ int sc_ossl_eckey_verify_sig(
     return 1;
 }
 
-int sc_ossl_eckey_keygen(EC_KEY *eckey)
+SCOSSL_STATUS sc_ossl_eckey_keygen(_Inout_ EC_KEY *key)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
-    switch( sc_ossl_get_context_ex(eckey, &keyCtx, TRUE) )
+    switch( sc_ossl_get_context_ex(key, &keyCtx, TRUE) )
     {
     case SC_OSSL_ECC_GET_CONTEXT_ERROR:
         SC_OSSL_LOG_ERROR("sc_ossl_get_context_ex failed.");
@@ -1009,7 +1008,7 @@ int sc_ossl_eckey_keygen(EC_KEY *eckey)
         {
             return 0;
         }
-        return pfn_eckey_keygen(eckey);
+        return pfn_eckey_keygen(key);
     case SC_OSSL_ECC_GET_CONTEXT_SUCCESS:
         return 1;
     default:
@@ -1018,10 +1017,10 @@ int sc_ossl_eckey_keygen(EC_KEY *eckey)
     }
 }
 
-int sc_ossl_eckey_compute_key(unsigned char **psec,
-                               size_t *pseclen,
-                               const EC_POINT *pub_key,
-                               const EC_KEY *ecdh)
+SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(pseclen) unsigned char **psec,
+                                                _Out_ size_t *pseclen,
+                                                _In_ const EC_POINT *pub_key,
+                                                _In_ const EC_KEY *ecdh)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -1062,7 +1061,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( ecgroup == NULL )
     {
         SC_OSSL_LOG_ERROR("EC_KEY_get0_group returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
@@ -1070,13 +1069,13 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( pkPublic == NULL )
     {
         SC_OSSL_LOG_ERROR("SymCryptEckeyAllocate returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
         SC_OSSL_LOG_ERROR("BN_CTX_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
     BN_CTX_start(bn_ctx);
 
@@ -1084,20 +1083,20 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
         ((ec_pub_y = BN_new()) == NULL) )
     {
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     if( EC_POINT_get_affine_coordinates(ecgroup, pub_key, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
         SC_OSSL_LOG_ERROR("EC_POINT_get_affine_coordinates failed.");
-        goto err;
+        goto cleanup;
     }
 
     if( (2*BN_num_bytes(ec_pub_x) > cbPublicKey) || (2*BN_num_bytes(ec_pub_y) > cbPublicKey) )
     {
         SC_OSSL_LOG_ERROR("EC_POINT coordinate too big: BN_num_bytes(ec_pub_x) %d, BN_num_bytes(ec_pub_y) %d, cbPublicKey %d.",
                         BN_num_bytes(ec_pub_x), BN_num_bytes(ec_pub_y), cbPublicKey);
-        goto err;
+        goto cleanup;
     }
 
     BN_bn2binpad(ec_pub_x, buf, cbPublicKey/2);
@@ -1113,7 +1112,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEckeySetValue failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     *pseclen = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
@@ -1129,12 +1128,23 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEcDhSecretAgreement failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     res = *pseclen;
 
 cleanup:
+
+    if (res == -1)
+    {
+        if( *psec )
+        {
+            OPENSSL_free(*psec);
+            *psec = NULL;
+        }
+        *pseclen = 0;
+    }
+
     // Always free the temporary pkPublic, BIGNUMs and BN_CTX
     if( pkPublic )
     {
@@ -1154,23 +1164,10 @@ cleanup:
         BN_CTX_free(bn_ctx);
     }
     return res;
-
-err:
-    if( *psec )
-    {
-        OPENSSL_free(*psec);
-        *psec = NULL;
-    }
-    *pseclen = 0;
-
-    res = -1;
-
-    goto cleanup;
 }
 
 void sc_ossl_destroy_ecc_curves(void)
 {
-
     if( _hidden_curve_P192 )
     {
         SymCryptEcurveFree(_hidden_curve_P192);
