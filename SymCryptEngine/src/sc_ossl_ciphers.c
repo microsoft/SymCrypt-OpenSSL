@@ -78,7 +78,6 @@ static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *pt
 static EVP_CIPHER *_hidden_aes_128_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_cbc(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_128_cbc == NULL
         && ((_hidden_aes_128_cbc = EVP_CIPHER_meth_new(NID_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_cbc,16)
@@ -98,7 +97,6 @@ static const EVP_CIPHER *sc_ossl_aes_128_cbc(void)
 static EVP_CIPHER *_hidden_aes_192_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_cbc(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_192_cbc == NULL
         && ((_hidden_aes_192_cbc = EVP_CIPHER_meth_new(NID_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_cbc,16)
@@ -118,7 +116,6 @@ static const EVP_CIPHER *sc_ossl_aes_192_cbc(void)
 static EVP_CIPHER *_hidden_aes_256_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_cbc(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_256_cbc == NULL
         && ((_hidden_aes_256_cbc = EVP_CIPHER_meth_new(NID_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_cbc,16)
@@ -143,7 +140,6 @@ static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *pt
 static EVP_CIPHER *_hidden_aes_128_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_ecb(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_128_ecb == NULL
         && ((_hidden_aes_128_ecb = EVP_CIPHER_meth_new(NID_aes_128_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_ecb,16)
@@ -163,7 +159,6 @@ static const EVP_CIPHER *sc_ossl_aes_128_ecb(void)
 static EVP_CIPHER *_hidden_aes_192_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_ecb(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_192_ecb == NULL
         && ((_hidden_aes_192_ecb = EVP_CIPHER_meth_new(NID_aes_192_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_ecb,16)
@@ -183,7 +178,6 @@ static const EVP_CIPHER *sc_ossl_aes_192_ecb(void)
 static EVP_CIPHER *_hidden_aes_256_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_ecb(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_256_ecb == NULL
         && ((_hidden_aes_256_ecb = EVP_CIPHER_meth_new(NID_aes_256_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_ecb, 16)
@@ -210,7 +204,6 @@ static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *pt
 static EVP_CIPHER *_hidden_aes_128_xts = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_xts(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_128_xts == NULL
         && ((_hidden_aes_128_xts = EVP_CIPHER_meth_new(NID_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE * 2)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, 16)
@@ -231,7 +224,6 @@ static const EVP_CIPHER *sc_ossl_aes_128_xts(void)
 static EVP_CIPHER *_hidden_aes_256_xts = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_xts(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_256_xts == NULL
         && ((_hidden_aes_256_xts = EVP_CIPHER_meth_new(NID_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE * 2)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, 16)
@@ -259,7 +251,6 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *pt
 static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_gcm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_128_gcm == NULL
         && ((_hidden_aes_128_gcm = EVP_CIPHER_meth_new(NID_aes_128_gcm, 1, AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_gcm,12)
@@ -279,7 +270,6 @@ static const EVP_CIPHER *sc_ossl_aes_128_gcm(void)
 static EVP_CIPHER *_hidden_aes_192_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_gcm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_192_gcm == NULL
         && ((_hidden_aes_192_gcm = EVP_CIPHER_meth_new(NID_aes_192_gcm, 1, AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_gcm,12)
@@ -299,7 +289,6 @@ static const EVP_CIPHER *sc_ossl_aes_192_gcm(void)
 static EVP_CIPHER *_hidden_aes_256_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_gcm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_256_gcm == NULL
         && ((_hidden_aes_256_gcm = EVP_CIPHER_meth_new(NID_aes_256_gcm, 1, AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_gcm,12)
@@ -318,7 +307,6 @@ static const EVP_CIPHER *sc_ossl_aes_256_gcm(void)
 
 void sc_ossl_destroy_ciphers(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     EVP_CIPHER_meth_free(_hidden_aes_128_cbc);
     EVP_CIPHER_meth_free(_hidden_aes_192_cbc);
     EVP_CIPHER_meth_free(_hidden_aes_256_cbc);
@@ -346,7 +334,6 @@ void sc_ossl_destroy_ciphers(void)
 int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
                      const int **nids, int nid)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int ok = 1;
     if( !cipher )
     {
@@ -406,8 +393,6 @@ int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                              const unsigned char *iv, int enc)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("Encryption?: %d", enc);
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     PBYTE ctx_iv = EVP_CIPHER_CTX_iv_noconst(ctx);
@@ -415,17 +400,14 @@ int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     if( iv )
     {
         memcpy(ctx_iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
-        SC_OSSL_LOG_BYTES_DEBUG("ctx_iv", ctx_iv, EVP_CIPHER_CTX_iv_length(ctx));
     }
     if( key )
     {
         SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptAesExpandKey failed", SymError);
             return 0;
         }
-        SC_OSSL_LOG_BYTES_DEBUG("key", key, EVP_CIPHER_CTX_key_length(ctx));
     }
     return 1;
 }
@@ -433,15 +415,9 @@ int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("in: %lx, out: %lx, Input Length: %ld", in, out, inl);
-    SC_OSSL_LOG_BYTES_DEBUG("pre in", in, inl);
-    SC_OSSL_LOG_BYTES_DEBUG("pre out", out, inl);
     int ret = 0;
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     PBYTE ctx_iv = EVP_CIPHER_CTX_iv_noconst(ctx);
-    SC_OSSL_LOG_BYTES_DEBUG("cipherCtx", cipherCtx, sizeof(struct cipher_cbc_ctx));
-    SC_OSSL_LOG_BYTES_DEBUG("ctx_iv", ctx_iv, EVP_CIPHER_CTX_iv_length(ctx));
     if( cipherCtx->enc )
     {
         SymCryptAesCbcEncrypt(&cipherCtx->key, ctx_iv, in, out, inl);
@@ -450,10 +426,9 @@ int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
     {
         SymCryptAesCbcDecrypt(&cipherCtx->key, ctx_iv, in, out, inl);
     }
-    SC_OSSL_LOG_BYTES_DEBUG("post in", in, inl);
-    SC_OSSL_LOG_BYTES_DEBUG("post out", out, inl);
-    SC_OSSL_LOG_BYTES_DEBUG("ctx_iv", ctx_iv, EVP_CIPHER_CTX_iv_length(ctx));
+
     ret = 1;
+
 end:
     return ret;
 }
@@ -461,8 +436,6 @@ end:
 static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
                                     void *ptr)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("type: %d, arg: %d", type, arg);
     struct cipher_cbc_ctx *srcCtx;
     struct cipher_cbc_ctx *dstCtx;
     switch( type )
@@ -477,7 +450,6 @@ static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
         break;
     default:
-        SC_OSSL_LOG_DEBUG("Unexpected ctrl type");
         return 0;
     }
     return 1;
@@ -489,21 +461,14 @@ static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                              const unsigned char *iv, int enc)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("Encryption?: %d", enc);
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     cipherCtx->enc = enc;
-    if( iv )
-    {
-        SC_OSSL_LOG_DEBUG("Unexpected non-NULL iv - ignored");
-    }
     if( key )
     {
         SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptAesExpandKey failed", SymError);
             return 0;
         }
     }
@@ -513,12 +478,8 @@ int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 int sc_ossl_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    // TOO NOISY
-    // SC_OSSL_LOG_DEBUG(NULL);
-    // SC_OSSL_LOG_DEBUG("in: %x, out: %x, Input Length: %ld", in, out, inl);
     int ret = 0;
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    //SC_OSSL_LOG_DEBUG("cipherCtx->key: %x, cipherCtx->iv: %x", cipherCtx->key, cipherCtx->iv);
     if( cipherCtx->enc )
     {
         SymCryptAesEcbEncrypt(&cipherCtx->key, in, out, inl);
@@ -535,8 +496,6 @@ end:
 static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
                                     void *ptr)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("type: %d, arg: %d", type, arg);
     struct cipher_cbc_ctx *srcCtx;
     struct cipher_cbc_ctx *dstCtx;
     switch( type )
@@ -551,7 +510,6 @@ static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
         break;
     default:
-        SC_OSSL_LOG_DEBUG("Unexpected ctrl type");
         return 0;
     }
     return 1;
@@ -563,8 +521,6 @@ static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                              const unsigned char *iv, int enc)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("Encryption?: %d, EVP_CIPHER_CTX_iv_length: %d", enc, EVP_CIPHER_CTX_iv_length(ctx));
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     cipherCtx->enc = enc;
@@ -575,7 +531,6 @@ int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     }
     else
     {
-        SC_OSSL_LOG_DEBUG("ERROR: No iv (tweak) provided to xts init");
         return 0;
     }
     if( key )
@@ -583,7 +538,6 @@ int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
         SymError = SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptXtsAesExpandKey failed", SymError);
             return 0;
         }
     }
@@ -593,11 +547,8 @@ int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 int sc_ossl_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("in: %x, out: %x, Input Length: %ld", in, out, inl);
     int ret = 0;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    SC_OSSL_LOG_DEBUG("cipherCtx->key: %x, cipherCtx->iv: %x", cipherCtx->key, cipherCtx->iv);
     if( inl > 0 )
     {
         if( (inl % 16) != 0 )
@@ -639,8 +590,6 @@ end:
 static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
                                     void *ptr)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("type: %d, arg: %d", type, arg);
     switch( type )
     {
     case EVP_CTRL_COPY:
@@ -656,7 +605,6 @@ static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         // SymCryptXtsKeyCopy(&srcCtx->key, &dstCtx->key);
         return 0;
     default:
-        SC_OSSL_LOG_DEBUG("Unexpected ctrl type");
         return 0;
     }
     return 1;
@@ -668,8 +616,6 @@ static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                              const unsigned char *iv, int enc)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("Encryption?: %d", enc);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
@@ -678,15 +624,12 @@ int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     if( iv )
     {
         memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
-        SC_OSSL_LOG_BYTES_DEBUG("Saved IV", cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx));
     }
     if( key )
     {
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmExpandKey Input: key", key, EVP_CIPHER_CTX_key_length(ctx));
         SymError = SymCryptGcmExpandKey(&cipherCtx->key, SymCryptAesBlockCipher, key, EVP_CIPHER_CTX_key_length(ctx));
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptGcmExpandKey failed", SymError);
             return 0;
         }
     }
@@ -699,7 +642,6 @@ int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     UINT64 nextIV = 0;
@@ -739,7 +681,6 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
         memcpy(out, cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, SC_OSSL_AESGCM_TLS_IV_LEN);
 
         // Set up the cipher state with the full IV
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmInit enc Input cipherCtx->IV", cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
         SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
 
         // Set up the cipher state with the next IV
@@ -753,7 +694,6 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
         memcpy(cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, out, SC_OSSL_AESGCM_TLS_IV_LEN);
 
         // Set up the cipher state with the full IV
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmInit dec Input cipherCtx->IV", cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
         SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
     }
 
@@ -761,7 +701,6 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
     cbPayload = inl - (SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN);
 
     // Add Auth Data to Gcm State
-    SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmAuthPart input: AuthData", cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN);
     SymCryptGcmAuthPart(&cipherCtx->state, cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN);
 
     if( cipherCtx->enc )
@@ -803,10 +742,8 @@ err:
 int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    SC_OSSL_LOG_DEBUG("Input Length: %ld", inl);
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
     if( cipherCtx->tlsAadSet )
@@ -816,7 +753,6 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
     if( !cipherCtx->operationInProgress )
     {
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmInit Input cipherCtx->IV", cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx));
         SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx));
         cipherCtx->operationInProgress = 1;
     }
@@ -824,7 +760,6 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
     if( out == NULL && in != NULL && inl > 0 )
     {
         // Auth Data Passed in
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmAuthPart input: AuthData", (const char *)in, inl);
         SymCryptGcmAuthPart(&cipherCtx->state, in, inl);
         ret = 0;
         goto end;
@@ -835,9 +770,7 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
         if( inl > 0 )
         {
             // Encrypt Part
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmEncryptPart output: in", (const char *)in, inl);
             SymCryptGcmEncryptPart(&cipherCtx->state, in, out, inl);
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmEncryptPart output: out", (const char *)out, inl);
             ret = inl;
             goto end;
         }
@@ -845,7 +778,6 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
         {
             // Final Encrypt Call
             SymCryptGcmEncryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmEncryptFinal output: tag", (const char *)cipherCtx->tag, cipherCtx->taglen);
             ret = 0;
             goto end;
         }
@@ -855,9 +787,7 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
         if( inl > 0 )
         {
             // Decrypt Part
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmDecryptPart output: in", (const char *)in, inl);
             SymCryptGcmDecryptPart(&cipherCtx->state, in, out, inl);
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmDecryptPart output: out", (const char *)out, inl);
             ret = inl;
             goto end;
         }
@@ -871,7 +801,6 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                 ret = -1;
                 goto end;
             }
-            SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmDecryptFinal output: tag", (const char *)cipherCtx->tag, cipherCtx->taglen);
             ret = 0;
             goto end;
         }
@@ -883,8 +812,6 @@ end:
 static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
                                     void *ptr)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("type: %d, arg: %d", type, arg);
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     struct cipher_gcm_ctx *dstCtx;
     unsigned char *iv = NULL;
