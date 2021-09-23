@@ -390,8 +390,12 @@ int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 /*
  * AES-CBC Implementation
  */
-int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
-                             const unsigned char *iv, int enc)
+ 
+// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+                             _In_ const unsigned char *iv, int enc)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -412,8 +416,10 @@ int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     return 1;
 }
 
-int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                               const unsigned char *in, size_t inl)
+// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -429,12 +435,13 @@ int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
     ret = 1;
 
-end:
     return ret;
 }
 
-static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
-                                    void *ptr)
+// Allows various cipher specific parameters to be determined and set.
+// Returns 1 on success, or 0 on error.
+static SCOSSL_STATUS sc_ossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    _Inout_ void *ptr)
 {
     struct cipher_cbc_ctx *srcCtx;
     struct cipher_cbc_ctx *dstCtx;
@@ -458,8 +465,12 @@ static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 /*
  * AES-ECB Implementation
  */
-int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
-                             const unsigned char *iv, int enc)
+
+// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+                             _In_ const unsigned char *iv, int enc)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -475,8 +486,10 @@ int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     return 1;
 }
 
-int sc_ossl_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                               const unsigned char *in, size_t inl)
+// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -489,12 +502,14 @@ int sc_ossl_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
         SymCryptAesEcbDecrypt(&cipherCtx->key, in, out, inl);
     }
     ret = 1;
-end:
+
     return ret;
 }
 
-static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
-                                    void *ptr)
+// Allows various cipher specific parameters to be determined and set.
+// Returns 1 on success, or 0 on error.
+static SCOSSL_STATUS sc_ossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    _Inout_ void *ptr)
 {
     struct cipher_cbc_ctx *srcCtx;
     struct cipher_cbc_ctx *dstCtx;
@@ -518,8 +533,12 @@ static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 /*
  * AES-XTS Implementation
  */
-int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
-                             const unsigned char *iv, int enc)
+
+// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+                             _In_ const unsigned char *iv, int enc)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -544,8 +563,10 @@ int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     return 1;
 }
 
-int sc_ossl_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
-                               const unsigned char *in, size_t inl)
+// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -581,14 +602,16 @@ int sc_ossl_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                 out,
                 inl);
         }
-        ret = inl;
+        ret = 1;
     }
-end:
+
     return ret;
 }
 
-static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
-                                    void *ptr)
+// Allows various cipher specific parameters to be determined and set.
+// Returns 1 on success, or 0 on error.
+static SCOSSL_STATUS sc_ossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    _Inout_ void *ptr)
 {
     switch( type )
     {
@@ -613,8 +636,12 @@ static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
 /*
  * AES-GCM Implementation
  */
-int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
-                             const unsigned char *iv, int enc)
+ 
+// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
+// Returns 1 on success, or 0 on error.
+SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+                             _In_ const unsigned char *iv, int enc)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -639,8 +666,10 @@ int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 #define SC_OSSL_AESGCM_TLS_IV_LEN 8
 #define SC_OSSL_AESGCM_TLS_ICV_LEN 16
 
-static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *out,
-                               const unsigned char *in, size_t inl)
+// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Returns 1 on success, or 0 on error.
+static SCOSSL_STATUS sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
+                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -656,22 +685,22 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
     if( in != out )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS does not support out-of-place operation");
-        goto err;
+        goto cleanup;
     }
     if( inl < SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS buffer too small");
-        goto err;
+        goto cleanup;
     }
     if( cipherCtx->operationInProgress )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS operation cannot be multi-stage");
-        goto err;
+        goto cleanup;
     }
     if( cipherCtx->taglen != SC_OSSL_AESGCM_TLS_ICV_LEN )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS taglen must be %d", SC_OSSL_AESGCM_TLS_ICV_LEN);
-        goto err;
+        goto cleanup;
     }
 
     if( cipherCtx->enc )
@@ -723,18 +752,19 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptGcmDecryptFinal failed", SymError);
-            goto err;
+            goto cleanup;
         }
 
         ret = cbPayload;
     }
 
-end:
+cleanup:
+    if( ret == 0 )
+    {
+        OPENSSL_cleanse(out, inl);
+    }
+
     return ret;
-err:
-    ret = -1;
-    OPENSSL_cleanse(out, inl);
-    goto end;
 }
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
@@ -809,8 +839,10 @@ end:
     return ret;
 }
 
-static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
-                                    void *ptr)
+// Allows various cipher specific parameters to be determined and set.
+// Returns 1 on success, or 0 on error.
+static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    _Inout_ void *ptr)
 {
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     struct cipher_gcm_ctx *dstCtx;
