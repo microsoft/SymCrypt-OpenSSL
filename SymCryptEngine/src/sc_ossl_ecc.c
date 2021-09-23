@@ -1049,7 +1049,7 @@ SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(pseclen) unsign
 
     int res = -1; // fail
 
-    switch( sc_ossl_get_context((EC_KEY*)ecdh, &keyCtx) )
+    switch( sc_ossl_get_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor sc_ossl_get_context
     {
     case SC_OSSL_ECC_GET_CONTEXT_ERROR:
         SC_OSSL_LOG_ERROR("sc_ossl_get_context failed.");
