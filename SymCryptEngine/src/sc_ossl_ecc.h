@@ -28,7 +28,7 @@ SCOSSL_STATUS sc_ossl_eckey_keygen(_Inout_ EC_KEY *key);
 // Computes shared secret psec and secret length pseclen using pub_key and ecdh.
 // Allocates psec on success.
 // Returns length of secret on success, or -1 on error.
-SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(pseclen) unsigned char **psec,
+SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsigned char **psec,
                                                 _Out_ size_t *pseclen,
                                                 _In_ const EC_POINT *pub_key,
                                                 _In_ const EC_KEY *ecdh);
@@ -40,7 +40,7 @@ SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(pseclen) unsign
 SCOSSL_STATUS sc_ossl_eckey_sign(int type,
                         _In_reads_bytes_(dlen) const unsigned char* dgst,
                         int dlen,
-                        _Out_writes_bytes_(siglen) unsigned char* sig,
+                        _Out_writes_bytes_(*siglen) unsigned char* sig,
                         _Out_ unsigned int* siglen,
                         _In_opt_ const BIGNUM* kinv,
                         _In_opt_ const BIGNUM* r,

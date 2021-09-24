@@ -718,7 +718,7 @@ SCOSSL_STATUS sc_ossl_get_context(_Inout_ EC_KEY* eckey, _Out_ SC_OSSL_ECC_KEY_C
 SCOSSL_STATUS sc_ossl_eckey_sign(int type,
                         _In_reads_bytes_(dlen) const unsigned char* dgst,
                         int dlen,
-                        _Out_writes_bytes_(siglen) unsigned char* sig,
+                        _Out_writes_bytes_(*siglen) unsigned char* sig,
                         _Out_ unsigned int* siglen,
                         _In_opt_ const BIGNUM* kinv,
                         _In_opt_ const BIGNUM* r,
@@ -1030,7 +1030,7 @@ SCOSSL_STATUS sc_ossl_eckey_keygen(_Inout_ EC_KEY *key)
     }
 }
 
-SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(pseclen) unsigned char **psec,
+SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsigned char **psec,
                                                 _Out_ size_t *pseclen,
                                                 _In_ const EC_POINT *pub_key,
                                                 _In_ const EC_KEY *ecdh)
