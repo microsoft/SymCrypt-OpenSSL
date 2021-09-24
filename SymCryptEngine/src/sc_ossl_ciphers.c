@@ -26,12 +26,13 @@ struct cipher_xts_ctx {
     SYMCRYPT_XTS_AES_EXPANDED_KEY key;
 };
 
-#define SC_OSSL_GCM_IV_LENGTH      12
+#define SC_OSSL_GCM_IV_LENGTH      (12)
 
 struct cipher_gcm_ctx {
     INT32 enc;                     /* COP_ENCRYPT or COP_DECRYPT */
     INT32 operationInProgress;
     BYTE iv[SC_OSSL_GCM_IV_LENGTH];
+    INT32 ivlen;
     SYMCRYPT_GCM_STATE state;
     SYMCRYPT_GCM_EXPANDED_KEY key;
     BYTE tag[EVP_GCM_TLS_TAG_LEN];
@@ -40,6 +41,40 @@ struct cipher_gcm_ctx {
     INT32 tlsAadSet;
 };
 
+#define SCOSSL_CCM_MIN_IV_LENGTH    (7)
+#define SCOSSL_CCM_MAX_IV_LENGTH    (13)
+#define SCOSSL_CCM_MIN_TAG_LENGTH   (4)
+#define SCOSSL_CCM_MAX_TAG_LENGTH   (16)
+
+// The way CCM works with the EVP APIs is quite specific, there are 2 cases:
+//  Encrypt/Decrypt with no AAD
+//      => We expect 1 call to en/decrypt the buffer from in to out (and set return to failure on tag mismatch for decrypt)
+//      => Then 1 call to "finalize" - does nothing (in==NULL, inl==0)
+//  Encrypt/Decrypt with AAD
+//      => We expect 1 call to set the total input length (i.e. plain/ciphertext + AAD) (in==NULL, inl==cbData)
+//      => Then 1 call to set all of the AAD (in==pbAuthData, inl==cbAuthData)
+//      => Then 1 call to en/decrypt the buffer from in to out (and set return to failure on tag mismatch for decrypt)
+//      => Then 1 call to "finalize" - does nothing (in==NULL, inl==0)
+typedef enum {
+    SCOSSL_CCM_STAGE_INIT = 0,      // The initial state
+    SCOSSL_CCM_STAGE_SET_CBDATA,    // The state after a call providing the total input length
+    SCOSSL_CCM_STAGE_SET_AAD,       // The state after a call providing the AAD
+    SCOSSL_CCM_STAGE_COMPLETE,      // The state after a call providing the plain/ciphertext
+} SCOSSL_CCM_STAGE;
+
+struct cipher_ccm_ctx {
+    INT32 enc;                     /* COP_ENCRYPT or COP_DECRYPT */
+    SCOSSL_CCM_STAGE ccmStage;
+    BYTE iv[SCOSSL_CCM_MAX_IV_LENGTH];
+    INT32 ivlen;
+    SYMCRYPT_CCM_STATE state;
+    SYMCRYPT_AES_EXPANDED_KEY key;
+    BYTE tag[EVP_CCM_TLS_TAG_LEN];
+    INT32 taglen;
+    UINT64 cbData;
+    BYTE tlsAad[EVP_AEAD_TLS1_AAD_LEN];
+    INT32 tlsAadSet;
+};
 
 static int sc_ossl_cipher_nids[] = {
     NID_aes_128_cbc,
@@ -62,6 +97,10 @@ static int sc_ossl_cipher_nids[] = {
     NID_aes_128_gcm,
     NID_aes_192_gcm,
     NID_aes_256_gcm,
+
+    NID_aes_128_ccm,
+    NID_aes_192_ccm,
+    NID_aes_256_ccm,
 };
 
 int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
@@ -252,8 +291,8 @@ int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, cons
 int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
-                        |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER|EVP_CIPH_ALWAYS_CALL_INIT \
-                        |EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
+                        |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
+                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
 
 /* AES128 - GCM */
 static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
@@ -315,6 +354,70 @@ static const EVP_CIPHER *sc_ossl_aes_256_gcm(void)
     return _hidden_aes_256_gcm;
 }
 
+int sc_ossl_aes_ccm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
+int sc_ossl_aes_ccm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
+static int sc_ossl_aes_ccm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+#define AES_CCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CCM_MODE|EVP_CIPH_CUSTOM_COPY \
+                        |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
+                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
+
+/* AES128 - CCM */
+static EVP_CIPHER *_hidden_aes_128_ccm = NULL;
+static const EVP_CIPHER *sc_ossl_aes_128_ccm(void)
+{
+    SC_OSSL_LOG_DEBUG(NULL);
+    if( _hidden_aes_128_ccm == NULL
+        && ((_hidden_aes_128_ccm = EVP_CIPHER_meth_new(NID_aes_128_ccm, 1, AES_128_KEY_SIZE)) == NULL
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ccm, AES_CCM_FLAGS)
+            || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ccm, sc_ossl_aes_ccm_init_key)
+            || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ccm, sc_ossl_aes_ccm_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ccm, sc_ossl_aes_ccm_ctrl)
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_ccm, sizeof(struct cipher_ccm_ctx))) )
+    {
+        EVP_CIPHER_meth_free(_hidden_aes_128_ccm);
+        _hidden_aes_128_ccm = NULL;
+    }
+    return _hidden_aes_128_ccm;
+}
+
+/* AES192 - CCM */
+static EVP_CIPHER *_hidden_aes_192_ccm = NULL;
+static const EVP_CIPHER *sc_ossl_aes_192_ccm(void)
+{
+    SC_OSSL_LOG_DEBUG(NULL);
+    if( _hidden_aes_192_ccm == NULL
+        && ((_hidden_aes_192_ccm = EVP_CIPHER_meth_new(NID_aes_192_ccm, 1, AES_192_KEY_SIZE)) == NULL
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ccm, AES_CCM_FLAGS)
+            || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ccm, sc_ossl_aes_ccm_init_key)
+            || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ccm, sc_ossl_aes_ccm_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ccm, sc_ossl_aes_ccm_ctrl)
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_ccm, sizeof(struct cipher_ccm_ctx))) )
+    {
+        EVP_CIPHER_meth_free(_hidden_aes_192_ccm);
+        _hidden_aes_192_ccm = NULL;
+    }
+    return _hidden_aes_192_ccm;
+}
+
+/* AES256 - CCM */
+static EVP_CIPHER *_hidden_aes_256_ccm = NULL;
+static const EVP_CIPHER *sc_ossl_aes_256_ccm(void)
+{
+    SC_OSSL_LOG_DEBUG(NULL);
+    if( _hidden_aes_256_ccm == NULL
+        && ((_hidden_aes_256_ccm = EVP_CIPHER_meth_new(NID_aes_256_ccm, 1, AES_256_KEY_SIZE)) == NULL
+            || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ccm, AES_CCM_FLAGS)
+            || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ccm, sc_ossl_aes_ccm_init_key)
+            || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ccm, sc_ossl_aes_ccm_cipher)
+            || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ccm, sc_ossl_aes_ccm_ctrl)
+            || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_ccm, sizeof(struct cipher_ccm_ctx))) )
+    {
+        EVP_CIPHER_meth_free(_hidden_aes_256_ccm);
+        _hidden_aes_256_ccm = NULL;
+    }
+    return _hidden_aes_256_ccm;
+}
+
 
 void sc_ossl_destroy_ciphers(void)
 {
@@ -330,6 +433,9 @@ void sc_ossl_destroy_ciphers(void)
     EVP_CIPHER_meth_free(_hidden_aes_128_gcm);
     EVP_CIPHER_meth_free(_hidden_aes_192_gcm);
     EVP_CIPHER_meth_free(_hidden_aes_256_gcm);
+    EVP_CIPHER_meth_free(_hidden_aes_128_ccm);
+    EVP_CIPHER_meth_free(_hidden_aes_192_ccm);
+    EVP_CIPHER_meth_free(_hidden_aes_256_ccm);
     _hidden_aes_128_cbc = NULL;
     _hidden_aes_192_cbc = NULL;
     _hidden_aes_256_cbc = NULL;
@@ -341,6 +447,9 @@ void sc_ossl_destroy_ciphers(void)
     _hidden_aes_128_gcm = NULL;
     _hidden_aes_192_gcm = NULL;
     _hidden_aes_256_gcm = NULL;
+    _hidden_aes_128_ccm = NULL;
+    _hidden_aes_192_ccm = NULL;
+    _hidden_aes_256_ccm = NULL;
 }
 
 int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
@@ -391,6 +500,15 @@ int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
         break;
     case NID_aes_256_gcm:
         *cipher = sc_ossl_aes_256_gcm();
+        break;
+    case NID_aes_128_ccm:
+        *cipher = sc_ossl_aes_128_ccm();
+        break;
+    case NID_aes_192_ccm:
+        *cipher = sc_ossl_aes_192_ccm();
+        break;
+    case NID_aes_256_ccm:
+        *cipher = sc_ossl_aes_256_ccm();
         break;
     default:
         ok = 0;
@@ -693,14 +811,12 @@ int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     return 1;
 }
 
-#define SC_OSSL_AESGCM_TLS_IV_LEN 8
-#define SC_OSSL_AESGCM_TLS_ICV_LEN 16
-
+#define EVP_GCM_TLS_IV_LEN (EVP_GCM_TLS_FIXED_IV_LEN + EVP_GCM_TLS_EXPLICIT_IV_LEN)
 static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
     SC_OSSL_LOG_DEBUG(NULL);
-    int ret = 0;
+    int ret = -1;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     UINT64 nextIV = 0;
     PBYTE  pbPayload = NULL;
@@ -714,88 +830,73 @@ static int sc_ossl_aes_gcm_tls(struct cipher_gcm_ctx *cipherCtx, unsigned char *
     if( in != out )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS does not support out-of-place operation");
-        goto err;
+        goto cleanup;
     }
-    if( inl < SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN )
+    if( inl < EVP_GCM_TLS_EXPLICIT_IV_LEN + EVP_GCM_TLS_TAG_LEN )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS buffer too small");
-        goto err;
+        goto cleanup;
     }
     if( cipherCtx->operationInProgress )
     {
         SC_OSSL_LOG_ERROR("AES-GCM TLS operation cannot be multi-stage");
-        goto err;
+        goto cleanup;
     }
-    if( cipherCtx->taglen != SC_OSSL_AESGCM_TLS_ICV_LEN )
+    if( cipherCtx->taglen != EVP_GCM_TLS_TAG_LEN )
     {
-        SC_OSSL_LOG_ERROR("AES-GCM TLS taglen must be %d", SC_OSSL_AESGCM_TLS_ICV_LEN);
-        goto err;
+        SC_OSSL_LOG_ERROR("AES-GCM TLS taglen must be %d", EVP_GCM_TLS_TAG_LEN);
+        goto cleanup;
     }
+
+    pbPayload = out + EVP_GCM_TLS_EXPLICIT_IV_LEN;
+    cbPayload = inl - (EVP_GCM_TLS_EXPLICIT_IV_LEN + EVP_GCM_TLS_TAG_LEN);
 
     if( cipherCtx->enc )
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
         // Copy it from the context
-        memcpy(out, cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, SC_OSSL_AESGCM_TLS_IV_LEN);
+        memcpy(out, cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_EXPLICIT_IV_LEN);
 
-        // Set up the cipher state with the full IV
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmInit enc Input cipherCtx->IV", cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
-        SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
-
-        // Set up the cipher state with the next IV
-        nextIV = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN ) + 1;
-        SYMCRYPT_STORE_MSBFIRST64( cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, nextIV );
-    }
-    else
-    {
-        // First 8B of ESP payload data are the variable part of the IV (last 8B)
-        // Copy it to the context
-        memcpy(cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, out, SC_OSSL_AESGCM_TLS_IV_LEN);
-
-        // Set up the cipher state with the full IV
-        SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmInit dec Input cipherCtx->IV", cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
-        SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
-    }
-
-    pbPayload = out + SC_OSSL_AESGCM_TLS_IV_LEN;
-    cbPayload = inl - (SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN);
-
-    // Add Auth Data to Gcm State
-    SC_OSSL_LOG_BYTES_DEBUG("SymCryptGcmAuthPart input: AuthData", cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN);
-    SymCryptGcmAuthPart(&cipherCtx->state, cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN);
-
-    if( cipherCtx->enc )
-    {
         // Encrypt payload
-        SymCryptGcmEncryptPart(&cipherCtx->state, pbPayload, pbPayload, cbPayload);
-
-        // Set ICV
-        SymCryptGcmEncryptFinal(&cipherCtx->state, pbPayload+cbPayload, SC_OSSL_AESGCM_TLS_ICV_LEN);
+        SymCryptGcmEncrypt(
+            &cipherCtx->key,
+            cipherCtx->iv, cipherCtx->ivlen,
+            cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload+cbPayload, EVP_GCM_TLS_TAG_LEN );
 
         ret = inl;
     }
     else
     {
-        // Decrypt payload
-        SymCryptGcmDecryptPart(&cipherCtx->state, pbPayload, pbPayload, cbPayload);
+        // First 8B of ESP payload data are the variable part of the IV (last 8B)
+        // Copy it to the context
+        memcpy(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, out, EVP_GCM_TLS_EXPLICIT_IV_LEN);
 
         // Check ICV
-        SymError = SymCryptGcmDecryptFinal(&cipherCtx->state, pbPayload+cbPayload, SC_OSSL_AESGCM_TLS_ICV_LEN);
+        SymError = SymCryptGcmDecrypt(
+            &cipherCtx->key,
+            cipherCtx->iv, cipherCtx->ivlen,
+            cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload+cbPayload, EVP_GCM_TLS_TAG_LEN );
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptGcmDecryptFinal failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptGcmDecrypt failed", SymError);
+
+            goto cleanup;
         }
 
         ret = cbPayload;
     }
 
-end:
+cleanup:
+    if( ret == -1 )
+    {
+        OPENSSL_cleanse(out, inl);
+    }
+
     return ret;
-err:
-    ret = -1;
-    OPENSSL_cleanse(out, inl);
-    goto end;
 }
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
@@ -883,8 +984,6 @@ end:
 static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
                                     void *ptr)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-    SC_OSSL_LOG_DEBUG("type: %d, arg: %d", type, arg);
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     struct cipher_gcm_ctx *dstCtx;
     unsigned char *iv = NULL;
@@ -894,10 +993,11 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
     switch( type )
     {
     case EVP_CTRL_INIT:
+        cipherCtx->ivlen = SC_OSSL_GCM_IV_LENGTH;
         iv = (unsigned char *)EVP_CIPHER_CTX_iv(ctx);
         if( iv )
         {
-            memcpy(cipherCtx->iv, iv, SC_OSSL_GCM_IV_LENGTH);
+            memcpy(cipherCtx->iv, iv, cipherCtx->ivlen);
         }
         cipherCtx->taglen = EVP_GCM_TLS_TAG_LEN;
         cipherCtx->tlsAadSet = 0;
@@ -906,7 +1006,7 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         *(int *)ptr = SC_OSSL_GCM_IV_LENGTH;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // Symcrypt only supports SC_OSSL_GCM_IV_LENGTH
+        // Symcrypt currently only supports SC_OSSL_GCM_IV_LENGTH
         if( arg != SC_OSSL_GCM_IV_LENGTH )
         {
             SC_OSSL_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SC_OSSL_GCM_IV_LENGTH);
@@ -940,21 +1040,26 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
         break;
     case EVP_CTRL_GCM_SET_IV_FIXED:
+        if( cipherCtx->ivlen != EVP_GCM_TLS_IV_LEN )
+        {
+            SC_OSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
+            return 0;
+        }
         if( arg == -1 )
         {
-            memcpy(cipherCtx->iv, ptr, SC_OSSL_GCM_IV_LENGTH);
+            memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen);
             break;
         }
-        if( arg != SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN )
+        if( arg != cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN )
         {
             SC_OSSL_LOG_ERROR("set_iv_fixed incorrect length");
             return 0;
         }
         // Set first 4B of IV to ptr value
-        memcpy(cipherCtx->iv, ptr, SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN);
+        memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN);
         // If encrypting, randomly set the last 8B of IV
         if( EVP_CIPHER_CTX_encrypting(ctx) &&
-            (RAND_bytes(cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, SC_OSSL_AESGCM_TLS_IV_LEN) <= 0) )
+            (RAND_bytes(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_EXPLICIT_IV_LEN) <= 0) )
         {
             return 0;
         }
@@ -971,12 +1076,12 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         if( EVP_CIPHER_CTX_encrypting(ctx) )
         {
             // Provided AAD contains len of plaintext + IV (8B)
-            min_tls_buffer_len = SC_OSSL_AESGCM_TLS_IV_LEN;
+            min_tls_buffer_len = EVP_GCM_TLS_EXPLICIT_IV_LEN;
         }
         else
         {
             // Provided AAD contains len of ciphertext + IV (8B) + ICV (16B)
-            min_tls_buffer_len = SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN;
+            min_tls_buffer_len = EVP_GCM_TLS_EXPLICIT_IV_LEN + EVP_GCM_TLS_TAG_LEN;
         }
 
         tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
@@ -988,7 +1093,355 @@ static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
         tls_buffer_len -= min_tls_buffer_len;
         SYMCRYPT_STORE_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
 
-        return SC_OSSL_AESGCM_TLS_ICV_LEN;
+        return EVP_GCM_TLS_TAG_LEN;
+    default:
+        SC_OSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * AES-CCM Implementation
+ */
+int sc_ossl_aes_ccm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
+                             const unsigned char *iv, int enc)
+{
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+
+    cipherCtx->ccmStage = SCOSSL_CCM_STAGE_INIT;
+    cipherCtx->cbData = 0;
+    cipherCtx->enc = enc;
+    if( iv )
+    {
+        memcpy(cipherCtx->iv, iv, cipherCtx->ivlen);
+    }
+    if( key )
+    {
+        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int sc_ossl_aes_ccm_tls(struct cipher_ccm_ctx *cipherCtx, unsigned char *out,
+                               const unsigned char *in, size_t inl)
+{
+    int ret = -1;
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    UINT64 nextIV = 0;
+    PBYTE  pbPayload = NULL;
+    SIZE_T cbPayload = 0;
+
+    // For TLS we only support in-place en/decryption of an ESP taking the form:
+    // IV (8B) || Ciphertext (variable) || ICV (Auth Tag) (8 or 16B)
+
+    // When encrypting, the space for the IV and ICV should be provided by the caller with the
+    // plaintext starting 8B from the start of the buffer and ending 8 or 16B from the end
+    if( in != out )
+    {
+        SC_OSSL_LOG_ERROR("AES-CCM TLS does not support out-of-place operation");
+        goto cleanup;
+    }
+    if( inl < EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherCtx->taglen )
+    {
+        SC_OSSL_LOG_ERROR("AES-CCM TLS buffer too small");
+        goto cleanup;
+    }
+    if( cipherCtx->ccmStage != SCOSSL_CCM_STAGE_INIT )
+    {
+        SC_OSSL_LOG_ERROR("AES-CCM TLS operation cannot be multi-stage");
+        goto cleanup;
+    }
+    if( cipherCtx->ivlen != EVP_CCM_TLS_IV_LEN )
+    {
+        SC_OSSL_LOG_ERROR("AES-CCM TLS operation with incorrect IV length");
+        goto cleanup;
+    }
+    if( cipherCtx->taglen != EVP_CCM_TLS_TAG_LEN && cipherCtx->taglen != EVP_CCM8_TLS_TAG_LEN )
+    {
+        SC_OSSL_LOG_ERROR("AES-CCM TLS operation with incorrect tag length");
+        goto cleanup;
+    }
+
+    pbPayload = out + EVP_CCM_TLS_EXPLICIT_IV_LEN;
+    cbPayload = inl - (EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherCtx->taglen);
+
+    if( cipherCtx->enc )
+    {
+        // First 8B of ESP payload data are the variable part of the IV (last 8B)
+        // Copy it from the context
+        memcpy(out, cipherCtx->iv + cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, EVP_CCM_TLS_EXPLICIT_IV_LEN);
+
+        // Encrypt payload
+        SymCryptCcmEncrypt(
+            SymCryptAesBlockCipher,
+            &cipherCtx->key,
+            cipherCtx->iv, cipherCtx->ivlen,
+            cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload+cbPayload, cipherCtx->taglen );
+
+        ret = inl;
+    }
+    else
+    {
+        // First 8B of ESP payload data are the variable part of the IV (last 8B)
+        // Copy it to the context
+        memcpy(cipherCtx->iv + cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, out, EVP_CCM_TLS_EXPLICIT_IV_LEN);
+
+        // Check ICV
+        SymError = SymCryptCcmDecrypt(
+            SymCryptAesBlockCipher,
+            &cipherCtx->key,
+            cipherCtx->iv, cipherCtx->ivlen,
+            cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload+cbPayload, cipherCtx->taglen );
+        if( SymError != SYMCRYPT_NO_ERROR )
+        {
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptCcmDecrypt failed", SymError);
+            goto cleanup;
+        }
+
+        ret = cbPayload;
+    }
+
+cleanup:
+    if( ret == -1 )
+    {
+        OPENSSL_cleanse(out, inl);
+    }
+
+    return ret;
+}
+
+// This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
+// return negative value on failure, and number of bytes written to out on success (may be 0)
+int sc_ossl_aes_ccm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
+                               const unsigned char *in, size_t inl)
+{
+    int ret = 0;
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+
+    if( cipherCtx->tlsAadSet )
+    {
+        return sc_ossl_aes_ccm_tls(cipherCtx, out, in, inl);
+    }
+
+    // See SCOSSL_CCM_STAGE definition above - callers to CCM must use the API in a very particular way
+    if( cipherCtx->ccmStage == SCOSSL_CCM_STAGE_COMPLETE )
+    {
+        if( in == NULL && inl == 0 )
+        {
+            // Expected redundant Finalize call - do nothing
+            goto cleanup;
+        }
+        else
+        {
+            SC_OSSL_LOG_ERROR("Data provided to CCM after CCM operation is complete");
+            ret = -1;
+            goto cleanup;
+        }
+    }
+
+    if( cipherCtx->ccmStage == SCOSSL_CCM_STAGE_INIT )
+    {
+        if( in != NULL )
+        {
+            // No AAD
+            SymCryptCcmInit(
+                &cipherCtx->state,
+                SymCryptAesBlockCipher,
+                &cipherCtx->key,
+                cipherCtx->iv, EVP_CIPHER_CTX_iv_length(ctx),
+                NULL, 0,
+                inl,
+                cipherCtx->taglen);
+            cipherCtx->ccmStage = SCOSSL_CCM_STAGE_SET_AAD; // continue so we can perform the en/decryption with no AAD
+        }
+        else
+        {
+            // Setting cbData for following call which will provide AAD
+            cipherCtx->cbData = inl;
+            cipherCtx->ccmStage = SCOSSL_CCM_STAGE_SET_CBDATA;
+            goto cleanup;
+        }
+    }
+
+    if( cipherCtx->ccmStage == SCOSSL_CCM_STAGE_SET_CBDATA)
+    {
+        // Auth Data Passed in
+        SymCryptCcmInit(
+            &cipherCtx->state,
+            SymCryptAesBlockCipher,
+            &cipherCtx->key,
+            cipherCtx->iv, cipherCtx->ivlen,
+            in, inl,
+            cipherCtx->cbData,
+            cipherCtx->taglen);
+        cipherCtx->ccmStage = SCOSSL_CCM_STAGE_SET_AAD;
+        goto cleanup;
+    }
+
+    if( cipherCtx->ccmStage == SCOSSL_CCM_STAGE_SET_AAD)
+    {
+        cipherCtx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
+        if( cipherCtx->enc )
+        {
+            // Encryption
+            SymCryptCcmEncryptPart(&cipherCtx->state, in, out, inl);
+            SymCryptCcmEncryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
+            ret = inl;
+        }
+        else
+        {
+            // Decryption
+            SymCryptCcmDecryptPart(&cipherCtx->state, in, out, inl);
+            SymError = SymCryptCcmDecryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
+            if( SymError != SYMCRYPT_NO_ERROR )
+            {
+                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptCcmDecryptFinal failed", SymError);
+                ret = -1;
+                goto cleanup;
+            }
+            ret = inl;
+        }
+    }
+
+cleanup:
+    return ret;
+}
+
+static int sc_ossl_aes_ccm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+                                    void *ptr)
+{
+    struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
+    struct cipher_ccm_ctx *dstCtx;
+    unsigned char *iv = NULL;
+    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    UINT16 tls_buffer_len = 0;
+    UINT16 min_tls_buffer_len = 0;
+    switch( type )
+    {
+    case EVP_CTRL_INIT:
+        cipherCtx->ivlen = SCOSSL_CCM_MIN_IV_LENGTH;
+        iv = (unsigned char *)EVP_CIPHER_CTX_iv(ctx);
+        if( iv )
+        {
+            memcpy(cipherCtx->iv, iv, cipherCtx->ivlen);
+        }
+        cipherCtx->taglen = SCOSSL_CCM_MAX_TAG_LENGTH;
+        cipherCtx->tlsAadSet = 0;
+        break;
+    case EVP_CTRL_GET_IVLEN:
+        *(int *)ptr = cipherCtx->ivlen;
+        break;
+    case EVP_CTRL_AEAD_SET_IVLEN:
+        if( arg < SCOSSL_CCM_MIN_IV_LENGTH || arg > SCOSSL_CCM_MAX_IV_LENGTH )
+        {
+            SC_OSSL_LOG_ERROR("SymCrypt Engine only supports [%d-%d] byte IVs for AES-CCM", SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
+            return 0;
+        }
+        cipherCtx->ivlen = arg;
+        break;
+    case EVP_CTRL_AEAD_SET_TAG:
+        if( (arg & 1) || arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH ||
+            (EVP_CIPHER_CTX_encrypting(ctx) && ptr != NULL) )
+        {
+            SC_OSSL_LOG_ERROR("Set tag error");
+            return 0;
+        }
+        if( ptr != NULL )
+        {
+            memcpy(cipherCtx->tag, ptr, arg);
+        }
+        cipherCtx->taglen = arg;
+        break;
+    case EVP_CTRL_AEAD_GET_TAG:
+        if( arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH || !EVP_CIPHER_CTX_encrypting(ctx) )
+        {
+            SC_OSSL_LOG_ERROR("Get tag error");
+            return 0;
+        }
+        memcpy(ptr, cipherCtx->tag, cipherCtx->taglen);
+        break;
+    case EVP_CTRL_COPY:
+        // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
+        // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
+        // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        dstCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
+        SymCryptAesKeyCopy(&cipherCtx->key, &dstCtx->key);
+        // make sure the dstCtx uses its copy of the expanded key TODO: implement SymCryptCcmStateCopy
+        dstCtx->state = cipherCtx->state;
+        dstCtx->state.pExpandedKey = &dstCtx->key;
+        break;
+    case EVP_CTRL_CCM_SET_IV_FIXED:
+        if( cipherCtx->ivlen != EVP_CCM_TLS_IV_LEN )
+        {
+            SC_OSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
+            return 0;
+        }
+        if( arg == -1 )
+        {
+            memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen);
+            break;
+        }
+        if( arg != cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN )
+        {
+            SC_OSSL_LOG_ERROR("set_iv_fixed incorrect length");
+            return 0;
+        }
+        // Set first 4B of IV to ptr value
+        memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN);
+        // If encrypting, randomly set the last 8B of IV
+        if( EVP_CIPHER_CTX_encrypting(ctx) &&
+            (RAND_bytes(cipherCtx->iv + cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, EVP_CCM_TLS_EXPLICIT_IV_LEN) <= 0) )
+        {
+            return 0;
+        }
+        break;
+    case EVP_CTRL_AEAD_TLS1_AAD:
+        if( arg != EVP_AEAD_TLS1_AAD_LEN )
+        {
+            SC_OSSL_LOG_ERROR("Set tlsAad error");
+            return 0;
+        }
+        if( cipherCtx->taglen != EVP_CCM_TLS_TAG_LEN && cipherCtx->taglen != EVP_CCM8_TLS_TAG_LEN )
+        {
+            SC_OSSL_LOG_ERROR("Invalid taglen for TLS");
+            return 0;
+        }
+        memcpy(cipherCtx->tlsAad, ptr, EVP_AEAD_TLS1_AAD_LEN);
+        cipherCtx->tlsAadSet = 1;
+
+        if( EVP_CIPHER_CTX_encrypting(ctx) )
+        {
+            // Provided AAD contains len of plaintext + IV (8B)
+            min_tls_buffer_len = EVP_CCM_TLS_EXPLICIT_IV_LEN;
+        }
+        else
+        {
+            // Provided AAD contains len of ciphertext + IV (8B) + ICV (16B)
+            min_tls_buffer_len = EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherCtx->taglen;
+        }
+
+        tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
+        if( tls_buffer_len < min_tls_buffer_len )
+        {
+            SC_OSSL_LOG_ERROR("tls_buffer_len too short");
+            return 0;
+        }
+        tls_buffer_len -= min_tls_buffer_len;
+        SYMCRYPT_STORE_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
+
+        return cipherCtx->taglen;
     default:
         SC_OSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
         return 0;

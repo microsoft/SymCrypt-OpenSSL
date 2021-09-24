@@ -1082,7 +1082,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
 
     int res = -1; // fail
 
-    switch( sc_ossl_get_context(ecdh, &keyCtx) )
+    switch( sc_ossl_get_context((EC_KEY*)ecdh, &keyCtx) )
     {
     case SC_OSSL_ECC_GET_CONTEXT_ERROR:
         SC_OSSL_LOG_ERROR("sc_ossl_get_context failed.");
