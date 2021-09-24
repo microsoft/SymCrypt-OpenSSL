@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+#ifndef _Return_type_success_
+#define _Return_type_success_(expr)
+#endif
+
 typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
 typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For functions that return length on success and -1 on error
 
