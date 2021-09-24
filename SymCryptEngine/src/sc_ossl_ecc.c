@@ -62,8 +62,8 @@ int eckey_sc_ossl_idx = -1;
 // Largest support curve is P521 => 66 * 2 byte Public key
 #define SC_OSSL_ECDH_MAX_PUBLIC_KEY_LEN 132
 
-static int sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
-    PCBYTE pbDerField, SIZE_T cbDerField, BYTE expectedTag, PCBYTE* ppbContent, SIZE_T* pcbContent )
+static SCOSSL_STATUS sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
+    _In_reads_bytes_(cbDerField) PCBYTE pbDerField, SIZE_T cbDerField, BYTE expectedTag, _Out_writes_bytes_(pcbContent) PCBYTE* ppbContent, SIZE_T* pcbContent )
 {
     PCBYTE pbContent = NULL;
     SIZE_T cbContent = 0;
@@ -73,8 +73,7 @@ static int sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
     if( pbDerField[0] != expectedTag )
     {
         SC_OSSL_LOG_ERROR("pbDerField[0] != 0x%x", expectedTag);
-        SC_OSSL_LOG_BYTES_DEBUG("pbDerField", pbDerField, cbDerField);
-        goto err;
+        goto cleanup;
     }
 
     // Extract content length and pointer to beginning of content
@@ -93,13 +92,13 @@ static int sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
             else
             {
                 SC_OSSL_LOG_ERROR("Der element length field is not minimal");
-                goto err;
+                goto cleanup;
             }
         }
         else
         {
             SC_OSSL_LOG_ERROR("Unexpected length field encoding. pbDerField[1] == 0x%x", cbContent);
-            goto err;
+            goto cleanup;
         }
     }
 
@@ -107,20 +106,23 @@ static int sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
     {
         SC_OSSL_LOG_ERROR("Decoded content length does not fit in derField buffer. pbDerField [0x%lx, 0x%lx), pbContent [0x%lx, 0x%lx)",
                             pbDerField, pbDerField+cbDerField, pbContent, pbContent+cbContent);
-        goto err;
+        goto cleanup;
     }
 
     *ppbContent = pbContent;
     *pcbContent = cbContent;
 
     res = 1;
-err:
+
+cleanup:
     return res;
 }
 
 // Quick hack function to parse precisely the DER encodings which we expect for ECDSA signatures for the NIST prime curves
 // Extracts the encoded R and S and places them in a buffer with 2 same-sized big-endian encodings (BER encoding expected by SymCrypt)
-static int sc_ossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature, PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature)
+// Returns 1 on success, or 0 on failure.
+static SCOSSL_STATUS sc_ossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PCBYTE pbDerSignature, SIZE_T cbDerSignature,
+                                                _Out_writes_bytes_(cbSymCryptSignature) PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature)
 {
     PCBYTE pbSeq = NULL;
     SIZE_T cbSeq = 0;
@@ -141,49 +143,41 @@ static int sc_ossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature
                            "                cbSymCryptSignature %d should be even integer in range [%d, %d]",
                            cbDerSignature, SC_OSSL_ECDSA_MIN_DER_SIGNATURE_LEN, SC_OSSL_ECDSA_MAX_DER_SIGNATURE_LEN,
                            cbSymCryptSignature, SC_OSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN, SC_OSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN );
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_BYTES_DEBUG("pbDerSignature", pbDerSignature, cbDerSignature);
 
 
     if( sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbDerSignature, cbDerSignature, 0x30, &pbSeq, &cbSeq) == 0 )
     {
-        goto err;
+        goto cleanup;
     }
 
     if( pbSeq - pbDerSignature != cbDerSignature - cbSeq )
     {
         SC_OSSL_LOG_ERROR("Sequence length field (0x%x) does not match cbDerSignature (0x%x)", cbSeq, cbDerSignature);
-        SC_OSSL_LOG_BYTES_DEBUG("pbDerSignature", pbDerSignature, cbDerSignature);
-        goto err;
+        SC_OSSL_LOG_BYTES_ERROR("pbDerSignature", pbDerSignature, cbDerSignature);
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_BYTES_DEBUG("pbSeq", pbSeq, cbSeq);
 
     if( sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbSeq, cbSeq, 0x02, &pbR, &cbR) == 0 )
     {
-        goto err;
+        goto cleanup;
     }
 
     if( cbR > cbSeq - 4 )
     {
         SC_OSSL_LOG_ERROR("cbR = pbSeq[1] > cbSeq - 4");
         SC_OSSL_LOG_BYTES_ERROR("pbDerSignature", pbDerSignature, cbDerSignature);
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_BYTES_DEBUG("pbR", pbR, cbR);
 
     if( sc_ossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbR+cbR, (pbSeq+cbSeq)-(pbR+cbR), 0x02, &pbS, &cbS) == 0 )
     {
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_BYTES_DEBUG("pbS", pbS, cbS);
 
     // Check R's validity
     if( ((pbR[0] & 0x80) == 0x80) || // R is negative
@@ -191,7 +185,7 @@ static int sc_ossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature
     {
         SC_OSSL_LOG_ERROR("pbR is not strict DER encoded non-negative integer");
         SC_OSSL_LOG_BYTES_ERROR("pbR", pbR, cbR);
-        goto err;
+        goto cleanup;
     }
     // Trim leading 0 from R
     if( pbR[0] == 0 )
@@ -205,7 +199,7 @@ static int sc_ossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature
     {
         SC_OSSL_LOG_ERROR("pbS is not strict DER encoded non-negative integer");
         SC_OSSL_LOG_BYTES_ERROR("pbS", pbS, cbS);
-        goto err;
+        goto cleanup;
     }
     // Trim leading 0 from S
     if( pbS[0] == 0 )
@@ -217,23 +211,24 @@ static int sc_ossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature
     if( (cbSymCryptSignature < 2*cbR) || (cbSymCryptSignature < 2*cbS) )
     {
         SC_OSSL_LOG_ERROR("cbR (%d) or cbS (%d) too big for cbSymCryptSignature (%d)", cbR, cbS, cbSymCryptSignature);
-        goto err;
+        goto cleanup;
     }
 
     memset(pbSymCryptSignature, 0, cbSymCryptSignature);
     memcpy(pbSymCryptSignature + (cbSymCryptSignature/2) - cbR, pbR, cbR);
     memcpy(pbSymCryptSignature + cbSymCryptSignature - cbS, pbS, cbS);
 
-    SC_OSSL_LOG_BYTES_DEBUG("pbSymCryptSignature", pbSymCryptSignature, cbSymCryptSignature);
-
     res = 1; // success
-err:
+
+cleanup:
     return res;
 }
 
 // Quick hack function to generate precisely the DER encodings which we want for ECDSA signatures for the NIST prime curves
 // Takes 2 same-size big-endian integers output from SymCrypt and encodes them in the minimally sized (strict) equivalent DER encoding
-static int sc_ossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature, PBYTE pbDerSignature, unsigned int* cbDerSignature)
+// Returns 1 on success, or 0 on failure.
+static SCOSSL_STATUS sc_ossl_ecdsa_apply_der(_In_reads_bytes_(cbSymCryptSignature) PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
+                                                _Out_writes_bytes_(cbDerSignature) PBYTE pbDerSignature, unsigned int* cbDerSignature)
 {
     PBYTE  pbWrite = pbDerSignature;
     SIZE_T cbSeq = 0;
@@ -253,10 +248,8 @@ static int sc_ossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T cbSymCrypt
     {
         SC_OSSL_LOG_ERROR("Incorrect size: cbSymCryptSignature %d should be even integer in range [%d, %d]",
                            cbSymCryptSignature, SC_OSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN, SC_OSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN );
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_BYTES_DEBUG("pbSymCryptSignature", pbSymCryptSignature, cbSymCryptSignature);
 
     pbR = pbSymCryptSignature;
     cbR = cbSymCryptSignature/2;
@@ -292,8 +285,6 @@ static int sc_ossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T cbSymCrypt
 
     *cbDerSignature = (SIZE_T)cbSeq + padSeq + 2;
 
-    SC_OSSL_LOG_DEBUG("cbDerSignature %d", *cbDerSignature);
-
     // Write SEQUENCE header
     *pbWrite = 0x30;
     pbWrite++;
@@ -328,25 +319,21 @@ static int sc_ossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T cbSymCrypt
     }
     memcpy(pbWrite, pbS, cbS);
 
-    SC_OSSL_LOG_BYTES_DEBUG("pbDerSignature", pbDerSignature, *cbDerSignature);
-
     res = 1; // success
-err:
+
+cleanup:
     return res;
 }
 
-void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
+void sc_ossl_ecc_free_key_context(_Inout_ SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     keyCtx->initialized = 0;
     if( keyCtx->data )
     {
-        SC_OSSL_LOG_DEBUG("OPENSSL_clear_free %lx %d", keyCtx->data, keyCtx->cbData);
         OPENSSL_clear_free(keyCtx->data, keyCtx->cbData);
     }
     if( keyCtx->key )
     {
-        SC_OSSL_LOG_DEBUG("SymCryptEckeyFree %lx", keyCtx->key);
         SymCryptEckeyFree(keyCtx->key);
     }
     return;
@@ -355,9 +342,8 @@ void sc_ossl_ecc_free_key_context(SC_OSSL_ECC_KEY_CONTEXT *keyCtx)
 #define NID_secp192r1 (NID_X9_62_prime192v1)
 #define NID_secp256r1 (NID_X9_62_prime256v1)
 
-void sc_ossl_eckey_finish(EC_KEY *key)
+void sc_ossl_eckey_finish(_Inout_ EC_KEY *key)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, eckey_sc_ossl_idx);
     if( keyCtx )
     {
@@ -380,9 +366,10 @@ static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P384 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 
-int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE pCurve, EC_KEY* eckey, const EC_GROUP* ecgroup)
+// Generates a new keypair using pCurve and ecgroup, storing the new keypair in eckey and pKeyCtx.
+// Returns SC_OSSL_ECC_GET_CONTEXT_SUCCESS on success or SC_OSSL_ECC_GET_CONTEXT_ERROR on error.
+SCOSSL_STATUS sc_ossl_generate_keypair(_Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve, _Inout_ EC_KEY* eckey, _In_ const EC_GROUP* ecgroup)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
 
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     PBYTE  pbPrivateKey = NULL;
@@ -400,7 +387,7 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
     if( pKeyCtx->key == NULL )
     {
         SC_OSSL_LOG_ERROR("SymCryptEckeyAllocate returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     cbPrivateKey = SymCryptEckeySizeofPrivateKey(pKeyCtx->key);
@@ -411,7 +398,7 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
     if( pKeyCtx->data == NULL )
     {
         SC_OSSL_LOG_ERROR("OPENSSL_zalloc returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     symError = SymCryptEckeySetRandom(
@@ -420,7 +407,7 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEckeySetRandom failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     pbPrivateKey = pKeyCtx->data;
@@ -436,7 +423,7 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEckeyGetValue failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     if( ((ec_privkey = BN_secure_new()) == NULL) ||
@@ -444,7 +431,7 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
         ((ec_pub_y = BN_new()) == NULL) )
     {
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     BN_bin2bn(pbPrivateKey, cbPrivateKey, ec_privkey);
@@ -454,18 +441,24 @@ int sc_ossl_generate_keypair(SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE
     if( EC_KEY_set_private_key(eckey, ec_privkey) == 0)
     {
         SC_OSSL_LOG_ERROR("EC_KEY_set_private_key failed.");
-        goto err;
+        goto cleanup;
     }
     if( EC_KEY_set_public_key_affine_coordinates(eckey, ec_pub_x, ec_pub_y) == 0 )
     {
         SC_OSSL_LOG_ERROR("EC_KEY_set_public_key_affine_coordinates failed.");
-        goto err;
+        goto cleanup;
     }
 
     pKeyCtx->initialized = 1;
     res = SC_OSSL_ECC_GET_CONTEXT_SUCCESS;
 
 cleanup:
+    if( res != SC_OSSL_ECC_GET_CONTEXT_SUCCESS )
+    {
+        // On error free the partially constructed key context
+        sc_ossl_ecc_free_key_context(pKeyCtx);
+    }
+
     // Always free the temporary BIGNUMs
     if( ec_privkey != NULL )
     {
@@ -480,16 +473,12 @@ cleanup:
         BN_free(ec_pub_y);
     }
     return res;
-
-err:
-    // On error free the partially constructed key context
-    sc_ossl_ecc_free_key_context(pKeyCtx);
-    goto cleanup;
 }
 
-int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, PCSYMCRYPT_ECURVE pCurve)
+// Imports key using eckey, ecgroup, and pCurve into pKeyCtx.
+// Returns SC_OSSL_ECC_GET_CONTEXT_SUCCESS on success or SC_OSSL_ECC_GET_CONTEXT_ERROR on error.
+SCOSSL_STATUS sc_ossl_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup, _Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
 
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     PBYTE  pbPrivateKey = NULL;
@@ -509,7 +498,7 @@ int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL
     if( pKeyCtx->key == NULL )
     {
         SC_OSSL_LOG_ERROR("SymCryptEckeyAllocate returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     cbPrivateKey = SymCryptEckeySizeofPrivateKey(pKeyCtx->key);
@@ -521,14 +510,14 @@ int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL
     if( ec_pubkey == NULL )
     {
         SC_OSSL_LOG_ERROR("EC_KEY_get0_public_key returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     if( (ec_privkey != NULL) && (BN_num_bytes(ec_privkey) > cbPrivateKey) )
     {
         SC_OSSL_LOG_ERROR("ec_privkey too big: BN_num_bytes(ec_privkey) %d, cbPrivateKey %d.",
                            BN_num_bytes(ec_privkey), cbPrivateKey);
-        goto err;
+        goto cleanup;
     }
     else if( ec_privkey == NULL )
     {
@@ -538,7 +527,7 @@ int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
         SC_OSSL_LOG_ERROR("BN_CTX_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
     BN_CTX_start(bn_ctx);
 
@@ -546,49 +535,39 @@ int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL
         ((ec_pub_y = BN_new()) == NULL) )
     {
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     if( EC_POINT_get_affine_coordinates(ecgroup, ec_pubkey, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
         SC_OSSL_LOG_ERROR("EC_POINT_get_affine_coordinates failed.");
-        goto err;
+        goto cleanup;
     }
 
     if( (2*BN_num_bytes(ec_pub_x) > cbPublicKey) || (2*BN_num_bytes(ec_pub_y) > cbPublicKey) )
     {
         SC_OSSL_LOG_ERROR("EC_POINT coordinate too big: BN_num_bytes(ec_pub_x) %d, BN_num_bytes(ec_pub_y) %d, cbPublicKey %d.",
                            BN_num_bytes(ec_pub_x), BN_num_bytes(ec_pub_y), cbPublicKey);
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_DEBUG("pKeyCtx %lx pKeyCtx->key %lx pKeyCtx->data %lx", pKeyCtx, pKeyCtx->key, pKeyCtx->data);
 
     pKeyCtx->cbData = cbPublicKey + cbPrivateKey;
     pKeyCtx->data = OPENSSL_zalloc(pKeyCtx->cbData);
     if( pKeyCtx->data == NULL )
     {
         SC_OSSL_LOG_ERROR("OPENSSL_zalloc returned NULL.");
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_DEBUG("cbPrivateKey %d, cbPublicKey %d, data %lx, key %lx", cbPrivateKey, cbPublicKey, pKeyCtx->data, pKeyCtx->key);
 
     if( cbPrivateKey != 0 )
     {
         pbPrivateKey = pKeyCtx->data;
         BN_bn2binpad(ec_privkey, pbPrivateKey, cbPrivateKey);
-        SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPrivateKey", pbPrivateKey, cbPrivateKey);
     }
 
     pbPublicKey = pKeyCtx->data + cbPrivateKey;
     BN_bn2binpad(ec_pub_x, pbPublicKey, cbPublicKey/2);
     BN_bn2binpad(ec_pub_y, pbPublicKey + (cbPublicKey/2), cbPublicKey/2);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPublicKey", pbPublicKey, cbPublicKey);
-
-    SC_OSSL_LOG_BIGNUM_DEBUG("priv", (BIGNUM*) ec_privkey);
-    SC_OSSL_LOG_BIGNUM_DEBUG("x", ec_pub_x);
-    SC_OSSL_LOG_BIGNUM_DEBUG("y", ec_pub_y);
 
     symError = SymCryptEckeySetValue(
         pbPrivateKey, cbPrivateKey,
@@ -600,13 +579,19 @@ int sc_ossl_import_keypair(const EC_KEY* eckey, const EC_GROUP* ecgroup, SC_OSSL
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEckeySetValue failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     pKeyCtx->initialized = 1;
     res = SC_OSSL_ECC_GET_CONTEXT_SUCCESS;
 
 cleanup:
+    if( res != SC_OSSL_ECC_GET_CONTEXT_SUCCESS )
+    {
+        // On error free the partially constructed key context
+        sc_ossl_ecc_free_key_context(pKeyCtx);
+    }
+
     // Always free the temporary BIGNUMs and BN_CTX
     if( ec_pub_x != NULL )
     {
@@ -622,11 +607,6 @@ cleanup:
         BN_CTX_free(bn_ctx);
     }
     return res;
-
-err:
-    // On error free the partially constructed key context
-    sc_ossl_ecc_free_key_context(pKeyCtx);
-    goto cleanup;
 }
 
 // returns SC_OSSL_ECC_GET_CONTEXT_FALLBACK when the eckey is not supported by the engine, so we
@@ -634,16 +614,13 @@ err:
 // returns SC_OSSL_ECC_GET_CONTEXT_ERROR on an error
 // returns SC_OSSL_ECC_GET_CONTEXT_SUCCESS and sets pKeyCtx to a pointer to an initialized
 // SC_OSSL_ECC_KEY_CONTEXT on success
-int sc_ossl_get_context_ex(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
+SCOSSL_STATUS sc_ossl_get_context_ex(_Inout_ EC_KEY* eckey, _Out_ SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PCSYMCRYPT_ECURVE pCurve = NULL;
 
     const EC_GROUP* ecgroup = EC_KEY_get0_group(eckey);
 
     int groupNid = EC_GROUP_get_curve_name(ecgroup);
-
-    SC_OSSL_LOG_DEBUG("groupNid %d", groupNid);
 
     // Only reroute NIST Prime curves to SymCrypt for now
     switch( groupNid )
@@ -717,7 +694,6 @@ int sc_ossl_get_context_ex(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx, BO
 
     if( (*ppKeyCtx)->initialized == 1 )
     {
-        SC_OSSL_LOG_DEBUG("pKeyCtx is already initialized");
         return SC_OSSL_ECC_GET_CONTEXT_SUCCESS;
     }
 
@@ -734,16 +710,20 @@ int sc_ossl_get_context_ex(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx, BO
 // returns -1 when the eckey is not supported by the engine, so we should fallback to OpenSSL
 // returns 0 on an error
 // returns 1 and sets pKeyCtx to a pointer to an initialized SC_OSSL_ECC_KEY_CONTEXT on success
-int sc_ossl_get_context(EC_KEY* eckey, SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx)
+SCOSSL_STATUS sc_ossl_get_context(_Inout_ EC_KEY* eckey, _Out_ SC_OSSL_ECC_KEY_CONTEXT** ppKeyCtx)
 {
     return sc_ossl_get_context_ex(eckey, ppKeyCtx, FALSE);
 }
 
-int sc_ossl_eckey_sign(int type, const unsigned char* dgst, int dlen,
-    unsigned char* sig, unsigned int* siglen,
-    const BIGNUM* kinv, const BIGNUM* r, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_sign(int type,
+                        _In_reads_bytes_(dlen) const unsigned char* dgst,
+                        int dlen,
+                        _Out_writes_bytes_(*siglen) unsigned char* sig,
+                        _Out_ unsigned int* siglen,
+                        _In_opt_ const BIGNUM* kinv,
+                        _In_opt_ const BIGNUM* r,
+                        _In_ EC_KEY* eckey)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
@@ -795,11 +775,8 @@ int sc_ossl_eckey_sign(int type, const unsigned char* dgst, int dlen,
     return 1;
 }
 
-
-int sc_ossl_eckey_sign_setup(EC_KEY* eckey, BN_CTX* ctx_in, BIGNUM** kinvp,
-    BIGNUM** rp)
+SCOSSL_STATUS sc_ossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _Out_ BIGNUM** kinvp, _Out_ BIGNUM** rp)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
     const EC_KEY_METHOD* ossl_eckey_method = EC_KEY_OpenSSL();
     PFN_eckey_sign_setup pfn_eckey_sign_setup = NULL;
@@ -824,12 +801,10 @@ int sc_ossl_eckey_sign_setup(EC_KEY* eckey, BN_CTX* ctx_in, BIGNUM** kinvp,
     }
 }
 
-
-ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
-    const BIGNUM* in_kinv, const BIGNUM* in_r,
-    EC_KEY* eckey)
+ECDSA_SIG* sc_ossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* dgst, int dgst_len,
+                                   _In_opt_ const BIGNUM* in_kinv, _In_opt_ const BIGNUM* in_r,
+                                   _In_ EC_KEY* eckey)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
@@ -891,7 +866,7 @@ ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
         }
         if( s != NULL )
         {
-            BN_free(r);
+            BN_free(s);
         }
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
         return NULL;
@@ -917,12 +892,9 @@ ECDSA_SIG* sc_ossl_eckey_sign_sig(const unsigned char* dgst, int dgst_len,
     return returnSignature;
 }
 
-
-int sc_ossl_eckey_verify(
-    int type, const unsigned char* dgst, int dgstlen,
-    const unsigned char* sig, int siglen, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+                          _In_reads_bytes_(sig_len) const unsigned char* sigbuf, int sig_len, _In_ EC_KEY* eckey)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
@@ -942,7 +914,7 @@ int sc_ossl_eckey_verify(
         {
             return 0;
         }
-        return pfn_eckey_verify(type, dgst, dgstlen, sig, siglen, eckey);
+        return pfn_eckey_verify(type, dgst, dgst_len, sigbuf, sig_len, eckey);
     case SC_OSSL_ECC_GET_CONTEXT_SUCCESS:
         break;
     default:
@@ -951,7 +923,7 @@ int sc_ossl_eckey_verify(
     }
 
     cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement( keyCtx->key->pCurve );
-    if( sc_ossl_ecdsa_remove_der(sig, siglen, &buf[0], cbSymCryptSig) == 0 )
+    if( sc_ossl_ecdsa_remove_der(sigbuf, sig_len, &buf[0], cbSymCryptSig) == 0 )
     {
         SC_OSSL_LOG_ERROR("sc_ossl_ecdsa_remove_der failed");
         return 0;
@@ -960,7 +932,7 @@ int sc_ossl_eckey_verify(
     symError = SymCryptEcDsaVerify(
         keyCtx->key,
         dgst,
-        dgstlen,
+        dgst_len,
         buf,
         cbSymCryptSig,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -974,11 +946,9 @@ int sc_ossl_eckey_verify(
     return 1;
 }
 
-
-int sc_ossl_eckey_verify_sig(
-    const unsigned char* dgst, int dgst_len, const ECDSA_SIG* sig, EC_KEY* eckey)
+SCOSSL_STATUS sc_ossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+                              _In_ const ECDSA_SIG* sig, _In_ EC_KEY* eckey)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
@@ -1032,14 +1002,13 @@ int sc_ossl_eckey_verify_sig(
     return 1;
 }
 
-int sc_ossl_eckey_keygen(EC_KEY *eckey)
+SCOSSL_STATUS sc_ossl_eckey_keygen(_Inout_ EC_KEY *key)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
-    switch( sc_ossl_get_context_ex(eckey, &keyCtx, TRUE) )
+    switch( sc_ossl_get_context_ex(key, &keyCtx, TRUE) )
     {
     case SC_OSSL_ECC_GET_CONTEXT_ERROR:
         SC_OSSL_LOG_ERROR("sc_ossl_get_context_ex failed.");
@@ -1052,9 +1021,8 @@ int sc_ossl_eckey_keygen(EC_KEY *eckey)
         {
             return 0;
         }
-        return pfn_eckey_keygen(eckey);
+        return pfn_eckey_keygen(key);
     case SC_OSSL_ECC_GET_CONTEXT_SUCCESS:
-        SC_OSSL_LOG_DEBUG("generated new key in sc_ossl_get_context_ex");
         return 1;
     default:
         SC_OSSL_LOG_ERROR("Unexpected sc_ossl_get_context value");
@@ -1062,12 +1030,11 @@ int sc_ossl_eckey_keygen(EC_KEY *eckey)
     }
 }
 
-int sc_ossl_eckey_compute_key(unsigned char **psec,
-                               size_t *pseclen,
-                               const EC_POINT *pub_key,
-                               const EC_KEY *ecdh)
+SCOSSL_RETURNLENGTH sc_ossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsigned char **psec,
+                                                _Out_ size_t *pseclen,
+                                                _In_ const EC_POINT *pub_key,
+                                                _In_ const EC_KEY *ecdh)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
@@ -1082,7 +1049,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
 
     int res = -1; // fail
 
-    switch( sc_ossl_get_context(ecdh, &keyCtx) )
+    switch( sc_ossl_get_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor sc_ossl_get_context
     {
     case SC_OSSL_ECC_GET_CONTEXT_ERROR:
         SC_OSSL_LOG_ERROR("sc_ossl_get_context failed.");
@@ -1107,7 +1074,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( ecgroup == NULL )
     {
         SC_OSSL_LOG_ERROR("EC_KEY_get0_group returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
@@ -1115,15 +1082,13 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( pkPublic == NULL )
     {
         SC_OSSL_LOG_ERROR("SymCryptEckeyAllocate returned NULL.");
-        goto err;
+        goto cleanup;
     }
-
-    SC_OSSL_LOG_DEBUG("psec %lx, pseclen %lx, pub_key %lx, ecdh %lx", psec, pseclen, pub_key, ecdh);
 
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
         SC_OSSL_LOG_ERROR("BN_CTX_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
     BN_CTX_start(bn_ctx);
 
@@ -1131,28 +1096,24 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
         ((ec_pub_y = BN_new()) == NULL) )
     {
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
-        goto err;
+        goto cleanup;
     }
 
     if( EC_POINT_get_affine_coordinates(ecgroup, pub_key, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
         SC_OSSL_LOG_ERROR("EC_POINT_get_affine_coordinates failed.");
-        goto err;
+        goto cleanup;
     }
 
     if( (2*BN_num_bytes(ec_pub_x) > cbPublicKey) || (2*BN_num_bytes(ec_pub_y) > cbPublicKey) )
     {
         SC_OSSL_LOG_ERROR("EC_POINT coordinate too big: BN_num_bytes(ec_pub_x) %d, BN_num_bytes(ec_pub_y) %d, cbPublicKey %d.",
                         BN_num_bytes(ec_pub_x), BN_num_bytes(ec_pub_y), cbPublicKey);
-        goto err;
+        goto cleanup;
     }
 
     BN_bn2binpad(ec_pub_x, buf, cbPublicKey/2);
     BN_bn2binpad(ec_pub_y, buf + (cbPublicKey/2), cbPublicKey/2);
-    SC_OSSL_LOG_BYTES_DEBUG("SymCrypt pbPublicKey", buf, cbPublicKey);
-
-    SC_OSSL_LOG_BIGNUM_DEBUG("x", ec_pub_x);
-    SC_OSSL_LOG_BIGNUM_DEBUG("y", ec_pub_y);
 
     symError = SymCryptEckeySetValue(
         NULL, 0,
@@ -1164,7 +1125,7 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEckeySetValue failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     *pseclen = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
@@ -1180,12 +1141,23 @@ int sc_ossl_eckey_compute_key(unsigned char **psec,
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEcDhSecretAgreement failed", symError);
-        goto err;
+        goto cleanup;
     }
 
     res = *pseclen;
 
 cleanup:
+
+    if (res == -1)
+    {
+        if( *psec )
+        {
+            OPENSSL_free(*psec);
+            *psec = NULL;
+        }
+        *pseclen = 0;
+    }
+
     // Always free the temporary pkPublic, BIGNUMs and BN_CTX
     if( pkPublic )
     {
@@ -1205,24 +1177,10 @@ cleanup:
         BN_CTX_free(bn_ctx);
     }
     return res;
-
-err:
-    if( *psec )
-    {
-        OPENSSL_free(*psec);
-        *psec = NULL;
-    }
-    *pseclen = 0;
-
-    res = -1;
-
-    goto cleanup;
 }
 
 void sc_ossl_destroy_ecc_curves(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-
     if( _hidden_curve_P192 )
     {
         SymCryptEcurveFree(_hidden_curve_P192);
