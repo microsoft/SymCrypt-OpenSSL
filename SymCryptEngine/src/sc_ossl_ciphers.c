@@ -667,11 +667,11 @@ SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
 #define SC_OSSL_AESGCM_TLS_ICV_LEN 16
 
 // Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
-// Returns 1 on success, or 0 on error.
-static SCOSSL_STATUS sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
+// Returns length of out on success, or -1 on error.
+static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    int ret = 0;
+    int ret = -1;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     UINT64 nextIV = 0;
     PBYTE  pbPayload = NULL;
@@ -759,7 +759,7 @@ static SCOSSL_STATUS sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *cipherCt
     }
 
 cleanup:
-    if( ret == 0 )
+    if( ret == -1 )
     {
         OPENSSL_cleanse(out, inl);
     }
@@ -769,10 +769,10 @@ cleanup:
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
 // return negative value on failure, and number of bytes written to out on success (may be 0)
-int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
+SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                                const unsigned char *in, size_t inl)
 {
-    int ret = 0;
+    int ret = -1;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
@@ -792,7 +792,7 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
         // Auth Data Passed in
         SymCryptGcmAuthPart(&cipherCtx->state, in, inl);
         ret = 0;
-        goto end;
+        goto cleanup;
     }
 
     if( cipherCtx->enc )
@@ -802,14 +802,12 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
             // Encrypt Part
             SymCryptGcmEncryptPart(&cipherCtx->state, in, out, inl);
             ret = inl;
-            goto end;
         }
         else
         {
             // Final Encrypt Call
             SymCryptGcmEncryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
             ret = 0;
-            goto end;
         }
     }
     else
@@ -819,7 +817,6 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
             // Decrypt Part
             SymCryptGcmDecryptPart(&cipherCtx->state, in, out, inl);
             ret = inl;
-            goto end;
         }
         else
         {
@@ -829,13 +826,13 @@ int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
             {
                 SC_OSSL_LOG_SYMERROR_ERROR("SymCryptGcmDecryptFinal failed", SymError);
                 ret = -1;
-                goto end;
+                goto cleanup;
             }
             ret = 0;
-            goto end;
         }
     }
-end:
+
+cleanup:
     return ret;
 }
 
