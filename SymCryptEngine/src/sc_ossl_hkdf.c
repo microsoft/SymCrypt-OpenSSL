@@ -26,7 +26,7 @@ typedef struct {
 } SC_OSSL_HKDF_PKEY_CTX;
 
 
-int sc_ossl_hkdf_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context;
     if ((sc_ossl_hkdf_context = OPENSSL_zalloc(sizeof(*sc_ossl_hkdf_context))) == NULL) {
@@ -37,7 +37,7 @@ int sc_ossl_hkdf_init(EVP_PKEY_CTX *ctx)
     return 1;
 }
 
-void sc_ossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
+void sc_ossl_hkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = NULL;
 
@@ -52,7 +52,7 @@ void sc_ossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-int sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
+SCOSSL_STATUS sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     switch (type) {
@@ -100,7 +100,7 @@ int sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     }
 }
 
-int sc_ossl_hkdf_derive_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_hkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(sc_ossl_hkdf_context->key, sc_ossl_hkdf_context->key_len);
@@ -212,7 +212,7 @@ static unsigned char *HKDF(const EVP_MD *evp_md,
 
 PCSYMCRYPT_MAC
 SymCryptMacAlgorithm(
-    const EVP_MD *evp_md)
+    _In_ const EVP_MD *evp_md)
 {
     int type = EVP_MD_type(evp_md);
 
@@ -229,7 +229,7 @@ SymCryptMacAlgorithm(
     return NULL;
 }
 
-int sc_ossl_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_opt_ unsigned char *key, _Out_ size_t *keylen)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
