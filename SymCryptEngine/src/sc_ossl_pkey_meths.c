@@ -30,9 +30,9 @@ static const EVP_PKEY_METHOD *_openssl_pkey_rsa = NULL;
 static int (*_openssl_pkey_rsa_sign) (EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen) = NULL;
 static int (*_openssl_pkey_rsa_verify) (EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen) = NULL;
 
+// Call SymCrypt engine sign if PSS padding, otherwise OpenSSL version.
 static int sc_ossl_pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int padding;
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
@@ -49,9 +49,9 @@ static int sc_ossl_pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *
     return _openssl_pkey_rsa_sign(ctx, sig, siglen, tbs, tbslen);
 }
 
+// Call SymCrypt engine verify if PSS padding, otherwise OpenSSL version.
 static int sc_ossl_pkey_rsa_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int padding;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
 
@@ -80,13 +80,15 @@ static int sc_ossl_pkey_rsa_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, 
 }
 
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa = NULL;
+
+// Returns the internal RSA method structure holding methods for RSA functinos, and
+// creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
     int (*pverify_init) (EVP_PKEY_CTX *ctx) = NULL;
     int flags = 0;
 
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _sc_ossl_pkey_rsa == NULL )
     {
         EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_rsa );
@@ -110,6 +112,9 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 
 static const EVP_PKEY_METHOD *_openssl_pkey_rsa_pss = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa_pss = NULL;
+
+// Returns the internal RSA PSS method structure holding methods for RSA PSS functinos, and
+// creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
@@ -118,7 +123,6 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
     int (*pverify) (EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen) = NULL;
     int flags = 0;
 
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _sc_ossl_pkey_rsa_pss == NULL )
     {
         EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_rsa_pss );
@@ -141,12 +145,14 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 
 static const EVP_PKEY_METHOD *_openssl_pkey_tls1_prf = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_tls1_prf = NULL;
+
+// Returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functinos, and
+// creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
 
-    SC_OSSL_LOG_DEBUG(NULL);
     if (_sc_ossl_pkey_tls1_prf == NULL)
     {
         if((_sc_ossl_pkey_tls1_prf = EVP_PKEY_meth_new(EVP_PKEY_TLS1_PRF, 0)) != NULL)
@@ -165,12 +171,14 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
 
 static const EVP_PKEY_METHOD *_openssl_pkey_hkdf = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_hkdf = NULL;
+
+// Returns the internal HKDF method structure holding methods for HKDF functions, and creates that structure
+// if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_hkdf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
 
-    SC_OSSL_LOG_DEBUG(NULL);
     if (_sc_ossl_pkey_hkdf == NULL)
     {
         if((_sc_ossl_pkey_hkdf = EVP_PKEY_meth_new(EVP_PKEY_HKDF, 0)) != NULL)
@@ -187,11 +195,10 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_hkdf(void)
     return _sc_ossl_pkey_hkdf;
 }
 
-
-int sc_ossl_pkey_methods(ENGINE *e, EVP_PKEY_METHOD **pmeth,
-                        const int **nids, int nid)
+_Success_(return > 0)
+int sc_ossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
+                               _Out_opt_ const int **nids, int nid)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int ok = 1;
 
     if( _openssl_pkey_rsa == NULL )
@@ -235,8 +242,6 @@ int sc_ossl_pkey_methods(ENGINE *e, EVP_PKEY_METHOD **pmeth,
 
 void sc_ossl_destroy_pkey_methods(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-
     // It seems that explicitly freeing these methods in the destroy method causes a double free
     // (seen in SslPlay with sanitizers on, or in OpenSSL applications using the engine)
     // For now just don't free these methods here, but keep an eye out for memory leaks
