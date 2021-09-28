@@ -13,14 +13,15 @@
 extern "C" {
 #endif
 
-int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
+SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen,
+                                    _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    int ret = -1;
     // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
     // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
     SC_OSSL_RSA_KEY_CONTEXT localKeyCtx;
@@ -74,7 +75,6 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
         return -2;
     }
 
-    SC_OSSL_LOG_DEBUG("cbSalt= %d", cbSalt);
     if( sc_ossl_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
     {
         SC_OSSL_LOG_ERROR("Failed to initialize localKeyCtx");
@@ -83,25 +83,23 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
     cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
     cbResult = cbModulus;
-    SC_OSSL_LOG_DEBUG("tbslen= %d", tbslen);
     if( siglen != NULL )
     {
         *siglen = cbResult;
     }
     if( sig == NULL )
     {
-        SC_OSSL_LOG_DEBUG("sig NOT present");
-        goto CommonReturn; // Not error - this can be called with NULL parameter for siglen
+        ret = 1;
+        goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
     switch( type )
     {
     case NID_md5:
-        SC_OSSL_LOG_DEBUG("NID_md5");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
         if( tbslen != 16 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssSign(
@@ -118,16 +116,15 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssSign failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_DEBUG("NID_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
         if( tbslen != 20 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssSign(
@@ -144,15 +141,13 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssSign failed", SymError);
-            goto err;
+            goto cleanup;
         }
         break;
     case NID_sha256:
-        SC_OSSL_LOG_DEBUG("NID_sha256");
         if( tbslen != 32 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssSign(
@@ -169,16 +164,15 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssSign failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+            goto cleanup;
         }
 
         break;
     case NID_sha384:
-        SC_OSSL_LOG_DEBUG("NID_sha384");
         if( tbslen != 48 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssSign(
@@ -195,15 +189,14 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssSign failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha512:
-        SC_OSSL_LOG_DEBUG("NID_sha512");
         if( tbslen != 64 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssSign(
@@ -220,30 +213,28 @@ int sc_ossl_rsapss_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, c
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssSign failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+            goto cleanup;
         }
         break;
     default:
         SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
-        goto err;
+        goto cleanup;
     }
+    ret = 1;
 
-CommonReturn:
+cleanup:
     sc_ossl_rsa_free_key_context(&localKeyCtx);
-    return cbResult;
-err:
-    cbResult = 0;
-    goto CommonReturn;
+    return ret;
 }
 
-int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
+SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                      _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
-    size_t cbResult = 0;
+    size_t ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
     // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
@@ -303,31 +294,25 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
         return -2;
     }
 
-    SC_OSSL_LOG_DEBUG("cbSalt= %d", cbSalt);
-
     if( sc_ossl_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
     {
         SC_OSSL_LOG_ERROR("Failed to initialize localKeyCtx");
         return -2;
     }
 
-    SC_OSSL_LOG_DEBUG("tbslen= %d", tbslen);
     if( sig == NULL )
     {
-        SC_OSSL_LOG_DEBUG("sig NOT present");
-        goto err;
+        goto cleanup;
     }
 
     cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
-    cbResult = cbModulus;
     switch( dtype )
     {
     case NID_md5:
-        SC_OSSL_LOG_DEBUG("NID_md5");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
         if( tbslen != 16 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssVerify(
@@ -343,16 +328,15 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssverify failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_DEBUG("NID_sha1");
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
         if( tbslen != 20 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssVerify(
@@ -368,15 +352,14 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssverify failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha256:
-        SC_OSSL_LOG_DEBUG("NID_sha256");
         if( tbslen != 32 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssVerify(
@@ -392,15 +375,14 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssverify failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha384:
-        SC_OSSL_LOG_DEBUG("NID_sha384");
         if( tbslen != 48 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssVerify(
@@ -416,15 +398,14 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssverify failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+            goto cleanup;
         }
         break;
     case NID_sha512:
-        SC_OSSL_LOG_DEBUG("NID_sha512");
         if( tbslen != 64 )
         {
-            goto err;
+            goto cleanup;
         }
 
         SymError = SymCryptRsaPssVerify(
@@ -440,23 +421,20 @@ int sc_ossl_rsapss_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t si
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPssverify failed", SymError);
-            goto err;
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+            goto cleanup;
         }
         break;
     default:
         SC_OSSL_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, tbslen);
-        goto err;
+        goto cleanup;
     }
 
-    cbResult = 1;
+    ret = 1;
 
-CommonReturn:
+cleanup:
     sc_ossl_rsa_free_key_context(&localKeyCtx);
-    return cbResult;
-err:
-    cbResult = 0;
-    goto CommonReturn;
+    return ret;
 }
 
 

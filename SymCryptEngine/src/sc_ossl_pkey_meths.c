@@ -31,7 +31,7 @@ static int (*_openssl_pkey_rsa_sign) (EVP_PKEY_CTX *ctx, unsigned char *sig, siz
 static int (*_openssl_pkey_rsa_verify) (EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen) = NULL;
 
 // Call SymCrypt engine sign if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
+static int sc_ossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
 
@@ -50,7 +50,7 @@ static int sc_ossl_pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *
 }
 
 // Call SymCrypt engine verify if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_verify(EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
+static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
