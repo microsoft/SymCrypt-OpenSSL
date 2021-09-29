@@ -26,7 +26,6 @@ static SCOSSL_STATUS sc_ossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EV
 static EVP_MD *_hidden_md5_md = NULL;
 static const EVP_MD *sc_ossl_digest_md5(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if (_hidden_md5_md == NULL) {
         EVP_MD *md;
         if ((md = EVP_MD_meth_new(NID_md5, NID_md5WithRSAEncryption)) == NULL
@@ -56,7 +55,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const E
 static EVP_MD *_hidden_sha1_md = NULL;
 static const EVP_MD *sc_ossl_digest_sha1(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_sha1_md == NULL )
     {
         EVP_MD *md;
@@ -87,7 +85,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const
 static EVP_MD *_hidden_sha256_md = NULL;
 static const EVP_MD *sc_ossl_digest_sha256(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_sha256_md == NULL )
     {
         EVP_MD *md;
@@ -118,7 +115,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const
 static EVP_MD *_hidden_sha384_md = NULL;
 static const EVP_MD *sc_ossl_digest_sha384(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_sha384_md == NULL )
     {
         EVP_MD *md;
@@ -149,7 +145,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha512_copy(_Out_ EVP_MD_CTX *to, _In_ const
 static EVP_MD *_hidden_sha512_md = NULL;
 static const EVP_MD *sc_ossl_digest_sha512(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_sha512_md == NULL )
     {
         EVP_MD *md;
@@ -174,7 +169,6 @@ static const EVP_MD *sc_ossl_digest_sha512(void)
 
 void sc_ossl_destroy_digests(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     EVP_MD_meth_free(_hidden_md5_md);
     _hidden_md5_md = NULL;
     EVP_MD_meth_free(_hidden_sha1_md);
@@ -191,7 +185,6 @@ _Success_(return > 0)
 int sc_ossl_digests(_Inout_ ENGINE *e, _Out_opt_ const EVP_MD **digest,
                           _Out_opt_ const int **nids, int nid)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int ok = 1;
     if( !digest )
     {
@@ -232,7 +225,6 @@ int sc_ossl_digests(_Inout_ ENGINE *e, _Out_opt_ const EVP_MD **digest,
  */
 static SCOSSL_STATUS sc_ossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -247,7 +239,6 @@ static SCOSSL_STATUS sc_ossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                              size_t count)
 {
-    SC_OSSL_LOG_DEBUG("Count: %d", count);
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -261,7 +252,6 @@ static SCOSSL_STATUS sc_ossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_read
 
 static SCOSSL_STATUS sc_ossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_MD5_RESULT_SIZE) unsigned char *md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -275,17 +265,14 @@ static SCOSSL_STATUS sc_ossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_writ
 
 static SCOSSL_STATUS sc_ossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_MD5_STATE state_to = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_MD5_STATE state_from = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(from);
     if( state_to == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'to' Present");
         return 1;
     }
     if( state_from == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'from' Present");
         return 1;
     }
 
@@ -298,7 +285,6 @@ static SCOSSL_STATUS sc_ossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EV
  */
 static SCOSSL_STATUS sc_ossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -313,7 +299,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                               size_t count)
 {
-    SC_OSSL_LOG_DEBUG("Count: %d", count);
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -327,7 +312,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_rea
 
 static SCOSSL_STATUS sc_ossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA1_RESULT_SIZE) unsigned char *md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -341,17 +325,14 @@ static SCOSSL_STATUS sc_ossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_wri
 
 static SCOSSL_STATUS sc_ossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA1_STATE state_to = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA1_STATE state_from = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(from);
     if( state_to == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'to' Present");
         return 1;
     }
     if( state_from == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'from' Present");
         return 1;
     }
 
@@ -365,7 +346,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const E
  */
 static SCOSSL_STATUS sc_ossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -380,7 +360,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    SC_OSSL_LOG_DEBUG("Count: %d", count);
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -394,7 +373,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_r
 
 static SCOSSL_STATUS sc_ossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA256_RESULT_SIZE) unsigned char *md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -408,17 +386,14 @@ static SCOSSL_STATUS sc_ossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_w
 
 static SCOSSL_STATUS sc_ossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA256_STATE state_to = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA256_STATE state_from = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(from);
     if( state_to == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'to' Present");
         return 1;
     }
     if( state_from == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'from' Present");
         return 1;
     }
 
@@ -431,7 +406,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const
  */
 static SCOSSL_STATUS sc_ossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -446,7 +420,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    SC_OSSL_LOG_DEBUG("Count: %d", count);
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -460,7 +433,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_r
 
 static SCOSSL_STATUS sc_ossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA384_RESULT_SIZE) unsigned char *md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -474,17 +446,14 @@ static SCOSSL_STATUS sc_ossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_w
 
 static SCOSSL_STATUS sc_ossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA384_STATE state_to = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA384_STATE state_from = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(from);
     if( state_to == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'to' Present");
         return 1;
     }
     if( state_from == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'from' Present");
         return 1;
     }
 
@@ -497,7 +466,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const
  */
 static SCOSSL_STATUS sc_ossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -512,7 +480,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    SC_OSSL_LOG_DEBUG("Count: %d", count);
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -526,7 +493,6 @@ static SCOSSL_STATUS sc_ossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_r
 
 static SCOSSL_STATUS sc_ossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA512_RESULT_SIZE) unsigned char *md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
     if( state == NULL )
     {
@@ -540,17 +506,14 @@ static SCOSSL_STATUS sc_ossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_w
 
 static SCOSSL_STATUS sc_ossl_digest_sha512_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     PSYMCRYPT_SHA512_STATE state_to = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA512_STATE state_from = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(from);
     if( state_to == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'to' Present");
         return 1;
     }
     if( state_from == NULL )
     {
-        SC_OSSL_LOG_DEBUG("No MD 'from' Present");
         return 1;
     }
 

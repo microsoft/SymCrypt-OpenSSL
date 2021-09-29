@@ -398,7 +398,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -423,7 +423,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -448,7 +448,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -472,7 +472,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
 
@@ -497,7 +497,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -521,7 +521,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -584,7 +584,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -608,7 +608,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -632,7 +632,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -654,7 +654,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        0);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -677,7 +677,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -700,7 +700,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -1098,7 +1098,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     SymError = SymCryptLoadMsbFirstUint64(pbPublicExp, cbPublicExp, &pubExp64);
     if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptLoadMsbFirstUint64 failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptLoadMsbFirstUint64 failed", SymError);
         goto cleanup;
     }
 
@@ -1115,7 +1115,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
                    keyCtx->key);
     if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsakeySetValue failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeySetValue failed", SymError);
         goto cleanup;
     }
 

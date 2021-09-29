@@ -31,7 +31,6 @@ static RSA_METHOD* sc_ossl_rsa_method = NULL;
 
 int sc_ossl_destroy(ENGINE* e)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     sc_ossl_destroy_digests();
     sc_ossl_destroy_ciphers();
     sc_ossl_destroy_pkey_methods();
@@ -51,7 +50,6 @@ int sc_ossl_destroy(ENGINE* e)
 
 static int engine_set_defaults(ENGINE* e)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if(    !ENGINE_set_default_digests(e)
         || !ENGINE_set_default_ciphers(e)
         || !ENGINE_set_default_pkey_meths(e)
@@ -69,8 +67,6 @@ static int engine_set_defaults(ENGINE* e)
 
 static int bind_sc_ossl_engine(ENGINE* e)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
-
     if( !sc_ossl_module_initialized )
     {
         SymCryptModuleInit(SYMCRYPT_CODE_VERSION_API, SYMCRYPT_CODE_VERSION_MINOR, SYMCRYPT_CODE_VERSION_PATCH);
@@ -205,7 +201,6 @@ IMPLEMENT_DYNAMIC_BIND_FN(bind_helper)
 
 static ENGINE* engine_sc_ossl(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     ENGINE* ret = ENGINE_new();
     if( ret == NULL )
     {
@@ -221,7 +216,6 @@ static ENGINE* engine_sc_ossl(void)
 
 int engine_load_sc_ossl_int(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int retVal = 1;
     ENGINE* symcryptEngine = engine_sc_ossl();
     if( !symcryptEngine )
@@ -241,7 +235,6 @@ err:
 
 int SC_OSSL_ENGINE_Initialize()
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     return engine_load_sc_ossl_int();
 }
 
