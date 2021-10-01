@@ -131,7 +131,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         SymError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,

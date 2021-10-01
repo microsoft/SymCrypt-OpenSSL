@@ -12,7 +12,7 @@ extern "C" {
 // Returns 1 on success or 0 on error. 
 SCOSSL_STATUS sc_ossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx);
 
-//Frees SymCrypt context inside of ctx.
+// Frees SymCrypt context inside of ctx.
 void sc_ossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx);
 
 // Sends a control operation to context ctx. type indicates which operation, and

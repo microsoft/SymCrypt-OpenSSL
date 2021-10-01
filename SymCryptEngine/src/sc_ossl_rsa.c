@@ -377,7 +377,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
     switch( type )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
@@ -403,7 +403,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -428,7 +428,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -564,7 +564,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
     switch( dtype )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
@@ -589,7 +589,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -613,7 +613,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;

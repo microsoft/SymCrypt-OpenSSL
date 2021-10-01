@@ -27,11 +27,14 @@ const int evp_nids_count = sizeof(sc_ossl_evp_nids) / sizeof(sc_ossl_evp_nids[0]
 
 
 static const EVP_PKEY_METHOD *_openssl_pkey_rsa = NULL;
-static int (*_openssl_pkey_rsa_sign) (EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen) = NULL;
-static int (*_openssl_pkey_rsa_verify) (EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen) = NULL;
+static int (*_openssl_pkey_rsa_sign) (EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
+                                        const unsigned char *tbs, size_t tbslen) = NULL;
+static int (*_openssl_pkey_rsa_verify) (EVP_PKEY_CTX *ctx, const unsigned char *sig, size_t siglen,
+                                        const unsigned char *tbs, size_t tbslen) = NULL;
 
 // Call SymCrypt engine sign if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static int sc_ossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*siglen) unsigned char *sig,
+                                    _Out_ size_t *siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
 
@@ -50,7 +53,8 @@ static int sc_ossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*
 }
 
 // Call SymCrypt engine verify if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                    _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
@@ -81,7 +85,7 @@ static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
 
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa = NULL;
 
-// Returns the internal RSA method structure holding methods for RSA functinos, and
+// Returns the internal RSA method structure holding methods for RSA functions, and
 // creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 {
@@ -113,7 +117,7 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 static const EVP_PKEY_METHOD *_openssl_pkey_rsa_pss = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa_pss = NULL;
 
-// Returns the internal RSA PSS method structure holding methods for RSA PSS functinos, and
+// Returns the internal RSA PSS method structure holding methods for RSA PSS functions, and
 // creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 {
@@ -146,7 +150,7 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 static const EVP_PKEY_METHOD *_openssl_pkey_tls1_prf = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_tls1_prf = NULL;
 
-// Returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functinos, and
+// Returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functions, and
 // creates that structure if it doesn't already exist.
 static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
 {
