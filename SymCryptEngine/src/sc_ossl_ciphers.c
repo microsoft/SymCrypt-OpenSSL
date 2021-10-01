@@ -10,6 +10,11 @@
 extern "C" {
 #endif
 
+typedef int SC_OSSL_ENCRYPTION_MODE;
+#define SC_OSSL_ENCRYPTION_MODE_ENCRYPT (1)
+#define SC_OSSL_ENCRYPTION_MODE_DECRYPT (0)
+#define SC_OSSL_ENCRYPTION_MODE_NOCHANGE (-1)
+
 struct cipher_cbc_ctx {
     INT32 enc;                     /* COP_ENCRYPT or COP_DECRYPT */
     SYMCRYPT_AES_EXPANDED_KEY key;
@@ -64,7 +69,7 @@ static int sc_ossl_cipher_nids[] = {
     NID_aes_256_gcm,
 };
 
-int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
+int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
 int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 
@@ -131,7 +136,7 @@ static const EVP_CIPHER *sc_ossl_aes_256_cbc(void)
     return _hidden_aes_256_cbc;
 }
 
-int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
+int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
 int sc_ossl_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 #define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY)
@@ -194,7 +199,7 @@ static const EVP_CIPHER *sc_ossl_aes_256_ecb(void)
 }
 
 
-int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
+int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
 int sc_ossl_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 #define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_XTS_MODE|EVP_CIPH_CUSTOM_COPY \
@@ -240,7 +245,7 @@ static const EVP_CIPHER *sc_ossl_aes_256_xts(void)
     return _hidden_aes_256_xts;
 }
 
-int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
+int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
 int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
 static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
@@ -395,12 +400,15 @@ int sc_ossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 // enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, int enc)
+                             _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     PBYTE ctx_iv = EVP_CIPHER_CTX_iv_noconst(ctx);
-    cipherCtx->enc = enc;
+    if( enc != SC_OSSL_ENCRYPTION_MODE_NOCHANGE )
+    {
+        cipherCtx->enc = enc;
+    }
     if( iv )
     {
         memcpy(ctx_iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
@@ -416,7 +424,7 @@ SCOSSL_STATUS sc_ossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     return 1;
 }
 
-// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
@@ -424,13 +432,18 @@ SCOSSL_STATUS sc_ossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned
     int ret = 0;
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     PBYTE ctx_iv = EVP_CIPHER_CTX_iv_noconst(ctx);
-    if( cipherCtx->enc )
+    if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
     {
         SymCryptAesCbcEncrypt(&cipherCtx->key, ctx_iv, in, out, inl);
     }
-    else
+    else if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
     {
         SymCryptAesCbcDecrypt(&cipherCtx->key, ctx_iv, in, out, inl);
+    }
+    else
+    {
+        SC_OSSL_LOG_ERROR("Encryption mode not set");
+        return 0;
     }
 
     ret = 1;
@@ -470,11 +483,14 @@ static SCOSSL_STATUS sc_ossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, in
 // enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, int enc)
+                             _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    cipherCtx->enc = enc;
+    if( enc != SC_OSSL_ENCRYPTION_MODE_NOCHANGE )
+    {
+        cipherCtx->enc = enc;
+    }
     if( key )
     {
         SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
@@ -486,21 +502,27 @@ SCOSSL_STATUS sc_ossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     return 1;
 }
 
-// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    if( cipherCtx->enc )
+    if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
     {
         SymCryptAesEcbEncrypt(&cipherCtx->key, in, out, inl);
     }
-    else
+    else if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
     {
         SymCryptAesEcbDecrypt(&cipherCtx->key, in, out, inl);
     }
+    else
+    {
+        SC_OSSL_LOG_ERROR("Encryption mode not set");
+        return 0;
+    }
+
     ret = 1;
 
     return ret;
@@ -538,11 +560,14 @@ static SCOSSL_STATUS sc_ossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, in
 // enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, int enc)
+                             _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    cipherCtx->enc = enc;
+    if( enc != SC_OSSL_ENCRYPTION_MODE_NOCHANGE )
+    {
+        cipherCtx->enc = enc;
+    }
     if( iv )
     {
         memcpy(cipherCtx->iv, iv, 8); // copy only the first 8B
@@ -563,7 +588,7 @@ SCOSSL_STATUS sc_ossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     return 1;
 }
 
-// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
@@ -582,7 +607,7 @@ SCOSSL_STATUS sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned
         // a data unit. My understanding is that callers are expected to make a single call through
         // the EVP interface per data unit - so we pass inl to both cbDataUnit and cbData.
 
-        if( cipherCtx->enc )
+        if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
         {
             SymCryptXtsAesEncrypt(
                 &cipherCtx->key,
@@ -592,7 +617,7 @@ SCOSSL_STATUS sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned
                 out,
                 inl);
         }
-        else
+        else if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
         {
             SymCryptXtsAesDecrypt(
                 &cipherCtx->key,
@@ -602,6 +627,12 @@ SCOSSL_STATUS sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned
                 out,
                 inl);
         }
+        else
+        {
+            SC_OSSL_LOG_ERROR("Encryption mode not set");
+            return 0;
+        }
+
         ret = 1;
     }
 
@@ -641,13 +672,16 @@ static SCOSSL_STATUS sc_ossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, in
 // enc should be set to 1 for encryption, 0 for decryption, and -1 to leave value unchanged.
 // Returns 1 on success, or 0 on error.
 SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, int enc)
+                             _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
     cipherCtx->operationInProgress = 0;
-    cipherCtx->enc = enc;
+    if( enc != SC_OSSL_ENCRYPTION_MODE_NOCHANGE )
+    {
+        cipherCtx->enc = enc;
+    }
     if( iv )
     {
         memcpy(cipherCtx->iv, iv, EVP_CIPHER_CTX_iv_length(ctx));
@@ -666,7 +700,7 @@ SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
 #define SC_OSSL_AESGCM_TLS_IV_LEN 8
 #define SC_OSSL_AESGCM_TLS_ICV_LEN 16
 
-// Encrypts or ecrypts in, storing result in out, depending on mode set in ctx.
+// Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns length of out on success, or -1 on error.
 static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
@@ -703,7 +737,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *ci
         goto cleanup;
     }
 
-    if( cipherCtx->enc )
+    if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
         // Copy it from the context
@@ -716,7 +750,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *ci
         nextIV = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN ) + 1;
         SYMCRYPT_STORE_MSBFIRST64( cipherCtx->iv + SC_OSSL_GCM_IV_LENGTH - SC_OSSL_AESGCM_TLS_IV_LEN, nextIV );
     }
-    else
+    else if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
         // Copy it to the context
@@ -725,6 +759,11 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *ci
         // Set up the cipher state with the full IV
         SymCryptGcmInit(&cipherCtx->state, &cipherCtx->key, cipherCtx->iv, SC_OSSL_GCM_IV_LENGTH);
     }
+    else
+    {
+        SC_OSSL_LOG_ERROR("Encryption mode not set");
+        goto cleanup;
+    }
 
     pbPayload = out + SC_OSSL_AESGCM_TLS_IV_LEN;
     cbPayload = inl - (SC_OSSL_AESGCM_TLS_IV_LEN + SC_OSSL_AESGCM_TLS_ICV_LEN);
@@ -732,7 +771,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *ci
     // Add Auth Data to Gcm State
     SymCryptGcmAuthPart(&cipherCtx->state, cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN);
 
-    if( cipherCtx->enc )
+    if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
     {
         // Encrypt payload
         SymCryptGcmEncryptPart(&cipherCtx->state, pbPayload, pbPayload, cbPayload);
@@ -742,7 +781,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_Inout_ struct cipher_gcm_ctx *ci
 
         ret = inl;
     }
-    else
+    else if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
     {
         // Decrypt payload
         SymCryptGcmDecryptPart(&cipherCtx->state, pbPayload, pbPayload, cbPayload);
@@ -795,7 +834,7 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *o
         goto cleanup;
     }
 
-    if( cipherCtx->enc )
+    if( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_ENCRYPT )
     {
         if( inl > 0 )
         {
@@ -810,7 +849,7 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *o
             ret = 0;
         }
     }
-    else
+    else if ( cipherCtx->enc == SC_OSSL_ENCRYPTION_MODE_DECRYPT )
     {
         if( inl > 0 )
         {
@@ -830,6 +869,11 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *o
             }
             ret = 0;
         }
+    }
+    else
+    {
+        SC_OSSL_LOG_ERROR("Encryption mode not set");
+        goto cleanup;
     }
 
 cleanup:
