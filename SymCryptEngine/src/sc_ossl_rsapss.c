@@ -13,6 +13,38 @@
 extern "C" {
 #endif
 
+static PCSYMCRYPT_HASH GetSymCryptHashAlgorithm(int type)
+{
+    if (type == NID_md5)
+        return SymCryptMd5Algorithm;
+    if (type == NID_sha1)
+        return SymCryptSha1Algorithm;
+    if (type == NID_sha256)
+        return SymCryptSha256Algorithm;
+    if (type == NID_sha384)
+        return SymCryptSha384Algorithm;
+    if (type == NID_sha512)
+        return SymCryptSha512Algorithm;
+    SC_OSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    return NULL;
+}
+
+static size_t GetExpectedTbsLength(int type)
+{
+    if (type == NID_md5)
+        return 16;
+    if (type == NID_sha1)
+        return 20;
+    if (type == NID_sha256)
+        return 32;
+    if (type == NID_sha384)
+        return 48;
+    if (type == NID_sha512)
+        return 64;
+    SC_OSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    return -1;
+}
+
 SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen,
                                     _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
@@ -25,6 +57,8 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
     // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
     // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
     SC_OSSL_RSA_KEY_CONTEXT localKeyCtx;
+    PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
+    size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
     EVP_MD *mgf1Digest;
     int type = 0;
@@ -93,134 +127,46 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
         goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
-    switch( type )
+    sc_ossl_mac_algo = GetSymCryptHashAlgorithm(type);
+    expectedTbsLength = GetExpectedTbsLength(type);
+    if( !sc_ossl_mac_algo || expectedTbsLength < 0 )
     {
-    case NID_md5:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
-        if( tbslen != 16 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssSign(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       SymCryptMd5Algorithm,
-                       cbSalt,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       sig,
-                       siglen != NULL ? (*siglen) : 0,
-                       &cbResult);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
-        if( tbslen != 20 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssSign(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       SymCryptSha1Algorithm,
-                       cbSalt,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       sig,
-                       siglen != NULL ? (*siglen) : 0,
-                       &cbResult);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            goto cleanup;
-        }
-        break;
-    case NID_sha256:
-        if( tbslen != 32 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssSign(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       SymCryptSha256Algorithm,
-                       cbSalt,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       sig,
-                       siglen != NULL ? (*siglen) : 0,
-                       &cbResult);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
-            goto cleanup;
-        }
-
-        break;
-    case NID_sha384:
-        if( tbslen != 48 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssSign(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       SymCryptSha384Algorithm,
-                       cbSalt,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       sig,
-                       siglen != NULL ? (*siglen) : 0,
-                       &cbResult);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha512:
-        if( tbslen != 64 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssSign(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       SymCryptSha512Algorithm,
-                       cbSalt,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       sig,
-                       siglen != NULL ? (*siglen) : 0,
-                       &cbResult);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
-            goto cleanup;
-        }
-        break;
-    default:
         SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
         goto cleanup;
     }
+
+    // Log warnings for algorithms that aren't FIPS compliant
+    if( type == NID_md5 )
+    {
+        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+    }
+    else if( type == NID_sha1 )
+    {
+        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+    }
+
+    if( tbslen != expectedTbsLength )
+    {
+        goto cleanup;
+    }
+
+    SymError = SymCryptRsaPssSign(
+                localKeyCtx.key,
+                tbs,
+                tbslen,
+                sc_ossl_mac_algo,
+                cbSalt,
+                0,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                sig,
+                siglen != NULL ? (*siglen) : 0,
+                &cbResult);
+    if( SymError != SYMCRYPT_NO_ERROR )
+    {
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+        goto cleanup;
+    }
+
     ret = 1;
 
 cleanup:
@@ -239,9 +185,11 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
     // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
     // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
     SC_OSSL_RSA_KEY_CONTEXT localKeyCtx;
+    PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
+    size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
     EVP_MD *mgf1Digest;
-    int dtype = 0;
+    int type = 0;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
@@ -254,9 +202,9 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
         SC_OSSL_LOG_ERROR("Failed to get mgf1Digest");
         return -2;
     }
-    dtype = EVP_MD_type(messageDigest);
+    type = EVP_MD_type(messageDigest);
 
-    if( dtype != EVP_MD_type(mgf1Digest) )
+    if( type != EVP_MD_type(mgf1Digest) )
     {
         SC_OSSL_LOG_ERROR("messageDigest and mgf1Digest do not match");
         return -2;
@@ -306,127 +254,44 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
     }
 
     cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
-    switch( dtype )
+
+    sc_ossl_mac_algo = GetSymCryptHashAlgorithm(type);
+    expectedTbsLength = GetExpectedTbsLength(type);
+    if( !sc_ossl_mac_algo || expectedTbsLength < 0 )
     {
-    case NID_md5:
+        SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
+        goto cleanup;
+    }
+    
+    // Log warnings for algorithms that aren't FIPS compliant
+    if( type == NID_md5 )
+    {
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
-        if( tbslen != 16 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssVerify(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       sig,
-                       siglen,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptMd5Algorithm,
-                       cbSalt,
-                       0);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha1:
+    }
+    else if( type == NID_sha1 )
+    {
         SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
-        if( tbslen != 20 )
-        {
-            goto cleanup;
-        }
+    }
 
-        SymError = SymCryptRsaPssVerify(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       sig,
-                       siglen,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptSha1Algorithm,
-                       cbSalt,
-                       0);
+    if( tbslen != expectedTbsLength )
+    {
+        goto cleanup;
+    }
 
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha256:
-        if( tbslen != 32 )
-        {
-            goto cleanup;
-        }
+    SymError = SymCryptRsaPssVerify(
+                localKeyCtx.key,
+                tbs,
+                tbslen,
+                sig,
+                siglen,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                sc_ossl_mac_algo,
+                cbSalt,
+                0);
 
-        SymError = SymCryptRsaPssVerify(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       sig,
-                       siglen,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptSha256Algorithm,
-                       cbSalt,
-                       0);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha384:
-        if( tbslen != 48 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssVerify(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       sig,
-                       siglen,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptSha384Algorithm,
-                       cbSalt,
-                       0);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
-            goto cleanup;
-        }
-        break;
-    case NID_sha512:
-        if( tbslen != 64 )
-        {
-            goto cleanup;
-        }
-
-        SymError = SymCryptRsaPssVerify(
-                       localKeyCtx.key,
-                       tbs,
-                       tbslen,
-                       sig,
-                       siglen,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptSha512Algorithm,
-                       cbSalt,
-                       0);
-
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
-            goto cleanup;
-        }
-        break;
-    default:
-        SC_OSSL_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, tbslen);
+    if( SymError != SYMCRYPT_NO_ERROR )
+    {
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
         goto cleanup;
     }
 
