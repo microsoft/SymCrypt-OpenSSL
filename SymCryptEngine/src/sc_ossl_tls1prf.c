@@ -25,9 +25,8 @@ typedef struct {
     size_t seed_length;
 } SC_OSSL_TLS1_PRF_PKEY_CTX;
 
-int sc_ossl_tls1prf_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
         SC_OSSL_LOG_ERROR("Memory Allocation Error");
@@ -37,9 +36,8 @@ int sc_ossl_tls1prf_init(EVP_PKEY_CTX *ctx)
     return 1;
 }
 
-void sc_ossl_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
+void sc_ossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     if (key_context == NULL) {
         return;
@@ -50,9 +48,8 @@ void sc_ossl_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-int sc_ossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
+SCOSSL_STATUS sc_ossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
     switch (type) {
@@ -86,9 +83,8 @@ int sc_ossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     }
 }
 
-int sc_ossl_tls1prf_derive_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(key_context->secret, key_context->secret_length);
     OPENSSL_cleanse(key_context->seed, key_context->seed_length);
@@ -100,7 +96,6 @@ PCSYMCRYPT_MAC
 GetSymCryptMacAlgorithm(
     const EVP_MD *evp_md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int type = EVP_MD_type(evp_md);
 
     if (type == NID_sha1)
@@ -117,9 +112,9 @@ GetSymCryptMacAlgorithm(
     return NULL;
 }
 
-int sc_ossl_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+                                        _Out_ size_t *keylen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
@@ -137,7 +132,7 @@ int sc_ossl_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         SymError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,
@@ -170,7 +165,7 @@ int sc_ossl_tls1prf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen
 
     if (SymError != SYMCRYPT_NO_ERROR)
     {
-        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptTlsPrf1_2 failed", SymError);
         return 0;
     }
     return 1;

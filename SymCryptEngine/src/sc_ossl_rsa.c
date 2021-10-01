@@ -46,7 +46,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
-    int res = -1;
+    int ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -174,10 +174,10 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         break;
     }
 
-    res = (cbResult <= INT_MAX) ? cbResult : -1;
+    ret = (cbResult <= INT_MAX) ? cbResult : -1;
 
 cleanup:
-    return res;
+    return ret;
 }
 
 SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
@@ -186,7 +186,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
-    int res = -1;
+    int ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, rsa_sc_ossl_idx);
@@ -306,10 +306,10 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
         break;
     }
 
-    res = (cbResult <= INT_MAX) ? cbResult : -1;
+    ret = (cbResult <= INT_MAX) ? cbResult : -1;
 
 cleanup:
-    return res;
+    return ret;
 }
 
 SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
@@ -377,7 +377,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
     switch( type )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
@@ -398,12 +398,12 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -423,12 +423,12 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -448,7 +448,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -472,7 +472,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
 
@@ -497,7 +497,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -521,7 +521,7 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1Sign failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", SymError);
             goto cleanup;
         }
         break;
@@ -564,7 +564,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
     switch( dtype )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
         {
             SC_OSSL_LOG_ERROR("m_length == %d", m_length);
@@ -584,12 +584,12 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm MD5 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
         if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -608,12 +608,12 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("SymCrypt engine warning using Mac algorithm SHA1 which is not FIPS compliant");
+        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
         if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;
@@ -632,7 +632,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -654,7 +654,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        0);
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -677,7 +677,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -700,7 +700,7 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsaPkcs1verify failed", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify failed", SymError);
             goto cleanup;
         }
         break;
@@ -1098,7 +1098,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     SymError = SymCryptLoadMsbFirstUint64(pbPublicExp, cbPublicExp, &pubExp64);
     if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptLoadMsbFirstUint64 failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptLoadMsbFirstUint64 failed", SymError);
         goto cleanup;
     }
 
@@ -1115,7 +1115,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
                    keyCtx->key);
     if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptRsakeySetValue failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeySetValue failed", SymError);
         goto cleanup;
     }
 

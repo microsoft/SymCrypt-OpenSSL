@@ -26,9 +26,8 @@ typedef struct {
 } SC_OSSL_HKDF_PKEY_CTX;
 
 
-int sc_ossl_hkdf_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context;
     if ((sc_ossl_hkdf_context = OPENSSL_zalloc(sizeof(*sc_ossl_hkdf_context))) == NULL) {
         SC_OSSL_LOG_ERROR("Memory Allocation Error");
@@ -38,9 +37,8 @@ int sc_ossl_hkdf_init(EVP_PKEY_CTX *ctx)
     return 1;
 }
 
-void sc_ossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
+void sc_ossl_hkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = NULL;
 
     sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
@@ -54,9 +52,8 @@ void sc_ossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-int sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
+SCOSSL_STATUS sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     switch (type) {
     case EVP_PKEY_CTRL_HKDF_MD:
@@ -103,9 +100,8 @@ int sc_ossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     }
 }
 
-int sc_ossl_hkdf_derive_init(EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS sc_ossl_hkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(sc_ossl_hkdf_context->key, sc_ossl_hkdf_context->key_len);
     OPENSSL_clear_free(sc_ossl_hkdf_context->salt, sc_ossl_hkdf_context->salt_len);
@@ -122,7 +118,6 @@ static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
                                    const unsigned char *key, size_t key_len,
                                    unsigned char *prk, size_t *prk_len)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     unsigned int tmp_len;
 
     if (!HMAC(evp_md, salt, salt_len, key, key_len, prk, &tmp_len))
@@ -137,7 +132,6 @@ static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
                                   const unsigned char *info, size_t info_len,
                                   unsigned char *okm, size_t okm_len)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     HMAC_CTX *hmac;
     unsigned char *ret = NULL;
 
@@ -218,9 +212,8 @@ static unsigned char *HKDF(const EVP_MD *evp_md,
 
 PCSYMCRYPT_MAC
 SymCryptMacAlgorithm(
-    const EVP_MD *evp_md)
+    _In_ const EVP_MD *evp_md)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     int type = EVP_MD_type(evp_md);
 
     if (type == NID_sha1)
@@ -236,9 +229,9 @@ SymCryptMacAlgorithm(
     return NULL;
 }
 
-int sc_ossl_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
+SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+                                    _Out_ size_t *keylen)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
@@ -270,7 +263,6 @@ int sc_ossl_hkdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
                 *keylen);
             if (SymError != SYMCRYPT_NO_ERROR)
             {
-                SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdf failed", SymError);
                 return 0;
             }
         }
