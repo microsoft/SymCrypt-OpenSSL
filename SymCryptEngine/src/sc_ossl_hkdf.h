@@ -29,7 +29,8 @@ SCOSSL_STATUS sc_ossl_hkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx);
 // is written to the keylen parameter. If key is not NULL, then the shared secret is written to key
 // and the amount of data written to keylen.
 // Returns 1 on success, or 0 or a negative value for failure.
-SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key, _Out_ size_t *keylen);
+SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+                                    _Out_ size_t *keylen);
 
 #ifdef __cplusplus
 }

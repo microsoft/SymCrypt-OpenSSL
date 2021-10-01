@@ -229,7 +229,8 @@ SymCryptMacAlgorithm(
     return NULL;
 }
 
-SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key, _Out_ size_t *keylen)
+SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+                                    _Out_ size_t *keylen)
 {
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);

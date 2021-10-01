@@ -112,7 +112,8 @@ GetSymCryptMacAlgorithm(
     return NULL;
 }
 
-SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key, _Out_ size_t *keylen)
+SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+                                        _Out_ size_t *keylen)
 {
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;

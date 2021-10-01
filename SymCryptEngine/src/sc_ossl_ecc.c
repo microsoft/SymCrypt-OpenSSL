@@ -368,7 +368,8 @@ static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 
 // Generates a new keypair using pCurve and ecgroup, storing the new keypair in eckey and pKeyCtx.
 // Returns SC_OSSL_ECC_GET_CONTEXT_SUCCESS on success or SC_OSSL_ECC_GET_CONTEXT_ERROR on error.
-SCOSSL_STATUS sc_ossl_generate_keypair(_Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve, _Inout_ EC_KEY* eckey, _In_ const EC_GROUP* ecgroup)
+SCOSSL_STATUS sc_ossl_generate_keypair(_Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve,
+                                        _Inout_ EC_KEY* eckey, _In_ const EC_GROUP* ecgroup)
 {
 
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
@@ -477,7 +478,8 @@ cleanup:
 
 // Imports key using eckey, ecgroup, and pCurve into pKeyCtx.
 // Returns SC_OSSL_ECC_GET_CONTEXT_SUCCESS on success or SC_OSSL_ECC_GET_CONTEXT_ERROR on error.
-SCOSSL_STATUS sc_ossl_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup, _Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve)
+SCOSSL_STATUS sc_ossl_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup,
+                                        _Inout_ SC_OSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve)
 {
 
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
