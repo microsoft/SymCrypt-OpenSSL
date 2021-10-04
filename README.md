@@ -20,15 +20,15 @@ The known cases where the Engine will currently fail rather than fallback to the
 Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module.
 
 ```
-cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/libsymcrypt.so ./
-cmake . -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>
+cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./
+mkdir bin; cd bin
+cmake .. -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory> -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake
 cmake --build .
 ```
 
 ## Run Samples
 ```
-cd SslPlay
-./SslPlay
+./SslPlay/SslPlay
 ```
 
 ## Contributing

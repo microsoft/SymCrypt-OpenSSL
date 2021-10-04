@@ -21,68 +21,77 @@ void* SC_OSSL_ENGINE_zalloc(size_t num);
 void* SC_OSSL_ENGINE_realloc(void *mem, size_t num);
 void SC_OSSL_ENGINE_free(void *mem);
 
-void _sc_ossl_log(
+void _scossl_log(
     int trace_level,
     const char *func,
     const char *format, ...);
 
-#define SC_OSSL_LOG_DEBUG(...) \
-    _sc_ossl_log(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, __VA_ARGS__)
-
-#define SC_OSSL_LOG_INFO(...) \
-    _sc_ossl_log(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, __VA_ARGS__)
-
-#define SC_OSSL_LOG_ERROR(...) \
-    _sc_ossl_log(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, __VA_ARGS__)
-
-void _sc_ossl_log_bytes(
+void _scossl_log_bytes(
     int trace_level,
     const char *func,
     char *description,
     const char *s,
     int len);
 
-#define SC_OSSL_LOG_BYTES_DEBUG(description, s, len) \
-    _sc_ossl_log_bytes(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, (const char*) s, len)
-
-#define SC_OSSL_LOG_BYTES_INFO(description, s, len) \
-    _sc_ossl_log_bytes(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, (const char*) s, len)
-
-#define SC_OSSL_LOG_BYTES_ERROR(description, s, len) \
-    _sc_ossl_log_bytes(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, (const char*) s, len)
-
-
-void _sc_ossl_log_bignum(
+void _scossl_log_bignum(
     int trace_level,
     const char *func,
     char *description,
     BIGNUM *bn);
 
-#define SC_OSSL_LOG_BIGNUM_DEBUG(description, bn) \
-    _sc_ossl_log_bignum(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, bn)
-
-#define SC_OSSL_LOG_BIGNUM_INFO(description, s, len) \
-    _sc_ossl_log_bignum(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, bn)
-
-#define SC_OSSL_LOG_BIGNUM_ERROR(description, s, len) \
-    _sc_ossl_log_bignum(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, bn)
-
-
-void _sc_ossl_log_SYMCRYPT_ERROR(
+void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     const char *func,
     char *description,
     SYMCRYPT_ERROR symError);
 
+// Enable debug and info messages in debug builds, but compile them out in release builds
+#if DBG
+    #define SC_OSSL_LOG_DEBUG(...) \
+        _scossl_log(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, __VA_ARGS__)
 
-#define SC_OSSL_LOG_SYMERROR_DEBUG(description, symError) \
-    _sc_ossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, symError)
+    #define SC_OSSL_LOG_INFO(...) \
+        _scossl_log(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, __VA_ARGS__)
 
-#define SC_OSSL_LOG_SYMERROR_INFO(description, symError) \
-    _sc_ossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, symError)
+    #define SC_OSSL_LOG_BYTES_DEBUG(description, s, len) \
+        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, (const char*) s, len)
+
+    #define SC_OSSL_LOG_BYTES_INFO(description, s, len) \
+        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, (const char*) s, len)
+
+    #define SC_OSSL_LOG_BIGNUM_DEBUG(description, bn) \
+        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, bn)
+
+    #define SC_OSSL_LOG_BIGNUM_INFO(description, s, len) \
+        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, bn)
+
+    #define SC_OSSL_LOG_SYMERROR_DEBUG(description, symError) \
+        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, symError)
+
+    #define SC_OSSL_LOG_SYMERROR_INFO(description, symError) \
+        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, symError)
+#else
+    #define SC_OSSL_LOG_DEBUG(...)
+    #define SC_OSSL_LOG_INFO(...)
+    #define SC_OSSL_LOG_BYTES_DEBUG(description, s, len)
+    #define SC_OSSL_LOG_BYTES_INFO(description, s, len)
+    #define SC_OSSL_LOG_BIGNUM_DEBUG(description, bn)
+    #define SC_OSSL_LOG_BIGNUM_INFO(description, s, len)
+    #define SC_OSSL_LOG_SYMERROR_DEBUG(description, symError)
+    #define SC_OSSL_LOG_SYMERROR_INFO(description, symError)
+#endif
+
+#define SC_OSSL_LOG_ERROR(...) \
+    _scossl_log(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, __VA_ARGS__)
+
+#define SC_OSSL_LOG_BYTES_ERROR(description, s, len) \
+    _scossl_log_bytes(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, (const char*) s, len)
+
+#define SC_OSSL_LOG_BIGNUM_ERROR(description, s, len) \
+    _scossl_log_bignum(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, bn)
 
 #define SC_OSSL_LOG_SYMERROR_ERROR(description, symError) \
-    _sc_ossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, symError)
+    _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, symError)
 
 #ifdef __cplusplus
 }

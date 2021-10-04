@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.13.0)
 
 project(SslPlay)
 
@@ -13,5 +13,5 @@ add_executable (SslPlay
 target_link_directories(SslPlay PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_LIBDIR})
 target_include_directories(SslPlay PUBLIC ${CMAKE_SOURCE_DIR}/SymCryptEngine/inc)
 
-target_link_libraries(SslPlay LINK_PUBLIC $<TARGET_FILE:sc_ossl_dynamic> ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(SslPlay LINK_PUBLIC $<TARGET_FILE:scossl_dynamic> ${OPENSSL_CRYPTO_LIBRARY})
 #target_link_libraries(SslPlay ${OPENSSL_CRYPTO_LIBRARY})
