@@ -31,12 +31,14 @@ struct cipher_xts_ctx {
     SYMCRYPT_XTS_AES_EXPANDED_KEY key;
 };
 
-#define SC_OSSL_GCM_IV_LENGTH      (12)
+#define SCOSSL_GCM_IV_LENGTH      (12)
+#define SCOSSL_GCM_MIN_TAG_LENGTH (12)
+#define SCOSSL_GCM_MAX_TAG_LENGTH (16)
 
 struct cipher_gcm_ctx {
     INT32 enc;                     /* COP_ENCRYPT or COP_DECRYPT */
     INT32 operationInProgress;
-    BYTE iv[SC_OSSL_GCM_IV_LENGTH];
+    BYTE iv[SCOSSL_GCM_IV_LENGTH];
     INT32 ivlen;
     SYMCRYPT_GCM_STATE state;
     SYMCRYPT_GCM_EXPANDED_KEY key;
@@ -989,7 +991,7 @@ static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type,
     switch( type )
     {
     case EVP_CTRL_INIT:
-        cipherCtx->ivlen = SC_OSSL_GCM_IV_LENGTH;
+        cipherCtx->ivlen = SCOSSL_GCM_IV_LENGTH;
         iv = (unsigned char *)EVP_CIPHER_CTX_iv(ctx);
         if( iv )
         {
@@ -999,18 +1001,18 @@ static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type,
         cipherCtx->tlsAadSet = 0;
         break;
     case EVP_CTRL_GET_IVLEN:
-        *(int *)ptr = SC_OSSL_GCM_IV_LENGTH;
+        *(int *)ptr = SCOSSL_GCM_IV_LENGTH;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // SymCrypt currently only supports SC_OSSL_GCM_IV_LENGTH
-        if( arg != SC_OSSL_GCM_IV_LENGTH )
+        // SymCrypt currently only supports SCOSSL_GCM_IV_LENGTH
+        if( arg != SCOSSL_GCM_IV_LENGTH )
         {
-            SC_OSSL_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SC_OSSL_GCM_IV_LENGTH);
+            SC_OSSL_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
             return 0;
         }
         break;
     case EVP_CTRL_AEAD_SET_TAG:
-        if( arg <= 0 || arg > 16 || EVP_CIPHER_CTX_encrypting(ctx) )
+        if( arg < SCOSSL_GCM_MIN_TAG_LENGTH || arg > SCOSSL_GCM_MAX_TAG_LENGTH || EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SC_OSSL_LOG_ERROR("Set tag error");
             return 0;
@@ -1019,12 +1021,13 @@ static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type,
         cipherCtx->taglen = arg;
         break;
     case EVP_CTRL_AEAD_GET_TAG:
-        if( arg <= 0 || arg > 16 || !EVP_CIPHER_CTX_encrypting(ctx) )
+        if( arg < SCOSSL_GCM_MIN_TAG_LENGTH || arg > SCOSSL_GCM_MAX_TAG_LENGTH ||
+            arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SC_OSSL_LOG_ERROR("Get tag error");
             return 0;
         }
-        memcpy(ptr, cipherCtx->tag, cipherCtx->taglen);
+        memcpy(ptr, cipherCtx->tag, arg);
         break;
     case EVP_CTRL_COPY:
         // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
@@ -1396,12 +1399,13 @@ static SCOSSL_STATUS sc_ossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type,
         cipherCtx->taglen = arg;
         break;
     case EVP_CTRL_AEAD_GET_TAG:
-        if( arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH || !EVP_CIPHER_CTX_encrypting(ctx) )
+        if( (arg & 1) || arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH ||
+            arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SC_OSSL_LOG_ERROR("Get tag error");
             return 0;
         }
-        memcpy(ptr, cipherCtx->tag, cipherCtx->taglen);
+        memcpy(ptr, cipherCtx->tag, arg);
         break;
     case EVP_CTRL_COPY:
         // We expose the EVP_CTRL_COPY method which is called after the cipher context is copied because we
