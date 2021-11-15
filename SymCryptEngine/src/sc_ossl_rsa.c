@@ -90,7 +90,6 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Encrypt failed", SymError);
-            cbResult = -1;
             goto cleanup;
         }
         break;
@@ -114,7 +113,6 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepEncrypt failed", SymError);
-            cbResult = -1;
             goto cleanup;
         }
         break;
@@ -135,7 +133,6 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawEncrypt failed", SymError);
-            cbResult = -1;
             goto cleanup;
         }
         break;
@@ -227,13 +224,17 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
                        to,
                        cbModulus - SC_OSSL_MIN_PKCS1_PADDING,
                        &cbResult);
-        if( SymError != SYMCRYPT_NO_ERROR )
-        {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Decrypt failed", SymError);
-            cbResult = -1;
-            goto cleanup;
-        }
-        break;
+
+        // Constant-time error processing to avoid Bleichenbacher attack
+        // Set ret based on SymError and cbResult;
+        // SymError != SYMCRYPT_NO_ERROR => -1,
+        // cbResult > INT_MAX => -1,
+        // otherwise => 0
+        ret = (0ll - (((UINT64)cbResult >> 31) | (UINT32)(SymError ^ SYMCRYPT_NO_ERROR))) >> 32;
+
+        // Set ret to cbResult if ret still 0
+        ret |= (UINT32)cbResult;
+        goto cleanup;
     case RSA_PKCS1_OAEP_PADDING:
         SymError = SymCryptRsaOaepDecrypt(
                        keyCtx->key,
@@ -250,7 +251,6 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepDecrypt failed", SymError);
-            cbResult = -1;
             goto cleanup;
         }
         break;
@@ -267,7 +267,6 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
         if( SymError != SYMCRYPT_NO_ERROR )
         {
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawDecrypt failed", SymError);
-            cbResult = -1;
             goto cleanup;
         }
         break;
