@@ -110,13 +110,15 @@ static int sc_ossl_cipher_nids[] = {
     NID_aes_256_ccm,
 };
 
-int sc_ossl_aes_cbc_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
-int sc_ossl_aes_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-static int sc_ossl_aes_cbc_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
-
 #define AES_128_KEY_SIZE 16
 #define AES_192_KEY_SIZE 24
 #define AES_256_KEY_SIZE 32
+
+SCOSSL_STATUS sc_ossl_aes_cbc_init_key(
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
+SCOSSL_STATUS sc_ossl_aes_cbc_cipher(
+    _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS sc_ossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CBC_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE|EVP_CIPH_CUSTOM_COPY \
                          |EVP_CIPH_ALWAYS_CALL_INIT)
 
@@ -177,9 +179,11 @@ static const EVP_CIPHER *sc_ossl_aes_256_cbc(void)
     return _hidden_aes_256_cbc;
 }
 
-int sc_ossl_aes_ecb_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
-int sc_ossl_aes_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-static int sc_ossl_aes_ecb_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+SCOSSL_STATUS sc_ossl_aes_ecb_init_key(
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
+SCOSSL_STATUS sc_ossl_aes_ecb_cipher(
+    _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS sc_ossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY)
 
 /* AES128 - ecb */
@@ -240,9 +244,11 @@ static const EVP_CIPHER *sc_ossl_aes_256_ecb(void)
 }
 
 
-int sc_ossl_aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
-int sc_ossl_aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-static int sc_ossl_aes_xts_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+SCOSSL_STATUS sc_ossl_aes_xts_init_key(
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
+SCOSSL_STATUS sc_ossl_aes_xts_cipher(
+    _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS sc_ossl_aes_xts_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_XTS_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER)
 
@@ -286,9 +292,12 @@ static const EVP_CIPHER *sc_ossl_aes_256_xts(void)
     return _hidden_aes_256_xts;
 }
 
-int sc_ossl_aes_gcm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
-int sc_ossl_aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-static int sc_ossl_aes_gcm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+
+SCOSSL_STATUS sc_ossl_aes_gcm_init_key(
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
+SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(
+    _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
@@ -350,9 +359,11 @@ static const EVP_CIPHER *sc_ossl_aes_256_gcm(void)
     return _hidden_aes_256_gcm;
 }
 
-int sc_ossl_aes_ccm_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key, const unsigned char *iv, int enc);
-int sc_ossl_aes_ccm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in, size_t inl);
-static int sc_ossl_aes_ccm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr);
+SCOSSL_STATUS sc_ossl_aes_ccm_init_key(
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc);
+SCOSSL_RETURNLENGTH sc_ossl_aes_ccm_cipher(
+    _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS sc_ossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
@@ -361,7 +372,6 @@ static int sc_ossl_aes_ccm_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *pt
 static EVP_CIPHER *_hidden_aes_128_ccm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_ccm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_128_ccm == NULL
         && ((_hidden_aes_128_ccm = EVP_CIPHER_meth_new(NID_aes_128_ccm, 1, AES_128_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ccm, AES_CCM_FLAGS)
@@ -380,7 +390,6 @@ static const EVP_CIPHER *sc_ossl_aes_128_ccm(void)
 static EVP_CIPHER *_hidden_aes_192_ccm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_ccm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_192_ccm == NULL
         && ((_hidden_aes_192_ccm = EVP_CIPHER_meth_new(NID_aes_192_ccm, 1, AES_192_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ccm, AES_CCM_FLAGS)
@@ -399,7 +408,6 @@ static const EVP_CIPHER *sc_ossl_aes_192_ccm(void)
 static EVP_CIPHER *_hidden_aes_256_ccm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_ccm(void)
 {
-    SC_OSSL_LOG_DEBUG(NULL);
     if( _hidden_aes_256_ccm == NULL
         && ((_hidden_aes_256_ccm = EVP_CIPHER_meth_new(NID_aes_256_ccm, 1, AES_256_KEY_SIZE)) == NULL
             || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ccm, AES_CCM_FLAGS)
@@ -1355,7 +1363,6 @@ cleanup:
 static SCOSSL_STATUS sc_ossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
-    SC_OSSL_LOG_DEBUG("ctx %lx type %d arg %d ptr %lx", ctx, type, arg, ptr);
     struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     struct cipher_ccm_ctx *dstCtx;
     unsigned char *iv = NULL;
