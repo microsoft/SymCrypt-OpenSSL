@@ -183,6 +183,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
+    UINT64 err = 0;
     int ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
@@ -226,11 +227,15 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
                        &cbResult);
 
         // Constant-time error processing to avoid Bleichenbacher attack
-        // Set ret based on SymError and cbResult;
-        // SymError != SYMCRYPT_NO_ERROR => -1,
-        // cbResult > INT_MAX => -1,
-        // otherwise => 0
-        ret = (0ll - (((UINT64)cbResult >> 31) | (UINT32)(SymError ^ SYMCRYPT_NO_ERROR))) >> 32;
+
+        // Set ret based on SymError and cbResult
+        // cbResult > INT_MAX               => err > 0
+        err = (UINT64)cbResult >> 31;
+        // SymError != SYMCRYPT_NO_ERROR    => err > 0
+        err |= (UINT32)(SymError ^ SYMCRYPT_NO_ERROR);
+        // if( err > 0 ) { ret = -1; }
+        // else          { ret = 0; }
+        ret = (0ll - err) >> 32;
 
         // Set ret to cbResult if ret still 0
         ret |= (UINT32)cbResult;
