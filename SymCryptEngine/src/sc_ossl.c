@@ -238,22 +238,6 @@ int SC_OSSL_ENGINE_Initialize()
     return engine_load_sc_ossl_int();
 }
 
-SYMCRYPT_ERROR
-SYMCRYPT_CALL
-SymCryptCallbackRandom(
-    _Out_writes_bytes_(cbBuffer)  PBYTE   pbBuffer,
-    SIZE_T  cbBuffer)
-{
-    SYMCRYPT_ERROR status = SYMCRYPT_NO_ERROR;
-
-    if( !RAND_bytes(pbBuffer, cbBuffer) )
-    {
-        status = SYMCRYPT_EXTERNAL_FAILURE;
-    }
-
-    return status;
-}
-
 #ifdef __cplusplus
 }
 #endif
