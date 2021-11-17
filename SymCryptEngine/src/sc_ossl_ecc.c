@@ -759,7 +759,7 @@ SCOSSL_STATUS sc_ossl_eckey_sign(int type,
         dgst,
         dlen,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_ECDSA_NO_TRUNCATION,
+        0,
         buf,
         cbSymCryptSig);
     if( symError != SYMCRYPT_NO_ERROR )
@@ -843,7 +843,7 @@ ECDSA_SIG* sc_ossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char*
         dgst,
         dgst_len,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_ECDSA_NO_TRUNCATION,
+        0,
         buf,
         cbSymCryptSig);
     if( symError != SYMCRYPT_NO_ERROR )
@@ -938,7 +938,7 @@ SCOSSL_STATUS sc_ossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const un
         buf,
         cbSymCryptSig,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_ECDSA_NO_TRUNCATION);
+        0);
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEcDsaVerify failed", symError);
@@ -994,7 +994,7 @@ SCOSSL_STATUS sc_ossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned
         buf,
         cbSymCryptSig,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_ECDSA_NO_TRUNCATION);
+        0);
     if( symError != SYMCRYPT_NO_ERROR )
     {
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptEcDsaVerify failed", symError);
