@@ -12,8 +12,6 @@
 #include "sc_ossl_pkey_meths.h"
 #include "sc_ossl_rand.h"
 #include "sc_ossl_helpers.h"
-#include <symcrypt.h>
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +25,7 @@ static const char* engine_sc_ossl_name = "Symcrypt Engine";
 static EC_KEY_METHOD* sc_ossl_eckey_method = NULL;
 static RSA_METHOD* sc_ossl_rsa_method = NULL;
 // static DSA_METHOD* sc_ossl_dsa_method = NULL;
-// static DH_METHOD* sc_ossl_dh_method = NULL;
+static DH_METHOD* sc_ossl_dh_method = NULL;
 
 int sc_ossl_destroy(ENGINE* e)
 {
@@ -43,8 +41,10 @@ int sc_ossl_destroy(ENGINE* e)
     CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, eckey_sc_ossl_idx);
     // DSA_meth_free(sc_ossl_dsa_method);
     // sc_ossl_dsa_method = NULL;
-    // DH_meth_free(sc_ossl_dh_method);
-    // sc_ossl_dh_method = NULL;
+    sc_ossl_destroy_safeprime_dlgroups();
+    DH_meth_free(sc_ossl_dh_method);
+    sc_ossl_dh_method = NULL;
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, dh_sc_ossl_idx);
     return 1;
 }
 
@@ -57,7 +57,7 @@ static int engine_set_defaults(ENGINE* e)
         || !ENGINE_set_default_EC(e)
         || !ENGINE_set_default_RAND(e)
         // || !ENGINE_set_default_DSA(e)
-        // || !ENGINE_set_default_DH(e)
+        || !ENGINE_set_default_DH(e)
         )
     {
         return 0;
@@ -76,12 +76,12 @@ static int bind_sc_ossl_engine(ENGINE* e)
     sc_ossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
     sc_ossl_rsa_method = RSA_meth_new("Symcrypt RSA Method", 0);
     // sc_ossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
-    // sc_ossl_dh_method = DH_meth_dup(DH_OpenSSL());
+    sc_ossl_dh_method = DH_meth_dup(DH_OpenSSL());
 
     if( !sc_ossl_rsa_method
      || !sc_ossl_eckey_method
      // || !sc_ossl_dsa_method
-     // || !sc_ossl_dh_method
+     || !sc_ossl_dh_method
         )
     {
         goto memerr;
@@ -141,16 +141,19 @@ static int bind_sc_ossl_engine(ENGINE* e)
     //     goto memerr;
     // }
 
+    if( (dh_sc_ossl_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
+    {
+        goto memerr;
+    }
+
     // /* Setup DH METHOD */
-    // if (   !DH_meth_set_generate_key(sc_ossl_dh_method, sc_ossl_dh_generate_key)
-    //     || !DH_meth_set_compute_key(sc_ossl_dh_method, sc_ossl_dh_compute_key)
-    //     || !DH_meth_set_bn_mod_exp(sc_ossl_dh_method, sc_ossl_dh_bn_mod_exp)
-    //     || !DH_meth_set_init(sc_ossl_dh_method, sc_ossl_dh_init)
-    //     || !DH_meth_set_finish(sc_ossl_dh_method, sc_ossl_dh_finish)
-    //     )
-    // {
-    //     goto memerr;
-    // }
+    if (   !DH_meth_set_generate_key(sc_ossl_dh_method, sc_ossl_dh_generate_key)
+        || !DH_meth_set_compute_key(sc_ossl_dh_method, sc_ossl_dh_compute_key)
+        || !DH_meth_set_finish(sc_ossl_dh_method, sc_ossl_dh_finish)
+        )
+    {
+        goto memerr;
+    }
 
     // Engine initialization
     if(    !ENGINE_set_id(e, engine_sc_ossl_id)
@@ -159,7 +162,7 @@ static int bind_sc_ossl_engine(ENGINE* e)
         || !ENGINE_set_EC(e, sc_ossl_eckey_method)
         || !ENGINE_set_RSA(e, sc_ossl_rsa_method)
         //|| !ENGINE_set_DSA(e, sc_ossl_dsa_method)
-        //|| !ENGINE_set_DH(e, sc_ossl_dh_method)
+        || !ENGINE_set_DH(e, sc_ossl_dh_method)
         || !ENGINE_set_RAND(e, sc_ossl_rand_method())
         || !ENGINE_set_digests(e, sc_ossl_digests)
         || !ENGINE_set_ciphers(e, sc_ossl_ciphers)

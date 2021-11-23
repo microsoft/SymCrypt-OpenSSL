@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+extern int dh_sc_ossl_idx;
+
 // Generates public and private DH values.
 // Expects shared parameters dh->p and dh->g to be set.
 // Generates a random private DH key unless dh->priv_key set, and computes corresponding
@@ -22,19 +24,12 @@ SCOSSL_STATUS sc_ossl_dh_generate_key(_Inout_ DH* dh);
 // Returns size of shared secret on success, or -1 on error.
 SCOSSL_RETURNLENGTH sc_ossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsigned char* key, _In_ const BIGNUM* pub_key, _In_ DH* dh);
 
-// Computes r = a ^ p mod m
-// Returns 1 on success, or 0 on error
-SCOSSL_STATUS sc_ossl_dh_bn_mod_exp(_In_ const DH* dh, _Out_ BIGNUM* r,
-    _In_ const BIGNUM* a, _In_ const BIGNUM* p,
-    _In_ const BIGNUM* m, _In_ BN_CTX* ctx, _In_ BN_MONT_CTX* m_ctx);
-
-// Initializes a new DH instance.
-// Returns 1 on success, or 0 on error
-SCOSSL_STATUS sc_ossl_dh_init(_Inout_ DH* dh);
-
 // Destroys instance of DH object. The memory for dh is not freed by this function.
 // Returns 1 on success, or 0 on error
 SCOSSL_STATUS sc_ossl_dh_finish(_Inout_ DH* dh);
+
+// Frees internal SymCrypt safe-prime Dlgroups, only to be used on engine destruction.
+void sc_ossl_destroy_safeprime_dlgroups(void);
 
 #ifdef __cplusplus
 }
