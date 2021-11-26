@@ -226,12 +226,12 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm( _In_ const EVP_MD *evp_
 }
 
 SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                    _Out_ size_t *keylen)
+                                    _Inout_ size_t *keylen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_HKDF_PKEY_CTX *scossl_hkdf_context = (SCOSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC scossl_mac_algo = NULL;
-    // SYMCRYPT_HKDF_EXPANDED_KEY  scExpandedKey;
+    SYMCRYPT_HKDF_EXPANDED_KEY  scExpandedKey;
 
     if (scossl_hkdf_context->md == NULL) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
@@ -251,14 +251,10 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         {
             scError = SymCryptHkdf(
                 scossl_mac_algo,
-                scossl_hkdf_context->key,
-                scossl_hkdf_context->key_len,
-                scossl_hkdf_context->salt,
-                scossl_hkdf_context->salt_len,
-                scossl_hkdf_context->info,
-                scossl_hkdf_context->info_len,
-                key,
-                *keylen);
+                scossl_hkdf_context->key, scossl_hkdf_context->key_len,
+                scossl_hkdf_context->salt, scossl_hkdf_context->salt_len,
+                scossl_hkdf_context->info, scossl_hkdf_context->info_len,
+                key, *keylen);
             if (scError != SYMCRYPT_NO_ERROR)
             {
                 return SCOSSL_FAILURE;
@@ -271,12 +267,9 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
 
             return HKDF(
                 scossl_hkdf_context->md,
-                scossl_hkdf_context->salt,
-                scossl_hkdf_context->salt_len,
-                scossl_hkdf_context->key,
-                scossl_hkdf_context->key_len,
-                scossl_hkdf_context->info,
-                scossl_hkdf_context->info_len,
+                scossl_hkdf_context->salt, scossl_hkdf_context->salt_len,
+                scossl_hkdf_context->key, scossl_hkdf_context->key_len,
+                scossl_hkdf_context->info, scossl_hkdf_context->info_len,
                 key, *keylen) != NULL;
         }
         return SCOSSL_SUCCESS;
@@ -285,56 +278,65 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
             *keylen = EVP_MD_size(scossl_hkdf_context->md);
             return SCOSSL_SUCCESS;
         }
-        // SymCryptError = SymCryptHkdfExpandKey(
-        //     &scExpandedKey,
-        //     scossl_mac_algo,
-        //     scossl_hkdf_context->key,
-        //     scossl_hkdf_context->key_len,
-        //     scossl_hkdf_context->salt,
-        //     scossl_hkdf_context->salt_len);
-        // if (SymCryptError != SYMCRYPT_NO_ERROR)
-        // {
-        //     SCOSSL_LOG_SYMCRYPT_DEBUG(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-        //         "SymCryptHkdfExpandKey failed", scError);
-        //     return SCOSSL_FAILURE;
-        // }
 
-        // // TODO:
-        // // Extract expanded key output and copy it to key[keylen]
-        // return SCOSSL_SUCCESS;
+        if( scossl_mac_algo != NULL )
+        {
+            scError = SymCryptHkdfExtractPrk(
+                scossl_mac_algo,
+                scossl_hkdf_context->key, scossl_hkdf_context->key_len,
+                scossl_hkdf_context->salt, scossl_hkdf_context->salt_len,
+                key, *keylen );
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+        else
+        {
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+                "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(scossl_hkdf_context->md));
 
-        return HKDF_Extract(
-                scossl_hkdf_context->md,
-                scossl_hkdf_context->salt,
-                scossl_hkdf_context->salt_len,
-                scossl_hkdf_context->key,
-                scossl_hkdf_context->key_len,
-                key, keylen) != NULL;
+            return HKDF_Extract(
+                    scossl_hkdf_context->md,
+                    scossl_hkdf_context->salt, scossl_hkdf_context->salt_len,
+                    scossl_hkdf_context->key, scossl_hkdf_context->key_len,
+                    key, keylen) != NULL;
+        }
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_HKDEF_MODE_EXPAND_ONLY:
+        if( scossl_mac_algo != NULL )
+        {
+            scError = SymCryptHkdfPrkExpandKey(
+                &scExpandedKey,
+                scossl_mac_algo,
+                scossl_hkdf_context->key, scossl_hkdf_context->key_len );
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                return SCOSSL_FAILURE;
+            }
 
-        // // TODO:
-        // // Populate scExpandedKey
+            scError = SymCryptHkdfDerive(
+                &scExpandedKey,
+                scossl_hkdf_context->info, scossl_hkdf_context->info_len,
+                key,
+                *keylen);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+        else
+        {
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+                "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(scossl_hkdf_context->md));
 
-        // SymCryptError = SymCryptHkdfDerive(
-        //                     &scExpandedKey,
-        //                     scossl_hkdf_context->info,
-        //                     scossl_hkdf_context->info_len,
-        //                     key,
-        //                     *keylen);
-        // if (SymCryptError != SYMCRYPT_NO_ERROR)
-        // {
-        //     SCOSSL_LOG_SYMCRYPT_DEBUG(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-        //         "SymCryptHkdfExpandKey failed", scError);
-        //     return SCOSSL_FAILURE;
-        // }
-        // return SCOSSL_SUCCESS;
-        return HKDF_Expand(
-                scossl_hkdf_context->md,
-                scossl_hkdf_context->key,
-                scossl_hkdf_context->key_len,
-                scossl_hkdf_context->info,
-                scossl_hkdf_context->info_len,
-                key, *keylen) != NULL;
+            return HKDF_Expand(
+                    scossl_hkdf_context->md,
+                    scossl_hkdf_context->key, scossl_hkdf_context->key_len,
+                    scossl_hkdf_context->info, scossl_hkdf_context->info_len,
+                    key, *keylen) != NULL;
+        }
+        return SCOSSL_SUCCESS;
     default:
         return SCOSSL_FAILURE;
     }
