@@ -59,6 +59,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
+    UINT32 nBitsPriv = 0;
 
     BIGNUM* dh_privkey = NULL;
     BIGNUM* dh_pubkey = NULL;
@@ -75,6 +76,17 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
 
     cbPrivateKey = SymCryptDlkeySizeofPrivateKey(pKeyCtx->dlkey);
     cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
+
+    nBitsPriv = DH_get_length(dh);
+    if( nBitsPriv != 0 )
+    {
+        scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
+        if( scError != SYMCRYPT_NO_ERROR )
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptDlkeySetPrivateKeyLength failed", scError);
+            goto cleanup;
+        }
+    }
 
     cbData = cbPublicKey + cbPrivateKey;
     pbData = OPENSSL_zalloc(cbData);
@@ -171,6 +183,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
+    UINT32 nBitsPriv = 0;
 
     const BIGNUM*   dh_privkey = NULL;
     const BIGNUM*   dh_pubkey = NULL;
@@ -184,6 +197,17 @@ SCOSSL_STATUS scossl_dh_import_keypair(
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptDlkeyAllocate returned NULL.");
         goto cleanup;
+    }
+
+    nBitsPriv = DH_get_length(dh);
+    if( nBitsPriv != 0 )
+    {
+        scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
+        if( scError != SYMCRYPT_NO_ERROR )
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptDlkeySetPrivateKeyLength failed", scError);
+            goto cleanup;
+        }
     }
 
     DH_get0_key(dh, &dh_pubkey, &dh_privkey);
