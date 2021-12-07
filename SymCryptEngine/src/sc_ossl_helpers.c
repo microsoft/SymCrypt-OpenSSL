@@ -41,14 +41,14 @@ void SC_OSSL_ENGINE_set_trace_log_filename(const char *filename)
 
 static FILE *_open_trace_log_filename()
 {
-    FILE *fp = stdout;
+    FILE *fp = stderr;
 
     if( _traceLogFilename != NULL )
     {
         fp = fopen(_traceLogFilename, "a");
         if( fp == NULL )
         {
-            fp = stdout;
+            fp = stderr;
         }
     }
     return fp;
@@ -56,7 +56,7 @@ static FILE *_open_trace_log_filename()
 
 static void _close_trace_log_filename(FILE *fp)
 {
-    if( fp != stdout )
+    if( fp != stderr )
     {
         fflush(fp);
         fclose(fp);
@@ -138,7 +138,6 @@ void _scossl_log_bignum(
 {
     unsigned char *string = NULL;
     int length = 0;
-    FILE *fp = NULL;
 
     if( _traceLogLevel < trace_level )
     {

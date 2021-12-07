@@ -2,17 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl.h"
-#include "sc_ossl_ecc.h"
-#include "sc_ossl_rsa.h"
-#include "sc_ossl_dsa.h"
-#include "sc_ossl_dh.h"
-#include "sc_ossl_digests.h"
-#include "sc_ossl_ciphers.h"
-#include "sc_ossl_pkey_meths.h"
 #include "sc_ossl_rand.h"
-#include "sc_ossl_helpers.h"
-#include <symcrypt.h>
 
 #ifdef __cplusplus
 extern "C" {

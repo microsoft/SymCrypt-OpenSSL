@@ -2,10 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl.h"
 #include "sc_ossl_rsa.h"
-#include "sc_ossl_helpers.h"
-#include <symcrypt.h>
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
 
@@ -13,7 +10,7 @@
 extern "C" {
 #endif
 
-static PCSYMCRYPT_HASH GetSymCryptHashAlgorithm(int type)
+static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
 {
     if (type == NID_md5)
         return SymCryptMd5Algorithm;
@@ -29,7 +26,7 @@ static PCSYMCRYPT_HASH GetSymCryptHashAlgorithm(int type)
     return NULL;
 }
 
-static size_t GetExpectedTbsLength(int type)
+static size_t scossl_get_expected_tbs_length(int type)
 {
     if (type == NID_md5)
         return 16;
@@ -54,9 +51,7 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
     size_t cbResult = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
     int ret = -1;
-    // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
-    // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
-    SC_OSSL_RSA_KEY_CONTEXT localKeyCtx;
+    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
@@ -109,13 +104,21 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
         return -2;
     }
 
-    if( sc_ossl_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
+    keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("Failed to initialize localKeyCtx");
-        return -2;
+        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        goto cleanup;
+    }
+    if( keyCtx->initialized == 0 )
+    {
+        if( sc_ossl_initialize_rsa_key(rsa, keyCtx) == 0 )
+        {
+            return -2;
+        }
     }
 
-    cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     cbResult = cbModulus;
     if( siglen != NULL )
     {
@@ -127,9 +130,9 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
         goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
-    sc_ossl_mac_algo = GetSymCryptHashAlgorithm(type);
-    expectedTbsLength = GetExpectedTbsLength(type);
-    if( !sc_ossl_mac_algo || expectedTbsLength < 0 )
+    sc_ossl_mac_algo = scossl_get_symcrypt_hash_algorithm(type);
+    expectedTbsLength = scossl_get_expected_tbs_length(type);
+    if( !sc_ossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
         SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
         goto cleanup;
@@ -151,7 +154,7 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
     }
 
     SymError = SymCryptRsaPssSign(
-                localKeyCtx.key,
+                keyCtx->key,
                 tbs,
                 tbslen,
                 sc_ossl_mac_algo,
@@ -170,7 +173,6 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
     ret = 1;
 
 cleanup:
-    sc_ossl_rsa_free_key_context(&localKeyCtx);
     return ret;
 }
 
@@ -182,9 +184,7 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
     RSA* rsa = NULL;
     size_t ret = 0;
     SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
-    // We should have this localKeyCtx kept in some extension to EVP_PKEY_CTX
-    // Currently not sure how to achieve this with 1.1.1 APIs (EVP_PKEY_get_ex_data is introduced in OpenSSL 3.0)
-    SC_OSSL_RSA_KEY_CONTEXT localKeyCtx;
+    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
@@ -242,10 +242,18 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
         return -2;
     }
 
-    if( sc_ossl_initialize_rsa_key(rsa, &localKeyCtx) == 0 )
+    keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("Failed to initialize localKeyCtx");
-        return -2;
+        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        goto cleanup;
+    }
+    if( keyCtx->initialized == 0 )
+    {
+        if( sc_ossl_initialize_rsa_key(rsa, keyCtx) == 0 )
+        {
+            return -2;
+        }
     }
 
     if( sig == NULL )
@@ -253,16 +261,16 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
         goto cleanup;
     }
 
-    cbModulus = SymCryptRsakeySizeofModulus(localKeyCtx.key);
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
 
-    sc_ossl_mac_algo = GetSymCryptHashAlgorithm(type);
-    expectedTbsLength = GetExpectedTbsLength(type);
-    if( !sc_ossl_mac_algo || expectedTbsLength < 0 )
+    sc_ossl_mac_algo = scossl_get_symcrypt_hash_algorithm(type);
+    expectedTbsLength = scossl_get_expected_tbs_length(type);
+    if( !sc_ossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
         SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
         goto cleanup;
     }
-    
+
     // Log warnings for algorithms that aren't FIPS compliant
     if( type == NID_md5 )
     {
@@ -279,7 +287,7 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
     }
 
     SymError = SymCryptRsaPssVerify(
-                localKeyCtx.key,
+                keyCtx->key,
                 tbs,
                 tbslen,
                 sig,
@@ -291,14 +299,16 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
 
     if( SymError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify failed", SymError);
+        if( SymError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+        {
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify returned unexpected error", SymError);
+        }
         goto cleanup;
     }
 
     ret = 1;
 
 cleanup:
-    sc_ossl_rsa_free_key_context(&localKeyCtx);
     return ret;
 }
 

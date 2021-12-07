@@ -1515,7 +1515,6 @@ TestAesGcmGeneric()
     TestAesGcmCipher("EVP_aes_192_gcm", EVP_aes_192_gcm(), key, 24, iv, 12, aad, 16, plaintext, plaintext_len);
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), key, 32, iv, 12, aad, 16, plaintext, plaintext_len);
 
-    // Test Nist Curves
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), gcm_key, 32, gcm_iv, 12, gcm_aad, 16, gcm_pt, 16);
 
     printf("%s", SeparatorLine);

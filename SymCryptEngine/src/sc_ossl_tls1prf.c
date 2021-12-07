@@ -2,9 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl.h"
-#include "sc_ossl_helpers.h"
-#include <symcrypt.h>
+#include "sc_ossl_tls1prf.h"
 #include <openssl/kdf.h>
 
 #ifdef __cplusplus
@@ -92,8 +90,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
     return 1;
 }
 
-PCSYMCRYPT_MAC
-GetSymCryptMacAlgorithm(
+static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(
     const EVP_MD *evp_md)
 {
     int type = EVP_MD_type(evp_md);
@@ -145,7 +142,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
     }
     else
     {
-        sc_ossl_mac_algo = GetSymCryptMacAlgorithm(key_context->md);
+        sc_ossl_mac_algo = scossl_get_symcrypt_mac_algorithm(key_context->md);
         if( sc_ossl_mac_algo == NULL )
         {
             return 0;

@@ -10,12 +10,15 @@
 extern "C" {
 #endif
 
-extern int eckey_sc_ossl_idx;
+extern int scossl_eckey_idx;
 
 typedef int (*PFN_eckey_copy)(EC_KEY *dest, const EC_KEY *src);
 typedef int (*PFN_eckey_set_group)(EC_KEY *key, const EC_GROUP *grp);
 typedef int (*PFN_eckey_set_private)(EC_KEY *key, const BIGNUM *priv_key);
 typedef int (*PFN_eckey_set_public)(EC_KEY *key, const EC_POINT *pub_key);
+
+// Initialize all of the _hidden_* ecc variables
+SCOSSL_STATUS scossl_ecc_init_static();
 
 // Frees SymCrypt-specific components of key
 void sc_ossl_eckey_finish(_Inout_ EC_KEY *key);
