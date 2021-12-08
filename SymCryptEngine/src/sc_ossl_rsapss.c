@@ -49,7 +49,7 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     size_t cbResult = 0;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     int ret = -1;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
@@ -153,7 +153,7 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
         goto cleanup;
     }
 
-    SymError = SymCryptRsaPssSign(
+    symError = SymCryptRsaPssSign(
                 keyCtx->key,
                 tbs,
                 tbslen,
@@ -164,9 +164,9 @@ SCOSSL_STATUS sc_ossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*s
                 sig,
                 siglen != NULL ? (*siglen) : 0,
                 &cbResult);
-    if( SymError != SYMCRYPT_NO_ERROR )
+    if( symError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssSign failed", symError);
         goto cleanup;
     }
 
@@ -183,7 +183,7 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     size_t ret = 0;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH sc_ossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
@@ -286,7 +286,7 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
         goto cleanup;
     }
 
-    SymError = SymCryptRsaPssVerify(
+    symError = SymCryptRsaPssVerify(
                 keyCtx->key,
                 tbs,
                 tbslen,
@@ -297,11 +297,11 @@ SCOSSL_STATUS sc_ossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(
                 cbSalt,
                 0);
 
-    if( SymError != SYMCRYPT_NO_ERROR )
+    if( symError != SYMCRYPT_NO_ERROR )
     {
-        if( SymError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+        if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify returned unexpected error", SymError);
+            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPssverify returned unexpected error", symError);
         }
         goto cleanup;
     }

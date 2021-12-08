@@ -532,11 +532,11 @@ SCOSSL_STATUS sc_ossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
                              _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     if( key )
     {
-        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
-        if( SymError != SYMCRYPT_NO_ERROR )
+        symError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             return 0;
         }
@@ -597,11 +597,11 @@ SCOSSL_STATUS sc_ossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
                              _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     if( key )
     {
-        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
-        if( SymError != SYMCRYPT_NO_ERROR )
+        symError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             return 0;
         }
@@ -662,7 +662,7 @@ static SCOSSL_STATUS sc_ossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, in
 SCOSSL_STATUS sc_ossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     if( iv )
     {
@@ -675,8 +675,8 @@ SCOSSL_STATUS sc_ossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     }
     if( key )
     {
-        SymError = SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
-        if( SymError != SYMCRYPT_NO_ERROR )
+        symError = SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             return 0;
         }
@@ -765,7 +765,7 @@ static SCOSSL_STATUS sc_ossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, in
 SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
     cipherCtx->operationInProgress = 0;
@@ -775,8 +775,8 @@ SCOSSL_STATUS sc_ossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     }
     if( key )
     {
-        SymError = SymCryptGcmExpandKey(&cipherCtx->key, SymCryptAesBlockCipher, key, EVP_CIPHER_CTX_key_length(ctx));
-        if( SymError != SYMCRYPT_NO_ERROR )
+        symError = SymCryptGcmExpandKey(&cipherCtx->key, SymCryptAesBlockCipher, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             return 0;
         }
@@ -792,7 +792,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_In_ const EVP_CIPHER_CTX *ctx, _
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl, BOOL enc)
 {
     int ret = -1;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     PBYTE  pbPayload = NULL;
     SIZE_T cbPayload = 0;
 
@@ -848,13 +848,13 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_tls(_In_ const EVP_CIPHER_CTX *ctx, _
         memcpy(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, out, EVP_GCM_TLS_EXPLICIT_IV_LEN);
 
         // Check ICV
-        SymError = SymCryptGcmDecrypt(
+        symError = SymCryptGcmDecrypt(
             &cipherCtx->key,
             cipherCtx->iv, cipherCtx->ivlen,
             cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
             pbPayload, pbPayload, cbPayload,
             pbPayload+cbPayload, EVP_GCM_TLS_TAG_LEN );
-        if( SymError != SYMCRYPT_NO_ERROR )
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             goto cleanup;
         }
@@ -877,7 +877,7 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ un
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
     if( cipherCtx->tlsAadSet )
@@ -925,8 +925,8 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ un
         else
         {
             // Final Decrypt Call
-            SymError = SymCryptGcmDecryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
-            if( SymError != SYMCRYPT_NO_ERROR )
+            symError = SymCryptGcmDecryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
+            if( symError != SYMCRYPT_NO_ERROR )
             {
                 goto cleanup;
             }
@@ -1069,7 +1069,7 @@ static SCOSSL_STATUS sc_ossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type,
 SCOSSL_STATUS sc_ossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SC_OSSL_ENCRYPTION_MODE enc)
 {
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
 
     cipherCtx->ccmStage = SCOSSL_CCM_STAGE_INIT;
@@ -1080,8 +1080,8 @@ SCOSSL_STATUS sc_ossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const u
     }
     if( key )
     {
-        SymError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
-        if( SymError != SYMCRYPT_NO_ERROR )
+        symError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             return 0;
         }
@@ -1095,7 +1095,7 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_ccm_tls(_In_ const EVP_CIPHER_CTX *ctx, _
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     PBYTE  pbPayload = NULL;
     SIZE_T cbPayload = 0;
 
@@ -1157,14 +1157,14 @@ static SCOSSL_RETURNLENGTH sc_ossl_aes_ccm_tls(_In_ const EVP_CIPHER_CTX *ctx, _
         memcpy(cipherCtx->iv + cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, out, EVP_CCM_TLS_EXPLICIT_IV_LEN);
 
         // Check ICV
-        SymError = SymCryptCcmDecrypt(
+        symError = SymCryptCcmDecrypt(
             SymCryptAesBlockCipher,
             &cipherCtx->key,
             cipherCtx->iv, cipherCtx->ivlen,
             cipherCtx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
             pbPayload, pbPayload, cbPayload,
             pbPayload+cbPayload, cipherCtx->taglen );
-        if( SymError != SYMCRYPT_NO_ERROR )
+        if( symError != SYMCRYPT_NO_ERROR )
         {
             goto cleanup;
         }
@@ -1187,7 +1187,7 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ un
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     PCBYTE pbAuthData = NULL;
     SIZE_T cbAuthdata = 0;
@@ -1289,9 +1289,9 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ un
             {
                 SymCryptCcmDecryptPart(&cipherCtx->state, in, out, inl);
             }
-            SymError = SymCryptCcmDecryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
+            symError = SymCryptCcmDecryptFinal(&cipherCtx->state, cipherCtx->tag, cipherCtx->taglen);
             cipherCtx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
-            if( SymError != SYMCRYPT_NO_ERROR )
+            if( symError != SYMCRYPT_NO_ERROR )
             {
                 ret = -1;
                 goto cleanup;

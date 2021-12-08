@@ -114,7 +114,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
 {
     SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
 
     if (key_context->md == NULL) {
         SC_OSSL_LOG_ERROR("Missing Digest");
@@ -130,7 +130,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
         SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        SymError = SymCryptTlsPrf1_1(
+        symError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,
             NULL,
@@ -148,7 +148,7 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
             return 0;
         }
 
-        SymError = SymCryptTlsPrf1_2(
+        symError = SymCryptTlsPrf1_2(
             sc_ossl_mac_algo,
             key_context->secret,
             key_context->secret_length,
@@ -160,9 +160,9 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
             *keylen);
     }
 
-    if (SymError != SYMCRYPT_NO_ERROR)
+    if (symError != SYMCRYPT_NO_ERROR)
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptTlsPrf1_2 failed", SymError);
+        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptTlsPrf1_2 failed", symError);
         return 0;
     }
     return 1;

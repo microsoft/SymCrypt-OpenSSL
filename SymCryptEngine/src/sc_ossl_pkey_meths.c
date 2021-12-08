@@ -83,8 +83,7 @@ static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
 
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa = NULL;
 
-// Returns the internal RSA method structure holding methods for RSA functions, and
-// creates that structure if it doesn't already exist.
+// Creates and returns the internal RSA method structure holding methods for RSA functions
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
@@ -112,8 +111,7 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 static const EVP_PKEY_METHOD *_openssl_pkey_rsa_pss = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa_pss = NULL;
 
-// Returns the internal RSA PSS method structure holding methods for RSA PSS functions, and
-// creates that structure if it doesn't already exist.
+// Creates and returns the internal RSA PSS method structure holding methods for RSA PSS functions
 static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
@@ -142,8 +140,7 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 static const EVP_PKEY_METHOD *_openssl_pkey_tls1_prf = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_tls1_prf = NULL;
 
-// Returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functions, and
-// creates that structure if it doesn't already exist.
+// Creates and returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functions
 static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
@@ -165,8 +162,7 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
 static const EVP_PKEY_METHOD *_openssl_pkey_hkdf = NULL;
 static EVP_PKEY_METHOD *_sc_ossl_pkey_hkdf = NULL;
 
-// Returns the internal HKDF method structure holding methods for HKDF functions, and creates that structure
-// if it doesn't already exist.
+// Creates and returns the internal HKDF method structure holding methods for HKDF functions
 static EVP_PKEY_METHOD *sc_ossl_pkey_hkdf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;

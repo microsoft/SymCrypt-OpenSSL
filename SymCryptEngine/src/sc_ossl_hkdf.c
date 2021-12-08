@@ -228,7 +228,7 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm( _In_ const EVP_MD *evp_
 SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
                                     _Out_ size_t *keylen)
 {
-    SYMCRYPT_ERROR SymError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     SC_OSSL_HKDF_PKEY_CTX *sc_ossl_hkdf_context = (SC_OSSL_HKDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
     // SYMCRYPT_HKDF_EXPANDED_KEY  scExpandedKey;
@@ -247,7 +247,7 @@ SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*k
     case EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND:
         if( sc_ossl_mac_algo != NULL )
         {
-            SymError = SymCryptHkdf(
+            symError = SymCryptHkdf(
                 sc_ossl_mac_algo,
                 sc_ossl_hkdf_context->key,
                 sc_ossl_hkdf_context->key_len,
@@ -257,7 +257,7 @@ SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*k
                 sc_ossl_hkdf_context->info_len,
                 key,
                 *keylen);
-            if (SymError != SYMCRYPT_NO_ERROR)
+            if (symError != SYMCRYPT_NO_ERROR)
             {
                 return 0;
             }
@@ -291,7 +291,7 @@ SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*k
         //     sc_ossl_hkdf_context->salt_len);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", SymError);
+        //     SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", symError);
         //     return 0;
         // }
 
@@ -319,7 +319,7 @@ SCOSSL_STATUS sc_ossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*k
         //                     *keylen);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", SymError);
+        //     SC_OSSL_LOG_SYMERROR_DEBUG("SymCryptHkdfExpandKey failed", symError);
         //     return 0;
         // }
         // return 1;
