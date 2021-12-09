@@ -121,7 +121,7 @@ static EVP_CIPHER *_hidden_aes_128_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_cbc(void)
 {
     if( (_hidden_aes_128_cbc = EVP_CIPHER_meth_new(NID_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_cbc,16)
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_cbc, AES_CBC_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_cbc, sc_ossl_aes_cbc_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_cbc, sc_ossl_aes_cbc_cipher)
@@ -139,7 +139,7 @@ static EVP_CIPHER *_hidden_aes_192_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_cbc(void)
 {
     if( (_hidden_aes_192_cbc = EVP_CIPHER_meth_new(NID_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_cbc,16)
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_cbc, AES_CBC_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_192_cbc, sc_ossl_aes_cbc_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_cbc, sc_ossl_aes_cbc_cipher)
@@ -157,7 +157,7 @@ static EVP_CIPHER *_hidden_aes_256_cbc = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_cbc(void)
 {
     if( (_hidden_aes_256_cbc = EVP_CIPHER_meth_new(NID_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_cbc,16)
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_cbc, AES_CBC_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_cbc, sc_ossl_aes_cbc_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_cbc, sc_ossl_aes_cbc_cipher)
@@ -182,7 +182,6 @@ static EVP_CIPHER *_hidden_aes_128_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_ecb(void)
 {
     if( (_hidden_aes_128_ecb = EVP_CIPHER_meth_new(NID_aes_128_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_ecb,16)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ecb, AES_ECB_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ecb, sc_ossl_aes_ecb_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ecb, sc_ossl_aes_ecb_cipher)
@@ -200,7 +199,6 @@ static EVP_CIPHER *_hidden_aes_192_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_ecb(void)
 {
     if( (_hidden_aes_192_ecb = EVP_CIPHER_meth_new(NID_aes_192_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_ecb,16)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ecb, AES_ECB_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ecb, sc_ossl_aes_ecb_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ecb, sc_ossl_aes_ecb_cipher)
@@ -218,7 +216,6 @@ static EVP_CIPHER *_hidden_aes_256_ecb = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_ecb(void)
 {
     if( (_hidden_aes_256_ecb = EVP_CIPHER_meth_new(NID_aes_256_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_ecb, 16)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ecb, AES_ECB_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ecb, sc_ossl_aes_ecb_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ecb, sc_ossl_aes_ecb_cipher)
@@ -246,7 +243,7 @@ static EVP_CIPHER *_hidden_aes_128_xts = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_xts(void)
 {
     if( (_hidden_aes_128_xts = EVP_CIPHER_meth_new(NID_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE * 2)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, 16)
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_xts, AES_XTS_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_xts, sc_ossl_aes_xts_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_xts, sc_ossl_aes_xts_cipher)
@@ -264,7 +261,7 @@ static EVP_CIPHER *_hidden_aes_256_xts = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_xts(void)
 {
     if( (_hidden_aes_256_xts = EVP_CIPHER_meth_new(NID_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE * 2)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, 16)
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_xts, AES_XTS_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_xts, sc_ossl_aes_xts_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_xts, sc_ossl_aes_xts_cipher)
@@ -293,7 +290,6 @@ static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_128_gcm(void)
 {
     if( (_hidden_aes_128_gcm = EVP_CIPHER_meth_new(NID_aes_128_gcm, 1, AES_128_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_gcm,12)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, sc_ossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, sc_ossl_aes_gcm_cipher)
@@ -311,7 +307,6 @@ static EVP_CIPHER *_hidden_aes_192_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_192_gcm(void)
 {
     if( (_hidden_aes_192_gcm = EVP_CIPHER_meth_new(NID_aes_192_gcm, 1, AES_192_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_gcm,12)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, sc_ossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, sc_ossl_aes_gcm_cipher)
@@ -329,7 +324,6 @@ static EVP_CIPHER *_hidden_aes_256_gcm = NULL;
 static const EVP_CIPHER *sc_ossl_aes_256_gcm(void)
 {
     if( (_hidden_aes_256_gcm = EVP_CIPHER_meth_new(NID_aes_256_gcm, 1, AES_256_KEY_SIZE)) == NULL
-        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_gcm,12)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, sc_ossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, sc_ossl_aes_gcm_cipher)
@@ -693,7 +687,7 @@ SCOSSL_RETURNLENGTH sc_ossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ un
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     if( inl > 0 )
     {
-        if( (inl % 16) != 0 )
+        if( (inl % SYMCRYPT_AES_BLOCK_SIZE) != 0 )
         {
             SC_OSSL_LOG_ERROR("Data length (%d) is not a multiple of the AES block size. SymCrypt does not support this size", inl);
             return -1;
