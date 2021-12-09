@@ -12,6 +12,9 @@ extern "C" {
 
 extern int dh_sc_ossl_idx;
 
+// Initialize all of the _hidden_* dh variables
+SCOSSL_STATUS scossl_dh_init_static();
+
 // Generates public and private DH values.
 // Expects shared parameters dh->p and dh->g to be set.
 // Generates a random private DH key unless dh->priv_key set, and computes corresponding

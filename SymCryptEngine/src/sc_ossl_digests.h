@@ -3,15 +3,18 @@
 //
 
 #include "sc_ossl.h"
+#include "sc_ossl_helpers.h"
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 #include <openssl/md4.h>
 #include <openssl/md2.h>
-#include <symcrypt.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Initialize all of the _hidden_* digests variables
+SCOSSL_STATUS scossl_digests_init_static();
 
 /*
  * Returns either the digest for 'nid', or a list of supported 'nids'.

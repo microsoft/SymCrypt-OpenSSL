@@ -5,13 +5,12 @@
 #include "sc_ossl.h"
 #include "sc_ossl_helpers.h"
 #include <openssl/rsa.h>
-#include <symcrypt.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int rsa_sc_ossl_idx;
+extern int scossl_rsa_idx;
 
 // Public Encryption
 // Encrypts flen bytes at from using public key rsa and stores ciphertext in to.
@@ -57,7 +56,7 @@ SCOSSL_STATUS sc_ossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ R
 // r = a ^ p mod m
 // ctx is a temporary BIGNUM variable, while m_ctx is a Montgomery multiplication structure
 // Returns 1 on success, or 0 on error
-SCOSSL_STATUS sc_ossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p, 
+SCOSSL_STATUS sc_ossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p,
                                       _In_ const BIGNUM* m, _In_ BN_CTX* ctx, _In_ BN_MONT_CTX* m_ctx);
 
 // Signs the message digest m of size m_len using private key rsa using PKCS1-v1_5 and stores signature in sigret and
@@ -92,11 +91,6 @@ SCOSSL_STATUS sc_ossl_rsa_finish(_Inout_ RSA *rsa);
 
 typedef struct _SC_OSSL_RSA_KEY_CONTEXT {
     int initialized;
-    // Pointer to memory buffer holding private/public key data as it is transferred between OpenSSL
-    // and SymCrypt formats
-    // Must be cleared before freeing (using OPENSSL_clear_free)
-    PBYTE data;
-    SIZE_T cbData;
     PSYMCRYPT_RSAKEY key;
 } SC_OSSL_RSA_KEY_CONTEXT;
 

@@ -37,8 +37,8 @@ int sc_ossl_destroy(ENGINE* e)
     sc_ossl_destroy_ecc_curves();
     EC_KEY_METHOD_free(sc_ossl_eckey_method);
     sc_ossl_eckey_method = NULL;
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, rsa_sc_ossl_idx);
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, eckey_sc_ossl_idx);
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, scossl_rsa_idx);
+    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, scossl_eckey_idx);
     // DSA_meth_free(sc_ossl_dsa_method);
     // sc_ossl_dsa_method = NULL;
     sc_ossl_destroy_safeprime_dlgroups();
@@ -88,7 +88,7 @@ static int bind_sc_ossl_engine(ENGINE* e)
     }
 
     /* Setup RSA_METHOD */
-    if( (rsa_sc_ossl_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+    if( (scossl_rsa_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
         || !RSA_meth_set_pub_enc(sc_ossl_rsa_method, sc_ossl_rsa_pub_enc)
         || !RSA_meth_set_priv_dec(sc_ossl_rsa_method, sc_ossl_rsa_priv_dec)
         || !RSA_meth_set_priv_enc(sc_ossl_rsa_method, sc_ossl_rsa_priv_enc)
@@ -105,7 +105,7 @@ static int bind_sc_ossl_engine(ENGINE* e)
         goto memerr;
     }
 
-    if( (eckey_sc_ossl_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
+    if( (scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
     {
         goto memerr;
     }
@@ -175,6 +175,18 @@ static int bind_sc_ossl_engine(ENGINE* e)
     // Set Engine as default
     if( !engine_set_defaults(e) )
     {
+        return 0;
+    }
+
+    // Initialize hidden static variables once at Engine load time
+    if(    !scossl_ecc_init_static()
+        || !scossl_dh_init_static()
+        || !scossl_digests_init_static()
+        || !scossl_ciphers_init_static()
+        || !scossl_pkey_methods_init_static()
+        )
+    {
+        sc_ossl_destroy(e);
         return 0;
     }
 

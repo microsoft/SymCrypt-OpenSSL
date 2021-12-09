@@ -48,28 +48,28 @@ void _scossl_log_SYMCRYPT_ERROR(
 // Enable debug and info messages in debug builds, but compile them out in release builds
 #if DBG
     #define SC_OSSL_LOG_DEBUG(...) \
-        _scossl_log(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, __VA_ARGS__)
+        _scossl_log(SC_OSSL_LOG_LEVEL_DEBUG, __func__, __VA_ARGS__)
 
     #define SC_OSSL_LOG_INFO(...) \
-        _scossl_log(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, __VA_ARGS__)
+        _scossl_log(SC_OSSL_LOG_LEVEL_INFO, __func__, __VA_ARGS__)
 
     #define SC_OSSL_LOG_BYTES_DEBUG(description, s, len) \
-        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, (const char*) s, len)
+        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_DEBUG, __func__, description, (const char*) s, len)
 
     #define SC_OSSL_LOG_BYTES_INFO(description, s, len) \
-        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, (const char*) s, len)
+        _scossl_log_bytes(SC_OSSL_LOG_LEVEL_INFO, __func__, description, (const char*) s, len)
 
     #define SC_OSSL_LOG_BIGNUM_DEBUG(description, bn) \
-        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, bn)
+        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_DEBUG, __func__, description, bn)
 
     #define SC_OSSL_LOG_BIGNUM_INFO(description, s, len) \
-        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, bn)
+        _scossl_log_bignum(SC_OSSL_LOG_LEVEL_INFO, __func__, description, bn)
 
     #define SC_OSSL_LOG_SYMERROR_DEBUG(description, symError) \
-        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_DEBUG, __FUNCTION__, description, symError)
+        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_DEBUG, __func__, description, symError)
 
     #define SC_OSSL_LOG_SYMERROR_INFO(description, symError) \
-        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_INFO, __FUNCTION__, description, symError)
+        _scossl_log_SYMCRYPT_ERROR(SC_OSSL_LOG_LEVEL_INFO, __func__, description, symError)
 #else
     #define SC_OSSL_LOG_DEBUG(...)
     #define SC_OSSL_LOG_INFO(...)

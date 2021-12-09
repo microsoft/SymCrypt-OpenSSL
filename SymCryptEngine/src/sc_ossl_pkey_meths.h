@@ -3,12 +3,15 @@
 //
 
 #include "sc_ossl.h"
+#include "sc_ossl_helpers.h"
 #include <openssl/dh.h>
-#include <symcrypt.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Initialize all of the _hidden_* pkey method variables
+SCOSSL_STATUS scossl_pkey_methods_init_static();
 
 // Return a list of supported nids if pmeth is NULL, or a particular pkey
 // method in pmeth determined by nid. Returns number of supported nids in the first case.

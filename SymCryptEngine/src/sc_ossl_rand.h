@@ -3,6 +3,7 @@
 //
 
 #include "sc_ossl.h"
+#include "sc_ossl_helpers.h"
 #include <openssl/rand.h>
 
 #ifdef __cplusplus

@@ -44,6 +44,9 @@ void scossl_dh_free_key_context(_Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx)
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp4096 = NULL;
+static BIGNUM* _hidden_bignum_modp2048 = NULL;
+static BIGNUM* _hidden_bignum_modp3072 = NULL;
+static BIGNUM* _hidden_bignum_modp4096 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
@@ -75,7 +78,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
 
     cbPrivateKey = SymCryptDlkeySizeofPrivateKey(pKeyCtx->dlkey);
     cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
-    
+
     cbData = cbPublicKey + cbPrivateKey;
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
@@ -107,16 +110,20 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
         SC_OSSL_LOG_SYMERROR_ERROR("SymCryptDlkeyGetValue failed", symError);
         goto cleanup;
     }
-    
+
     if( ((dh_privkey = BN_secure_new()) == NULL) ||
         ((dh_pubkey = BN_new()) == NULL) )
     {
         SC_OSSL_LOG_ERROR("BN_new returned NULL.");
         goto cleanup;
     }
-    
-    BN_bin2bn(pbPrivateKey, cbPrivateKey, dh_privkey);
-    BN_bin2bn(pbPublicKey, cbPublicKey, dh_pubkey);
+
+    if( (BN_bin2bn(pbPrivateKey, cbPrivateKey, dh_privkey) == NULL) ||
+        (BN_bin2bn(pbPublicKey, cbPublicKey, dh_pubkey) == NULL) )
+    {
+        SC_OSSL_LOG_ERROR("BN_bin2bn failed.");
+        goto cleanup;
+    }
 
     if( DH_set0_key(dh, dh_pubkey, dh_privkey) == 0 )
     {
@@ -203,7 +210,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(
     if( cbPrivateKey != 0 )
     {
         pbPrivateKey = pbData;
-        if( BN_bn2binpad(dh_privkey, pbPrivateKey, cbPrivateKey) != cbPrivateKey )
+        if( (SIZE_T) BN_bn2binpad(dh_privkey, pbPrivateKey, cbPrivateKey) != cbPrivateKey )
         {
             SC_OSSL_LOG_ERROR("BN_bn2binpad did not write expected number of private key bytes.");
             goto cleanup;
@@ -212,7 +219,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(
     if( cbPublicKey != 0 )
     {
         pbPublicKey = pbData + cbPrivateKey;
-        if( BN_bn2binpad(dh_pubkey, pbPublicKey, cbPublicKey) != cbPublicKey )
+        if( (SIZE_T) BN_bn2binpad(dh_pubkey, pbPublicKey, cbPublicKey) != cbPublicKey )
         {
             SC_OSSL_LOG_ERROR("BN_bn2binpad did not write expected number of public key bytes.");
             goto cleanup;
@@ -249,14 +256,18 @@ SCOSSL_STATUS scossl_dh_import_keypair(
             SC_OSSL_LOG_SYMERROR_ERROR("SymCryptDlkeyGetValue failed", symError);
             goto cleanup;
         }
-        
+
         if( (generated_dh_pubkey = BN_new()) == NULL )
         {
             SC_OSSL_LOG_ERROR("BN_new returned NULL.");
             goto cleanup;
         }
-        
-        BN_bin2bn(pbPublicKey, cbPublicKey, generated_dh_pubkey);
+
+        if( BN_bin2bn(pbPublicKey, cbPublicKey, generated_dh_pubkey) == NULL )
+        {
+            SC_OSSL_LOG_ERROR("BN_bin2bn failed.");
+            goto cleanup;
+        }
 
         if( DH_set0_key(dh, generated_dh_pubkey, NULL) == 0 )
         {
@@ -290,16 +301,13 @@ PSYMCRYPT_DLGROUP scossl_initialize_safeprime_dlgroup(_Inout_ PSYMCRYPT_DLGROUP*
 {
     SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
 
+    *ppDlgroup = SymCryptDlgroupAllocate( nBitsOfP, nBitsOfP-1 );
     if( *ppDlgroup == NULL )
     {
-        *ppDlgroup = SymCryptDlgroupAllocate( nBitsOfP, nBitsOfP-1 );
-        if( *ppDlgroup == NULL )
-        {
-            goto cleanup;
-        }
-
-        symError = SymCryptDlgroupSetValueSafePrime(dhSafePrimeType, *ppDlgroup);
+        goto cleanup;
     }
+
+    symError = SymCryptDlgroupSetValueSafePrime(dhSafePrimeType, *ppDlgroup);
 
 cleanup:
     if( *ppDlgroup != NULL && symError != SYMCRYPT_NO_ERROR )
@@ -310,6 +318,23 @@ cleanup:
     return *ppDlgroup;
 }
 
+SCOSSL_STATUS scossl_dh_init_static()
+{
+    if( (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048 ) == NULL) ||
+        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072 ) == NULL) ||
+        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096 ) == NULL) ||
+        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048 ) == NULL) ||
+        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072 ) == NULL) ||
+        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096 ) == NULL) ||
+        ((_hidden_bignum_modp2048 = BN_get_rfc3526_prime_2048(NULL)) == NULL) ||
+        ((_hidden_bignum_modp3072 = BN_get_rfc3526_prime_3072(NULL)) == NULL) ||
+        ((_hidden_bignum_modp4096 = BN_get_rfc3526_prime_4096(NULL)) == NULL) )
+    {
+        return 0;
+    }
+    return 1;
+}
+
 // returns SC_OSSL_DH_GET_CONTEXT_FALLBACK when the dh is not supported by the engine, so we
 // should fallback to OpenSSL
 // returns SC_OSSL_DH_GET_CONTEXT_ERROR on an error
@@ -317,10 +342,7 @@ cleanup:
 // SCOSSL_DH_KEY_CONTEXT on success
 SCOSSL_STATUS sc_ossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx, BOOL generate)
 {
-    SCOSSL_STATUS status = SC_OSSL_DH_GET_CONTEXT_SUCCESS;
-
     PSYMCRYPT_DLGROUP pDlgroup = NULL;
-    PSYMCRYPT_DLKEY pDlkey = NULL;
 
     const BIGNUM* p = NULL;
     const BIGNUM* g = NULL;
@@ -341,28 +363,29 @@ SCOSSL_STATUS sc_ossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CON
     switch( dlgroupNid )
     {
     case NID_ffdhe2048:
-        pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048 );
+        pDlgroup = _hidden_dlgroup_ffdhe2048;
         break;
     case NID_ffdhe3072:
-        pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072 );
+        pDlgroup = _hidden_dlgroup_ffdhe3072;
         break;
     case NID_ffdhe4096:
-        pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096 );
+        pDlgroup = _hidden_dlgroup_ffdhe4096;
         break;
     default:
         // Not one of the supported ffdhe groups, but may still be a supported MODP group
         // Given we know the generator is 2, we can now check whether P corresponds to a MODP group
-        if( BN_cmp( p, BN_get_rfc3526_prime_2048(NULL) ) == 0 )
+        if( BN_cmp( p, _hidden_bignum_modp2048 ) == 0 )
         {
-            pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048 );
+            pDlgroup = _hidden_dlgroup_modp2048;
+            break;
         }
-        else if( BN_cmp( p, BN_get_rfc3526_prime_3072(NULL) ) == 0 )
+        else if( BN_cmp( p, _hidden_bignum_modp3072 ) == 0 )
         {
-            pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072 );
+            pDlgroup = _hidden_dlgroup_modp3072;
         }
-        else if( BN_cmp( p, BN_get_rfc3526_prime_4096(NULL) ) == 0 )
+        else if( BN_cmp( p, _hidden_bignum_modp4096 ) == 0 )
         {
-            pDlgroup = scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096 );
+            pDlgroup = _hidden_dlgroup_modp4096;
         }
         else
         {
@@ -374,7 +397,7 @@ SCOSSL_STATUS sc_ossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CON
 
     if( pDlgroup == NULL )
     {
-        SC_OSSL_LOG_ERROR("scossl_initialize_safeprime_dlgroup failed.");
+        SC_OSSL_LOG_ERROR("_hidden_dlgroup_* is NULL.");
         return SC_OSSL_DH_GET_CONTEXT_ERROR;
     }
 
@@ -431,7 +454,6 @@ SCOSSL_STATUS sc_ossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEX
 SCOSSL_STATUS sc_ossl_dh_generate_key(_Inout_ DH* dh)
 {
     const DH_METHOD* ossl_dh_meth = NULL;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
     PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
 
     switch( sc_ossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
@@ -498,7 +520,7 @@ SCOSSL_RETURNLENGTH sc_ossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsig
         goto cleanup;
     }
 
-    if( BN_bn2binpad(pub_key, buf, cbPublicKey) != cbPublicKey )
+    if( (SIZE_T) BN_bn2binpad(pub_key, buf, cbPublicKey) != cbPublicKey )
     {
         SC_OSSL_LOG_ERROR("BN_bn2binpad did not write expected number of public key bytes.");
         goto cleanup;
@@ -589,6 +611,12 @@ void sc_ossl_destroy_safeprime_dlgroups(void)
         SymCryptDlgroupFree(_hidden_dlgroup_modp4096);
         _hidden_dlgroup_modp4096 = NULL;
     }
+    BN_free(_hidden_bignum_modp2048);
+    _hidden_bignum_modp2048 = NULL;
+    BN_free(_hidden_bignum_modp3072);
+    _hidden_bignum_modp3072 = NULL;
+    BN_free(_hidden_bignum_modp4096);
+    _hidden_bignum_modp4096 = NULL;
 }
 
 #ifdef __cplusplus
