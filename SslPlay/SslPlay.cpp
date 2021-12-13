@@ -15,12 +15,25 @@
 
 BIO *bio_err = NULL;
 
-void printOpenSSLError(const char* description)
+// By default exit Sslplay application if an error is encountered
+#define SSLPLAY_EXIT_ON_ERROR (1)
+
+void handleError(const char* description)
+{
+    printf("Failure:%s:\n", description);
+#if SSLPLAY_EXIT_ON_ERROR
+    exit(1);
+#endif
+}
+
+void handleOpenSSLError(const char* description)
 {
     printf("Failure:%s:\n", description);
     BIO_printf(bio_err, "OpenSSL Error:\n");
     ERR_print_errors(bio_err);
-    return;
+#if SSLPLAY_EXIT_ON_ERROR
+    exit(1);
+#endif
 }
 
 const char SeparatorLine[] = "-----------------------------------------------------------------------------------------\n";
@@ -54,13 +67,13 @@ void TestEcdsa(EC_KEY* key)
     printf("Command ECDSA_sign\n");
     if( !ECDSA_sign(0, testHash, sizeof(testHash), resultBytes, &signatureBytesCount, key) )
     {
-        printOpenSSLError("ECDSA_sign failed\n");
+        handleOpenSSLError("ECDSA_sign failed\n");
         goto end;
     }
     printf("Command ECDSA_verify\n");
     if( ECDSA_verify(0, testHash, sizeof(testHash), resultBytes, signatureBytesCount, key) != 1 )
     {
-        printOpenSSLError("ECDSA_verify failed\n");
+        handleOpenSSLError("ECDSA_verify failed\n");
         goto end;
     }
     else
@@ -71,12 +84,12 @@ void TestEcdsa(EC_KEY* key)
     ecdsaSig = ECDSA_do_sign(testHash, sizeof(testHash), key);
     if( ecdsaSig == NULL )
     {
-        printOpenSSLError("ECDSA_do_sign failed\n");
+        handleOpenSSLError("ECDSA_do_sign failed\n");
         goto end;
     }
     printf("Command ECDSA_do_verify\n");
     if( ECDSA_do_verify(testHash, sizeof(testHash), ecdsaSig, key) != 1 ){
-        printOpenSSLError("ECDSA_do_verify failed\n");
+        handleOpenSSLError("ECDSA_do_verify failed\n");
         goto end;
     }
     else
@@ -102,20 +115,20 @@ void TestEcdh(EC_KEY* key1, EC_KEY* key2)
     printf("Command ECDH_compute_key #1\n");
     if( ECDH_compute_key(sharedSecretBytes1, SCOSSL_ECDH_SHARED_SECRET_LEN, publicKey2, key1, NULL) <= 0 )
     {
-        printOpenSSLError("ECDH_compute_key failed\n");
+        handleOpenSSLError("ECDH_compute_key failed\n");
         goto end;
     }
 
     printf("Command ECDH_compute_key #2\n");
     if( ECDH_compute_key(sharedSecretBytes2, SCOSSL_ECDH_SHARED_SECRET_LEN, publicKey1, key2, NULL) <= 0 )
     {
-        printOpenSSLError("ECDH_compute_key failed\n");
+        handleOpenSSLError("ECDH_compute_key failed\n");
         goto end;
     }
 
     if (memcmp(sharedSecretBytes1, sharedSecretBytes2, SCOSSL_ECDH_SHARED_SECRET_LEN) != 0)
     {
-        printf("Shared secrets don't match\n");
+        handleError("Shared secrets don't match\n");
         goto end;
     }
     else
@@ -172,7 +185,7 @@ void TestDhDlgroup(const BIGNUM* p)
     key2 = DH_new();
     if( key1 == NULL || key2 == NULL )
     {
-        printOpenSSLError("DH_new failed\n");
+        handleOpenSSLError("DH_new failed\n");
         goto end;
     }
 
@@ -182,21 +195,21 @@ void TestDhDlgroup(const BIGNUM* p)
     g2 = BN_new();
     if( p1==NULL || p2==NULL || g1==NULL || g2==NULL || !BN_set_word(g1, 2) || !BN_set_word(g2, 2) )
     {
-        printOpenSSLError("BN_dup, BN_new, or BN_set_word failed\n");
+        handleOpenSSLError("BN_dup, BN_new, or BN_set_word failed\n");
         goto end;
     }
 
     printf("Command DH_set0_pqg\n");
     if( DH_set0_pqg(key1, p1, NULL, g1) != 1 )
     {
-        printOpenSSLError("DH_set0_pqg failed\n");
+        handleOpenSSLError("DH_set0_pqg failed\n");
         goto end;
     }
     p1 = NULL; // key1 manages p1 and g1 BIGNUMs now
     g1 = NULL;
     if( DH_set0_pqg(key2, p2, NULL, g2) != 1 )
     {
-        printOpenSSLError("DH_set0_pqg failed\n");
+        handleOpenSSLError("DH_set0_pqg failed\n");
         goto end;
     }
     p2 = NULL; // key2 manages p2 and g2 BIGNUMs now
@@ -205,7 +218,7 @@ void TestDhDlgroup(const BIGNUM* p)
     printf("Command DH_generate_key\n");
     if( DH_generate_key(key1) != 1 || DH_generate_key(key2) != 1 )
     {
-        printOpenSSLError("DH_generate_key failed\n");
+        handleOpenSSLError("DH_generate_key failed\n");
         goto end;
     }
 
@@ -214,7 +227,7 @@ void TestDhDlgroup(const BIGNUM* p)
     DH_get0_key(key2, &pubkey2, NULL);
     if( pubkey1 == NULL || pubkey2 == NULL )
     {
-        printOpenSSLError("DH_get0_key failed\n");
+        handleOpenSSLError("DH_get0_key failed\n");
         goto end;
     }
 
@@ -222,13 +235,13 @@ void TestDhDlgroup(const BIGNUM* p)
     if( DH_compute_key_padded(sharedSecretBytes1, pubkey2, key1) != DH_size(key1) ||
         DH_compute_key_padded(sharedSecretBytes2, pubkey1, key2) != DH_size(key2) )
     {
-        printOpenSSLError("DH_compute_key_padded failed\n");
+        handleOpenSSLError("DH_compute_key_padded failed\n");
         goto end;
     }
 
     if (memcmp(sharedSecretBytes1, sharedSecretBytes2, SCOSSL_DH_SHARED_SECRET_MAX_LEN) != 0)
     {
-        printf("Shared secrets don't match\n");
+        handleError("Shared secrets don't match\n");
         goto end;
     }
     else
@@ -341,13 +354,17 @@ void TestRsaEncryptDecrypt(
     if (padding == RSA_NO_PADDING) {
         // PlainText has to be size of modulus of the key
         plaintext_len = EVP_PKEY_size(encryptionKey);
-    }
-    else
-    {
+    } else {
         plaintext_len = 42; // Choosen at whim
     }
 
     while(!RAND_bytes(plaintext, plaintext_len));
+
+    if (padding == RSA_NO_PADDING) {
+        // PlainText value has to be less than RSA public modulus
+        // We can just mask out the most significant bit
+        plaintext[0] &= 0x7f;
+    }
 
     //
     // Encrypt
@@ -357,17 +374,17 @@ void TestRsaEncryptDecrypt(
     pEncryptContext = EVP_PKEY_CTX_new(encryptionKey, NULL);
     if (pEncryptContext == NULL)
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_encrypt_init\n");
     if (EVP_PKEY_encrypt_init(pEncryptContext) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
     if (EVP_PKEY_CTX_set_rsa_padding(pEncryptContext, padding) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Determine buffer length */
@@ -378,18 +395,18 @@ void TestRsaEncryptDecrypt(
             &encryptedtext_len,
             plaintext,
             plaintext_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     encryptedtext = (unsigned char *)OPENSSL_zalloc(encryptedtext_len);
-    printf("Command EVP_PKEY_encrypt\n");
+    printf("Command EVP_PKEY_encrypt (%zu)\n", encryptedtext_len);
     if (EVP_PKEY_encrypt(
             pEncryptContext,
             encryptedtext,
             &encryptedtext_len,
             plaintext,
             plaintext_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
 
@@ -407,29 +424,29 @@ void TestRsaEncryptDecrypt(
     printf("Command EVP_PKEY_encrypt\n");
     pDecryptContext = EVP_PKEY_CTX_new(decryptionKey, NULL);
     if (pDecryptContext == NULL) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_decrypt_init\n");
     if (EVP_PKEY_decrypt_init(pDecryptContext) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
     if (EVP_PKEY_CTX_set_rsa_padding(pDecryptContext, padding) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Determine buffer length */
     printf("Command EVP_PKEY_decrypt\n");
     if (EVP_PKEY_decrypt(pDecryptContext, NULL, &decryptedtext_len, (const unsigned char*)encryptedtext, encryptedtext_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     decryptedtext = (unsigned char *)OPENSSL_zalloc(decryptedtext_len);
     printf("Command EVP_PKEY_decrypt\n");
     if (EVP_PKEY_decrypt(pDecryptContext, decryptedtext, &decryptedtext_len, (const unsigned char*)encryptedtext, encryptedtext_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("DecryptedText:\n");
@@ -438,7 +455,7 @@ void TestRsaEncryptDecrypt(
     if (decryptedtext_len != plaintext_len ||
         memcmp(plaintext, decryptedtext, decryptedtext_len) != 0)
     {
-        printf("PlainText and DecryptedText don't match\n");
+        handleError("PlainText and DecryptedText don't match\n");
         goto end;
     }
     else
@@ -484,22 +501,22 @@ void TestRsaSignVerify(
     printf("Command EVP_PKEY_CTX_new\n");
     pSignContext = EVP_PKEY_CTX_new(signingKey, NULL);
     if (pSignContext == NULL) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_sign_init\n");
     if (EVP_PKEY_sign_init(pSignContext) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
     if (EVP_PKEY_CTX_set_rsa_padding(pSignContext, padding) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_signature_md\n");
     if (EVP_PKEY_CTX_set_signature_md(pSignContext, digest) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
@@ -507,24 +524,24 @@ void TestRsaSignVerify(
         printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
         if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSignContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
         {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
     }
     /* Determine buffer length */
     printf("Command EVP_PKEY_sign\n");
     if (EVP_PKEY_sign(pSignContext, NULL, &signature_len, message_digest, message_digest_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     signature = (unsigned char *)OPENSSL_zalloc(signature_len);
     if (!signature) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_sign\n");
     if (EVP_PKEY_sign(pSignContext, signature, &signature_len, message_digest, message_digest_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
 
@@ -543,22 +560,22 @@ void TestRsaSignVerify(
     printf("Command EVP_PKEY_sign\n");
     pVerifyContext = EVP_PKEY_CTX_new(verificationKey, NULL);
     if (pVerifyContext == NULL) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_verify_init\n");
     if (EVP_PKEY_verify_init(pVerifyContext) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
     if (EVP_PKEY_CTX_set_rsa_padding(pVerifyContext, padding) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_PKEY_CTX_set_signature_md\n");
     if (EVP_PKEY_CTX_set_signature_md(pVerifyContext, digest) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
@@ -566,7 +583,7 @@ void TestRsaSignVerify(
         printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
         if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerifyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
         {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
     }
@@ -574,7 +591,7 @@ void TestRsaSignVerify(
     ret = EVP_PKEY_verify(pVerifyContext, signature, signature_len, message_digest, message_digest_len);
     if (ret != 1)
     {
-        printf("EVP_PKEY_verify failed\n");
+        handleError("EVP_PKEY_verify failed\n");
         goto end;
     } else {
         printf("EVP_PKEY_verify succeeded\n");
@@ -621,7 +638,7 @@ void TestRsaDigestSignVerify(
     RSASignCtx = EVP_MD_CTX_new();
     printf("Command EVP_DigestSignInit\n");
     if (EVP_DigestSignInit(RSASignCtx,&pSigningKeyContext, digest, NULL, signingKey)<=0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
 
@@ -629,7 +646,7 @@ void TestRsaDigestSignVerify(
         printf("Setting Padding: %s(%d)\n", paddingStr, padding);
         printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
         if (EVP_PKEY_CTX_set_rsa_padding(pSigningKeyContext, padding)<=0) {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
         // if (EVP_PKEY_CTX_set_rsa_mgf1_md(pSigningKeyContext, EVP_sha512())<=0) {
@@ -640,19 +657,19 @@ void TestRsaDigestSignVerify(
 
     printf("Command EVP_DigestSignUpdate\n");
     if (EVP_DigestSignUpdate(RSASignCtx, message, message_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_DigestSignFinal\n");
     if (EVP_DigestSignFinal(RSASignCtx, NULL, &signature_len) <=0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("signature_length= %ld\n", signature_len);
     signature = (unsigned char*)OPENSSL_zalloc(signature_len);
     printf("Command EVP_DigestSignFinal\n");
     if (EVP_DigestSignFinal(RSASignCtx, signature, &signature_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
 
@@ -671,14 +688,14 @@ void TestRsaDigestSignVerify(
     printf("Verify Signature\n");
     printf("Command EVP_DigestVerifyInit\n");
     if (EVP_DigestVerifyInit(RSAVerifyCtx,&pVerificationKeyContext, digest,NULL,verificationKey)<=0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     if (paddingStr) {
         printf("Setting Padding: %s(%d)\n", paddingStr, padding);
         printf("Command EVP_PKEY_CTX_set_rsa_padding\n");
         if (EVP_PKEY_CTX_set_rsa_padding(pVerificationKeyContext, padding)<=0) {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
         // if (EVP_PKEY_CTX_set_rsa_mgf1_md(pVerificationKeyContext, EVP_sha512())<=0) {
@@ -688,22 +705,22 @@ void TestRsaDigestSignVerify(
     }
     printf("Command EVP_DigestVerifyUpdate\n");
     if (EVP_DigestVerifyUpdate(RSAVerifyCtx, message, message_len) <= 0) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_DigestVerifyFinal\n");
     AuthStatus = EVP_DigestVerifyFinal(RSAVerifyCtx, signature, signature_len);
     if (AuthStatus==1) {
         authentic = true;
-    } else if(AuthStatus==0){
+    } else if(AuthStatus==0) {
         authentic = false;
-    } else{
+    } else {
         authentic = false;
     }
-    if (authentic) {
-         printf("Signature Verified\n");
+    if (!authentic) {
+        handleError("Signature Not Verified\n");
     } else {
-         printf("Signature Not Verified\n");
+        printf("Signature Verified\n");
     }
 
 end:
@@ -750,23 +767,23 @@ void TestRsaSealOpen(
 
     printf("Command EVP_CIPHER_CTX_init\n");
     if (EVP_CIPHER_CTX_init(rsaSealCtx) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     encKey = (unsigned char *) OPENSSL_zalloc(EVP_PKEY_size(sealKey));
     printf("Command EVP_SealInit\n");
     if (EVP_SealInit(rsaSealCtx, cipher, &encKey, &encKey_len, iv, &sealKey, 1) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_SealUpdate\n");
     if (EVP_SealUpdate(rsaSealCtx, ciphertext, &ciphertext_len, message, message_len) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_SealFinal\n");
     if (EVP_SealFinal(rsaSealCtx, ciphertext + ciphertext_len, &encryptedBlockLen) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     ciphertext_len += encryptedBlockLen;
@@ -787,12 +804,12 @@ void TestRsaSealOpen(
 
     printf("Command EVP_CIPHER_CTX_init\n");
     if (EVP_CIPHER_CTX_init(rsaOpenCtx) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_OpenInit\n");
     if (EVP_OpenInit(rsaOpenCtx, cipher, encKey, encKey_len, iv, openKey) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     decryptedMessage = (unsigned char *) OPENSSL_zalloc(ciphertext_len + EVP_MAX_IV_LENGTH);
@@ -802,7 +819,7 @@ void TestRsaSealOpen(
     // decrypt message with AES secret
     printf("Command EVP_OpenUpdate\n");
     if (EVP_OpenUpdate(rsaOpenCtx, decryptedMessage, &decryptedMessageLen, ciphertext, ciphertext_len) != 1) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     // finalize by decrypting padding
@@ -816,7 +833,7 @@ void TestRsaSealOpen(
     if (message_len != decryptedMessageLen ||
         memcmp(message,decryptedMessage, decryptedMessageLen) != 0)
     {
-        printf("Decrypted/Opened text don't match original message\n");
+        handleError("Decrypted/Opened text don't match original message\n");
     }
     else
     {
@@ -844,7 +861,7 @@ int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, cha
     BIO *privateBIO = NULL;
     BIO *publicBIO = NULL;
     FILE *fp = NULL;
-    int ret = 0;
+    int ret = -1;
 
     //
     // Generate RSA Key
@@ -852,29 +869,29 @@ int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, cha
     printf("Command EVP_PKEY_CTX_new_id\n");
     pKeyContext = EVP_PKEY_CTX_new_id(id, NULL);
     if (pKeyContext == NULL) {
-        printOpenSSLError("");
-        goto err;
+        handleOpenSSLError("");
+        goto end;
     }
     printf("Command EVP_PKEY_keygen_init\n");
     if (EVP_PKEY_keygen_init(pKeyContext) <= 0) {
-        printOpenSSLError("");
-        goto err;
+        handleOpenSSLError("");
+        goto end;
     }
     printf("Command EVP_PKEY_CTX_set_rsa_keygen_bits\n");
     if (EVP_PKEY_CTX_set_rsa_keygen_bits(pKeyContext, modulus) <= 0) {
-        printOpenSSLError("");
-        goto err;
+        handleOpenSSLError("");
+        goto end;
     }
     exponent_bn = BN_new();
     BN_set_word(exponent_bn, exponent);
     if (EVP_PKEY_CTX_set_rsa_keygen_pubexp(pKeyContext, exponent_bn) <= 0) {
-        printOpenSSLError("");
-        goto err;
+        handleOpenSSLError("");
+        goto end;
     }
     printf("Command EVP_PKEY_keygen\n");
     if (EVP_PKEY_keygen(pKeyContext, &pKey) != 1) {
-        printOpenSSLError("");
-        goto err;
+        handleOpenSSLError("");
+        goto end;
     }
 
     printf("%s", SeparatorLine);
@@ -927,17 +944,14 @@ int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, cha
     fclose(fp);
     printf("%s", SeparatorLine);
 
-    end:
+    ret = 0;
 
+end:
     if (pKeyContext)
         EVP_PKEY_CTX_free(pKeyContext);
     if (pKey)
         EVP_PKEY_free(pKey);
     return ret;
-
-    err:
-    ret = -1;
-    goto end;
 }
 
 void TestRsaEvp(int modulus, uint32_t exponent)
@@ -959,12 +973,14 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     sprintf(privatePssFileName, "%s_pss_%d.pem", "private",  modulus);
 
     printf("\nTesting EVP_PKEY_keygen* Functions\n\n");
-    if( CreateKeys(EVP_PKEY_RSA, modulus, exponent, publicFileName, privateFileName, &publicKey, &privateKey) )
+    if( CreateKeys(EVP_PKEY_RSA, modulus, exponent, publicFileName, privateFileName, &publicKey, &privateKey) == -1 )
     {
+        handleError("CreateKeys EVP_PKEY_RSA failed");
         goto end;
     }
-    if( CreateKeys(EVP_PKEY_RSA_PSS, modulus, exponent, publicPssFileName, privatePssFileName, &publicKeyPss, &privateKeyPss) )
+    if( CreateKeys(EVP_PKEY_RSA_PSS, modulus, exponent, publicPssFileName, privatePssFileName, &publicKeyPss, &privateKeyPss) == -1 )
     {
+        handleError("CreateKeys EVP_PKEY_RSA_PSS failed");
         goto end;
     }
 
@@ -1049,7 +1065,7 @@ bool TestDigest(const char* digestname)
     unsigned char md_value[EVP_MAX_MD_SIZE];
     unsigned int md_len, i;
 
-     printf("\nTestDigest: %s\n\n", digestname);
+    printf("\nTestDigest: %s\n\n", digestname);
 
     const EVP_MD *md = EVP_get_digestbyname(digestname);
     if (md == NULL)
@@ -1118,26 +1134,26 @@ int encrypt(const EVP_CIPHER *cipher, unsigned char *plaintext, int plaintext_le
     printf("Command EVP_CIPHER_CTX_new\n");
     if(!(ctx = EVP_CIPHER_CTX_new()))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_EncryptInit_ex\n");
     if(!EVP_EncryptInit_ex(ctx, cipher, NULL, key, iv))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_EncryptUpdate\n");
     if(!EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     ciphertext_len = len;
     printf("Command EVP_EncryptFinal_ex\n");
     if(!EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("len %d\n", len);
@@ -1157,26 +1173,26 @@ int decrypt(const EVP_CIPHER *cipher, unsigned char *ciphertext, int ciphertext_
     printf("Command EVP_CIPHER_CTX_new\n");
     if(!(ctx = EVP_CIPHER_CTX_new()))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_DecryptInit_ex\n");
     if(!EVP_DecryptInit_ex(ctx, cipher, NULL, key, iv))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     printf("Command EVP_DecryptUpdate\n");
     if(!EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     plaintext_len = len;
     printf("Command EVP_DecryptFinal_ex\n");
     if(!EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     plaintext_len += len;
@@ -1232,7 +1248,7 @@ bool TestAesCipher(
     if (decryptedtext_len != plaintext_len ||
         memcmp(plaintext, decryptedtext, decryptedtext_len) != 0)
     {
-        printf("PlainText and DecryptedText don't match\n");
+        handleError("PlainText and DecryptedText don't match\n");
         goto end;
     }
     else
@@ -1337,17 +1353,17 @@ int encrypt_gcm(
     int len=0, ciphertext_len=0;
     /* Create and initialise the context */
     if(!(ctx = EVP_CIPHER_CTX_new())) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Initialise the encryption operation. */
     if(1 != EVP_EncryptInit_ex(ctx, cipher, NULL, key, iv)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Provide any AAD data. This can be called zero or more times as required */
     if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
@@ -1356,13 +1372,13 @@ int encrypt_gcm(
     while(ciphertext_len <= plaintext_len-16) {
         if(1 != EVP_EncryptUpdate(ctx, ciphertext+ciphertext_len, &len, plaintext+ciphertext_len, 16))
         {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
         ciphertext_len+=len;
     }
     if(1 != EVP_EncryptUpdate(ctx, ciphertext+ciphertext_len, &len, plaintext+ciphertext_len, plaintext_len-ciphertext_len)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     ciphertext_len+=len;
@@ -1370,13 +1386,13 @@ int encrypt_gcm(
      * this stage, but this does not occur in GCM mode
      */
     if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + ciphertext_len, &len)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     ciphertext_len += len;
     /* Get the tag */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Clean up */
@@ -1394,18 +1410,18 @@ int decrypt_gcm(
     int len=0, decryptedtext_len=0, ret;
     /* Create and initialise the context */
     if(!(ctx = EVP_CIPHER_CTX_new())) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Initialise the decryption operation. */
     if(!EVP_DecryptInit_ex(ctx, cipher, NULL, key, iv)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Provide any AAD data. This can be called zero or more times as
      * required */
     if(!EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Provide the message to be decrypted, and obtain the decryptedtext output.
@@ -1415,20 +1431,20 @@ int decrypt_gcm(
      {
         if(1!=EVP_DecryptUpdate(ctx, decryptedtext+decryptedtext_len, &len, ciphertext+decryptedtext_len, 16))
         {
-            printOpenSSLError("");
+            handleOpenSSLError("");
             goto end;
         }
         decryptedtext_len+=len;
     }
     if(1!=EVP_DecryptUpdate(ctx, decryptedtext+decryptedtext_len, &len, ciphertext+decryptedtext_len, ciphertext_len-decryptedtext_len))
     {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     decryptedtext_len+=len;
     /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
     if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag)) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
     /* Finalise the decryption. A positive return value indicates success,
@@ -1444,6 +1460,7 @@ int decrypt_gcm(
         return decryptedtext_len;
     } else {
         /* Verify failed */
+        handleError("AES-GCM decryption failed");
         return -1;
     }
 end:
@@ -1486,11 +1503,11 @@ void TestAesGcmCipher(
     if (decryptedtext_len != plaintext_len ||
         memcmp(plaintext, decryptedtext, decryptedtext_len) != 0)
     {
-         printf("PlainText and DecryptedText don't match\n");
+        handleError("PlainText and DecryptedText don't match\n");
     }
     else
     {
-         printf("PlainText and DecryptedText match\n");
+        printf("PlainText and DecryptedText match\n");
     }
 
     printf("%s", SeparatorLine);
@@ -1551,7 +1568,7 @@ void TestHKDF(void)
     printf("Command EVP_PKEY_CTX_new_id\n");
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (pctx == NULL) {
-        printOpenSSLError("");
+        handleOpenSSLError("");
         goto end;
     }
 
@@ -1563,32 +1580,32 @@ void TestHKDF(void)
         printf("Command EVP_PKEY_derive_init\n");
         if (EVP_PKEY_derive_init(pctx) <= 0)
         {
-            printOpenSSLError("EVP_PKEY_derive_init");
+            handleOpenSSLError("EVP_PKEY_derive_init");
             goto end;
         }
         printf("Command EVP_PKEY_CTX_set_hkdf_md\n");
         if (EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha256()) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_set_hkdf_md");
+            handleOpenSSLError("EVP_PKEY_CTX_set_hkdf_md");
             goto end;
         }
         printf("Command EVP_PKEY_CTX_set1_hkdf_salt\n");
         if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, sizeof(salt) - 1) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_set1_hkdf_salt");
+            handleOpenSSLError("EVP_PKEY_CTX_set1_hkdf_salt");
             goto end;
         }
         printf("Command EVP_PKEY_CTX_set1_hkdf_key\n");
         if (EVP_PKEY_CTX_set1_hkdf_key(pctx, key, sizeof(key) - 1) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_set1_hkdf_key");
+            handleOpenSSLError("EVP_PKEY_CTX_set1_hkdf_key");
             goto end;
         }
         printf("Command EVP_PKEY_CTX_add1_hkdf_info\n");
         if (EVP_PKEY_CTX_add1_hkdf_info(pctx, info, sizeof(info) - 1) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_add1_hkdf_info");
+            handleOpenSSLError("EVP_PKEY_CTX_add1_hkdf_info");
             goto end;
         }
         printf("Command EVP_PKEY_derive\n");
         if (EVP_PKEY_derive(pctx, out, &outlen) <= 0) {
-            printOpenSSLError("EVP_PKEY_derive");
+            handleOpenSSLError("EVP_PKEY_derive");
             goto end;
         }
 
@@ -1596,8 +1613,9 @@ void TestHKDF(void)
         printBytes((char *)expected, expectedlen, "Expected KDF");
 
         if ((outlen != expectedlen) ||
-            (memcmp(out, expected, expectedlen) != 0)) {
-            printf("\n KDF didn't derive the expected values\n");
+            (memcmp(out, expected, expectedlen) != 0))
+        {
+            handleError("KDF didn't derive the expected values\n");
         }
         else {
             printf("KDF produced the right value\n");
@@ -1632,29 +1650,30 @@ void TestTls1Prf(void)
         memset(out, 0, outlen);
 
         if (EVP_PKEY_derive_init(pctx) <= 0) {
-            printOpenSSLError("EVP_PKEY_derive_init");
+            handleOpenSSLError("EVP_PKEY_derive_init");
             goto end;
         }
         if (EVP_PKEY_CTX_set_tls1_prf_md(pctx, EVP_sha256()) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_set_tls1_prf_md");
+            handleOpenSSLError("EVP_PKEY_CTX_set_tls1_prf_md");
             goto end;
         }
         if (EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, "secret", 6) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_set1_tls1_prf_secret");
+            handleOpenSSLError("EVP_PKEY_CTX_set1_tls1_prf_secret");
             goto end;
         }
         if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, "seed", 4) <= 0) {
-            printOpenSSLError("EVP_PKEY_CTX_add1_tls1_prf_seed");
+            handleOpenSSLError("EVP_PKEY_CTX_add1_tls1_prf_seed");
             goto end;
         }
         if (EVP_PKEY_derive(pctx, out, &outlen) <= 0) {
-            printOpenSSLError("EVP_PKEY_derive");
+            handleOpenSSLError("EVP_PKEY_derive");
             goto end;
         }
 
         if ((outlen != expectedlen) ||
-            (memcmp(out, expected, expectedlen) != 0)) {
-            printf("TLS1Prf didn't derive the expected values\n");
+            (memcmp(out, expected, expectedlen) != 0))
+        {
+            handleError("TLS1Prf didn't derive the expected values\n");
         }
         else {
             printf("TLS1Prf derived the expected value\n");
