@@ -41,7 +41,11 @@ target_link_directories(scossl_dynamic PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(scossl_dynamic PUBLIC symcrypt)
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
-install(TARGETS scossl_dynamic
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+# Install the engine to the OpenSSL engines directory
+# NB: this won't work if the distro has a custom engines directory that doesn't match
+# the OpenSSL default.
+install(
+    TARGETS scossl_dynamic
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/engines-1.1"
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
