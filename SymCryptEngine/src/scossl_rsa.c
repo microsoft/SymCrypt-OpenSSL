@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl_rsa.h"
+#include "scossl_rsa.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,38 +25,38 @@ typedef int (*PFN_RSA_meth_priv_dec)(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding);
 
 // The minimum PKCS1 padding is 11 bytes
-#define SC_OSSL_MIN_PKCS1_PADDING (11)
+#define SCOSSL_MIN_PKCS1_PADDING (11)
 // The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
-#define SC_OSSL_MIN_OAEP_PADDING (42)
+#define SCOSSL_MIN_OAEP_PADDING (42)
 
 // Hash digest lengths
-#define SC_OSSL_MD5_DIGEST_LENGTH (16)
-#define SC_OSSL_SHA1_DIGEST_LENGTH (20)
-#define SC_OSSL_MD5_SHA1_DIGEST_LENGTH (SC_OSSL_MD5_DIGEST_LENGTH + SC_OSSL_SHA1_DIGEST_LENGTH) //36
-#define SC_OSSL_SHA256_DIGEST_LENGTH (32)
-#define SC_OSSL_SHA384_DIGEST_LENGTH (48)
-#define SC_OSSL_SHA512_DIGEST_LENGTH (64)
+#define SCOSSL_MD5_DIGEST_LENGTH (16)
+#define SCOSSL_SHA1_DIGEST_LENGTH (20)
+#define SCOSSL_MD5_SHA1_DIGEST_LENGTH (SCOSSL_MD5_DIGEST_LENGTH + SCOSSL_SHA1_DIGEST_LENGTH) //36
+#define SCOSSL_SHA256_DIGEST_LENGTH (32)
+#define SCOSSL_SHA384_DIGEST_LENGTH (48)
+#define SCOSSL_SHA512_DIGEST_LENGTH (64)
 
-SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+SCOSSL_RETURNLENGTH scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa,
     int padding)
 {
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
     int ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
     if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
     {
-        if( sc_ossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -72,11 +72,11 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
     switch( padding )
     {
     case RSA_PKCS1_PADDING:
-        if( flen > (int) cbModulus - SC_OSSL_MIN_PKCS1_PADDING )
+        if( flen > (int) cbModulus - SCOSSL_MIN_PKCS1_PADDING )
         {
             goto cleanup;
         }
-        symError = SymCryptRsaPkcs1Encrypt(
+        scError = SymCryptRsaPkcs1Encrypt(
                        keyCtx->key,
                        from,
                        flen,
@@ -85,18 +85,18 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
                        to,
                        cbModulus,
                        &cbResult);
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Encrypt failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Encrypt failed", scError);
             goto cleanup;
         }
         break;
     case RSA_PKCS1_OAEP_PADDING:
-        if( flen > (int) cbModulus - SC_OSSL_MIN_OAEP_PADDING )
+        if( flen > (int) cbModulus - SCOSSL_MIN_OAEP_PADDING )
         {
             goto cleanup;
         }
-        symError = SymCryptRsaOaepEncrypt(
+        scError = SymCryptRsaOaepEncrypt(
                        keyCtx->key,
                        from,
                        flen,
@@ -108,9 +108,9 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
                        to,
                        cbModulus,
                        &cbResult);
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepEncrypt failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaOaepEncrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -119,7 +119,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
         {
             goto cleanup;
         }
-        symError = SymCryptRsaRawEncrypt(
+        scError = SymCryptRsaRawEncrypt(
                        keyCtx->key,
                        from,
                        flen,
@@ -128,19 +128,19 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const u
                        to,
                        cbModulus);
         cbResult = cbModulus;
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawEncrypt failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaRawEncrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
-        SC_OSSL_LOG_INFO("Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
+        SCOSSL_LOG_INFO("Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
         pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
         if( !pfn_rsa_meth_pub_enc )
         {
-            SC_OSSL_LOG_ERROR("RSA_meth_set_pub_enc failed");
+            SCOSSL_LOG_ERROR("RSA_meth_set_pub_enc failed");
             goto cleanup;
         }
         cbResult = pfn_rsa_meth_pub_enc(flen, from, to, rsa, padding);
@@ -153,26 +153,26 @@ cleanup:
     return ret;
 }
 
-SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+SCOSSL_RETURNLENGTH scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, int padding)
 {
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = -1;
     UINT64 err = 0;
     int ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
     if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
     {
-        if( sc_ossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -192,23 +192,23 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
     switch( padding )
     {
     case RSA_PKCS1_PADDING:
-        symError = SymCryptRsaPkcs1Decrypt(
+        scError = SymCryptRsaPkcs1Decrypt(
                        keyCtx->key,
                        from,
                        flen,
                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                        0,
                        to,
-                       cbModulus - SC_OSSL_MIN_PKCS1_PADDING,
+                       cbModulus - SCOSSL_MIN_PKCS1_PADDING,
                        &cbResult);
 
         // Constant-time error processing to avoid Bleichenbacher attack
 
-        // Set ret based on symError and cbResult
+        // Set ret based on scError and cbResult
         // cbResult > INT_MAX               => err > 0
         err = (UINT64)cbResult >> 31;
-        // symError != SYMCRYPT_NO_ERROR    => err > 0
-        err |= (UINT32)(symError ^ SYMCRYPT_NO_ERROR);
+        // scError != SYMCRYPT_NO_ERROR    => err > 0
+        err |= (UINT32)(scError ^ SYMCRYPT_NO_ERROR);
         // if( err > 0 ) { ret = -1; }
         // else          { ret = 0; }
         ret = (0ll - err) >> 32;
@@ -217,7 +217,7 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
         ret |= (UINT32)cbResult;
         goto cleanup;
     case RSA_PKCS1_OAEP_PADDING:
-        symError = SymCryptRsaOaepDecrypt(
+        scError = SymCryptRsaOaepDecrypt(
                        keyCtx->key,
                        from,
                        flen,
@@ -227,16 +227,16 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
                        0,
                        0,
                        to,
-                       cbModulus - SC_OSSL_MIN_OAEP_PADDING,
+                       cbModulus - SCOSSL_MIN_OAEP_PADDING,
                        &cbResult);
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaOaepDecrypt failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaOaepDecrypt failed", scError);
             goto cleanup;
         }
         break;
     case RSA_NO_PADDING:
-        symError = SymCryptRsaRawDecrypt(
+        scError = SymCryptRsaRawDecrypt(
                        keyCtx->key,
                        from,
                        flen,
@@ -245,19 +245,19 @@ SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const 
                        to,
                        cbModulus);
         cbResult = cbModulus;
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaRawDecrypt failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaRawDecrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
-        SC_OSSL_LOG_INFO("Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
+        SCOSSL_LOG_INFO("Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
         pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
         if( !pfn_rsa_meth_priv_dec )
         {
-            SC_OSSL_LOG_ERROR("RSA_meth_get_priv_dec failed");
+            SCOSSL_LOG_ERROR("RSA_meth_get_priv_dec failed");
             goto cleanup;
         }
         cbResult = pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
@@ -270,57 +270,57 @@ cleanup:
     return ret;
 }
 
-SCOSSL_RETURNLENGTH sc_ossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+SCOSSL_RETURNLENGTH scossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, int padding)
 {
-    SC_OSSL_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+    SCOSSL_LOG_INFO("RSA private encrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_priv_enc pfn_rsa_meth_priv_enc = NULL;
 
     pfn_rsa_meth_priv_enc = RSA_meth_get_priv_enc(ossl_rsa_meth);
     if( !pfn_rsa_meth_priv_enc )
     {
-        SC_OSSL_LOG_ERROR("RSA_meth_get_priv_enc failed");
+        SCOSSL_LOG_ERROR("RSA_meth_get_priv_enc failed");
         return -1;
     }
     return pfn_rsa_meth_priv_enc(flen, from, to, rsa, padding);
 }
 
-SCOSSL_RETURNLENGTH sc_ossl_rsa_pub_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
+SCOSSL_RETURNLENGTH scossl_rsa_pub_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa,
     int padding)
 {
-    SC_OSSL_LOG_INFO("RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
+    SCOSSL_LOG_INFO("RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_pub_dec pfn_rsa_meth_pub_dec = NULL;
 
     pfn_rsa_meth_pub_dec = RSA_meth_get_pub_dec(ossl_rsa_meth);
     if( !pfn_rsa_meth_pub_dec )
     {
-        SC_OSSL_LOG_ERROR("RSA_meth_get_pub_dec failed");
+        SCOSSL_LOG_ERROR("RSA_meth_get_pub_dec failed");
         return -1;
     }
     return pfn_rsa_meth_pub_dec(flen, from, to, rsa, padding);
 }
 
-SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
+SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
     _Out_writes_bytes_(siglen) unsigned char* sigret, _Out_ unsigned int* siglen,
     _In_ const RSA* rsa)
 {
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = 0;
     SCOSSL_STATUS ret = 0;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
     if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
     {
-        if( sc_ossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -335,14 +335,14 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
     switch( type )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != SCOSSL_MD5_SHA1_DIGEST_LENGTH )
         {
-            SC_OSSL_LOG_ERROR("m_length == %d", m_length);
+            SCOSSL_LOG_ERROR("m_length == %d", m_length);
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -354,20 +354,20 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
-        if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != SCOSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -379,20 +379,20 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
-        if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != SCOSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -404,19 +404,19 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
     case NID_sha256:
-        if( m_length != SC_OSSL_SHA256_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA256_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -428,20 +428,20 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
 
         break;
     case NID_sha384:
-        if( m_length != SC_OSSL_SHA384_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA384_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -453,19 +453,19 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
     case NID_sha512:
-        if( m_length != SC_OSSL_SHA512_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA512_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Sign(
+        scError = SymCryptRsaPkcs1Sign(
                        keyCtx->key,
                        m,
                        m_length,
@@ -477,14 +477,14 @@ SCOSSL_STATUS sc_ossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsign
                        cbModulus,
                        &cbResult);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1Sign failed", symError);
+            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
     default:
-        SC_OSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, m_length);
+        SCOSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, m_length);
         goto cleanup;
     }
 
@@ -495,24 +495,24 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
+SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
     unsigned int m_length,
     _In_reads_bytes_(siglen) const unsigned char* sigbuf,
     unsigned int siglen, _In_ const RSA* rsa)
 {
     BN_ULONG cbModulus = 0;
     SCOSSL_STATUS ret = 0;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
     if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
     {
-        if( sc_ossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -522,14 +522,14 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
     switch( dtype )
     {
     case NID_md5_sha1:
-        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if( m_length != SC_OSSL_MD5_SHA1_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        if( m_length != SCOSSL_MD5_SHA1_DIGEST_LENGTH )
         {
-            SC_OSSL_LOG_ERROR("m_length == %d", m_length);
+            SCOSSL_LOG_ERROR("m_length == %d", m_length);
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -540,23 +540,23 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        0,
                        0);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     case NID_md5:
-        SC_OSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
-        if( m_length != SC_OSSL_MD5_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
+        if( m_length != SCOSSL_MD5_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -567,23 +567,23 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        SYMCRYPT_MD5_OID_COUNT,
                        0);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     case NID_sha1:
-        SC_OSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
-        if( m_length != SC_OSSL_SHA1_DIGEST_LENGTH )
+        SCOSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
+        if( m_length != SCOSSL_SHA1_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -594,22 +594,22 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        SYMCRYPT_SHA1_OID_COUNT,
                        0);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     case NID_sha256:
-        if( m_length != SC_OSSL_SHA256_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA256_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -619,22 +619,22 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        SymCryptSha256OidList,
                        SYMCRYPT_SHA256_OID_COUNT,
                        0);
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     case NID_sha384:
-        if( m_length != SC_OSSL_SHA384_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA384_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -645,22 +645,22 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        SYMCRYPT_SHA384_OID_COUNT,
                        0);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     case NID_sha512:
-        if( m_length != SC_OSSL_SHA512_DIGEST_LENGTH )
+        if( m_length != SCOSSL_SHA512_DIGEST_LENGTH )
         {
             goto cleanup;
         }
 
-        symError = SymCryptRsaPkcs1Verify(
+        scError = SymCryptRsaPkcs1Verify(
                        keyCtx->key,
                        m,
                        m_length,
@@ -671,17 +671,17 @@ SCOSSL_STATUS sc_ossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const uns
                        SYMCRYPT_SHA512_OID_COUNT,
                        0);
 
-        if( symError != SYMCRYPT_NO_ERROR )
+        if( scError != SYMCRYPT_NO_ERROR )
         {
-            if( symError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
+            if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsaPkcs1verify returned unexpected error", symError);
+                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
         break;
     default:
-        SC_OSSL_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, m_length);
+        SCOSSL_LOG_ERROR("Unknown dtype: %d. Size: %d.", dtype, m_length);
         goto cleanup;
     }
 
@@ -691,7 +691,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
+SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     _In_opt_ BN_GENCB* cb)
 {
     UINT64  pubExp64;
@@ -712,9 +712,9 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     PBYTE   pbData = NULL;
     SIZE_T  cbData = 0;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int     ret = 0;
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
     BIGNUM *rsa_n = NULL;
     BIGNUM *rsa_e = NULL;
     BIGNUM *rsa_p = NULL;
@@ -726,12 +726,12 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
 
     if( keyCtx == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized != 0 )
     {
-        sc_ossl_rsa_free_key_context(keyCtx);
+        scossl_rsa_free_key_context(keyCtx);
     }
 
     SymcryptRsaParam.version = 1;               // Version of the parameters structure
@@ -741,23 +741,23 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if( keyCtx->key == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
+        SCOSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
     if( BN_bn2binpad(e, (PBYTE) &pubExp64, sizeof(pubExp64)) != sizeof(pubExp64) )
     {
-        SC_OSSL_LOG_ERROR("BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
+        SCOSSL_LOG_ERROR("BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
         goto cleanup;
     }
     if( SymCryptLoadMsbFirstUint64((PBYTE) &pubExp64, sizeof(pubExp64), &pubExp64) != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_ERROR("SymCryptLoadMsbFirstUint64 failed");
+        SCOSSL_LOG_ERROR("SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
-    symError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, 0);
-    if( symError != SYMCRYPT_NO_ERROR )
+    scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, 0);
+    if( scError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeyGenerate failed", symError);
+        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGenerate failed", scError);
         goto cleanup;
     }
 
@@ -783,7 +783,7 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SC_OSSL_LOG_ERROR("OPENSSL_zalloc failed");
+        SCOSSL_LOG_ERROR("OPENSSL_zalloc failed");
         goto cleanup;
     }
     pbCurrent = pbData;
@@ -814,7 +814,7 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     pbPrivateExponent = pbCurrent;
     cbPrivateExponent = cbModulus;
 
-    symError = SymCryptRsakeyGetValue(
+    scError = SymCryptRsakeyGetValue(
                    keyCtx->key,
                    pbModulus,
                    cbModulus,
@@ -825,13 +825,13 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
                    nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0);
-    if( symError != SYMCRYPT_NO_ERROR )
+    if( scError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeyGetValue failed", symError);
+        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
-    symError = SymCryptRsakeyGetCrtValue(
+    scError = SymCryptRsakeyGetCrtValue(
                     keyCtx->key,
                     ppbCrtExponents,
                     pcbCrtExponents,
@@ -842,9 +842,9 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
                     cbPrivateExponent,
                     SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                     0);
-    if( symError != SYMCRYPT_NO_ERROR )
+    if( scError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeyGetCrtValue failed", symError);
+        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
         goto cleanup;
     }
 
@@ -858,7 +858,7 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
         ((rsa_iqmp = BN_secure_new()) == NULL) ||
         ((rsa_d = BN_secure_new()) == NULL))
     {
-        SC_OSSL_LOG_ERROR("BN_new returned NULL.");
+        SCOSSL_LOG_ERROR("BN_new returned NULL.");
         goto cleanup;
     }
 
@@ -870,7 +870,7 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
         (BN_bin2bn(pbCrtCoefficient, cbPrime1, rsa_iqmp) == NULL) ||
         (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, rsa_d) == NULL) )
     {
-        SC_OSSL_LOG_ERROR("BN_bin2bn failed.");
+        SCOSSL_LOG_ERROR("BN_bin2bn failed.");
         goto cleanup;
     }
 
@@ -884,7 +884,7 @@ SCOSSL_STATUS sc_ossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
 cleanup:
     if( ret != 1 )
     {
-        sc_ossl_rsa_free_key_context(keyCtx);
+        scossl_rsa_free_key_context(keyCtx);
         BN_free(rsa_n);
         BN_free(rsa_e);
         BN_clear_free(rsa_p);
@@ -903,7 +903,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
+SCOSSL_STATUS scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONTEXT *keyCtx)
 {
     int ret = 0;
     UINT64  pubExp64;
@@ -915,7 +915,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     SIZE_T  cbPrime2 = 0;
     SIZE_T  nPrimes = 0;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PBYTE   pbData = NULL;
     SIZE_T  cbData = 0;
     PBYTE   pbCurrent = NULL;
@@ -935,7 +935,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     if( RSA_get_version(rsa) != RSA_ASN1_VERSION_DEFAULT )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
-        SC_OSSL_LOG_ERROR("Unsupported RSA version");
+        SCOSSL_LOG_ERROR("Unsupported RSA version");
         goto cleanup;
     }
 
@@ -944,7 +944,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
 
     if( rsa_n == NULL || rsa_e == NULL )
     {
-        SC_OSSL_LOG_ERROR("Not enough Parameters");
+        SCOSSL_LOG_ERROR("Not enough Parameters");
         goto cleanup;
     }
     // Modulus
@@ -968,7 +968,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SC_OSSL_LOG_ERROR("OPENSSL_zalloc failed");
+        SCOSSL_LOG_ERROR("OPENSSL_zalloc failed");
         goto cleanup;
     }
 
@@ -976,12 +976,12 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
 
     if( BN_bn2binpad(rsa_e, (PBYTE) &pubExp64, sizeof(pubExp64)) != sizeof(pubExp64) )
     {
-        SC_OSSL_LOG_ERROR("BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
+        SCOSSL_LOG_ERROR("BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
         goto cleanup;
     }
     if( SymCryptLoadMsbFirstUint64((PBYTE) &pubExp64, sizeof(pubExp64), &pubExp64) != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_ERROR("SymCryptLoadMsbFirstUint64 failed");
+        SCOSSL_LOG_ERROR("SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
 
@@ -1005,7 +1005,7 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     if( nPrimes != 0 && nPrimes != 2 )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
-        SC_OSSL_LOG_ERROR("Unsupported RSA version");
+        SCOSSL_LOG_ERROR("Unsupported RSA version");
         goto cleanup;
     }
 
@@ -1016,11 +1016,11 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if( keyCtx->key == NULL )
     {
-        SC_OSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
+        SCOSSL_LOG_ERROR("SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
 
-    symError = SymCryptRsakeySetValue(
+    scError = SymCryptRsakeySetValue(
                    pbModulus,
                    cbModulus,
                    &pubExp64,
@@ -1031,9 +1031,9 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0,
                    keyCtx->key);
-    if( symError != SYMCRYPT_NO_ERROR )
+    if( scError != SYMCRYPT_NO_ERROR )
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptRsakeySetValue failed", symError);
+        SCOSSL_LOG_scError_ERROR("SymCryptRsakeySetValue failed", scError);
         goto cleanup;
     }
 
@@ -1044,8 +1044,8 @@ SCOSSL_STATUS sc_ossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SC_OSSL_RSA_KEY_CO
 cleanup:
     if( ret != 1 )
     {
-        SC_OSSL_LOG_ERROR("sc_ossl_initialize_rsa_key failed.");
-        sc_ossl_rsa_free_key_context(keyCtx);
+        SCOSSL_LOG_ERROR("scossl_initialize_rsa_key failed.");
+        scossl_rsa_free_key_context(keyCtx);
     }
 
     if( pbData )
@@ -1058,7 +1058,7 @@ cleanup:
 
 typedef int (*PFN_RSA_meth_mod_exp) (BIGNUM* r0, const BIGNUM* i, RSA* rsa, BN_CTX* ctx);
 
-SCOSSL_STATUS sc_ossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ RSA* rsa, _In_ BN_CTX* ctx)
+SCOSSL_STATUS scossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ RSA* rsa, _In_ BN_CTX* ctx)
 {
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_mod_exp pfn_rsa_meth_mod_exp = RSA_meth_get_mod_exp(ossl_rsa_meth);
@@ -1073,31 +1073,31 @@ SCOSSL_STATUS sc_ossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ R
 typedef int (*PFN_RSA_meth_bn_mod_exp) (
         BIGNUM* r, const BIGNUM* a, const BIGNUM* p, const BIGNUM* m, BN_CTX* ctx, BN_MONT_CTX* m_ctx);
 
-SCOSSL_STATUS sc_ossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p,
+SCOSSL_STATUS scossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p,
         _In_ const BIGNUM* m, _In_ BN_CTX* ctx, _In_ BN_MONT_CTX* m_ctx)
 {
     const RSA_METHOD* ossl_rsa_meth = RSA_PKCS1_OpenSSL();
     PFN_RSA_meth_bn_mod_exp pfn_rsa_meth_bn_mod_exp = RSA_meth_get_bn_mod_exp(ossl_rsa_meth);
     if( !pfn_rsa_meth_bn_mod_exp )
     {
-        SC_OSSL_LOG_ERROR("RSA_meth_get_bn_mod_exp failed");
+        SCOSSL_LOG_ERROR("RSA_meth_get_bn_mod_exp failed");
         return 0;
     }
     return pfn_rsa_meth_bn_mod_exp(r, a, p, m, ctx, m_ctx);
 }
 
-SCOSSL_STATUS sc_ossl_rsa_init(_Inout_ RSA *rsa)
+SCOSSL_STATUS scossl_rsa_init(_Inout_ RSA *rsa)
 {
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
     if( !keyCtx )
     {
-        SC_OSSL_LOG_ERROR("OPENSSL_zalloc failed");
+        SCOSSL_LOG_ERROR("OPENSSL_zalloc failed");
         return 0;
     }
 
     if( RSA_set_ex_data(rsa, scossl_rsa_idx, keyCtx) == 0 )
     {
-        SC_OSSL_LOG_ERROR("RSA_set_ex_data failed");
+        SCOSSL_LOG_ERROR("RSA_set_ex_data failed");
         OPENSSL_free(keyCtx);
         return 0;
     }
@@ -1105,7 +1105,7 @@ SCOSSL_STATUS sc_ossl_rsa_init(_Inout_ RSA *rsa)
     return 1;
 }
 
-void sc_ossl_rsa_free_key_context(_In_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
+void scossl_rsa_free_key_context(_In_ SCOSSL_RSA_KEY_CONTEXT *keyCtx)
 {
     if( keyCtx->key )
     {
@@ -1116,14 +1116,14 @@ void sc_ossl_rsa_free_key_context(_In_ SC_OSSL_RSA_KEY_CONTEXT *keyCtx)
     return;
 }
 
-SCOSSL_STATUS sc_ossl_rsa_finish(_Inout_ RSA *rsa)
+SCOSSL_STATUS scossl_rsa_finish(_Inout_ RSA *rsa)
 {
-    SC_OSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
     if( keyCtx )
     {
         if( keyCtx->initialized == 1 )
         {
-            sc_ossl_rsa_free_key_context(keyCtx);
+            scossl_rsa_free_key_context(keyCtx);
         }
         OPENSSL_free(keyCtx);
         RSA_set_ex_data(rsa, scossl_rsa_idx, NULL);

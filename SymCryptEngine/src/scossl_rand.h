@@ -2,15 +2,15 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl.h"
-#include "sc_ossl_helpers.h"
+#include "scossl.h"
+#include "scossl_helpers.h"
 #include <openssl/rand.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-RAND_METHOD *sc_ossl_rand_method(void);
+RAND_METHOD *scossl_rand_method(void);
 
 #ifdef __cplusplus
 }

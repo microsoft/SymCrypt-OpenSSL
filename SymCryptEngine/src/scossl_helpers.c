@@ -2,34 +2,34 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl_helpers.h"
+#include "scossl_helpers.h"
 #include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define SC_OSSL_ENGINE_TRACELOG_PARA_LENGTH        256
+#define SCOSSL_ENGINE_TRACELOG_PARA_LENGTH        256
 
-#define     SC_OSSL_LOG_LEVEL_PREFIX_ERROR     "ERROR"
-#define     SC_OSSL_LOG_LEVEL_PREFIX_INFO      "INFO"
-#define     SC_OSSL_LOG_LEVEL_PREFIX_DEBUG     "DEBUG"
+#define     SCOSSL_LOG_LEVEL_PREFIX_ERROR     "ERROR"
+#define     SCOSSL_LOG_LEVEL_PREFIX_INFO      "INFO"
+#define     SCOSSL_LOG_LEVEL_PREFIX_DEBUG     "DEBUG"
 
 
-static int _traceLogLevel = SC_OSSL_LOG_LEVEL_INFO;
+static int _traceLogLevel = SCOSSL_LOG_LEVEL_INFO;
 static char *_traceLogFilename = NULL;
 
-void SC_OSSL_ENGINE_set_trace_level(int trace_level)
+void SCOSSL_ENGINE_set_trace_level(int trace_level)
 {
-    if( trace_level >= SC_OSSL_LOG_LEVEL_OFF &&
-        trace_level <= SC_OSSL_LOG_LEVEL_DEBUG )
+    if( trace_level >= SCOSSL_LOG_LEVEL_OFF &&
+        trace_level <= SCOSSL_LOG_LEVEL_DEBUG )
     {
         _traceLogLevel = trace_level;
     }
     return;
 }
 
-void SC_OSSL_ENGINE_set_trace_log_filename(const char *filename)
+void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
 {
     if( _traceLogFilename )
     {
@@ -69,7 +69,7 @@ void _scossl_log(
     const char *func,
     const char *format, ...)
 {
-    char paraBuf[SC_OSSL_ENGINE_TRACELOG_PARA_LENGTH];
+    char paraBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
     FILE *fp = NULL;
     va_list args;
     va_start(args, format);
@@ -82,14 +82,14 @@ void _scossl_log(
 
     switch( trace_level )
     {
-        case SC_OSSL_LOG_LEVEL_ERROR:
-            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_ERROR;
+        case SCOSSL_LOG_LEVEL_ERROR:
+            trace_level_prefix = SCOSSL_LOG_LEVEL_PREFIX_ERROR;
             break;
-        case SC_OSSL_LOG_LEVEL_INFO:
-            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_INFO;
+        case SCOSSL_LOG_LEVEL_INFO:
+            trace_level_prefix = SCOSSL_LOG_LEVEL_PREFIX_INFO;
             break;
-        case SC_OSSL_LOG_LEVEL_DEBUG:
-            trace_level_prefix = SC_OSSL_LOG_LEVEL_PREFIX_DEBUG;
+        case SCOSSL_LOG_LEVEL_DEBUG:
+            trace_level_prefix = SCOSSL_LOG_LEVEL_PREFIX_DEBUG;
         default:
             break;
     }
@@ -175,72 +175,72 @@ void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     const char *func,
     char *description,
-    SYMCRYPT_ERROR symError)
+    SYMCRYPT_ERROR scError)
 {
-    switch( symError  )
+    switch( scError  )
     {
         case SYMCRYPT_NO_ERROR:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_NO_ERROR (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_NO_ERROR (0x%x)", description, scError);
             break;
         case SYMCRYPT_UNUSED:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_UNUSED (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_UNUSED (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_KEY_SIZE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_KEY_SIZE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_KEY_SIZE (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_BLOCK_SIZE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_BLOCK_SIZE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_BLOCK_SIZE (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_DATA_SIZE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_DATA_SIZE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_DATA_SIZE (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_NONCE_SIZE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_NONCE_SIZE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_NONCE_SIZE (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_TAG_SIZE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_TAG_SIZE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_TAG_SIZE (0x%x)", description, scError);
             break;
         case SYMCRYPT_WRONG_ITERATION_COUNT:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_ITERATION_COUNT (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_WRONG_ITERATION_COUNT (0x%x)", description, scError);
             break;
         case SYMCRYPT_AUTHENTICATION_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_AUTHENTICATION_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_AUTHENTICATION_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_EXTERNAL_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_EXTERNAL_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_EXTERNAL_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_FIPS_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_FIPS_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_FIPS_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_HARDWARE_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_HARDWARE_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_HARDWARE_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_NOT_IMPLEMENTED:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_NOT_IMPLEMENTED (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_NOT_IMPLEMENTED (0x%x)", description, scError);
             break;
         case SYMCRYPT_INVALID_BLOB:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_BLOB (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_BLOB (0x%x)", description, scError);
             break;
         case SYMCRYPT_BUFFER_TOO_SMALL:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_BUFFER_TOO_SMALL (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_BUFFER_TOO_SMALL (0x%x)", description, scError);
             break;
         case SYMCRYPT_INVALID_ARGUMENT:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_ARGUMENT (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_INVALID_ARGUMENT (0x%x)", description, scError);
             break;
         case SYMCRYPT_MEMORY_ALLOCATION_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_MEMORY_ALLOCATION_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_MEMORY_ALLOCATION_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE (0x%x)", description, scError);
             break;
         case SYMCRYPT_INCOMPATIBLE_FORMAT:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_INCOMPATIBLE_FORMAT (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_INCOMPATIBLE_FORMAT (0x%x)", description, scError);
             break;
         case SYMCRYPT_VALUE_TOO_LARGE:
-            _scossl_log(trace_level, func, "%s - SYMCRYPT_VALUE_TOO_LARGE (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - SYMCRYPT_VALUE_TOO_LARGE (0x%x)", description, scError);
             break;
         default:
-            _scossl_log(trace_level, func, "%s - UNKNOWN SYMCRYPT_ERROR (%d)", description, symError);
+            _scossl_log(trace_level, func, "%s - UNKNOWN SYMCRYPT_ERROR (0x%x)", description, scError);
             break;
     }
 }

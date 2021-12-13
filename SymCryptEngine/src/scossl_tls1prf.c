@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl_tls1prf.h"
+#include "scossl_tls1prf.h"
 #include <openssl/kdf.h>
 
 #ifdef __cplusplus
@@ -21,22 +21,22 @@ typedef struct {
     /* Buffer of concatenated seed data */
     unsigned char seed[TLS1_PRF_MAXBUF];
     size_t seed_length;
-} SC_OSSL_TLS1_PRF_PKEY_CTX;
+} SCOSSL_TLS1_PRF_PKEY_CTX;
 
-SCOSSL_STATUS sc_ossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
+    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
-        SC_OSSL_LOG_ERROR("Memory Allocation Error");
+        SCOSSL_LOG_ERROR("Memory Allocation Error");
         return 0;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
     return 1;
 }
 
-void sc_ossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
+void scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     if (key_context == NULL) {
         return;
     }
@@ -46,9 +46,9 @@ void sc_ossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-SCOSSL_STATUS sc_ossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
+SCOSSL_STATUS scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
 {
-    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
     switch (type) {
     case EVP_PKEY_CTRL_TLS_MD:
@@ -76,14 +76,14 @@ SCOSSL_STATUS sc_ossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, 
         key_context->seed_length += p1;
         return 1;
     default:
-        SC_OSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
+        SCOSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
         return -2;
     }
 }
 
-SCOSSL_STATUS sc_ossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(key_context->secret, key_context->secret_length);
     OPENSSL_cleanse(key_context->seed, key_context->seed_length);
     memset(key_context, 0, sizeof(*key_context));
@@ -105,32 +105,32 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(
         return SymCryptHmacSha512Algorithm;
     // if (type == NID_AES_CMC)
     //     return SymCryptAesCmacAlgorithm;
-    SC_OSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SCOSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
-SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
                                         _Out_ size_t *keylen)
 {
-    SC_OSSL_TLS1_PRF_PKEY_CTX *key_context = (SC_OSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_MAC sc_ossl_mac_algo = NULL;
-    SYMCRYPT_ERROR symError = SYMCRYPT_NO_ERROR;
+    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    PCSYMCRYPT_MAC scossl_mac_algo = NULL;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     if (key_context->md == NULL) {
-        SC_OSSL_LOG_ERROR("Missing Digest");
+        SCOSSL_LOG_ERROR("Missing Digest");
         return 0;
     }
 
     if (key_context->secret == NULL) {
-        SC_OSSL_LOG_ERROR("Missing Secret");
+        SCOSSL_LOG_ERROR("Missing Secret");
         return 0;
     }
 
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
-        SC_OSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        symError = SymCryptTlsPrf1_1(
+        SCOSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        scError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,
             NULL,
@@ -142,14 +142,14 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
     }
     else
     {
-        sc_ossl_mac_algo = scossl_get_symcrypt_mac_algorithm(key_context->md);
-        if( sc_ossl_mac_algo == NULL )
+        scossl_mac_algo = scossl_get_symcrypt_mac_algorithm(key_context->md);
+        if( scossl_mac_algo == NULL )
         {
             return 0;
         }
 
-        symError = SymCryptTlsPrf1_2(
-            sc_ossl_mac_algo,
+        scError = SymCryptTlsPrf1_2(
+            scossl_mac_algo,
             key_context->secret,
             key_context->secret_length,
             NULL,
@@ -160,9 +160,9 @@ SCOSSL_STATUS sc_ossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_
             *keylen);
     }
 
-    if (symError != SYMCRYPT_NO_ERROR)
+    if (scError != SYMCRYPT_NO_ERROR)
     {
-        SC_OSSL_LOG_SYMERROR_ERROR("SymCryptTlsPrf1_2 failed", symError);
+        SCOSSL_LOG_scError_ERROR("SymCryptTlsPrf1_2 failed", scError);
         return 0;
     }
     return 1;
