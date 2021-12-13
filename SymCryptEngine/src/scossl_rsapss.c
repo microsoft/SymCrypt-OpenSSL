@@ -50,7 +50,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     RSA* rsa = NULL;
     size_t cbResult = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int ret = -1;
+    int ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
@@ -62,32 +62,32 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get messageDigest");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get mgf1Digest");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
     type = EVP_MD_type(messageDigest);
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
         SCOSSL_LOG_ERROR("messageDigest and mgf1Digest do not match");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
         SCOSSL_LOG_ERROR("Failed to get RSA key from ctx");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get cbSalt");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( cbSalt == RSA_PSS_SALTLEN_DIGEST )
@@ -101,7 +101,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     else if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
     {
         SCOSSL_LOG_ERROR("Invalid cbSalt");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
@@ -114,7 +114,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     {
         if( scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
-            return -2;
+            return SCOSSL_UNSUPPORTED;
         }
     }
 
@@ -126,7 +126,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     }
     if( sig == NULL )
     {
-        ret = 1;
+        ret = SCOSSL_SUCCESS;
         goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
@@ -166,11 +166,11 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
                 &cbResult);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptRsaPssSign failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPssSign failed", scError);
         goto cleanup;
     }
 
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     return ret;
@@ -182,7 +182,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
-    size_t ret = 0;
+    int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
@@ -195,32 +195,32 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get messageDigest");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get mgf1Digest");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
     type = EVP_MD_type(messageDigest);
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
         SCOSSL_LOG_ERROR("messageDigest and mgf1Digest do not match");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
         SCOSSL_LOG_ERROR("Failed to get RSA key from ctx");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get cbSalt");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( cbSalt == RSA_PSS_SALTLEN_DIGEST )
@@ -234,12 +234,12 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     else if ( cbSalt == RSA_PSS_SALTLEN_AUTO )
     {
         SCOSSL_LOG_ERROR("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
     else if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
     {
         SCOSSL_LOG_ERROR("Invalid cbSalt");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
@@ -252,7 +252,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     {
         if( scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
-            return -2;
+            return SCOSSL_UNSUPPORTED;
         }
     }
 
@@ -301,12 +301,12 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     {
         if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPssverify returned unexpected error", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPssverify returned unexpected error", scError);
         }
         goto cleanup;
     }
 
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     return ret;

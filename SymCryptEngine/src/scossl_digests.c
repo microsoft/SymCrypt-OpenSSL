@@ -163,9 +163,9 @@ SCOSSL_STATUS scossl_digests_init_static()
         (scossl_digest_sha384() == NULL) ||
         (scossl_digest_sha512() == NULL) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 _Success_(return > 0)
@@ -216,11 +216,11 @@ static SCOSSL_STATUS scossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptMd5Init(state);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
@@ -230,11 +230,11 @@ static SCOSSL_STATUS scossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptMd5Append(state, data, count);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_MD5_RESULT_SIZE) unsigned char *md)
@@ -243,28 +243,24 @@ static SCOSSL_STATUS scossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_write
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptMd5Result(state, md);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
     PSYMCRYPT_MD5_STATE state_to = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_MD5_STATE state_from = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(from);
-    if( state_to == NULL )
+    if( state_to == NULL || state_from == NULL )
     {
-        return 1;
-    }
-    if( state_from == NULL )
-    {
-        return 1;
+        return SCOSSL_SUCCESS;
     }
 
     SymCryptMd5StateCopy(state_from, state_to);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 /*
@@ -276,11 +272,11 @@ static SCOSSL_STATUS scossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha1Init(state);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
@@ -290,11 +286,11 @@ static SCOSSL_STATUS scossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_read
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha1Append(state, data, count);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA1_RESULT_SIZE) unsigned char *md)
@@ -303,28 +299,24 @@ static SCOSSL_STATUS scossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_writ
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha1Result(state, md);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
     PSYMCRYPT_SHA1_STATE state_to = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA1_STATE state_from = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(from);
-    if( state_to == NULL )
+    if( state_to == NULL || state_from == NULL )
     {
-        return 1;
-    }
-    if( state_from == NULL )
-    {
-        return 1;
+        return SCOSSL_SUCCESS;
     }
 
     SymCryptSha1StateCopy(state_from, state_to);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 
@@ -337,11 +329,11 @@ static SCOSSL_STATUS scossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha256Init(state);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
@@ -351,11 +343,11 @@ static SCOSSL_STATUS scossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_re
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha256Append(state, data, count);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA256_RESULT_SIZE) unsigned char *md)
@@ -364,28 +356,24 @@ static SCOSSL_STATUS scossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_wr
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha256Result(state, md);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
     PSYMCRYPT_SHA256_STATE state_to = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA256_STATE state_from = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(from);
-    if( state_to == NULL )
+    if( state_to == NULL || state_from == NULL )
     {
-        return 1;
-    }
-    if( state_from == NULL )
-    {
-        return 1;
+        return SCOSSL_SUCCESS;
     }
 
     SymCryptSha256StateCopy(state_from, state_to);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 /*
@@ -397,11 +385,11 @@ static SCOSSL_STATUS scossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha384Init(state);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
@@ -411,11 +399,11 @@ static SCOSSL_STATUS scossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_re
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha384Append(state, data, count);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA384_RESULT_SIZE) unsigned char *md)
@@ -424,28 +412,24 @@ static SCOSSL_STATUS scossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_wr
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha384Result(state, md);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
     PSYMCRYPT_SHA384_STATE state_to = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA384_STATE state_from = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(from);
-    if( state_to == NULL )
+    if( state_to == NULL || state_from == NULL )
     {
-        return 1;
-    }
-    if( state_from == NULL )
-    {
-        return 1;
+        return SCOSSL_SUCCESS;
     }
 
     SymCryptSha384StateCopy(state_from, state_to);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 /*
@@ -457,11 +441,11 @@ static SCOSSL_STATUS scossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha512Init(state);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
@@ -471,11 +455,11 @@ static SCOSSL_STATUS scossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_re
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha512Append(state, data, count);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA512_RESULT_SIZE) unsigned char *md)
@@ -484,28 +468,24 @@ static SCOSSL_STATUS scossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_wr
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR("No MD Data Present");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     SymCryptSha512Result(state, md);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS scossl_digest_sha512_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
     PSYMCRYPT_SHA512_STATE state_to = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(to);
     PSYMCRYPT_SHA512_STATE state_from = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(from);
-    if( state_to == NULL )
+    if( state_to == NULL || state_from == NULL )
     {
-        return 1;
-    }
-    if( state_from == NULL )
-    {
-        return 1;
+        return SCOSSL_SUCCESS;
     }
 
     SymCryptSha512StateCopy(state_from, state_to);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus

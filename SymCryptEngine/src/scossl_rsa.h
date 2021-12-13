@@ -49,19 +49,19 @@ SCOSSL_RETURNLENGTH scossl_rsa_pub_dec(int flen, _In_reads_bytes_(flen) const un
 
 // Used for CRT computations, used by default RSA implementations
 // ctx is a temporary BIGNUM variable
-// Returns 1 on success, or 0 on error
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ RSA* rsa, _In_ BN_CTX* ctx);
 
 // Used for CRT computations, used by default RSA implementations
 // r = a ^ p mod m
 // ctx is a temporary BIGNUM variable, while m_ctx is a Montgomery multiplication structure
-// Returns 1 on success, or 0 on error
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ const BIGNUM* p,
                                       _In_ const BIGNUM* m, _In_ BN_CTX* ctx, _In_ BN_MONT_CTX* m_ctx);
 
 // Signs the message digest m of size m_len using private key rsa using PKCS1-v1_5 and stores signature in sigret and
 // signature size in siglen. Type denotes the message digest algorithm used to generate m.
-// Returns 1 on success
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigned char* m, unsigned int m_length,
                                 _Out_writes_bytes_(siglen) unsigned char* sigret, _Out_ unsigned int* siglen,
                                 _In_ const RSA* rsa);
@@ -69,7 +69,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 // Verifies that the signature sigbuf of size siglen matches a given message digest m of size m_len.
 // dtype denotes the message digest algorithm that was used to generate the signature. rsa is the signer's
 // public key.
-// Returns 1 on successful verification
+// Returns SCOSSL_SUCCESS on successful verification, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
                                   unsigned int m_length,
                                   _In_reads_bytes_(siglen) const unsigned char* sigbuf,
@@ -78,15 +78,15 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
 // Generates a 2-prime RSA key pair and stores it in rsa. Modulus will be of length bits,
 // the number of primes to form the modulus will be primes, and the public exponent will be e.
 // cb is an optional callback for progress of key generation that is unused in our implementation.
-// Returns 1 on success or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e, _In_opt_ BN_GENCB* cb);
 
 // Initializes a new RSA instance.
-// Returns 1 on success, or 0 on error
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_init(_Inout_ RSA *rsa);
 
 // Destroys instance of RSA object. The memory for rsa is not freed by this function.
-// Returns 1 on success
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_rsa_finish(_Inout_ RSA *rsa);
 
 typedef struct _SCOSSL_RSA_KEY_CONTEXT {
@@ -95,7 +95,7 @@ typedef struct _SCOSSL_RSA_KEY_CONTEXT {
 } SCOSSL_RSA_KEY_CONTEXT;
 
 // Initializes keyCtx from key rsa.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONTEXT *keyCtx);
 
 // Frees data and key of keyCtx

@@ -87,7 +87,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const un
                        &cbResult);
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Encrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Encrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -110,7 +110,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const un
                        &cbResult);
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaOaepEncrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaOaepEncrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -130,7 +130,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const un
         cbResult = cbModulus;
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaRawEncrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaRawEncrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -231,7 +231,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const u
                        &cbResult);
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaOaepDecrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaOaepDecrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -247,7 +247,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const u
         cbResult = cbModulus;
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaRawDecrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaRawDecrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -309,7 +309,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 {
     BN_ULONG cbModulus = 0;
     SIZE_T cbResult = 0;
-    SCOSSL_STATUS ret = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
@@ -356,7 +356,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
@@ -381,7 +381,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
@@ -406,7 +406,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
@@ -430,7 +430,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
 
@@ -455,7 +455,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
@@ -479,7 +479,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
 
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1Sign failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1Sign failed", scError);
             goto cleanup;
         }
         break;
@@ -489,7 +489,7 @@ SCOSSL_STATUS scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsigne
     }
 
     *siglen = cbResult;
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     return ret;
@@ -501,7 +501,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
     unsigned int siglen, _In_ const RSA* rsa)
 {
     BN_ULONG cbModulus = 0;
-    SCOSSL_STATUS ret = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
 
@@ -544,7 +544,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -571,7 +571,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -598,7 +598,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -623,7 +623,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -649,7 +649,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -675,7 +675,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         {
             if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
             {
-                SCOSSL_LOG_scError_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPkcs1verify returned unexpected error", scError);
             }
             goto cleanup;
         }
@@ -685,7 +685,7 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         goto cleanup;
     }
 
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     return ret;
@@ -713,7 +713,7 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     SIZE_T  cbData = 0;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int     ret = 0;
+    int     ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
     BIGNUM *rsa_n = NULL;
     BIGNUM *rsa_e = NULL;
@@ -757,7 +757,7 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, 0);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGenerate failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGenerate failed", scError);
         goto cleanup;
     }
 
@@ -827,7 +827,7 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
                    0);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGetValue failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -844,7 +844,7 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
                     0);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
         goto cleanup;
     }
 
@@ -879,10 +879,10 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     RSA_set0_crt_params(rsa, rsa_dmp1, rsa_dmq1, rsa_iqmp);
 
     keyCtx->initialized = 1;
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
-    if( ret != 1 )
+    if( ret != SCOSSL_SUCCESS )
     {
         scossl_rsa_free_key_context(keyCtx);
         BN_free(rsa_n);
@@ -905,7 +905,7 @@ cleanup:
 
 SCOSSL_STATUS scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONTEXT *keyCtx)
 {
-    int ret = 0;
+    int ret = SCOSSL_FAILURE;
     UINT64  pubExp64;
     PBYTE   pbModulus = NULL;
     SIZE_T  cbModulus = 0;
@@ -1033,16 +1033,16 @@ SCOSSL_STATUS scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONT
                    keyCtx->key);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptRsakeySetValue failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsakeySetValue failed", scError);
         goto cleanup;
     }
 
     keyCtx->initialized = 1;
 
-    ret = 1;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
-    if( ret != 1 )
+    if( ret != SCOSSL_SUCCESS )
     {
         SCOSSL_LOG_ERROR("scossl_initialize_rsa_key failed.");
         scossl_rsa_free_key_context(keyCtx);
@@ -1065,7 +1065,7 @@ SCOSSL_STATUS scossl_rsa_mod_exp(_Out_ BIGNUM* r0, _In_ const BIGNUM* i, _In_ RS
 
     if( !pfn_rsa_meth_mod_exp )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
     return pfn_rsa_meth_mod_exp(r0, i, rsa, ctx);
 }
@@ -1081,7 +1081,7 @@ SCOSSL_STATUS scossl_rsa_bn_mod_exp(_Out_ BIGNUM* r, _In_ const BIGNUM* a, _In_ 
     if( !pfn_rsa_meth_bn_mod_exp )
     {
         SCOSSL_LOG_ERROR("RSA_meth_get_bn_mod_exp failed");
-        return 0;
+        return SCOSSL_FAILURE;
     }
     return pfn_rsa_meth_bn_mod_exp(r, a, p, m, ctx, m_ctx);
 }
@@ -1092,17 +1092,17 @@ SCOSSL_STATUS scossl_rsa_init(_Inout_ RSA *rsa)
     if( !keyCtx )
     {
         SCOSSL_LOG_ERROR("OPENSSL_zalloc failed");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     if( RSA_set_ex_data(rsa, scossl_rsa_idx, keyCtx) == 0 )
     {
         SCOSSL_LOG_ERROR("RSA_set_ex_data failed");
         OPENSSL_free(keyCtx);
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 void scossl_rsa_free_key_context(_In_ SCOSSL_RSA_KEY_CONTEXT *keyCtx)
@@ -1128,7 +1128,7 @@ SCOSSL_STATUS scossl_rsa_finish(_Inout_ RSA *rsa)
         OPENSSL_free(keyCtx);
         RSA_set_ex_data(rsa, scossl_rsa_idx, NULL);
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 

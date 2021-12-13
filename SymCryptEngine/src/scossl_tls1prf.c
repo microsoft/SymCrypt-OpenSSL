@@ -28,10 +28,10 @@ SCOSSL_STATUS scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
         SCOSSL_LOG_ERROR("Memory Allocation Error");
-        return 0;
+        return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 void scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
@@ -53,31 +53,31 @@ SCOSSL_STATUS scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _
     switch (type) {
     case EVP_PKEY_CTRL_TLS_MD:
         key_context->md = p2;
-        return 1;
+        return SCOSSL_SUCCESS;
 
     case EVP_PKEY_CTRL_TLS_SECRET:
         if (p1 < 0)
-            return 0;
+            return SCOSSL_FAILURE;
         if (key_context->secret != NULL)
             OPENSSL_clear_free(key_context->secret, key_context->secret_length);
         OPENSSL_cleanse(key_context->seed, key_context->seed_length);
         key_context->seed_length = 0;
         key_context->secret = OPENSSL_memdup(p2, p1);
         if (key_context->secret == NULL)
-            return 0;
+            return SCOSSL_FAILURE;
         key_context->secret_length  = p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_TLS_SEED:
         if (p1 == 0 || p2 == NULL)
-            return 1;
+            return SCOSSL_SUCCESS;
         if (p1 < 0 || p1 > (int)(TLS1_PRF_MAXBUF - key_context->seed_length))
-            return 0;
+            return SCOSSL_FAILURE;
         memcpy(key_context->seed + key_context->seed_length, p2, p1);
         key_context->seed_length += p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 }
 
@@ -87,7 +87,7 @@ SCOSSL_STATUS scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
     OPENSSL_clear_free(key_context->secret, key_context->secret_length);
     OPENSSL_cleanse(key_context->seed, key_context->seed_length);
     memset(key_context, 0, sizeof(*key_context));
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(
@@ -118,12 +118,12 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
 
     if (key_context->md == NULL) {
         SCOSSL_LOG_ERROR("Missing Digest");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     if (key_context->secret == NULL) {
         SCOSSL_LOG_ERROR("Missing Secret");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
@@ -145,7 +145,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
         scossl_mac_algo = scossl_get_symcrypt_mac_algorithm(key_context->md);
         if( scossl_mac_algo == NULL )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
 
         scError = SymCryptTlsPrf1_2(
@@ -162,10 +162,10 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_scError_ERROR("SymCryptTlsPrf1_2 failed", scError);
-        return 0;
+        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptTlsPrf1_2 failed", scError);
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus

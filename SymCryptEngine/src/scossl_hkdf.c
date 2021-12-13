@@ -28,10 +28,10 @@ SCOSSL_STATUS scossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
     SCOSSL_HKDF_PKEY_CTX *scossl_hkdf_context;
     if ((scossl_hkdf_context = OPENSSL_zalloc(sizeof(*scossl_hkdf_context))) == NULL) {
         SCOSSL_LOG_ERROR("Memory Allocation Error");
-        return 0;
+        return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, scossl_hkdf_context);
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 void scossl_hkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
@@ -55,45 +55,45 @@ SCOSSL_STATUS scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     switch (type) {
     case EVP_PKEY_CTRL_HKDF_MD:
         if (p2 == NULL)
-            return 0;
+            return SCOSSL_FAILURE;
         scossl_hkdf_context->md = p2;
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_HKDF_MODE:
         scossl_hkdf_context->mode = p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_HKDF_SALT:
         if (p1 == 0 || p2 == NULL)
-            return 1;
+            return SCOSSL_SUCCESS;
         if (p1 < 0)
-            return 0;
+            return SCOSSL_FAILURE;
         if (scossl_hkdf_context->salt != NULL)
             OPENSSL_clear_free(scossl_hkdf_context->salt, scossl_hkdf_context->salt_len);
         scossl_hkdf_context->salt = OPENSSL_memdup(p2, p1);
         if (scossl_hkdf_context->salt == NULL)
-            return 0;
+            return SCOSSL_FAILURE;
         scossl_hkdf_context->salt_len = p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_HKDF_KEY:
         if (p1 < 0)
-            return 0;
+            return SCOSSL_FAILURE;
         if (scossl_hkdf_context->key != NULL)
             OPENSSL_clear_free(scossl_hkdf_context->key, scossl_hkdf_context->key_len);
         scossl_hkdf_context->key = OPENSSL_memdup(p2, p1);
         if (scossl_hkdf_context->key == NULL)
-            return 0;
+            return SCOSSL_FAILURE;
         scossl_hkdf_context->key_len  = p1;
         return 1;
     case EVP_PKEY_CTRL_HKDF_INFO:
         if (p1 == 0 || p2 == NULL)
-            return 1;
+            return SCOSSL_SUCCESS;
         if (p1 < 0 || p1 > (int)(HKDF_MAXBUF - scossl_hkdf_context->info_len))
-            return 0;
+            return SCOSSL_FAILURE;
         memcpy(scossl_hkdf_context->info + scossl_hkdf_context->info_len, p2, p1);
         scossl_hkdf_context->info_len += p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 }
 
@@ -104,11 +104,8 @@ SCOSSL_STATUS scossl_hkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
     OPENSSL_clear_free(scossl_hkdf_context->salt, scossl_hkdf_context->salt_len);
     OPENSSL_cleanse(scossl_hkdf_context->info, scossl_hkdf_context->info_len);
     memset(scossl_hkdf_context, 0, sizeof(*scossl_hkdf_context));
-    return 1;
+    return SCOSSL_SUCCESS;
 }
-
-
-
 
 static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
                                    const unsigned char *salt, size_t salt_len,
@@ -235,12 +232,12 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
 
     if (scossl_hkdf_context->md == NULL) {
         SCOSSL_LOG_ERROR("Missing Digest");
-        return 0;
+        return SCOSSL_FAILURE;
     }
     scossl_mac_algo = scossl_get_symcrypt_mac_algorithm(scossl_hkdf_context->md);
     if (scossl_hkdf_context->key == NULL) {
         SCOSSL_LOG_ERROR("Missing Key");
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     switch (scossl_hkdf_context->mode) {
@@ -259,7 +256,7 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
                 *keylen);
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                return 0;
+                return SCOSSL_FAILURE;
             }
         }
         else
@@ -276,11 +273,11 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
                 scossl_hkdf_context->info_len,
                 key, *keylen) != NULL;
         }
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY:
         if (key == NULL) {
             *keylen = EVP_MD_size(scossl_hkdf_context->md);
-            return 1;
+            return SCOSSL_SUCCESS;
         }
         // SymCryptError = SymCryptHkdfExpandKey(
         //     &scExpandedKey,
@@ -291,13 +288,13 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         //     scossl_hkdf_context->salt_len);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SCOSSL_LOG_scError_DEBUG("SymCryptHkdfExpandKey failed", scError);
-        //     return 0;
+        //     SCOSSL_LOG_SYMCRYPT_DEBUG("SymCryptHkdfExpandKey failed", scError);
+        //     return SCOSSL_FAILURE;
         // }
 
         // // TODO:
         // // Extract expanded key output and copy it to key[keylen]
-        // return 1;
+        // return SCOSSL_SUCCESS;
 
         return HKDF_Extract(
                 scossl_hkdf_context->md,
@@ -319,10 +316,10 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         //                     *keylen);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SCOSSL_LOG_scError_DEBUG("SymCryptHkdfExpandKey failed", scError);
-        //     return 0;
+        //     SCOSSL_LOG_SYMCRYPT_DEBUG("SymCryptHkdfExpandKey failed", scError);
+        //     return SCOSSL_FAILURE;
         // }
-        // return 1;
+        // return SCOSSL_SUCCESS;
         return HKDF_Expand(
                 scossl_hkdf_context->md,
                 scossl_hkdf_context->key,
@@ -331,7 +328,7 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
                 scossl_hkdf_context->info_len,
                 key, *keylen) != NULL;
     default:
-        return 0;
+        return SCOSSL_FAILURE;
     }
 }
 

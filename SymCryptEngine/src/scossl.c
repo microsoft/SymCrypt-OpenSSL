@@ -48,7 +48,7 @@ int scossl_destroy(ENGINE* e)
     return 1;
 }
 
-static int engine_set_defaults(ENGINE* e)
+static int scossl_engine_set_defaults(ENGINE* e)
 {
     if(    !ENGINE_set_default_digests(e)
         || !ENGINE_set_default_ciphers(e)
@@ -65,7 +65,7 @@ static int engine_set_defaults(ENGINE* e)
     return 1;
 }
 
-static int bind_scossl_engine(ENGINE* e)
+static int scossl_bind_engine(ENGINE* e)
 {
     if( !scossl_module_initialized )
     {
@@ -173,7 +173,7 @@ static int bind_scossl_engine(ENGINE* e)
     }
 
     // Set Engine as default
-    if( !engine_set_defaults(e) )
+    if( !scossl_engine_set_defaults(e) )
     {
         return 0;
     }
@@ -197,13 +197,13 @@ memerr:
 }
 
 # ifndef OPENSSL_NO_DYNAMIC_ENGINE
-static int bind_helper(ENGINE *e, const char *id)
+static int scossl_bind_helper(ENGINE *e, const char *id)
 {
     if( id && (strcmp(id, engine_scossl_id) != 0) )
     {
         return 0;
     }
-    if( !bind_scossl_engine(e) )
+    if( !scossl_bind_engine(e) )
     {
         return 0;
     }
@@ -211,7 +211,7 @@ static int bind_helper(ENGINE *e, const char *id)
 }
 
 IMPLEMENT_DYNAMIC_CHECK_FN()
-IMPLEMENT_DYNAMIC_BIND_FN(bind_helper)
+IMPLEMENT_DYNAMIC_BIND_FN(scossl_bind_helper)
 # endif
 
 static ENGINE* engine_scossl(void)
@@ -221,7 +221,7 @@ static ENGINE* engine_scossl(void)
     {
         return NULL;
     }
-    if( !bind_scossl_engine(ret) )
+    if( !scossl_bind_engine(ret) )
     {
         ENGINE_free(ret);
         return NULL;
@@ -229,16 +229,16 @@ static ENGINE* engine_scossl(void)
     return ret;
 }
 
-int engine_load_scossl_int(void)
+static int scossl_engine_load(void)
 {
     int retVal = 1;
-    ENGINE* symcryptEngine = engine_scossl();
-    if( !symcryptEngine )
+    ENGINE* scosslEngine = engine_scossl();
+    if( !scosslEngine )
     {
         goto err;
     }
-    retVal = ENGINE_add(symcryptEngine);
-    ENGINE_free(symcryptEngine);
+    retVal = ENGINE_add(scosslEngine);
+    ENGINE_free(scosslEngine);
     ERR_clear_error();
 
 end:
@@ -250,7 +250,7 @@ err:
 
 int SCOSSL_ENGINE_Initialize()
 {
-    return engine_load_scossl_int();
+    return scossl_engine_load();
 }
 
 #ifdef __cplusplus

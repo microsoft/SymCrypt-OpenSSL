@@ -39,7 +39,7 @@ static int scossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*s
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get padding");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( padding == RSA_PKCS1_PSS_PADDING )
@@ -60,7 +60,7 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
         SCOSSL_LOG_ERROR("Failed to get padding");
-        return -2;
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( padding == RSA_PKCS1_PSS_PADDING )
@@ -68,7 +68,7 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
         if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
         {
             SCOSSL_LOG_ERROR("Failed to get cbSalt");
-            return -2;
+            return SCOSSL_UNSUPPORTED;
         }
         if( cbSalt != RSA_PSS_SALTLEN_AUTO )
         {
@@ -188,9 +188,9 @@ SCOSSL_STATUS scossl_pkey_methods_init_static()
         (scossl_pkey_tls1_prf() == NULL) ||
         (scossl_pkey_hkdf() == NULL) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 _Success_(return > 0)

@@ -280,7 +280,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
 SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static _Success_(return > 0) int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
@@ -340,7 +340,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
 SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static _Success_(return > 0) int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
@@ -446,9 +446,9 @@ SCOSSL_STATUS scossl_ciphers_init_static()
         (scossl_aes_192_ccm() == NULL) ||
         (scossl_aes_256_ccm() == NULL) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 int scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
@@ -521,7 +521,7 @@ int scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
  */
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
@@ -532,14 +532,14 @@ SCOSSL_STATUS scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
         scError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
@@ -554,11 +554,11 @@ SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned 
         SymCryptAesCbcDecrypt(&cipherCtx->key, ctx_iv, in, out, inl);
     }
 
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Allows various cipher specific parameters to be determined and set.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
@@ -576,9 +576,9 @@ static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
         SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
         break;
     default:
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 /*
@@ -586,7 +586,7 @@ static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
  */
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
@@ -597,14 +597,14 @@ SCOSSL_STATUS scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
         scError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
@@ -618,11 +618,11 @@ SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned 
         SymCryptAesEcbDecrypt(&cipherCtx->key, in, out, inl);
     }
 
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Allows various cipher specific parameters to be determined and set.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
@@ -640,9 +640,9 @@ static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
         SymCryptAesKeyCopy(&srcCtx->key, &dstCtx->key);
         break;
     default:
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Disabling XTS for now - remove with if region to avoid unused function warning
@@ -652,7 +652,7 @@ static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
  */
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
@@ -665,17 +665,17 @@ SCOSSL_STATUS scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
     }
     else
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
     if( key )
     {
         scError = SymCryptXtsAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
@@ -725,7 +725,7 @@ SCOSSL_RETURNLENGTH scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
 }
 
 // Allows various cipher specific parameters to be determined and set.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
@@ -742,11 +742,11 @@ static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
         // srcCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(                  ctx);
         // dstCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr);
         // SymCryptXtsKeyCopy(&srcCtx->key, &dstCtx->key);
-        return 0;
+        return SCOSSL_FAILURE;
     default:
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 #endif
 
@@ -755,7 +755,7 @@ static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
  */
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
@@ -772,10 +772,10 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
         scError = SymCryptGcmExpandKey(&cipherCtx->key, SymCryptAesBlockCipher, key, EVP_CIPHER_CTX_key_length(ctx));
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 #define EVP_GCM_TLS_IV_LEN (EVP_GCM_TLS_FIXED_IV_LEN + EVP_GCM_TLS_EXPLICIT_IV_LEN)
@@ -933,8 +933,9 @@ cleanup:
 }
 
 // Allows various cipher specific parameters to be determined and set.
-// Returns 1 on success, or 0 on error.
-static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
+// Returns SCOSSL_SUCCESS on success, SCOSSL_FAILURE on error, or taglen on successful query of
+// EVP_CTRL_AEAD_TLS1_AAD.
+static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -962,14 +963,14 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( arg != SCOSSL_GCM_IV_LENGTH )
         {
             SCOSSL_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
-            return 0;
+            return SCOSSL_FAILURE;
         }
         break;
     case EVP_CTRL_AEAD_SET_TAG:
         if( arg < SCOSSL_GCM_MIN_TAG_LENGTH || arg > SCOSSL_GCM_MAX_TAG_LENGTH || EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SCOSSL_LOG_ERROR("Set tag error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tag, ptr, arg);
         cipherCtx->taglen = arg;
@@ -979,7 +980,7 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
             arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SCOSSL_LOG_ERROR("Get tag error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         memcpy(ptr, cipherCtx->tag, arg);
         break;
@@ -996,7 +997,7 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( cipherCtx->ivlen != EVP_GCM_TLS_IV_LEN )
         {
             SCOSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         if( arg == -1 )
         {
@@ -1006,7 +1007,7 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( arg != cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN )
         {
             SCOSSL_LOG_ERROR("set_iv_fixed incorrect length");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         // Set first 4B of IV to ptr value
         memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN);
@@ -1014,14 +1015,14 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( EVP_CIPHER_CTX_encrypting(ctx) &&
             (RAND_bytes(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_EXPLICIT_IV_LEN) <= 0) )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
         break;
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
         {
             SCOSSL_LOG_ERROR("Set tlsAad error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tlsAad, ptr, EVP_AEAD_TLS1_AAD_LEN);
         cipherCtx->tlsAadSet = 1;
@@ -1041,17 +1042,17 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( tls_buffer_len < min_tls_buffer_len )
         {
             SCOSSL_LOG_ERROR("tls_buffer_len too short");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         tls_buffer_len -= min_tls_buffer_len;
         SYMCRYPT_STORE_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
 
-        return EVP_GCM_TLS_TAG_LEN;
+        return EVP_GCM_TLS_TAG_LEN; // <-- Special case return
     default:
         SCOSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 /*
@@ -1059,7 +1060,7 @@ static SCOSSL_STATUS scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
  */
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
-// Returns 1 on success, or 0 on error.
+// Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
@@ -1077,10 +1078,10 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
         scError = SymCryptAesExpandKey(&cipherCtx->key, key, EVP_CIPHER_CTX_key_length(ctx));
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
@@ -1299,8 +1300,9 @@ cleanup:
 }
 
 // Allows various cipher specific parameters to be determined and set.
-// Returns 1 on success, or 0 on error.
-static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
+// Returns SCOSSL_SUCCESS on success, SCOSSL_FAILURE on error, or taglen on successful query of
+// EVP_CTRL_AEAD_TLS1_AAD.
+static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -1327,7 +1329,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( arg < SCOSSL_CCM_MIN_IV_LENGTH || arg > SCOSSL_CCM_MAX_IV_LENGTH )
         {
             SCOSSL_LOG_ERROR("SymCrypt Engine only supports [%d-%d] byte IVs for AES-CCM", SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
-            return 0;
+            return SCOSSL_FAILURE;
         }
         cipherCtx->ivlen = arg;
         break;
@@ -1336,7 +1338,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
             (EVP_CIPHER_CTX_encrypting(ctx) && ptr != NULL) )
         {
             SCOSSL_LOG_ERROR("Set tag error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         if( ptr != NULL )
         {
@@ -1349,7 +1351,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
             arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
             SCOSSL_LOG_ERROR("Get tag error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         memcpy(ptr, cipherCtx->tag, arg);
         break;
@@ -1368,7 +1370,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( cipherCtx->ivlen != EVP_CCM_TLS_IV_LEN )
         {
             SCOSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         if( arg == -1 )
         {
@@ -1378,7 +1380,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( arg != cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN )
         {
             SCOSSL_LOG_ERROR("set_iv_fixed incorrect length");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         // Set first 4B of IV to ptr value
         memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN);
@@ -1386,19 +1388,19 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( EVP_CIPHER_CTX_encrypting(ctx) &&
             (RAND_bytes(cipherCtx->iv + cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, EVP_CCM_TLS_EXPLICIT_IV_LEN) <= 0) )
         {
-            return 0;
+            return SCOSSL_FAILURE;
         }
         break;
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
         {
             SCOSSL_LOG_ERROR("Set tlsAad error");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         if( cipherCtx->taglen != EVP_CCM_TLS_TAG_LEN && cipherCtx->taglen != EVP_CCM8_TLS_TAG_LEN )
         {
             SCOSSL_LOG_ERROR("Invalid taglen for TLS");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tlsAad, ptr, EVP_AEAD_TLS1_AAD_LEN);
         cipherCtx->tlsAadSet = 1;
@@ -1418,7 +1420,7 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         if( tls_buffer_len < min_tls_buffer_len )
         {
             SCOSSL_LOG_ERROR("tls_buffer_len too short");
-            return 0;
+            return SCOSSL_FAILURE;
         }
         tls_buffer_len -= min_tls_buffer_len;
         SYMCRYPT_STORE_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
@@ -1426,9 +1428,9 @@ static SCOSSL_STATUS scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, 
         return cipherCtx->taglen;
     default:
         SCOSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus
