@@ -1705,5 +1705,5 @@ int main(int argc, char** argv)
     TestDh();
 
     BIO_free(bio_err);
-    return 1;
+    return 0;
 }

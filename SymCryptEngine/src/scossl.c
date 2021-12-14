@@ -27,7 +27,7 @@ static RSA_METHOD* scossl_rsa_method = NULL;
 // static DSA_METHOD* scossl_dsa_method = NULL;
 static DH_METHOD* scossl_dh_method = NULL;
 
-int scossl_destroy(ENGINE* e)
+SCOSSL_STATUS scossl_destroy(ENGINE* e)
 {
     scossl_destroy_digests();
     scossl_destroy_ciphers();
@@ -45,28 +45,14 @@ int scossl_destroy(ENGINE* e)
     DH_meth_free(scossl_dh_method);
     scossl_dh_method = NULL;
     CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, scossl_dh_idx);
-    return 1;
+
+    return SCOSSL_SUCCESS;
 }
 
-static int scossl_engine_set_defaults(ENGINE* e)
+static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
 {
-    if(    !ENGINE_set_default_digests(e)
-        || !ENGINE_set_default_ciphers(e)
-        || !ENGINE_set_default_pkey_meths(e)
-        || !ENGINE_set_default_RSA(e)
-        || !ENGINE_set_default_EC(e)
-        || !ENGINE_set_default_RAND(e)
-        // || !ENGINE_set_default_DSA(e)
-        || !ENGINE_set_default_DH(e)
-        )
-    {
-        return 0;
-    }
-    return 1;
-}
+    int ret = SCOSSL_FAILURE;
 
-static int scossl_bind_engine(ENGINE* e)
-{
     if( !scossl_module_initialized )
     {
         SymCryptModuleInit(SYMCRYPT_CODE_VERSION_API, SYMCRYPT_CODE_VERSION_MINOR, SYMCRYPT_CODE_VERSION_PATCH);
@@ -84,7 +70,7 @@ static int scossl_bind_engine(ENGINE* e)
      || !scossl_dh_method
         )
     {
-        goto memerr;
+        goto end;
     }
 
     /* Setup RSA_METHOD */
@@ -102,12 +88,12 @@ static int scossl_bind_engine(ENGINE* e)
         || !RSA_meth_set_keygen(scossl_rsa_method, scossl_rsa_keygen)
         )
     {
-        goto memerr;
+        goto end;
     }
 
     if( (scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
     {
-        goto memerr;
+        goto end;
     }
 
     /* Setup EC_METHOD */
@@ -138,12 +124,12 @@ static int scossl_bind_engine(ENGINE* e)
     //     || !DSA_meth_set_finish(scossl_dsa_method, scossl_dsa_finish)
     //     )
     // {
-    //     goto memerr;
+    //     goto end;
     // }
 
     if( (scossl_dh_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
     {
-        goto memerr;
+        goto end;
     }
 
     // /* Setup DH METHOD */
@@ -152,7 +138,7 @@ static int scossl_bind_engine(ENGINE* e)
         || !DH_meth_set_finish(scossl_dh_method, scossl_dh_finish)
         )
     {
-        goto memerr;
+        goto end;
     }
 
     // Engine initialization
@@ -169,13 +155,21 @@ static int scossl_bind_engine(ENGINE* e)
         || !ENGINE_set_pkey_meths(e, scossl_pkey_methods)
         )
     {
-        return 0;
+        goto end;
     }
 
     // Set Engine as default
-    if( !scossl_engine_set_defaults(e) )
+    if(    !ENGINE_set_default_digests(e)
+        || !ENGINE_set_default_ciphers(e)
+        || !ENGINE_set_default_pkey_meths(e)
+        || !ENGINE_set_default_RSA(e)
+        || !ENGINE_set_default_EC(e)
+        || !ENGINE_set_default_RAND(e)
+        // || !ENGINE_set_default_DSA(e)
+        || !ENGINE_set_default_DH(e)
+        )
     {
-        return 0;
+        goto end;
     }
 
     // Initialize hidden static variables once at Engine load time
@@ -187,27 +181,26 @@ static int scossl_bind_engine(ENGINE* e)
         )
     {
         scossl_destroy(e);
-        return 0;
+        goto end;
     }
 
-    return 1;
-
-memerr:
-    return 0;
+    ret = SCOSSL_SUCCESS;
+end:
+    return ret;
 }
 
 # ifndef OPENSSL_NO_DYNAMIC_ENGINE
-static int scossl_bind_helper(ENGINE *e, const char *id)
+static SCOSSL_STATUS scossl_bind_helper(ENGINE *e, const char *id)
 {
     if( id && (strcmp(id, engine_scossl_id) != 0) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
     if( !scossl_bind_engine(e) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 IMPLEMENT_DYNAMIC_CHECK_FN()
@@ -229,23 +222,21 @@ static ENGINE* engine_scossl(void)
     return ret;
 }
 
-static int scossl_engine_load(void)
+static SCOSSL_STATUS scossl_engine_load(void)
 {
-    int retVal = 1;
+    int ret = SCOSSL_FAILURE;
     ENGINE* scosslEngine = engine_scossl();
     if( !scosslEngine )
     {
-        goto err;
+        goto end;
     }
-    retVal = ENGINE_add(scosslEngine);
+    ret = ENGINE_add(scosslEngine);
     ENGINE_free(scosslEngine);
     ERR_clear_error();
 
+    ret = SCOSSL_SUCCESS;
 end:
-    return retVal;
-err:
-    retVal = 0;
-    goto end;
+    return ret;
 }
 
 int SCOSSL_ENGINE_Initialize()

@@ -82,7 +82,7 @@ SCOSSL_STATUS scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         if (scossl_hkdf_context->key == NULL)
             return SCOSSL_FAILURE;
         scossl_hkdf_context->key_len  = p1;
-        return 1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_HKDF_INFO:
         if (p1 == 0 || p2 == NULL)
             return SCOSSL_SUCCESS;
