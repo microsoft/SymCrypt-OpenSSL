@@ -2,10 +2,10 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "sc_ossl_pkey_meths.h"
-#include "sc_ossl_hkdf.h"
-#include "sc_ossl_tls1prf.h"
-#include "sc_ossl_rsapss.h"
+#include "scossl_pkey_meths.h"
+#include "scossl_hkdf.h"
+#include "scossl_tls1prf.h"
+#include "scossl_rsapss.h"
 #include <openssl/evp.h>
 
 #ifdef __cplusplus
@@ -31,27 +31,27 @@ static int (*_openssl_pkey_rsa_verify) (EVP_PKEY_CTX *ctx, const unsigned char *
                                         const unsigned char *tbs, size_t tbslen) = NULL;
 
 // Call SymCrypt engine sign if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*siglen) unsigned char *sig,
+static int scossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*siglen) unsigned char *sig,
                                     _Out_ size_t *siglen, _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
-        SC_OSSL_LOG_ERROR("Failed to get padding");
-        return -2;
+        SCOSSL_LOG_ERROR("Failed to get padding");
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( padding == RSA_PKCS1_PSS_PADDING )
     {
-        return sc_ossl_rsapss_sign(ctx, sig, siglen, tbs, tbslen);
+        return scossl_rsapss_sign(ctx, sig, siglen, tbs, tbslen);
     }
 
     return _openssl_pkey_rsa_sign(ctx, sig, siglen, tbs, tbslen);
 }
 
 // Call SymCrypt engine verify if PSS padding, otherwise OpenSSL version.
-static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                     _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
@@ -59,32 +59,32 @@ static int sc_ossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
-        SC_OSSL_LOG_ERROR("Failed to get padding");
-        return -2;
+        SCOSSL_LOG_ERROR("Failed to get padding");
+        return SCOSSL_UNSUPPORTED;
     }
 
     if( padding == RSA_PKCS1_PSS_PADDING )
     {
         if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
         {
-            SC_OSSL_LOG_ERROR("Failed to get cbSalt");
-            return -2;
+            SCOSSL_LOG_ERROR("Failed to get cbSalt");
+            return SCOSSL_UNSUPPORTED;
         }
         if( cbSalt != RSA_PSS_SALTLEN_AUTO )
         {
 
-            return sc_ossl_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
+            return scossl_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
         }
-        SC_OSSL_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
+        SCOSSL_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
     }
 
     return _openssl_pkey_rsa_verify(ctx, sig, siglen, tbs, tbslen);
 }
 
-static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_rsa = NULL;
 
 // Creates and returns the internal RSA method structure holding methods for RSA functions
-static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
+static EVP_PKEY_METHOD *scossl_pkey_rsa(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
     int (*pverify_init) (EVP_PKEY_CTX *ctx) = NULL;
@@ -92,27 +92,27 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa(void)
 
     EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_rsa );
 
-    if( (_sc_ossl_pkey_rsa = EVP_PKEY_meth_new(EVP_PKEY_RSA, flags)) != NULL )
+    if( (_scossl_pkey_rsa = EVP_PKEY_meth_new(EVP_PKEY_RSA, flags)) != NULL )
     {
         // start with the default openssl method
-        EVP_PKEY_meth_copy(_sc_ossl_pkey_rsa, _openssl_pkey_rsa);
+        EVP_PKEY_meth_copy(_scossl_pkey_rsa, _openssl_pkey_rsa);
 
         // overwrite the sign and verify methods
         // we just want to use the pss method if pss padding is specified
-        EVP_PKEY_meth_get_sign(_sc_ossl_pkey_rsa, &psign_init, &_openssl_pkey_rsa_sign);
-        EVP_PKEY_meth_get_verify(_sc_ossl_pkey_rsa, &pverify_init, &_openssl_pkey_rsa_verify);
+        EVP_PKEY_meth_get_sign(_scossl_pkey_rsa, &psign_init, &_openssl_pkey_rsa_sign);
+        EVP_PKEY_meth_get_verify(_scossl_pkey_rsa, &pverify_init, &_openssl_pkey_rsa_verify);
 
-        EVP_PKEY_meth_set_sign(_sc_ossl_pkey_rsa, psign_init, sc_ossl_pkey_rsa_sign);
-        EVP_PKEY_meth_set_verify(_sc_ossl_pkey_rsa, pverify_init, sc_ossl_pkey_rsa_verify);
+        EVP_PKEY_meth_set_sign(_scossl_pkey_rsa, psign_init, scossl_pkey_rsa_sign);
+        EVP_PKEY_meth_set_verify(_scossl_pkey_rsa, pverify_init, scossl_pkey_rsa_verify);
     }
-    return _sc_ossl_pkey_rsa;
+    return _scossl_pkey_rsa;
 }
 
 static const EVP_PKEY_METHOD *_openssl_pkey_rsa_pss = NULL;
-static EVP_PKEY_METHOD *_sc_ossl_pkey_rsa_pss = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_rsa_pss = NULL;
 
 // Creates and returns the internal RSA PSS method structure holding methods for RSA PSS functions
-static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
+static EVP_PKEY_METHOD *scossl_pkey_rsa_pss(void)
 {
     int (*psign_init) (EVP_PKEY_CTX *ctx) = NULL;
     int (*psign) (EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen) = NULL;
@@ -122,79 +122,79 @@ static EVP_PKEY_METHOD *sc_ossl_pkey_rsa_pss(void)
 
     EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_rsa_pss );
 
-    if( (_sc_ossl_pkey_rsa_pss = EVP_PKEY_meth_new(EVP_PKEY_RSA_PSS, flags)) != NULL )
+    if( (_scossl_pkey_rsa_pss = EVP_PKEY_meth_new(EVP_PKEY_RSA_PSS, flags)) != NULL )
     {
         // start with the default openssl method
-        EVP_PKEY_meth_copy(_sc_ossl_pkey_rsa_pss, _openssl_pkey_rsa_pss);
+        EVP_PKEY_meth_copy(_scossl_pkey_rsa_pss, _openssl_pkey_rsa_pss);
 
         // overwrite the sign and verify methods specifically
-        EVP_PKEY_meth_get_sign(_sc_ossl_pkey_rsa_pss, &psign_init, &psign);
-        EVP_PKEY_meth_get_verify(_sc_ossl_pkey_rsa_pss, &pverify_init, &pverify);
+        EVP_PKEY_meth_get_sign(_scossl_pkey_rsa_pss, &psign_init, &psign);
+        EVP_PKEY_meth_get_verify(_scossl_pkey_rsa_pss, &pverify_init, &pverify);
 
-        EVP_PKEY_meth_set_sign(_sc_ossl_pkey_rsa_pss, psign_init, sc_ossl_rsapss_sign);
-        EVP_PKEY_meth_set_verify(_sc_ossl_pkey_rsa_pss, pverify_init, sc_ossl_rsapss_verify);
+        EVP_PKEY_meth_set_sign(_scossl_pkey_rsa_pss, psign_init, scossl_rsapss_sign);
+        EVP_PKEY_meth_set_verify(_scossl_pkey_rsa_pss, pverify_init, scossl_rsapss_verify);
     }
-    return _sc_ossl_pkey_rsa_pss;
+    return _scossl_pkey_rsa_pss;
 }
 
 static const EVP_PKEY_METHOD *_openssl_pkey_tls1_prf = NULL;
-static EVP_PKEY_METHOD *_sc_ossl_pkey_tls1_prf = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_tls1_prf = NULL;
 
 // Creates and returns the internal TLS1 PRF method structure holding methods for TLS1 PRF functions
-static EVP_PKEY_METHOD *sc_ossl_pkey_tls1_prf(void)
+static EVP_PKEY_METHOD *scossl_pkey_tls1_prf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
 
-    if((_sc_ossl_pkey_tls1_prf = EVP_PKEY_meth_new(EVP_PKEY_TLS1_PRF, 0)) != NULL)
+    if((_scossl_pkey_tls1_prf = EVP_PKEY_meth_new(EVP_PKEY_TLS1_PRF, 0)) != NULL)
     {
         // Use the default ctrl_str implementation, internally calls our ctrl method
         EVP_PKEY_meth_get_ctrl(_openssl_pkey_tls1_prf, &pctrl, &pctrl_str);
 
-        EVP_PKEY_meth_set_init(_sc_ossl_pkey_tls1_prf, sc_ossl_tls1prf_init);
-        EVP_PKEY_meth_set_cleanup(_sc_ossl_pkey_tls1_prf, sc_ossl_tls1prf_cleanup);
-        EVP_PKEY_meth_set_derive(_sc_ossl_pkey_tls1_prf, sc_ossl_tls1prf_derive_init, sc_ossl_tls1prf_derive);
-        EVP_PKEY_meth_set_ctrl(_sc_ossl_pkey_tls1_prf, sc_ossl_tls1prf_ctrl, pctrl_str);
+        EVP_PKEY_meth_set_init(_scossl_pkey_tls1_prf, scossl_tls1prf_init);
+        EVP_PKEY_meth_set_cleanup(_scossl_pkey_tls1_prf, scossl_tls1prf_cleanup);
+        EVP_PKEY_meth_set_derive(_scossl_pkey_tls1_prf, scossl_tls1prf_derive_init, scossl_tls1prf_derive);
+        EVP_PKEY_meth_set_ctrl(_scossl_pkey_tls1_prf, scossl_tls1prf_ctrl, pctrl_str);
     }
-    return _sc_ossl_pkey_tls1_prf;
+    return _scossl_pkey_tls1_prf;
 }
 
 static const EVP_PKEY_METHOD *_openssl_pkey_hkdf = NULL;
-static EVP_PKEY_METHOD *_sc_ossl_pkey_hkdf = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_hkdf = NULL;
 
 // Creates and returns the internal HKDF method structure holding methods for HKDF functions
-static EVP_PKEY_METHOD *sc_ossl_pkey_hkdf(void)
+static EVP_PKEY_METHOD *scossl_pkey_hkdf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
 
-    if((_sc_ossl_pkey_hkdf = EVP_PKEY_meth_new(EVP_PKEY_HKDF, 0)) != NULL)
+    if((_scossl_pkey_hkdf = EVP_PKEY_meth_new(EVP_PKEY_HKDF, 0)) != NULL)
     {
         // Use the default ctrl_str implementation, internally calls our ctrl method
         EVP_PKEY_meth_get_ctrl(_openssl_pkey_hkdf, &pctrl, &pctrl_str);
 
-        EVP_PKEY_meth_set_init(_sc_ossl_pkey_hkdf, sc_ossl_hkdf_init);
-        EVP_PKEY_meth_set_cleanup(_sc_ossl_pkey_hkdf, sc_ossl_hkdf_cleanup);
-        EVP_PKEY_meth_set_derive(_sc_ossl_pkey_hkdf, sc_ossl_hkdf_derive_init, sc_ossl_hkdf_derive);
-        EVP_PKEY_meth_set_ctrl(_sc_ossl_pkey_hkdf, sc_ossl_hkdf_ctrl, pctrl_str);
+        EVP_PKEY_meth_set_init(_scossl_pkey_hkdf, scossl_hkdf_init);
+        EVP_PKEY_meth_set_cleanup(_scossl_pkey_hkdf, scossl_hkdf_cleanup);
+        EVP_PKEY_meth_set_derive(_scossl_pkey_hkdf, scossl_hkdf_derive_init, scossl_hkdf_derive);
+        EVP_PKEY_meth_set_ctrl(_scossl_pkey_hkdf, scossl_hkdf_ctrl, pctrl_str);
     }
-    return _sc_ossl_pkey_hkdf;
+    return _scossl_pkey_hkdf;
 }
 
 SCOSSL_STATUS scossl_pkey_methods_init_static()
 {
-    if( (sc_ossl_pkey_rsa() == NULL) ||
-        (sc_ossl_pkey_rsa_pss() == NULL) ||
-        (sc_ossl_pkey_tls1_prf() == NULL) ||
-        (sc_ossl_pkey_hkdf() == NULL) )
+    if( (scossl_pkey_rsa() == NULL) ||
+        (scossl_pkey_rsa_pss() == NULL) ||
+        (scossl_pkey_tls1_prf() == NULL) ||
+        (scossl_pkey_hkdf() == NULL) )
     {
-        return 0;
+        return SCOSSL_FAILURE;
     }
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 _Success_(return > 0)
-int sc_ossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
+int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
                                _Out_opt_ const int **nids, int nid)
 {
     int ok = 1;
@@ -218,19 +218,19 @@ int sc_ossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
     switch( nid )
     {
     case EVP_PKEY_RSA:
-        *pmeth = _sc_ossl_pkey_rsa;
+        *pmeth = _scossl_pkey_rsa;
         break;
     case EVP_PKEY_RSA_PSS:
-        *pmeth = _sc_ossl_pkey_rsa_pss;
+        *pmeth = _scossl_pkey_rsa_pss;
         break;
     case EVP_PKEY_TLS1_PRF:
-        *pmeth = _sc_ossl_pkey_tls1_prf;
+        *pmeth = _scossl_pkey_tls1_prf;
         break;
     case EVP_PKEY_HKDF:
-        *pmeth = _sc_ossl_pkey_hkdf;
+        *pmeth = _scossl_pkey_hkdf;
         break;
     default:
-        SC_OSSL_LOG_ERROR("NID %d not supported");
+        SCOSSL_LOG_ERROR("NID %d not supported");
         ok = 0;
         *pmeth = NULL;
         break;
@@ -238,20 +238,20 @@ int sc_ossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
     return ok;
 }
 
-void sc_ossl_destroy_pkey_methods(void)
+void scossl_destroy_pkey_methods(void)
 {
     // It seems that explicitly freeing these methods in the destroy method causes a double free
     // (seen in SslPlay with sanitizers on, or in OpenSSL applications using the engine)
     // For now just don't free these methods here, but keep an eye out for memory leaks
 
-    // EVP_PKEY_meth_free(_sc_ossl_pkey_hkdf);
-    // EVP_PKEY_meth_free(_sc_ossl_pkey_tls1_prf);
-    // EVP_PKEY_meth_free(_sc_ossl_pkey_rsa_pss);
-    // EVP_PKEY_meth_free(_sc_ossl_pkey_rsa);
-    _sc_ossl_pkey_hkdf = NULL;
-    _sc_ossl_pkey_tls1_prf = NULL;
-    _sc_ossl_pkey_rsa_pss = NULL;
-    _sc_ossl_pkey_rsa = NULL;
+    // EVP_PKEY_meth_free(_scossl_pkey_hkdf);
+    // EVP_PKEY_meth_free(_scossl_pkey_tls1_prf);
+    // EVP_PKEY_meth_free(_scossl_pkey_rsa_pss);
+    // EVP_PKEY_meth_free(_scossl_pkey_rsa);
+    _scossl_pkey_hkdf = NULL;
+    _scossl_pkey_tls1_prf = NULL;
+    _scossl_pkey_rsa_pss = NULL;
+    _scossl_pkey_rsa = NULL;
     _openssl_pkey_hkdf = NULL;
     _openssl_pkey_tls1_prf = NULL;
     _openssl_pkey_rsa_pss = NULL;
