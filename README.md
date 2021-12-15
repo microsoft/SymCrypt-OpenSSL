@@ -1,17 +1,47 @@
-# SymCrypt Engine for OpenSSL
+# SCOSSL - The SymCrypt engine for OpenSSL
 
-The SymCrypt Engine for OpenSSL allows the use of OpenSSL with [SymCrypt](https://github.com/Microsoft/SymCrypt) as the provider for core cryptographic operations. It leverages the [OpenSSL engine interface](https://www.openssl.org/docs/man1.0.2/man3/engine.html) to override the cryptographic implementations in OpenSSL's libcrypto.so with SymCrypt's implementations. The primary motivation for this is to support FIPS certification, as vanilla OpenSSL 1.1.1 does not have a FIPS-certified cryptographic module.
+The SymCrypt engine for OpenSSL (SCOSSL) allows the use of OpenSSL with [SymCrypt](https://github.com/Microsoft/SymCrypt) as the provider
+for core cryptographic operations. It leverages the [OpenSSL engine interface](https://www.openssl.org/docs/man1.0.2/man3/engine.html) to
+override the cryptographic implementations in OpenSSL's libcrypto.so with SymCrypt's implementations. The primary motivation for this is to
+support FIPS certification, as vanilla OpenSSL 1.1.1 does not have a FIPS-certified cryptographic module.
 
-Where possible the SymCrypt engine will direct OpenSSL API calls to the SymCrypt module. In cases where SymCrypt cannot (currently) support an OpenSSL
-API, the best effort is made to fall-back to the default OpenSSL implementation of the given function. In a few cases the engine will instead fail the
-call completely, as re-routing to OpenSSL's implementation is not always easy, and as with any project we have to prioritize!
+Where possible the SCOSSL will direct OpenSSL API calls to the SymCrypt FIPS module. In cases where SymCrypt cannot (currently) support an
+OpenSSL API, the best effort is made to fall-back to the default OpenSSL implementation of the given function. In a few cases the engine
+will instead fail the call completely, as re-routing to OpenSSL's implementation is not always easy, and as with any project we have to
+prioritize!
 
-The known cases where the Engine will currently fail rather than fallback to the default OpenSSL implementation are:
+**Important note:** The code in this repository is currently undergoing validation for use in Microsoft-internal products. At this time, it
+has not been tested for use in other environments and should not be considered production-ready.
+
+## Algorithms that will be routed to a FIPS certifiable SymCrypt module with this version
+
+The following list is not necessarily exhaustive, and will be updated as more functionality is added to SCOSSL.
+Note that just because an algorithm is FIPS certifiable, does not mean it is recommended for use.
+
+ + Key derivation
+   + HKDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
+   + TLS 1.2 KDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
+ + Key Agreement
+   + ECDH (P256, P384, P521)
+   + Finite Field DH (ffdhe2048, ffdhe3072, ffdhe4096, modp2048, modp3072, modp4096)
+ + Hashing
+   + SHA-1
+   + SHA2-256
+   + SHA2-384
+   + SHA2-512
+ + Symmetric
+   + AES (128, 192, 256)
+     + CBC, CCM, ECB, GCM
+ + Asymmetric
+   + RSA (2048, 3072, 4096)
+     + PKCS1, OAEP, PSS
+   + ECDSA (P256, P384, P521)
+
+## Known cases where SCOSSL will fail rather than fallback to default OpenSSL
+
 1. Use of an AES-GCM IV which is not 12-bytes (192-bits)
 2. Use of unsupported digests in RSA signatures and TLS PRF
 3. Use of multi-prime (more than 2-prime) RSA
-
-**Important note:** The code in this repository is currently undergoing validation for use in Microsoft-internal products. At this time, it has not been tested for use in other environments and should not be considered production-ready.
 
 # Building Instructions
 ## Compilation Instructions
