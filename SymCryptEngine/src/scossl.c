@@ -172,6 +172,11 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
         goto end;
     }
 
+    // Also set our engine as the global default for ECC/RSA so that other engines which call through
+    // the default methods will call into our methods
+    RSA_set_default_method(ENGINE_get_RSA(e));
+    EC_KEY_set_default_method(ENGINE_get_EC(e));
+
     // Initialize hidden static variables once at Engine load time
     if(    !scossl_ecc_init_static()
         || !scossl_dh_init_static()
