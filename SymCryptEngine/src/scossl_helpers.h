@@ -29,14 +29,20 @@ void* SCOSSL_ENGINE_zalloc(size_t num);
 void* SCOSSL_ENGINE_realloc(void *mem, size_t num);
 void SCOSSL_ENGINE_free(void *mem);
 
+void SCOSSL_ENGINE_setup_ERR();
+
 void _scossl_log(
     int trace_level,
     const char *func,
+    const char *file,
+    int line,
     const char *format, ...);
 
 void _scossl_log_bytes(
     int trace_level,
     const char *func,
+    const char *file,
+    int line,
     char *description,
     const char *s,
     int len);
@@ -44,40 +50,44 @@ void _scossl_log_bytes(
 void _scossl_log_bignum(
     int trace_level,
     const char *func,
+    const char *file,
+    int line,
     char *description,
     BIGNUM *bn);
 
 void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     const char *func,
+    const char *file,
+    int line,
     char *description,
     SYMCRYPT_ERROR scError);
 
 // Enable debug and info messages in debug builds, but compile them out in release builds
 #if DBG
     #define SCOSSL_LOG_DEBUG(...) \
-        _scossl_log(SCOSSL_LOG_LEVEL_DEBUG, __func__, __VA_ARGS__)
+        _scossl_log(SCOSSL_LOG_LEVEL_DEBUG, __func__, __FILE__, __LINE__, __VA_ARGS__)
 
     #define SCOSSL_LOG_INFO(...) \
-        _scossl_log(SCOSSL_LOG_LEVEL_INFO, __func__, __VA_ARGS__)
+        _scossl_log(SCOSSL_LOG_LEVEL_INFO, __func__, __FILE__, __LINE__, __VA_ARGS__)
 
     #define SCOSSL_LOG_BYTES_DEBUG(description, s, len) \
-        _scossl_log_bytes(SCOSSL_LOG_LEVEL_DEBUG, __func__, description, (const char*) s, len)
+        _scossl_log_bytes(SCOSSL_LOG_LEVEL_DEBUG, __func__, __FILE__, __LINE__, description, (const char*) s, len)
 
     #define SCOSSL_LOG_BYTES_INFO(description, s, len) \
-        _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, __func__, description, (const char*) s, len)
+        _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, __func__, __FILE__, __LINE__, description, (const char*) s, len)
 
     #define SCOSSL_LOG_BIGNUM_DEBUG(description, bn) \
-        _scossl_log_bignum(SCOSSL_LOG_LEVEL_DEBUG, __func__, description, bn)
+        _scossl_log_bignum(SCOSSL_LOG_LEVEL_DEBUG, __func__, __FILE__, __LINE__, description, bn)
 
     #define SCOSSL_LOG_BIGNUM_INFO(description, s, len) \
-        _scossl_log_bignum(SCOSSL_LOG_LEVEL_INFO, __func__, description, bn)
+        _scossl_log_bignum(SCOSSL_LOG_LEVEL_INFO, __func__, __FILE__, __LINE__, description, bn)
 
     #define SCOSSL_LOG_SYMCRYPT_DEBUG(description, scError) \
-        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_DEBUG, __func__, description, scError)
+        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_DEBUG, __func__, __FILE__, __LINE__, description, scError)
 
     #define SCOSSL_LOG_SYMCRYPT_INFO(description, scError) \
-        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_INFO, __func__, description, scError)
+        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_INFO, __func__, __FILE__, __LINE__, description, scError)
 #else
     #define SCOSSL_LOG_DEBUG(...)
     #define SCOSSL_LOG_INFO(...)
@@ -90,16 +100,16 @@ void _scossl_log_SYMCRYPT_ERROR(
 #endif
 
 #define SCOSSL_LOG_ERROR(...) \
-    _scossl_log(SCOSSL_LOG_LEVEL_ERROR, __FUNCTION__, __VA_ARGS__)
+    _scossl_log(SCOSSL_LOG_LEVEL_ERROR, __func__, __FILE__, __LINE__, __VA_ARGS__)
 
 #define SCOSSL_LOG_BYTES_ERROR(description, s, len) \
-    _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, (const char*) s, len)
+    _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, __func__, __FILE__, __LINE__, description, (const char*) s, len)
 
 #define SCOSSL_LOG_BIGNUM_ERROR(description, s, len) \
-    _scossl_log_bignum(SCOSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, bn)
+    _scossl_log_bignum(SCOSSL_LOG_LEVEL_ERROR, __func__, __FILE__, __LINE__, description, bn)
 
 #define SCOSSL_LOG_SYMCRYPT_ERROR(description, scError) \
-    _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, __FUNCTION__, description, scError)
+    _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, __func__, __FILE__, __LINE__, description, scError)
 
 #ifdef __cplusplus
 }
