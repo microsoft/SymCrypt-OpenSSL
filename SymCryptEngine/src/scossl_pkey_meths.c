@@ -50,12 +50,31 @@ static int scossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*s
     return _openssl_pkey_rsa_sign(ctx, sig, siglen, tbs, tbslen);
 }
 
+// Call SymCrypt engine RSA-PSS verify, unless auto salt-length specified (not yet supported by SymCrypt)
+static int scossl_pkey_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                      _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    int cbSalt = RSA_PSS_SALTLEN_DIGEST;
+
+    if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
+    {
+        SCOSSL_LOG_ERROR("Failed to get cbSalt");
+        return SCOSSL_UNSUPPORTED;
+    }
+    if( cbSalt != RSA_PSS_SALTLEN_AUTO )
+    {
+        return scossl_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
+    }
+    SCOSSL_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
+
+    return _openssl_pkey_rsa_verify(ctx, sig, siglen, tbs, tbslen);
+}
+
 // Call SymCrypt engine verify if PSS padding, otherwise OpenSSL version.
 static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                     _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int padding;
-    int cbSalt = RSA_PSS_SALTLEN_DIGEST;
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
@@ -65,17 +84,7 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
 
     if( padding == RSA_PKCS1_PSS_PADDING )
     {
-        if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
-        {
-            SCOSSL_LOG_ERROR("Failed to get cbSalt");
-            return SCOSSL_UNSUPPORTED;
-        }
-        if( cbSalt != RSA_PSS_SALTLEN_AUTO )
-        {
-
-            return scossl_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
-        }
-        SCOSSL_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
+        return scossl_pkey_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
     }
 
     return _openssl_pkey_rsa_verify(ctx, sig, siglen, tbs, tbslen);
@@ -132,7 +141,7 @@ static EVP_PKEY_METHOD *scossl_pkey_rsa_pss(void)
         EVP_PKEY_meth_get_verify(_scossl_pkey_rsa_pss, &pverify_init, &pverify);
 
         EVP_PKEY_meth_set_sign(_scossl_pkey_rsa_pss, psign_init, scossl_rsapss_sign);
-        EVP_PKEY_meth_set_verify(_scossl_pkey_rsa_pss, pverify_init, scossl_rsapss_verify);
+        EVP_PKEY_meth_set_verify(_scossl_pkey_rsa_pss, pverify_init, scossl_pkey_rsapss_verify);
     }
     return _scossl_pkey_rsa_pss;
 }
