@@ -27,7 +27,8 @@ SCOSSL_STATUS scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
-        SCOSSL_LOG_ERROR("Memory Allocation Error");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_INIT, ERR_R_MALLOC_FAILURE,
+            "OPENSSL_zalloc return NULL");
         return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
@@ -76,7 +77,8 @@ SCOSSL_STATUS scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _
         key_context->seed_length += p1;
         return SCOSSL_SUCCESS;
     default:
-        SCOSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support ctrl type (%d)", type);
         return SCOSSL_UNSUPPORTED;
     }
 }
@@ -90,8 +92,7 @@ SCOSSL_STATUS scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(
-    const EVP_MD *evp_md)
+static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
 {
     int type = EVP_MD_type(evp_md);
 
@@ -105,7 +106,8 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(
         return SymCryptHmacSha512Algorithm;
     // if (type == NID_AES_CMC)
     //     return SymCryptAesCmacAlgorithm;
-    SCOSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
@@ -117,19 +119,22 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     if (key_context->md == NULL) {
-        SCOSSL_LOG_ERROR("Missing Digest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
     if (key_context->secret == NULL) {
-        SCOSSL_LOG_ERROR("Missing Secret");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Secret");
         return SCOSSL_FAILURE;
     }
 
     if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
-        SCOSSL_LOG_INFO("Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         scError = SymCryptTlsPrf1_1(
             key_context->secret,
             key_context->secret_length,
@@ -162,7 +167,8 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptTlsPrf1_2 failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptTlsPrf1_x failed", scError);
         return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;

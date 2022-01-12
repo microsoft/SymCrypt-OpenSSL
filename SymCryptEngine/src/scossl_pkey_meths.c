@@ -38,7 +38,8 @@ static int scossl_pkey_rsa_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_bytes_(*s
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get padding");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_RSA_SIGN, ERR_R_OPERATION_FAIL,
+            "Failed to get padding");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -59,7 +60,8 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
 
     if( EVP_PKEY_CTX_get_rsa_padding(ctx, &padding) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get padding");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_RSA_VERIFY, ERR_R_OPERATION_FAIL,
+            "Failed to get padding");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -67,7 +69,8 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
     {
         if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
         {
-            SCOSSL_LOG_ERROR("Failed to get cbSalt");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_RSA_VERIFY, ERR_R_OPERATION_FAIL,
+                "Failed to get cbSalt");
             return SCOSSL_UNSUPPORTED;
         }
         if( cbSalt != RSA_PSS_SALTLEN_AUTO )
@@ -75,7 +78,8 @@ static int scossl_pkey_rsa_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(si
 
             return scossl_rsapss_verify(ctx, sig, siglen, tbs, tbslen);
         }
-        SCOSSL_LOG_INFO("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_PKEY_RSA_VERIFY, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+            "SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen - falling back to OpenSSL");
     }
 
     return _openssl_pkey_rsa_verify(ctx, sig, siglen, tbs, tbslen);
@@ -230,7 +234,8 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
         *pmeth = _scossl_pkey_hkdf;
         break;
     default:
-        SCOSSL_LOG_ERROR("NID %d not supported");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_METHODS, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "NID %d not supported");
         ok = 0;
         *pmeth = NULL;
         break;

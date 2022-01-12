@@ -689,7 +689,8 @@ SCOSSL_RETURNLENGTH scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
     {
         if( (inl % SYMCRYPT_AES_BLOCK_SIZE) != 0 )
         {
-            SCOSSL_LOG_ERROR("Data length (%d) is not a multiple of the AES block size. SymCrypt does not support this size", inl);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_XTS_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
+                "Data length (%d) is not a multiple of the AES block size. SymCrypt does not support this size", inl);
             return -1;
         }
 
@@ -736,7 +737,8 @@ static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
         // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
         // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
         // to itself, so a plain memcpy will maintain pointers to the source context
-        SCOSSL_LOG_ERROR("No copy method currently implemented");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_XTS_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "No copy method currently implemented");
         // We need a SymCryptXtsKeyCopy function for this as we don't have explicit control over the AES key
         // struct here
         // srcCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(                  ctx);
@@ -797,22 +799,26 @@ static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ const EVP_CIPHER_CTX *ctx, _I
     // plaintext starting 8B from the start of the buffer and ending 16B from the end
     if( in != out )
     {
-        SCOSSL_LOG_ERROR("AES-GCM TLS does not support out-of-place operation");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-GCM TLS does not support out-of-place operation");
         goto cleanup;
     }
     if( inl < EVP_GCM_TLS_EXPLICIT_IV_LEN + EVP_GCM_TLS_TAG_LEN )
     {
-        SCOSSL_LOG_ERROR("AES-GCM TLS buffer too small");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-GCM TLS buffer too small");
         goto cleanup;
     }
     if( cipherCtx->operationInProgress )
     {
-        SCOSSL_LOG_ERROR("AES-GCM TLS operation cannot be multi-stage");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-GCM TLS operation cannot be multi-stage");
         goto cleanup;
     }
     if( cipherCtx->taglen != EVP_GCM_TLS_TAG_LEN )
     {
-        SCOSSL_LOG_ERROR("AES-GCM TLS taglen must be %d", EVP_GCM_TLS_TAG_LEN);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-GCM TLS taglen must be %d", EVP_GCM_TLS_TAG_LEN);
         goto cleanup;
     }
 
@@ -962,14 +968,14 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         // SymCrypt currently only supports SCOSSL_GCM_IV_LENGTH
         if( arg != SCOSSL_GCM_IV_LENGTH )
         {
-            SCOSSL_LOG_ERROR("SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         break;
     case EVP_CTRL_AEAD_SET_TAG:
         if( arg < SCOSSL_GCM_MIN_TAG_LENGTH || arg > SCOSSL_GCM_MAX_TAG_LENGTH || EVP_CIPHER_CTX_encrypting(ctx) )
         {
-            SCOSSL_LOG_ERROR("Set tag error");
             return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tag, ptr, arg);
@@ -979,7 +985,6 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         if( arg < SCOSSL_GCM_MIN_TAG_LENGTH || arg > SCOSSL_GCM_MAX_TAG_LENGTH ||
             arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
-            SCOSSL_LOG_ERROR("Get tag error");
             return SCOSSL_FAILURE;
         }
         memcpy(ptr, cipherCtx->tag, arg);
@@ -996,7 +1001,8 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_GCM_SET_IV_FIXED:
         if( cipherCtx->ivlen != EVP_GCM_TLS_IV_LEN )
         {
-            SCOSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "set_iv_fixed only works with TLS IV length");
             return SCOSSL_FAILURE;
         }
         if( arg == -1 )
@@ -1006,7 +1012,8 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         if( arg != cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN )
         {
-            SCOSSL_LOG_ERROR("set_iv_fixed incorrect length");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "set_iv_fixed incorrect length");
             return SCOSSL_FAILURE;
         }
         // Set first 4B of IV to ptr value
@@ -1021,7 +1028,8 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
         {
-            SCOSSL_LOG_ERROR("Set tlsAad error");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "tls1_aad only works with TLS1 AAD length");
             return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tlsAad, ptr, EVP_AEAD_TLS1_AAD_LEN);
@@ -1041,7 +1049,8 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
         if( tls_buffer_len < min_tls_buffer_len )
         {
-            SCOSSL_LOG_ERROR("tls_buffer_len too short");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "tls_buffer_len too short");
             return SCOSSL_FAILURE;
         }
         tls_buffer_len -= min_tls_buffer_len;
@@ -1049,7 +1058,8 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
 
         return EVP_GCM_TLS_TAG_LEN; // <-- Special case return
     default:
-        SCOSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support control type (%d)", type);
         return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;
@@ -1101,27 +1111,32 @@ static SCOSSL_RETURNLENGTH scossl_aes_ccm_tls(_In_ const EVP_CIPHER_CTX *ctx, _I
     // plaintext starting 8B from the start of the buffer and ending 8 or 16B from the end
     if( in != out )
     {
-        SCOSSL_LOG_ERROR("AES-CCM TLS does not support out-of-place operation");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-CCM TLS does not support out-of-place operation");
         goto cleanup;
     }
     if( inl < (SIZE_T) EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherCtx->taglen )
     {
-        SCOSSL_LOG_ERROR("AES-CCM TLS buffer too small");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-CCM TLS buffer too small");
         goto cleanup;
     }
     if( cipherCtx->ccmStage != SCOSSL_CCM_STAGE_INIT )
     {
-        SCOSSL_LOG_ERROR("AES-CCM TLS operation cannot be multi-stage");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-CCM TLS operation cannot be multi-stage");
         goto cleanup;
     }
     if( cipherCtx->ivlen != EVP_CCM_TLS_IV_LEN )
     {
-        SCOSSL_LOG_ERROR("AES-CCM TLS operation with incorrect IV length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-CCM TLS operation with incorrect IV length");
         goto cleanup;
     }
     if( cipherCtx->taglen != EVP_CCM_TLS_TAG_LEN && cipherCtx->taglen != EVP_CCM8_TLS_TAG_LEN )
     {
-        SCOSSL_LOG_ERROR("AES-CCM TLS operation with incorrect tag length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+            "AES-CCM TLS operation with incorrect tag length");
         goto cleanup;
     }
 
@@ -1213,7 +1228,8 @@ SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
         }
         else
         {
-            SCOSSL_LOG_ERROR("Data provided to CCM after CCM operation is complete");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
+                "Data provided to CCM after CCM operation is complete");
             goto cleanup;
         }
     }
@@ -1222,7 +1238,8 @@ SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
     {
         if( in != NULL && out == NULL )
         {
-            SCOSSL_LOG_ERROR("AAD provided to CCM before cbData has been set");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
+                "AAD provided to CCM before cbData has been set");
             goto cleanup;
         }
 
@@ -1328,7 +1345,9 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_AEAD_SET_IVLEN:
         if( arg < SCOSSL_CCM_MIN_IV_LENGTH || arg > SCOSSL_CCM_MAX_IV_LENGTH )
         {
-            SCOSSL_LOG_ERROR("SymCrypt Engine only supports [%d-%d] byte IVs for AES-CCM", SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "SymCrypt Engine only supports [%d-%d] byte IVs for AES-CCM",
+                SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         cipherCtx->ivlen = arg;
@@ -1337,7 +1356,6 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         if( (arg & 1) || arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH ||
             (EVP_CIPHER_CTX_encrypting(ctx) && ptr != NULL) )
         {
-            SCOSSL_LOG_ERROR("Set tag error");
             return SCOSSL_FAILURE;
         }
         if( ptr != NULL )
@@ -1350,7 +1368,6 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         if( (arg & 1) || arg < SCOSSL_CCM_MIN_TAG_LENGTH || arg > SCOSSL_CCM_MAX_TAG_LENGTH ||
             arg > cipherCtx->taglen || !EVP_CIPHER_CTX_encrypting(ctx) )
         {
-            SCOSSL_LOG_ERROR("Get tag error");
             return SCOSSL_FAILURE;
         }
         memcpy(ptr, cipherCtx->tag, arg);
@@ -1369,7 +1386,8 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_CCM_SET_IV_FIXED:
         if( cipherCtx->ivlen != EVP_CCM_TLS_IV_LEN )
         {
-            SCOSSL_LOG_ERROR("set_iv_fixed only works with TLS IV length");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "set_iv_fixed only works with TLS IV length");
             return SCOSSL_FAILURE;
         }
         if( arg == -1 )
@@ -1379,7 +1397,8 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         if( arg != cipherCtx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN )
         {
-            SCOSSL_LOG_ERROR("set_iv_fixed incorrect length");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "set_iv_fixed incorrect length");
             return SCOSSL_FAILURE;
         }
         // Set first 4B of IV to ptr value
@@ -1394,12 +1413,14 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
         {
-            SCOSSL_LOG_ERROR("Set tlsAad error");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "tls1_aad only works with TLS1 AAD length");
             return SCOSSL_FAILURE;
         }
         if( cipherCtx->taglen != EVP_CCM_TLS_TAG_LEN && cipherCtx->taglen != EVP_CCM8_TLS_TAG_LEN )
         {
-            SCOSSL_LOG_ERROR("Invalid taglen for TLS");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "Invalid taglen for TLS");
             return SCOSSL_FAILURE;
         }
         memcpy(cipherCtx->tlsAad, ptr, EVP_AEAD_TLS1_AAD_LEN);
@@ -1419,7 +1440,8 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(cipherCtx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
         if( tls_buffer_len < min_tls_buffer_len )
         {
-            SCOSSL_LOG_ERROR("tls_buffer_len too short");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                "tls_buffer_len too short");
             return SCOSSL_FAILURE;
         }
         tls_buffer_len -= min_tls_buffer_len;
@@ -1427,7 +1449,8 @@ static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
 
         return cipherCtx->taglen;
     default:
-        SCOSSL_LOG_ERROR("SymCrypt Engine does not support control type (%d)", type);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support control type (%d)", type);
         return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;

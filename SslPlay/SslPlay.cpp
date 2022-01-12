@@ -40,12 +40,12 @@ const char SeparatorLine[] = "--------------------------------------------------
 
 void printBytes(char* data, int len, const char* header)
 {
-     printf("\n%s (%d bytes): ", header, len);
+    printf("\n%s (%d bytes): ", header, len);
     for (int i = 0; i < len; i++)
     {
          printf("%X",data[i]);
     }
-     printf("\n\n");
+    printf("\n\n");
 }
 
 // Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
@@ -989,7 +989,8 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING);
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_PKCS1_OAEP_PADDING", RSA_PKCS1_OAEP_PADDING);
-    TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_SSLV23_PADDING", RSA_SSLV23_PADDING);
+    // SSLV23 fails with sslv3 rollback attack in OpenSSL 1.1.1n-dev
+    // TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_SSLV23_PADDING", RSA_SSLV23_PADDING);
     TestRsaEncryptDecrypt(publicKey, privateKey, "RSA_NO_PADDING", RSA_NO_PADDING);
     printf("%s", SeparatorLine);
 
