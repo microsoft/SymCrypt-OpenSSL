@@ -27,7 +27,8 @@ SCOSSL_STATUS scossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SCOSSL_HKDF_PKEY_CTX *scossl_hkdf_context;
     if ((scossl_hkdf_context = OPENSSL_zalloc(sizeof(*scossl_hkdf_context))) == NULL) {
-        SCOSSL_LOG_ERROR("Memory Allocation Error");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_INIT, ERR_R_MALLOC_FAILURE,
+            "OPENSSL_zalloc returned NULL");
         return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, scossl_hkdf_context);
@@ -92,7 +93,8 @@ SCOSSL_STATUS scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         scossl_hkdf_context->info_len += p1;
         return SCOSSL_SUCCESS;
     default:
-        SCOSSL_LOG_ERROR("SymCrypt Engine does not support ctrl type (%d)", type);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support ctrl type (%d)", type);
         return SCOSSL_UNSUPPORTED;
     }
 }
@@ -218,7 +220,8 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm( _In_ const EVP_MD *evp_
         return SymCryptHmacSha512Algorithm;
     // if (type == NID_AES_CMC)
     //     return SymCryptAesCmacAlgorithm;
-    SCOSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
@@ -231,12 +234,14 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
     // SYMCRYPT_HKDF_EXPANDED_KEY  scExpandedKey;
 
     if (scossl_hkdf_context->md == NULL) {
-        SCOSSL_LOG_ERROR("Missing Digest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Digest");
         return SCOSSL_FAILURE;
     }
     scossl_mac_algo = scossl_get_symcrypt_mac_algorithm(scossl_hkdf_context->md);
     if (scossl_hkdf_context->key == NULL) {
-        SCOSSL_LOG_ERROR("Missing Key");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Key");
         return SCOSSL_FAILURE;
     }
 
@@ -261,7 +266,8 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         }
         else
         {
-            SCOSSL_LOG_INFO("SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(scossl_hkdf_context->md));
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+                "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(scossl_hkdf_context->md));
 
             return HKDF(
                 scossl_hkdf_context->md,
@@ -288,7 +294,8 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         //     scossl_hkdf_context->salt_len);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SCOSSL_LOG_SYMCRYPT_DEBUG("SymCryptHkdfExpandKey failed", scError);
+        //     SCOSSL_LOG_SYMCRYPT_DEBUG(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        //         "SymCryptHkdfExpandKey failed", scError);
         //     return SCOSSL_FAILURE;
         // }
 
@@ -316,7 +323,8 @@ SCOSSL_STATUS scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*ke
         //                     *keylen);
         // if (SymCryptError != SYMCRYPT_NO_ERROR)
         // {
-        //     SCOSSL_LOG_SYMCRYPT_DEBUG("SymCryptHkdfExpandKey failed", scError);
+        //     SCOSSL_LOG_SYMCRYPT_DEBUG(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        //         "SymCryptHkdfExpandKey failed", scError);
         //     return SCOSSL_FAILURE;
         // }
         // return SCOSSL_SUCCESS;

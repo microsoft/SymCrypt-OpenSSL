@@ -22,7 +22,8 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
         return SymCryptSha384Algorithm;
     if (type == NID_sha512)
         return SymCryptSha512Algorithm;
-    SCOSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt engine does not support Mac algorithm %d", type);
     return NULL;
 }
 
@@ -38,7 +39,8 @@ static size_t scossl_get_expected_tbs_length(int type)
         return 48;
     if (type == NID_sha512)
         return 64;
-    SCOSSL_LOG_ERROR("SymCrypt engine does not support Mac algorithm %d", type);
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt engine does not support Mac algorithm %d", type);
     return -1;
 }
 
@@ -61,32 +63,37 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get messageDigest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+            "Failed to get messageDigest");
         return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get mgf1Digest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+            "Failed to get mgf1Digest");
         return SCOSSL_UNSUPPORTED;
     }
     type = EVP_MD_type(messageDigest);
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
-        SCOSSL_LOG_ERROR("messageDigest and mgf1Digest do not match");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "messageDigest and mgf1Digest do not match");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
-        SCOSSL_LOG_ERROR("Failed to get RSA key from ctx");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "Failed to get RSA key from ctx");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get cbSalt");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+            "Failed to get cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -100,14 +107,16 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     }
     else if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
     {
-        SCOSSL_LOG_ERROR("Invalid cbSalt");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_INVALID_ARGUMENT,
+            "Invalid cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
     keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
@@ -134,18 +143,21 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     expectedTbsLength = scossl_get_expected_tbs_length(type);
     if( !scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
-        SCOSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "Unknown type: %d. Size: %d.", type, tbslen);
         goto cleanup;
     }
 
     // Log warnings for algorithms that aren't FIPS compliant
     if( type == NID_md5 )
     {
-        SCOSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using Mac algorithm MD5 which is not FIPS compliant");
     }
     else if( type == NID_sha1 )
     {
-        SCOSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
     if( tbslen != expectedTbsLength )
@@ -166,7 +178,8 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
                 &cbResult);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPssSign failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptRsaPssSign failed", scError);
         goto cleanup;
     }
 
@@ -194,32 +207,37 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get messageDigest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+            "Failed to get messageDigest");
         return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get mgf1Digest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+            "Failed to get mgf1Digest");
         return SCOSSL_UNSUPPORTED;
     }
     type = EVP_MD_type(messageDigest);
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
-        SCOSSL_LOG_ERROR("messageDigest and mgf1Digest do not match");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "messageDigest and mgf1Digest do not match");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
-        SCOSSL_LOG_ERROR("Failed to get RSA key from ctx");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "Failed to get RSA key from ctx");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
-        SCOSSL_LOG_ERROR("Failed to get cbSalt");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+            "Failed to get cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -233,19 +251,22 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     }
     else if ( cbSalt == RSA_PSS_SALTLEN_AUTO )
     {
-        SCOSSL_LOG_ERROR("SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
         return SCOSSL_UNSUPPORTED;
     }
     else if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
     {
-        SCOSSL_LOG_ERROR("Invalid cbSalt");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_PASSED_INVALID_ARGUMENT,
+            "Invalid cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
     keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR("SymCrypt Context Not Found.");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "SymCrypt Context Not Found.");
         goto cleanup;
     }
     if( keyCtx->initialized == 0 )
@@ -267,18 +288,21 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     expectedTbsLength = scossl_get_expected_tbs_length(type);
     if( !scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
-        SCOSSL_LOG_ERROR("Unknown type: %d. Size: %d.", type, tbslen);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "Unknown type: %d. Size: %d.", type, tbslen);
         goto cleanup;
     }
 
     // Log warnings for algorithms that aren't FIPS compliant
     if( type == NID_md5 )
     {
-        SCOSSL_LOG_INFO("Using Mac algorithm MD5 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using Mac algorithm MD5 which is not FIPS compliant");
     }
     else if( type == NID_sha1 )
     {
-        SCOSSL_LOG_INFO("Using Mac algorithm SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
     if( tbslen != expectedTbsLength )
@@ -301,7 +325,8 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     {
         if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptRsaPssverify returned unexpected error", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptRsaPssVerify returned unexpected error", scError);
         }
         goto cleanup;
     }

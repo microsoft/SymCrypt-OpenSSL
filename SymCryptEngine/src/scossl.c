@@ -177,6 +177,9 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     RSA_set_default_method(ENGINE_get_RSA(e));
     EC_KEY_set_default_method(ENGINE_get_EC(e));
 
+    // Register the Engine as a source of OpenSSL errors
+    SCOSSL_ENGINE_setup_ERR();
+
     // Initialize hidden static variables once at Engine load time
     if(    !scossl_ecc_init_static()
         || !scossl_dh_init_static()
