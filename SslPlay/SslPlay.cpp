@@ -654,6 +654,15 @@ void TestRsaDigestSignVerify(
         //     goto end;
         // }
     }
+    if (padding == RSA_PKCS1_PSS_PADDING)
+    {
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSigningKeyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        {
+            handleOpenSSLError("");
+            goto end;
+        }
+    }
 
     printf("Command EVP_DigestSignUpdate\n");
     if (EVP_DigestSignUpdate(RSASignCtx, message, message_len) <= 0) {
@@ -702,6 +711,15 @@ void TestRsaDigestSignVerify(
         //     printOpenSSLError("");
         //     goto end;
         // }
+    }
+    if (padding == RSA_PKCS1_PSS_PADDING)
+    {
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerificationKeyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        {
+            handleOpenSSLError("");
+            goto end;
+        }
     }
     printf("Command EVP_DigestVerifyUpdate\n");
     if (EVP_DigestVerifyUpdate(RSAVerifyCtx, message, message_len) <= 0) {
@@ -1016,7 +1034,10 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha256", EVP_sha256());
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha384", EVP_sha384());
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512());
+    printf("%s", SeparatorLine);
 
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
     printf("%s", SeparatorLine);
 
     //
