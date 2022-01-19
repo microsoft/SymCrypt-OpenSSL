@@ -3,6 +3,7 @@
 //
 
 #include <openssl/err.h>
+#include <openssl/crypto.h>
 #include "scossl_helpers.h"
 #include <string.h>
 
@@ -18,6 +19,11 @@ extern "C" {
 
 static int _traceLogLevel = SCOSSL_LOG_LEVEL_INFO;
 static char *_traceLogFilename = NULL;
+static FILE *_traceLogFile = NULL;
+
+// Lock around writing information to stderr/log file/OpenSSL ERR handling framework to avoid
+// muddled error messages in multi-threaded environment
+static CRYPTO_RWLOCK *_loggingLock;
 
 static int _scossl_err_library_code = 0;
 
@@ -103,6 +109,9 @@ void SCOSSL_ENGINE_setup_ERR()
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_library_string);
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_function_strings);
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_reason_strings);
+
+        _loggingLock = CRYPTO_THREAD_lock_new();
+        SCOSSL_ENGINE_set_trace_log_filename(NULL);
     }
 }
 
@@ -123,45 +132,37 @@ void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
         OPENSSL_free(_traceLogFilename);
     }
     _traceLogFilename = OPENSSL_strdup(filename);
-    return;
-}
 
-static FILE *_open_trace_log_filename()
-{
-    FILE *fp = stderr;
 
-    if( _traceLogFilename != NULL )
+    if( CRYPTO_THREAD_write_lock(_loggingLock) )
     {
-        fp = fopen(_traceLogFilename, "a");
-        if( fp == NULL )
+        if( _traceLogFile != NULL && _traceLogFile != stderr )
         {
-            fp = stderr;
+            fflush(_traceLogFile);
+            fclose(_traceLogFile);
+        }
+        _traceLogFile = fopen(_traceLogFilename, "a");
+        if( _traceLogFile == NULL )
+        {
+            _traceLogFile = stderr;
         }
     }
-    return fp;
-}
-
-static void _close_trace_log_filename(FILE *fp)
-{
-    if( fp != stderr )
-    {
-        fflush(fp);
-        fclose(fp);
-    }
+    CRYPTO_THREAD_unlock(_loggingLock);
     return;
 }
 
-void _scossl_log(
+void _scossl_log_bytes(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
     SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
+    const char *s,
+    int len,
     const char *format, ...)
 {
     char errStringBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
     char paraBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
-    FILE *fp = NULL;
     va_list args;
     va_start(args, format);
     char *trace_level_prefix = "";
@@ -193,40 +194,40 @@ void _scossl_log(
         *paraBuf = '\0';
     }
 
-    // Log an OpenSSL error, so calling applications can handle the log appropriately
-    ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
-    // Add error string indicating the error details as error data
-    ERR_add_error_data(1, paraBuf);
+    if( CRYPTO_THREAD_write_lock(_loggingLock) )
+    {
+        // Log an OpenSSL error, so calling applications can handle the log appropriately
+        ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
+        // Add error string indicating the error details as error data
+        ERR_add_error_data(1, paraBuf);
 
-    // Log details to stderr or a log file
-    ERR_error_string_n(ERR_PACK(_scossl_err_library_code, func_code, reason_code), errStringBuf, sizeof(errStringBuf));
+        // Log details to stderr or a log file
+        ERR_error_string_n(ERR_PACK(_scossl_err_library_code, func_code, reason_code), errStringBuf, sizeof(errStringBuf));
 
-    fp = _open_trace_log_filename();
-    fprintf(fp, "[%s] %s:%s at %s, line %d\n", trace_level_prefix, errStringBuf, paraBuf, file, line);
-    _close_trace_log_filename(fp);
+        fprintf(_traceLogFile, "[%s] %s:%s at %s, line %d\n", trace_level_prefix, errStringBuf, paraBuf, file, line);
+        if( s )
+        {
+            fwrite(s, 1, len, _traceLogFile);
+        }
+    }
+    CRYPTO_THREAD_unlock(_loggingLock);
 
     return;
 }
 
-void _scossl_log_bytes(
+void _scossl_log(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
     SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
-    char *description,
-    const char *s,
-    int len)
+    const char *format, ...)
 {
-    if( _traceLogLevel < trace_level )
-    {
-        return;
-    }
-    FILE *fp = NULL;
-    _scossl_log(trace_level, func_code, reason_code, file, line, description);
-    fp = _open_trace_log_filename();
-    BIO_dump_fp(fp, s, len);
-    _close_trace_log_filename(fp);
+    va_list args;
+    va_start(args, format);
+
+    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, NULL, 0, format, args);
+
     return;
 }
 
@@ -269,7 +270,7 @@ void _scossl_log_bignum(
         return;
     }
 
-    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, description, (const char*) string, length);
+    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, (const char*) string, length, description);
     OPENSSL_free(string);
     return;
 }
@@ -283,72 +284,75 @@ void _scossl_log_SYMCRYPT_ERROR(
     char *description,
     SYMCRYPT_ERROR scError)
 {
-    switch( scError  )
+    const char* scErrorString;
+
+    switch( scError )
     {
         case SYMCRYPT_NO_ERROR:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_NO_ERROR (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_NO_ERROR";
             break;
         case SYMCRYPT_UNUSED:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_UNUSED (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_UNUSED";
             break;
         case SYMCRYPT_WRONG_KEY_SIZE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_KEY_SIZE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_KEY_SIZE";
             break;
         case SYMCRYPT_WRONG_BLOCK_SIZE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_BLOCK_SIZE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_BLOCK_SIZE";
             break;
         case SYMCRYPT_WRONG_DATA_SIZE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_DATA_SIZE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_DATA_SIZE";
             break;
         case SYMCRYPT_WRONG_NONCE_SIZE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_NONCE_SIZE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_NONCE_SIZE";
             break;
         case SYMCRYPT_WRONG_TAG_SIZE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_TAG_SIZE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_TAG_SIZE";
             break;
         case SYMCRYPT_WRONG_ITERATION_COUNT:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_WRONG_ITERATION_COUNT (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_WRONG_ITERATION_COUNT";
             break;
         case SYMCRYPT_AUTHENTICATION_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_AUTHENTICATION_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_AUTHENTICATION_FAILURE";
             break;
         case SYMCRYPT_EXTERNAL_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_EXTERNAL_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_EXTERNAL_FAILURE";
             break;
         case SYMCRYPT_FIPS_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_FIPS_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_FIPS_FAILURE";
             break;
         case SYMCRYPT_HARDWARE_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_HARDWARE_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_HARDWARE_FAILURE";
             break;
         case SYMCRYPT_NOT_IMPLEMENTED:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_NOT_IMPLEMENTED (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_NOT_IMPLEMENTED";
             break;
         case SYMCRYPT_INVALID_BLOB:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_INVALID_BLOB (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_INVALID_BLOB";
             break;
         case SYMCRYPT_BUFFER_TOO_SMALL:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_BUFFER_TOO_SMALL (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_BUFFER_TOO_SMALL";
             break;
         case SYMCRYPT_INVALID_ARGUMENT:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_INVALID_ARGUMENT (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_INVALID_ARGUMENT";
             break;
         case SYMCRYPT_MEMORY_ALLOCATION_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_MEMORY_ALLOCATION_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_MEMORY_ALLOCATION_FAILURE";
             break;
         case SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE";
             break;
         case SYMCRYPT_INCOMPATIBLE_FORMAT:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_INCOMPATIBLE_FORMAT (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_INCOMPATIBLE_FORMAT";
             break;
         case SYMCRYPT_VALUE_TOO_LARGE:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - SYMCRYPT_VALUE_TOO_LARGE (0x%x)", description, scError);
+            scErrorString = "SYMCRYPT_VALUE_TOO_LARGE";
             break;
         default:
-            _scossl_log(trace_level, func_code, reason_code, file, line, "%s - UNKNOWN SYMCRYPT_ERROR (0x%x)", description, scError);
+            scErrorString = "UNKNOWN SYMCRYPT_ERROR";
             break;
     }
+    _scossl_log(trace_level, func_code, reason_code, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
 }
 
 #ifdef __cplusplus

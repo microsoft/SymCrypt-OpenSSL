@@ -112,9 +112,9 @@ void _scossl_log_bytes(
     SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
-    char *description,
     const char *s,
-    int len);
+    int len,
+    const char *format, ...);
 
 void _scossl_log_bignum(
     int trace_level,
@@ -143,10 +143,10 @@ void _scossl_log_SYMCRYPT_ERROR(
         _scossl_log(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, __VA_ARGS__)
 
     #define SCOSSL_LOG_BYTES_DEBUG(func_code, reason_code, description, s, len) \
-        _scossl_log_bytes(SCOSSL_LOG_LEVEL_DEBUG, func_code, reason_code, __FILE__, __LINE__, description, (const char*) s, len)
+        _scossl_log_bytes(SCOSSL_LOG_LEVEL_DEBUG, func_code, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
 
     #define SCOSSL_LOG_BYTES_INFO(func_code, reason_code, description, s, len) \
-        _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, description, (const char*) s, len)
+        _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
 
     #define SCOSSL_LOG_BIGNUM_DEBUG(func_code, reason_code, description, bn) \
         _scossl_log_bignum(SCOSSL_LOG_LEVEL_DEBUG, func_code, reason_code, __FILE__, __LINE__, description, bn)
@@ -174,7 +174,7 @@ void _scossl_log_SYMCRYPT_ERROR(
     _scossl_log(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, __VA_ARGS__)
 
 #define SCOSSL_LOG_BYTES_ERROR(func_code, reason_code, description, s, len) \
-    _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, description, (const char*) s, len)
+    _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
 
 #define SCOSSL_LOG_BIGNUM_ERROR(func_code, reason_code, description, s, len) \
     _scossl_log_bignum(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, description, bn)
