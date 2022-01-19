@@ -177,6 +177,8 @@ void TestDhDlgroup(const BIGNUM* p)
     BIGNUM* g1 = NULL;
     BIGNUM* p2 = NULL;
     BIGNUM* g2 = NULL;
+    const BIGNUM* cp1 = NULL;
+    const BIGNUM* cg1 = NULL;
     const BIGNUM* pubkey1 = NULL;
     const BIGNUM* pubkey2 = NULL;
 
@@ -189,24 +191,38 @@ void TestDhDlgroup(const BIGNUM* p)
         goto end;
     }
 
-    p1 = BN_dup(p);
-    p2 = BN_dup(p);
-    g1 = BN_new();
-    g2 = BN_new();
-    if( p1==NULL || p2==NULL || g1==NULL || g2==NULL || !BN_set_word(g1, 2) || !BN_set_word(g2, 2) )
+    if( p )
     {
-        handleOpenSSLError("BN_dup, BN_new, or BN_set_word failed\n");
-        goto end;
+        p1 = BN_dup(p);
+        p2 = BN_dup(p);
+        g1 = BN_new();
+        g2 = BN_new();
+        if( p1==NULL || p2==NULL || g1==NULL || g2==NULL || !BN_set_word(g1, 2) || !BN_set_word(g2, 2) )
+        {
+            handleOpenSSLError("BN_dup, BN_new, or BN_set_word failed\n");
+            goto end;
+        }
+
+        printf("Command DH_set0_pqg\n");
+        if( DH_set0_pqg(key1, p1, NULL, g1) != 1 )
+        {
+            handleOpenSSLError("DH_set0_pqg failed\n");
+            goto end;
+        }
+        p1 = NULL; // key1 manages p1 and g1 BIGNUMs now
+        g1 = NULL;
+    } else {
+        if( DH_generate_parameters_ex(key1, 1024, 3, NULL) != 1 )
+        {
+            handleOpenSSLError("DH_generate_parameters_ex failed\n");
+            goto end;
+        }
+
+        DH_get0_pqg(key1, &cp1, NULL, &cg1);
+        p2 = BN_dup(cp1);
+        g2 = BN_dup(cg1);
     }
 
-    printf("Command DH_set0_pqg\n");
-    if( DH_set0_pqg(key1, p1, NULL, g1) != 1 )
-    {
-        handleOpenSSLError("DH_set0_pqg failed\n");
-        goto end;
-    }
-    p1 = NULL; // key1 manages p1 and g1 BIGNUMs now
-    g1 = NULL;
     if( DH_set0_pqg(key2, p2, NULL, g2) != 1 )
     {
         handleOpenSSLError("DH_set0_pqg failed\n");
@@ -289,6 +305,9 @@ void TestDh()
     DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
     TestDhDlgroup(p_ffdhe);
     DH_free(dh_ffdhe);
+
+    // Test an unsupported DH group
+    TestDhDlgroup(NULL);
 
     printf("%s", SeparatorLine);
 }
