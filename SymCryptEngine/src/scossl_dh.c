@@ -131,11 +131,11 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "DH_set0_key failed.");
-        BN_clear_free(dh_privkey);
-        BN_free(dh_pubkey);
         goto cleanup;
     }
     // Do not free the temporary BIGNUMs now, as DH manages them after success
+    dh_privkey = NULL;
+    dh_pubkey = NULL;
 
     pKeyCtx->initialized = 1;
     res = SCOSSL_SUCCESS;
@@ -146,6 +146,9 @@ cleanup:
         // On error free the partially constructed key context
         scossl_dh_free_key_context(pKeyCtx);
     }
+
+    BN_clear_free(dh_privkey);
+    BN_free(dh_pubkey);
 
     if( pbData )
     {
@@ -285,10 +288,10 @@ SCOSSL_STATUS scossl_dh_import_keypair(
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
                 "DH_set0_key failed.");
-            BN_free(generated_dh_pubkey);
             goto cleanup;
         }
-        // Do not free the temporary BIGNUM now, as DH manages them after success
+        // Do not free the temporary BIGNUM now, as DH manages it after success
+        generated_dh_pubkey = NULL;
     }
 
     pKeyCtx->initialized = 1;
@@ -300,6 +303,8 @@ cleanup:
         // On error free the partially constructed key context
         scossl_dh_free_key_context(pKeyCtx);
     }
+
+    BN_free(generated_dh_pubkey);
 
     if( pbData )
     {
@@ -466,7 +471,7 @@ SCOSSL_STATUS scossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT
 
 SCOSSL_STATUS scossl_dh_generate_key(_Inout_ DH* dh)
 {
-    const DH_METHOD* ossl_dh_meth = NULL;
+    PFN_DH_meth_generate_key pfn_dh_meth_generate_key = NULL;
     PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
 
     switch( scossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
@@ -476,8 +481,7 @@ SCOSSL_STATUS scossl_dh_generate_key(_Inout_ DH* dh)
             "scossl_get_dh_context_ex failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
-        ossl_dh_meth = DH_OpenSSL();
-        PFN_DH_meth_generate_key pfn_dh_meth_generate_key = DH_meth_get_generate_key(ossl_dh_meth);
+        pfn_dh_meth_generate_key = DH_meth_get_generate_key(DH_OpenSSL());
         if (pfn_dh_meth_generate_key == NULL)
         {
             return SCOSSL_FAILURE;
@@ -496,7 +500,7 @@ SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsign
                                             _In_ const BIGNUM* pub_key,
                                             _In_ DH* dh)
 {
-    const DH_METHOD* ossl_dh_meth = NULL;
+    PFN_DH_meth_compute_key pfn_dh_meth_compute_key = NULL;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
     BYTE buf[SCOSSL_DH_MAX_PUBLIC_KEY_LEN] = { 0 };
@@ -513,8 +517,7 @@ SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsign
             "scossl_get_dh_context failed.");
         return res;
     case SCOSSL_FALLBACK:
-        ossl_dh_meth = DH_OpenSSL();
-        PFN_DH_meth_compute_key pfn_dh_meth_compute_key = DH_meth_get_compute_key(ossl_dh_meth);
+        pfn_dh_meth_compute_key = DH_meth_get_compute_key(DH_OpenSSL());
         if (pfn_dh_meth_compute_key == NULL)
         {
             return res;
@@ -587,6 +590,7 @@ cleanup:
 
 SCOSSL_STATUS scossl_dh_finish(_Inout_ DH* dh)
 {
+    PFN_DH_meth_finish pfn_dh_meth_finish = DH_meth_get_finish(DH_OpenSSL());
     PSCOSSL_DH_KEY_CONTEXT pKeyCtx = DH_get_ex_data(dh, scossl_dh_idx);
     if( pKeyCtx )
     {
@@ -597,7 +601,13 @@ SCOSSL_STATUS scossl_dh_finish(_Inout_ DH* dh)
         OPENSSL_free(pKeyCtx);
         DH_set_ex_data(dh, scossl_dh_idx, NULL);
     }
-    return SCOSSL_SUCCESS;
+
+    // Ensure any buffers initialized by DH_OpenSSL are freed
+    if( pfn_dh_meth_finish == NULL )
+    {
+        return SCOSSL_FAILURE;
+    }
+    return pfn_dh_meth_finish(dh);
 }
 
 void scossl_destroy_safeprime_dlgroups(void)
