@@ -27,11 +27,10 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 // Only applies in certain contexts (used when implementing EVP-layer functionality)
 #define SCOSSL_UNSUPPORTED (-2)
 
-void* SCOSSL_ENGINE_zalloc(size_t num);
-void* SCOSSL_ENGINE_realloc(void *mem, size_t num);
-void SCOSSL_ENGINE_free(void *mem);
-
-void SCOSSL_ENGINE_setup_ERR();
+// Functions to set up and destroy SCOSSL logging static variables, locks, and integration with
+// OpenSSL ERR infrastructure. Should only be called in Engine bind / destroy.
+void scossl_setup_logging();
+void scossl_destroy_logging();
 
 // SCOSSL function codes
 typedef enum {

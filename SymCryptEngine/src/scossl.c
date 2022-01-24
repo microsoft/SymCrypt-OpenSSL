@@ -20,8 +20,8 @@ extern "C" {
 int scossl_module_initialized = 0;
 
 /* The constants used when creating the ENGINE */
-static const char* engine_scossl_id = "symcrypt";
-static const char* engine_scossl_name = "Symcrypt Engine";
+static const char* engine_scossl_id = "SCOSSL";
+static const char* engine_scossl_name = "SymCrypt engine for OpenSSL";
 static EC_KEY_METHOD* scossl_eckey_method = NULL;
 static RSA_METHOD* scossl_rsa_method = NULL;
 // static DSA_METHOD* scossl_dsa_method = NULL;
@@ -45,6 +45,7 @@ SCOSSL_STATUS scossl_destroy(ENGINE* e)
     DH_meth_free(scossl_dh_method);
     scossl_dh_method = NULL;
     CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, scossl_dh_idx);
+    scossl_destroy_logging();
 
     return SCOSSL_SUCCESS;
 }
@@ -60,7 +61,7 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     }
 
     scossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
-    scossl_rsa_method = RSA_meth_new("SymCrypt RSA Method", 0);
+    scossl_rsa_method = RSA_meth_new("SCOSSL RSA Method", 0);
     // scossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
     scossl_dh_method = DH_meth_dup(DH_OpenSSL());
 
@@ -177,8 +178,8 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     RSA_set_default_method(ENGINE_get_RSA(e));
     EC_KEY_set_default_method(ENGINE_get_EC(e));
 
-    // Register the Engine as a source of OpenSSL errors
-    SCOSSL_ENGINE_setup_ERR();
+    // Register the Engine as a source of OpenSSL errors and create logging lock
+    scossl_setup_logging();
 
     // Initialize hidden static variables once at Engine load time
     if(    !scossl_ecc_init_static()
