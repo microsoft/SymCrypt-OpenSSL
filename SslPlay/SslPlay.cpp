@@ -1729,11 +1729,15 @@ end:
 
 int main(int argc, char** argv)
 {
-    int scossl_log_level_debug = SCOSSL_LOG_LEVEL_ERROR;
+    int scossl_log_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
+    int scossl_ossl_ERR_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
     if (argc >= 2) {
-         scossl_log_level_debug = atoi(argv[1]);
-        SCOSSL_ENGINE_set_trace_level(scossl_log_level_debug);
+        scossl_log_level = atoi(argv[1]);
     }
+    if (argc >= 3) {
+        scossl_ossl_ERR_level = atoi(argv[2]);
+    }
+    SCOSSL_ENGINE_set_trace_level(scossl_log_level, scossl_ossl_ERR_level);
     SCOSSL_ENGINE_Initialize();
     bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
 

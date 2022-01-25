@@ -17,9 +17,16 @@ extern "C" {
 #define SCOSSL_LOG_LEVEL_PREFIX_INFO        "INFO"
 #define SCOSSL_LOG_LEVEL_PREFIX_DEBUG       "DEBUG"
 
+// Level of tracing that is output to stderr / log file
 static int _traceLogLevel = SCOSSL_LOG_LEVEL_INFO;
 static char *_traceLogFilename = NULL;
 static FILE *_traceLogFile = NULL;
+
+// Level of tracing that is output to OpenSSL ERR infrastructure
+// By default only log actual errors, as some OpenSSL unit tests check that successful calls do not
+// generate any ERR entries. Callers may wish to set this to SCOSSL_LOG_LEVEL_INFO to expose data
+// about where they may not be calling FIPS certified code.
+static int _osslERRLogLevel = SCOSSL_LOG_LEVEL_ERROR;
 
 // Lock around writing information to stderr/log file/OpenSSL ERR handling framework to avoid
 // muddled error messages in multi-threaded environment
@@ -98,7 +105,7 @@ static ERR_STRING_DATA SCOSSL_ERR_reason_strings[] = {
 
 C_ASSERT( (sizeof(SCOSSL_ERR_reason_strings) / sizeof(ERR_STRING_DATA)) == SCOSSL_ERR_R_ENUM_END-SCOSSL_ERR_R_ENUM_START );
 
-void SCOSSL_ENGINE_setup_ERR()
+void scossl_setup_logging()
 {
     if( _scossl_err_library_code == 0 )
     {
@@ -115,14 +122,23 @@ void SCOSSL_ENGINE_setup_ERR()
     }
 }
 
-void SCOSSL_ENGINE_set_trace_level(int trace_level)
+void scossl_destroy_logging()
+{
+    CRYPTO_THREAD_lock_free(_loggingLock);
+}
+
+void SCOSSL_ENGINE_set_trace_level(int trace_level, int ossl_ERR_level)
 {
     if( trace_level >= SCOSSL_LOG_LEVEL_OFF &&
         trace_level <= SCOSSL_LOG_LEVEL_DEBUG )
     {
         _traceLogLevel = trace_level;
     }
-    return;
+    if( ossl_ERR_level >= SCOSSL_LOG_LEVEL_OFF &&
+        ossl_ERR_level <= SCOSSL_LOG_LEVEL_DEBUG )
+    {
+        _osslERRLogLevel = ossl_ERR_level;
+    }
 }
 
 void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
@@ -133,15 +149,18 @@ void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
     }
     _traceLogFilename = OPENSSL_strdup(filename);
 
-
     if( CRYPTO_THREAD_write_lock(_loggingLock) )
     {
         if( _traceLogFile != NULL && _traceLogFile != stderr )
         {
             fflush(_traceLogFile);
             fclose(_traceLogFile);
+            _traceLogFile = NULL;
         }
-        _traceLogFile = fopen(_traceLogFilename, "a");
+        if( _traceLogFilename != NULL )
+        {
+            _traceLogFile = fopen(_traceLogFilename, "a");
+        }
         if( _traceLogFile == NULL )
         {
             _traceLogFile = stderr;
@@ -167,7 +186,7 @@ void _scossl_log_bytes(
     va_start(args, format);
     char *trace_level_prefix = "";
 
-    if( _traceLogLevel < trace_level )
+    if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
     {
         return;
     }
@@ -196,18 +215,24 @@ void _scossl_log_bytes(
 
     if( CRYPTO_THREAD_write_lock(_loggingLock) )
     {
-        // Log an OpenSSL error, so calling applications can handle the log appropriately
-        ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
-        // Add error string indicating the error details as error data
-        ERR_add_error_data(1, paraBuf);
-
-        // Log details to stderr or a log file
-        ERR_error_string_n(ERR_PACK(_scossl_err_library_code, func_code, reason_code), errStringBuf, sizeof(errStringBuf));
-
-        fprintf(_traceLogFile, "[%s] %s:%s at %s, line %d\n", trace_level_prefix, errStringBuf, paraBuf, file, line);
-        if( s )
+        if( _osslERRLogLevel >= trace_level )
         {
-            fwrite(s, 1, len, _traceLogFile);
+            // Log an OpenSSL error, so calling applications can handle the log appropriately
+            ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
+            // Add error string indicating the error details as error data
+            ERR_add_error_data(1, paraBuf);
+        }
+
+        if( _traceLogLevel >= trace_level )
+        {
+            // Log details to stderr or a log file
+            ERR_error_string_n(ERR_PACK(_scossl_err_library_code, func_code, reason_code), errStringBuf, sizeof(errStringBuf));
+
+            fprintf(_traceLogFile, "[%s] %s:%s at %s, line %d\n", trace_level_prefix, errStringBuf, paraBuf, file, line);
+            if( s )
+            {
+                fwrite(s, 1, len, _traceLogFile);
+            }
         }
     }
     CRYPTO_THREAD_unlock(_loggingLock);
@@ -243,7 +268,7 @@ void _scossl_log_bignum(
     unsigned char *string = NULL;
     int length = 0;
 
-    if( _traceLogLevel < trace_level )
+    if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
     {
         return;
     }
