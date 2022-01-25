@@ -20,8 +20,8 @@ extern "C" {
 int scossl_module_initialized = 0;
 
 /* The constants used when creating the ENGINE */
-static const char* engine_scossl_id = "SCOSSL";
-static const char* engine_scossl_name = "SymCrypt engine for OpenSSL";
+static const char* engine_scossl_id = "symcrypt";
+static const char* engine_scossl_name = "SCOSSL (SymCrypt engine for OpenSSL)";
 static EC_KEY_METHOD* scossl_eckey_method = NULL;
 static RSA_METHOD* scossl_rsa_method = NULL;
 // static DSA_METHOD* scossl_dsa_method = NULL;
@@ -61,7 +61,7 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     }
 
     scossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
-    scossl_rsa_method = RSA_meth_new("SCOSSL RSA Method", 0);
+    scossl_rsa_method = RSA_meth_new("SCOSSL (SymCrypt engine for OpenSSL) RSA Method", 0);
     // scossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
     scossl_dh_method = DH_meth_dup(DH_OpenSSL());
 

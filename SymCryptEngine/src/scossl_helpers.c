@@ -149,15 +149,18 @@ void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
     }
     _traceLogFilename = OPENSSL_strdup(filename);
 
-
     if( CRYPTO_THREAD_write_lock(_loggingLock) )
     {
         if( _traceLogFile != NULL && _traceLogFile != stderr )
         {
             fflush(_traceLogFile);
             fclose(_traceLogFile);
+            _traceLogFile = NULL;
         }
-        _traceLogFile = fopen(_traceLogFilename, "a");
+        if( _traceLogFilename != NULL )
+        {
+            _traceLogFile = fopen(_traceLogFilename, "a");
+        }
         if( _traceLogFile == NULL )
         {
             _traceLogFile = stderr;

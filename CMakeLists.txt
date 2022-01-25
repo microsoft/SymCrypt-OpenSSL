@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13.0)
 
 project(scossl)
 
-include_directories(~/SymCrypt/inc)
+include_directories(${SYMCRYPT_ROOT_DIR}/inc)
 
 # In Sanitize version, enable sanitizers
 if (CMAKE_BUILD_TYPE MATCHES Sanitize)

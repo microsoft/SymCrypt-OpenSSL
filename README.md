@@ -52,7 +52,7 @@ Follow Linux build instructions from SymCrypt repository [SymCrypt](https://gith
 ```
 cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./
 mkdir bin; cd bin
-cmake .. -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory> -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake
+cmake .. -DSYMCRYPT_ROOT_DIR=<SymCryptRepo> -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory> -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 ```
 
