@@ -56,7 +56,7 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
 
     if( !scossl_module_initialized )
     {
-        SymCryptModuleInit(SYMCRYPT_CODE_VERSION_API, SYMCRYPT_CODE_VERSION_MINOR, SYMCRYPT_CODE_VERSION_PATCH);
+        SYMCRYPT_MODULE_INIT();
         scossl_module_initialized = 1;
     }
 

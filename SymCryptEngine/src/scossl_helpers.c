@@ -326,9 +326,6 @@ void _scossl_log_SYMCRYPT_ERROR(
         case SYMCRYPT_NO_ERROR:
             scErrorString = "SYMCRYPT_NO_ERROR";
             break;
-        case SYMCRYPT_UNUSED:
-            scErrorString = "SYMCRYPT_UNUSED";
-            break;
         case SYMCRYPT_WRONG_KEY_SIZE:
             scErrorString = "SYMCRYPT_WRONG_KEY_SIZE";
             break;
