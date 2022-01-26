@@ -12,6 +12,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-par
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
+find_library(SYMCRYPT_LIBRARY symcrypt)
+
 add_library(scossl_dynamic SHARED
     ../src/scossl.c
     ../src/scossl_ciphers.c
@@ -39,7 +41,7 @@ set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
 set_target_properties(scossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
 target_link_directories(scossl_dynamic PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(scossl_dynamic PUBLIC symcrypt)
+target_link_libraries(scossl_dynamic PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 # Install the engine to the OpenSSL engines directory
