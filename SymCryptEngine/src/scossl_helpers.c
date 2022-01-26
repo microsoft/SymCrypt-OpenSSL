@@ -170,7 +170,7 @@ void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
     return;
 }
 
-void _scossl_log_bytes(
+static void _scossl_log_bytes_valist(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
     SCOSSL_ERR_REASON reason_code,
@@ -178,12 +178,11 @@ void _scossl_log_bytes(
     int line,
     const char *s,
     int len,
-    const char *format, ...)
+    const char *format,
+    va_list args)
 {
     char errStringBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
     char paraBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
-    va_list args;
-    va_start(args, format);
     char *trace_level_prefix = "";
 
     if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
@@ -236,8 +235,22 @@ void _scossl_log_bytes(
         }
     }
     CRYPTO_THREAD_unlock(_loggingLock);
+}
 
-    return;
+void _scossl_log_bytes(
+    int trace_level,
+    SCOSSL_ERR_FUNC func_code,
+    SCOSSL_ERR_REASON reason_code,
+    const char *file,
+    int line,
+    const char *s,
+    int len,
+    const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    _scossl_log_bytes_valist(trace_level, func_code, reason_code, file, line, s, len, format, args);
+    va_end(args);
 }
 
 void _scossl_log(
@@ -250,10 +263,8 @@ void _scossl_log(
 {
     va_list args;
     va_start(args, format);
-
-    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, NULL, 0, format, args);
-
-    return;
+    _scossl_log_bytes_valist(trace_level, func_code, reason_code, file, line, NULL, 0, format, args);
+    va_end(args);
 }
 
 void _scossl_log_bignum(
@@ -297,7 +308,6 @@ void _scossl_log_bignum(
 
     _scossl_log_bytes(trace_level, func_code, reason_code, file, line, (const char*) string, length, description);
     OPENSSL_free(string);
-    return;
 }
 
 void _scossl_log_SYMCRYPT_ERROR(
