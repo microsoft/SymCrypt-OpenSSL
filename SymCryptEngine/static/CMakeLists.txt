@@ -34,8 +34,7 @@ target_include_directories(scossl_static PUBLIC ../inc)
 target_include_directories(scossl_static PRIVATE ../src)
 target_include_directories (scossl_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-
 install(TARGETS scossl_static
+    EXCLUDE_FROM_ALL
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
