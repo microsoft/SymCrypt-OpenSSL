@@ -112,7 +112,7 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
 }
 
 SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                        _Out_ size_t *keylen)
+                                        _Inout_ size_t *keylen)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     PCSYMCRYPT_MAC scossl_mac_algo = NULL;
@@ -136,14 +136,10 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
             "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
         scError = SymCryptTlsPrf1_1(
-            key_context->secret,
-            key_context->secret_length,
-            NULL,
-            0,
-            key_context->seed,
-            key_context->seed_length,
-            key,
-            *keylen);
+            key_context->secret, key_context->secret_length,
+            NULL, 0,
+            key_context->seed, key_context->seed_length,
+            key, *keylen);
     }
     else
     {
@@ -155,14 +151,10 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
 
         scError = SymCryptTlsPrf1_2(
             scossl_mac_algo,
-            key_context->secret,
-            key_context->secret_length,
-            NULL,
-            0,
-            key_context->seed,
-            key_context->seed_length,
-            key,
-            *keylen);
+            key_context->secret, key_context->secret_length,
+            NULL, 0,
+            key_context->seed, key_context->seed_length,
+            key, *keylen);
     }
 
     if (scError != SYMCRYPT_NO_ERROR)
