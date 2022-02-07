@@ -40,6 +40,8 @@ struct cipher_gcm_ctx {
     INT32 taglen;
     BYTE tlsAad[EVP_AEAD_TLS1_AAD_LEN];
     INT32 tlsAadSet;
+    UINT64 ivInvocation;
+    INT32 useInvocation;
 };
 
 #define SCOSSL_CCM_MIN_IV_LENGTH    (7)
@@ -784,7 +786,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns length of out on success, or -1 on error.
-static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ const EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
+static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl, BOOL enc)
 {
     int ret = -1;
@@ -828,8 +830,13 @@ static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ const EVP_CIPHER_CTX *ctx, _I
     if( EVP_CIPHER_CTX_encrypting(ctx) )
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
-        // Copy it from the context
-        memcpy(out, cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_EXPLICIT_IV_LEN);
+        // Generate it using the IV invocation field to avoid repeated IVs
+        if( scossl_aes_gcm_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, EVP_GCM_TLS_EXPLICIT_IV_LEN, out) != SCOSSL_SUCCESS )
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_INTERNAL_ERROR,
+                "AES-GCM TLS failed to generate IV");
+            goto cleanup;
+        }
 
         // Encrypt payload
         SymCryptGcmEncrypt(
@@ -960,6 +967,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         cipherCtx->taglen = EVP_GCM_TLS_TAG_LEN;
         cipherCtx->tlsAadSet = 0;
+        cipherCtx->useInvocation = 0;
         break;
     case EVP_CTRL_GET_IVLEN:
         *(int *)ptr = SCOSSL_GCM_IV_LENGTH;
@@ -1008,6 +1016,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         if( arg == -1 )
         {
             memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen);
+            cipherCtx->useInvocation = 1;
             break;
         }
         if( arg != cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN )
@@ -1018,12 +1027,44 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         // Set first 4B of IV to ptr value
         memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN);
-        // If encrypting, randomly set the last 8B of IV
+        // If encrypting, randomly set the invocation field (last 8B of IV)
         if( EVP_CIPHER_CTX_encrypting(ctx) &&
-            (RAND_bytes(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, EVP_GCM_TLS_EXPLICIT_IV_LEN) <= 0) )
+            (RAND_bytes((PBYTE) &cipherCtx->ivInvocation, EVP_GCM_TLS_EXPLICIT_IV_LEN) <= 0) )
         {
             return SCOSSL_FAILURE;
         }
+        // Place invocation field into IV
+        SYMCRYPT_STORE_MSBFIRST64(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, cipherCtx->ivInvocation);
+        cipherCtx->useInvocation = 1;
+        break;
+    case EVP_CTRL_GCM_IV_GEN:
+        if( cipherCtx->useInvocation == 0 )
+        {
+            return SCOSSL_FAILURE;
+        }
+        // Place invocation field into IV
+        SYMCRYPT_STORE_MSBFIRST64(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, cipherCtx->ivInvocation);
+        if( arg <= 0 || arg > cipherCtx->ivlen )
+        {
+            arg = cipherCtx->ivlen;
+        }
+        memcpy(ptr, cipherCtx->iv + cipherCtx->ivlen - arg, arg);
+        // Increment invocation field
+        cipherCtx->ivInvocation++;
+        break;
+    case EVP_CTRL_GCM_SET_IV_INV:
+        if( cipherCtx->useInvocation == 0 || EVP_CIPHER_CTX_encrypting(ctx) )
+        {
+            return SCOSSL_FAILURE;
+        }
+        if( arg <= 0 || arg > cipherCtx->ivlen )
+        {
+            return SCOSSL_FAILURE;
+        }
+        // Copy provided invocation field into IV
+        memcpy(cipherCtx->iv + cipherCtx->ivlen - arg, ptr, arg);
+        // Read invocation field from IV ready to increment it and place it back
+        cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - 8 );
         break;
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
