@@ -192,7 +192,6 @@ cleanup:
 SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    BN_ULONG cbModulus = 0;
     EVP_PKEY* pkey = NULL;
     RSA* rsa = NULL;
     int ret = SCOSSL_FAILURE;
@@ -281,8 +280,6 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     {
         goto cleanup;
     }
-
-    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
 
     scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(type);
     expectedTbsLength = scossl_get_expected_tbs_length(type);

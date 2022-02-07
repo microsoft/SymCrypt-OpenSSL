@@ -151,7 +151,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const un
         break;
     }
 
-    ret = (cbResult <= INT_MAX) ? cbResult : -1;
+    ret = (cbResult <= INT_MAX) ? (int) cbResult : -1;
 
 cleanup:
     return ret;
@@ -271,7 +271,7 @@ SCOSSL_RETURNLENGTH scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const u
         break;
     }
 
-    ret = (cbResult <= INT_MAX) ? cbResult : -1;
+    ret = (cbResult <= INT_MAX) ? (int) cbResult : -1;
 
 cleanup:
     return ret;
@@ -481,7 +481,6 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
     _In_reads_bytes_(siglen) const unsigned char* sigbuf,
     unsigned int siglen, _In_ const RSA* rsa)
 {
-    BN_ULONG cbModulus = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
@@ -500,7 +499,6 @@ SCOSSL_STATUS scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsi
         }
     }
 
-    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     switch( dtype )
     {
     case NID_md5_sha1:

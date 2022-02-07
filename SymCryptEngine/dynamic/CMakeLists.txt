@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-par
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-find_library(SYMCRYPT_LIBRARY symcrypt)
+find_library(SYMCRYPT_LIBRARY symcrypt PATHS ../../)
 
 add_library(scossl_dynamic SHARED
     ../src/scossl.c

@@ -60,8 +60,6 @@ void TestEcdsa(EC_KEY* key)
         0x1, 0x54, 0xF, 0x2, 0xC9, 0xC, 0xFF, 0x31
     };
     unsigned char resultBytes[SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN] = { 0 };
-    bool result = true;
-    int currentIteration = 0;
     unsigned int signatureBytesCount = sizeof(resultBytes);
     ECDSA_SIG* ecdsaSig = NULL;
     printf("Command ECDSA_sign\n");
@@ -643,7 +641,6 @@ void TestRsaDigestSignVerify(
     size_t signature_len = 0;
     const unsigned char plaintext[] =
         "Message for testing EVP_PKEY_Encrypt* APIs for encryption/decryption";
-    size_t plaintext_len = sizeof(plaintext);
     const char message[] = "My EVP_DigestSign Message";
     size_t message_len = sizeof(message);
     bool authentic = false;
@@ -1140,7 +1137,6 @@ end:
 
 void TestDigests()
 {
-    EVP_MD *md = NULL;
     char mess1[] = "Test Message1234567";
     char mess2[] = "Hello World";
     unsigned int md_len=32, i;
@@ -1513,7 +1509,7 @@ end:
 void TestAesGcmCipher(
     const char* ciphername, const EVP_CIPHER *cipher, unsigned char *key, int key_length,
     unsigned char *iv, int iv_length, unsigned char *aad, int aad_length, unsigned char* plaintext,
-    int plaintext_len)
+    int plaintext_len, unsigned char *expected_tag=NULL, int expected_tag_length=0)
 {
     unsigned char ciphertext[8192];
     int ciphertext_len = 0;
@@ -1531,6 +1527,12 @@ void TestAesGcmCipher(
     BIO_dump_fp (stdout, (const char *)plaintext, plaintext_len);
     /* Encrypt the plaintext */
     ciphertext_len = encrypt_gcm(cipher, plaintext, plaintext_len, aad, aad_length, key, iv, ciphertext, tag);
+    /* Check the tag matches if not NULL */
+    if (expected_tag != NULL &&
+        memcmp(tag, expected_tag, expected_tag_length))
+    {
+        handleError("Expected tag not produced by encryption\n");
+    }
     /* Do something useful with the ciphertext here */
     printf("Ciphertext:\n");
     BIO_dump_fp (stdout, (const char *)ciphertext, ciphertext_len);
@@ -1573,7 +1575,7 @@ TestAesGcmGeneric()
     TestAesGcmCipher("EVP_aes_192_gcm", EVP_aes_192_gcm(), key, 24, iv, 12, aad, 16, plaintext, plaintext_len);
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), key, 32, iv, 12, aad, 16, plaintext, plaintext_len);
 
-    TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), gcm_key, 32, gcm_iv, 12, gcm_aad, 16, gcm_pt, 16);
+    TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), gcm_key, 32, gcm_iv, 12, gcm_aad, 16, gcm_pt, 16, gcm_tag, 16);
 
     printf("%s", SeparatorLine);
     return;

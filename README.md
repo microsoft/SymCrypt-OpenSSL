@@ -47,14 +47,16 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
 ## Compilation Instructions
 ## Prerequisite, need libssl installed to compile
 
-Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module.
-
-```
-cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./
-mkdir bin; cd bin
-cmake .. -DSYMCRYPT_ROOT_DIR=<SymCryptRepo> -DOPENSSL_ROOT_DIR=<OpensslInstallDirectory> -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build .
-```
+1. Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module
+    * You can either install the Linux SymCrypt module (i.e libsymcrypt.so* to /usr/lib/, and inc/* to /usr/include/), or
+    * Copy the built module to the root of the SymCrypt-OpenSSL repo `cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./`
+2. `mkdir bin; cd bin`
+3. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
+    * If you have not installed SymCrypt header files, you can also specify the root directory `-DSYMCRYPT_ROOT_DIR=<SymCryptRepo>`
+    * If you want to link to a specific OpenSSL installation, you can also specify `-DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>`
+    * Optionally, for a release build, specify `-DCMAKE_BUILD_TYPE=Release`
+4, `cmake --build .`
+    * Optionally specify `-jN` where N is the number of processes you wish to spawn for the build
 
 ## Run Samples
 ```
