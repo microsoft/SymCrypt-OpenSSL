@@ -83,7 +83,8 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
         scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptDlkeySetPrivateKeyLength failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
     }
@@ -205,7 +206,8 @@ SCOSSL_STATUS scossl_dh_import_keypair(
         scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR("SymCryptDlkeySetPrivateKeyLength failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
     }
