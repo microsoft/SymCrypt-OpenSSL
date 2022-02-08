@@ -30,6 +30,33 @@ struct cipher_xts_ctx {
 #define SCOSSL_GCM_MIN_TAG_LENGTH (12)
 #define SCOSSL_GCM_MAX_TAG_LENGTH (16)
 
+// RFC5647 section 7 documents a specific way for AES-GCM IVs to be formed
+//
+// It appears that a slightly more generalized way of forming IVs, of which RFC5647 is a subset, is
+// supported in OpenSSL APIs using undocumented controls:
+// EVP_CTRL_GCM_SET_IV_FIXED, EVP_CTRL_GCM_IV_GEN, and EVP_CTRL_GCM_SET_IV_INV
+// The idea is to support IV generation with an AES-GCM context, rather than making the caller have
+// to explicitly track and update the IV.
+//
+// My understanding from looking at how these controls are used, and reading the RFC is:
+//  EVP_CTRL_GCM_SET_IV_FIXED is used to set up an initial IV
+//      The caller has 2 options:
+//          1) Set the whole IV (including the initial value of the invocation counter), by
+//             providing the full 12 bytes
+//          2) Set the fixed part of the IV (up to 4 bytes), and allow the initial value of the
+//             invocation counter (the rest of the initial IV) to be set randomly
+//
+//  EVP_CTRL_GCM_IV_GEN is used to consume an IV, and indicate the invocation field (at least 8
+//  bytes) must be incremented to form the next IV
+//
+//  EVP_CTRL_GCM_SET_IV_INV is used in decryption to set only the invocation field
+//
+// In SCOSSL we are tracking this using the fields below:
+//  ivInvocation is the 64b counter which is incremented on each call to EVP_CTRL_GCM_IV_GEN, the
+//  MSB first value is inserted into the IV. Caller will guarantee there are not 2^64 calls.
+//  useInvocation is set to 1 to indicate that the ivInvocation field is in use (set on a successful
+//  call to EVP_CTRL_GCM_SET_IV_FIXED)
+
 struct cipher_gcm_ctx {
     INT32 operationInProgress;
     BYTE iv[SCOSSL_GCM_IV_LENGTH];
@@ -43,6 +70,7 @@ struct cipher_gcm_ctx {
     UINT64 ivInvocation;
     INT32 useInvocation;
 };
+
 
 #define SCOSSL_CCM_MIN_IV_LENGTH    (7)
 #define SCOSSL_CCM_MAX_IV_LENGTH    (13)
@@ -830,7 +858,7 @@ static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ EVP_CIPHER_CTX *ctx, _Inout_ 
     if( EVP_CIPHER_CTX_encrypting(ctx) )
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
-        // Generate it using the IV invocation field to avoid repeated IVs
+        // Generate it using the IV invocation field to ensure distinct IVs are used
         if( scossl_aes_gcm_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, EVP_GCM_TLS_EXPLICIT_IV_LEN, out) != SCOSSL_SUCCESS )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_INTERNAL_ERROR,
@@ -967,6 +995,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         cipherCtx->taglen = EVP_GCM_TLS_TAG_LEN;
         cipherCtx->tlsAadSet = 0;
+        cipherCtx->ivInvocation = 0;
         cipherCtx->useInvocation = 0;
         break;
     case EVP_CTRL_GET_IVLEN:
@@ -1015,26 +1044,29 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         }
         if( arg == -1 )
         {
+            // Set entire initial IV
             memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen);
+            // Initialize our invocation counter from the IV
+            cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN );
             cipherCtx->useInvocation = 1;
             break;
         }
-        if( arg != cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN )
+        if( arg < 0 || arg > 4 )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
                 "set_iv_fixed incorrect length");
             return SCOSSL_FAILURE;
         }
-        // Set first 4B of IV to ptr value
-        memcpy(cipherCtx->iv, ptr, cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN);
-        // If encrypting, randomly set the invocation field (last 8B of IV)
+        // Set first up to 4B of IV to ptr value
+        memcpy(cipherCtx->iv, ptr, arg);
+        // If encrypting, randomly set the invocation field
         if( EVP_CIPHER_CTX_encrypting(ctx) &&
-            (RAND_bytes((PBYTE) &cipherCtx->ivInvocation, EVP_GCM_TLS_EXPLICIT_IV_LEN) <= 0) )
+            (RAND_bytes(cipherCtx->iv + arg, EVP_GCM_TLS_IV_LEN - arg) <= 0) )
         {
             return SCOSSL_FAILURE;
         }
-        // Place invocation field into IV
-        SYMCRYPT_STORE_MSBFIRST64(cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, cipherCtx->ivInvocation);
+        // Initialize our invocation counter from the IV
+        cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN );
         cipherCtx->useInvocation = 1;
         break;
     case EVP_CTRL_GCM_IV_GEN:
@@ -1049,7 +1081,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
             arg = cipherCtx->ivlen;
         }
         memcpy(ptr, cipherCtx->iv + cipherCtx->ivlen - arg, arg);
-        // Increment invocation field
+        // Increment invocation counter
         cipherCtx->ivInvocation++;
         break;
     case EVP_CTRL_GCM_SET_IV_INV:
@@ -1061,10 +1093,10 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         {
             return SCOSSL_FAILURE;
         }
-        // Copy provided invocation field into IV
+        // Place provided invocation field into IV
         memcpy(cipherCtx->iv + cipherCtx->ivlen - arg, ptr, arg);
-        // Read invocation field from IV ready to increment it and place it back
-        cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - 8 );
+        // Initialize our invocation counter from the IV
+        cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN );
         break;
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
