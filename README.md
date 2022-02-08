@@ -43,19 +43,34 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
 2. Use of unsupported digests in RSA signatures and TLS PRF
 3. Use of multi-prime (more than 2-prime) RSA
 
+## Versioning and Servicing
+
+As of version 1.0.0, SCOSSL uses the versioning scheme defined by the [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) specification. This means:
+
+- Major version changes introduce ABI and/or API breaking changes
+- Minor version changes introduce backwards compatible additional functionality or improvements, and/or bug fixes
+- Patch version changes introduce backwards compatible bug fixes
+
+Regarding servicing, our strong recommendation is that distro vendors and application developers regularly
+update to the latest version of SymCrypt and SymCrypt engine for both security fixes and
+functionality/performance improvements.
+
+We will support long-term servicing of specific releases for security fixes. Details of this plan will be
+released publicly in the future.
+
 # Building Instructions
 ## Compilation Instructions
-## Prerequisite, need libssl installed to compile
 
-1. Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module
+1. Install libssl, or compile and install OpenSSL from source
+2. Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module
     * You can either install the Linux SymCrypt module (i.e libsymcrypt.so* to /usr/lib/, and inc/* to /usr/include/), or
     * Copy the built module to the root of the SymCrypt-OpenSSL repo `cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./`
-2. `mkdir bin; cd bin`
-3. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
+3. `mkdir bin; cd bin`
+4. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
     * If you have not installed SymCrypt header files, you can also specify the root directory `-DSYMCRYPT_ROOT_DIR=<SymCryptRepo>`
     * If you want to link to a specific OpenSSL installation, you can also specify `-DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>`
     * Optionally, for a release build, specify `-DCMAKE_BUILD_TYPE=Release`
-4, `cmake --build .`
+5. `cmake --build .`
     * Optionally specify `-jN` where N is the number of processes you wish to spawn for the build
 
 ## Run Samples
