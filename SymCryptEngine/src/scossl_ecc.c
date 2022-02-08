@@ -1161,8 +1161,8 @@ SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsign
         goto cleanup;
     }
 
-    if( (BN_bn2binpad(ec_pub_x, buf, cbPublicKey/2) != cbPublicKey/2) ||
-        (BN_bn2binpad(ec_pub_y, buf + (cbPublicKey/2), cbPublicKey/2) != cbPublicKey/2) )
+    if( (BN_bn2binpad(ec_pub_x, buf, cbPublicKey/2) != (int) cbPublicKey/2) ||
+        (BN_bn2binpad(ec_pub_y, buf + (cbPublicKey/2), cbPublicKey/2) != (int) cbPublicKey/2) )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad did not write expected number of public key bytes.");

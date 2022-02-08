@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13.0)
 
-project(scossl)
+project(SymCrypt-OpenSSL
+    VERSION 1.0.0
+    DESCRIPTION "The SymCrypt engine for OpenSSL (SCOSSL)"
+    HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
 include_directories(${SYMCRYPT_ROOT_DIR}/inc)
 
@@ -26,5 +29,3 @@ endif()
 add_subdirectory (SymCryptEngine/static)
 add_subdirectory (SymCryptEngine/dynamic)
 add_subdirectory (SslPlay)
-
-

@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-par
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-find_library(SYMCRYPT_LIBRARY symcrypt)
+find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 add_library(scossl_dynamic SHARED
     ../src/scossl.c
@@ -40,7 +40,6 @@ target_include_directories (scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
 set_target_properties(scossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
-target_link_directories(scossl_dynamic PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(scossl_dynamic PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
