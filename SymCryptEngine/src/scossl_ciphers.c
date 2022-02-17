@@ -993,6 +993,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         {
             memcpy(cipherCtx->iv, iv, cipherCtx->ivlen);
         }
+        cipherCtx->operationInProgress = 0;
         cipherCtx->taglen = EVP_GCM_TLS_TAG_LEN;
         cipherCtx->tlsAadSet = 0;
         cipherCtx->ivInvocation = 0;
@@ -1083,6 +1084,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         memcpy(ptr, cipherCtx->iv + cipherCtx->ivlen - arg, arg);
         // Increment invocation counter
         cipherCtx->ivInvocation++;
+        cipherCtx->operationInProgress = 0; // Flag cipherCtx->state to be reinitialized
         break;
     case EVP_CTRL_GCM_SET_IV_INV:
         if( cipherCtx->useInvocation == 0 || EVP_CIPHER_CTX_encrypting(ctx) )
@@ -1097,6 +1099,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         memcpy(cipherCtx->iv + cipherCtx->ivlen - arg, ptr, arg);
         // Initialize our invocation counter from the IV
         cipherCtx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64( cipherCtx->iv + cipherCtx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN );
+        cipherCtx->operationInProgress = 0; // Flag cipherCtx->state to be reinitialized
         break;
     case EVP_CTRL_AEAD_TLS1_AAD:
         if( arg != EVP_AEAD_TLS1_AAD_LEN )
