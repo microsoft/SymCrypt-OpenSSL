@@ -696,7 +696,7 @@ SCOSSL_STATUS scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
             "SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
-    scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, 0);
+    scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, SYMCRYPT_FLAG_RSAKEY_SELFTEST);
     if( scError != SYMCRYPT_NO_ERROR )
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
@@ -984,7 +984,7 @@ SCOSSL_STATUS scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONT
                    (SIZE_T *)pcbPrimes,
                    nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                   0,
+                   SYMCRYPT_FLAG_RSAKEY_SELFTEST,
                    keyCtx->key);
     if( scError != SYMCRYPT_NO_ERROR )
     {
