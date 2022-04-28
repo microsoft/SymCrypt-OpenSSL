@@ -144,7 +144,7 @@ SCOSSL_STATUS scossl_aes_cbc_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
 static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CBC_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE|EVP_CIPH_CUSTOM_COPY \
-                         |EVP_CIPH_ALWAYS_CALL_INIT)
+                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_FLAG_FIPS)
 
 /* AES128 - CBC */
 static EVP_CIPHER *_hidden_aes_128_cbc = NULL;
@@ -205,7 +205,8 @@ SCOSSL_STATUS scossl_aes_ecb_init_key(
 SCOSSL_STATUS scossl_aes_ecb_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
 static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
-#define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY)
+#define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY \
+                         |EVP_CIPH_FLAG_FIPS)
 
 /* AES128 - ecb */
 static EVP_CIPHER *_hidden_aes_128_ecb = NULL;
@@ -313,7 +314,8 @@ SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(
 static _Success_(return > 0) int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
-                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
+                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER \
+                        |EVP_CIPH_FLAG_FIPS)
 
 /* AES128 - GCM */
 static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
@@ -373,7 +375,8 @@ SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(
 static _Success_(return > 0) int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
-                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER)
+                        |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER \
+                        |EVP_CIPH_FLAG_FIPS )
 
 /* AES128 - CCM */
 static EVP_CIPHER *_hidden_aes_128_ccm = NULL;

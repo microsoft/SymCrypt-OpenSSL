@@ -60,8 +60,8 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
         scossl_module_initialized = 1;
     }
 
+    scossl_rsa_method = RSA_meth_dup(RSA_PKCS1_OpenSSL());
     scossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
-    scossl_rsa_method = RSA_meth_new("SCOSSL (SymCrypt engine for OpenSSL) RSA Method", 0);
     // scossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
     scossl_dh_method = DH_meth_dup(DH_OpenSSL());
 
@@ -76,6 +76,7 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
 
     /* Setup RSA_METHOD */
     if( (scossl_rsa_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+        || !RSA_meth_set1_name(scossl_rsa_method, "SCOSSL (SymCrypt engine for OpenSSL) RSA Method")
         || !RSA_meth_set_pub_enc(scossl_rsa_method, scossl_rsa_pub_enc)
         || !RSA_meth_set_priv_dec(scossl_rsa_method, scossl_rsa_priv_dec)
         || !RSA_meth_set_priv_enc(scossl_rsa_method, scossl_rsa_priv_enc)
@@ -92,12 +93,12 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
         goto end;
     }
 
-    if( (scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
+    /* Setup EC_METHOD */
+    if( (scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1 )
     {
         goto end;
     }
 
-    /* Setup EC_METHOD */
     EC_KEY_METHOD_set_init(scossl_eckey_method,
                            NULL, // eckey_init - lazily initialize ex_data only when the engine needs to
                            scossl_eckey_finish,
@@ -128,13 +129,10 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     //     goto end;
     // }
 
-    if( (scossl_dh_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1)
-    {
-        goto end;
-    }
-
     // /* Setup DH METHOD */
-    if (   !DH_meth_set_generate_key(scossl_dh_method, scossl_dh_generate_key)
+    if (   (scossl_dh_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+        || !DH_meth_set1_name(scossl_dh_method, "SCOSSL (SymCrypt engine for OpenSSL) DH Method")
+        || !DH_meth_set_generate_key(scossl_dh_method, scossl_dh_generate_key)
         || !DH_meth_set_compute_key(scossl_dh_method, scossl_dh_compute_key)
         || !DH_meth_set_finish(scossl_dh_method, scossl_dh_finish)
         )
