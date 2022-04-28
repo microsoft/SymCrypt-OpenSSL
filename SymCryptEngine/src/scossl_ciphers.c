@@ -939,7 +939,7 @@ SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
 
     if( EVP_CIPHER_CTX_encrypting(ctx) )
     {
-        if( inl > 0 )
+        if( in != NULL )
         {
             // Encrypt Part
             SymCryptGcmEncryptPart(&cipherCtx->state, in, out, inl);
@@ -954,7 +954,7 @@ SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
     }
     else
     {
-        if( inl > 0 )
+        if( in != NULL )
         {
             // Decrypt Part
             SymCryptGcmDecryptPart(&cipherCtx->state, in, out, inl);

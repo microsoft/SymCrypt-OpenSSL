@@ -98,9 +98,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(
         goto cleanup;
     }
 
-    scError = SymCryptDlkeyGenerate(
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_DLKEY_SELFTEST_DH,
-        pKeyCtx->dlkey );
+    scError = SymCryptDlkeyGenerate( SYMCRYPT_FLAG_DLKEY_DH, pKeyCtx->dlkey );
     if( scError != SYMCRYPT_NO_ERROR )
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
@@ -267,7 +265,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(
         pbPrivateKey, cbPrivateKey,
         pbPublicKey, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_KEY_KEYPAIR_REGENERATION_VALIDATION | SYMCRYPT_FLAG_DLKEY_SELFTEST_DH,
+        SYMCRYPT_FLAG_DLKEY_DH,
         pKeyCtx->dlkey );
     if( scError != SYMCRYPT_NO_ERROR )
     {
@@ -578,7 +576,7 @@ SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsign
         NULL, 0,
         buf, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_DLKEY_SELFTEST_DH,
+        SYMCRYPT_FLAG_DLKEY_DH,
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {

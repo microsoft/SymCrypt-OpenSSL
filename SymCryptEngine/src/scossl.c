@@ -29,23 +29,26 @@ static DH_METHOD* scossl_dh_method = NULL;
 
 SCOSSL_STATUS scossl_destroy(ENGINE* e)
 {
-    scossl_destroy_digests();
-    scossl_destroy_ciphers();
-    scossl_destroy_pkey_methods();
-    RSA_meth_free(scossl_rsa_method);
-    scossl_rsa_method = NULL;
-    scossl_destroy_ecc_curves();
-    EC_KEY_METHOD_free(scossl_eckey_method);
-    scossl_eckey_method = NULL;
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, scossl_rsa_idx);
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, scossl_eckey_idx);
-    // DSA_meth_free(scossl_dsa_method);
-    // scossl_dsa_method = NULL;
-    scossl_destroy_safeprime_dlgroups();
-    DH_meth_free(scossl_dh_method);
-    scossl_dh_method = NULL;
-    CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, scossl_dh_idx);
-    scossl_destroy_logging();
+    if( scossl_eckey_method != NULL )
+    {
+        scossl_destroy_digests();
+        scossl_destroy_ciphers();
+        scossl_destroy_pkey_methods();
+        RSA_meth_free(scossl_rsa_method);
+        scossl_rsa_method = NULL;
+        scossl_destroy_ecc_curves();
+        EC_KEY_METHOD_free(scossl_eckey_method);
+        scossl_eckey_method = NULL;
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, scossl_rsa_idx);
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, scossl_eckey_idx);
+        // DSA_meth_free(scossl_dsa_method);
+        // scossl_dsa_method = NULL;
+        scossl_destroy_safeprime_dlgroups();
+        DH_meth_free(scossl_dh_method);
+        scossl_dh_method = NULL;
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, scossl_dh_idx);
+        scossl_destroy_logging();
+    }
 
     return SCOSSL_SUCCESS;
 }

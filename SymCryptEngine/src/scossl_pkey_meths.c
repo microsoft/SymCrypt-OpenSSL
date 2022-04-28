@@ -260,7 +260,8 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
 
 void scossl_destroy_pkey_methods(void)
 {
-    // It seems that explicitly freeing these methods in the destroy method causes a double free
+    // It seems that explicitly freeing these methods in the destroy method causes a double free as
+    // OpenSSL automatically frees pkey methods associated with an engine in destroying the engine
     // (seen in SslPlay with sanitizers on, or in OpenSSL applications using the engine)
     // For now just don't free these methods here, but keep an eye out for memory leaks
 
