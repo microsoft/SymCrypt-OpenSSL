@@ -146,8 +146,9 @@ void TestEccCurve(int nid)
     key2 = EC_KEY_new_by_curve_name(nid);
     printf("Command EC_KEY_generate_key\n");
     EC_KEY_generate_key(key1);
-    EC_KEY_generate_key(key2);
     TestEcdsa(key1);
+    EC_KEY_generate_key(key1);
+    EC_KEY_generate_key(key2);
     TestEcdh(key1, key2);
     EC_KEY_free(key1);
     EC_KEY_free(key2);

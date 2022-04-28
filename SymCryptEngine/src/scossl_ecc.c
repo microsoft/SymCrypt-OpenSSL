@@ -32,8 +32,15 @@ typedef int (*PFN_eckey_compute_key)(unsigned char **psec,
                                const EC_POINT *pub_key,
                                const EC_KEY *ecdh);
 
+typedef enum {
+    SCOSSL_ECC_KEY_PURPOSE_UNINITIALIZED = 0,
+    SCOSSL_ECC_KEY_PURPOSE_UNKNOWN,
+    SCOSSL_ECC_KEY_PURPOSE_ECDH,
+    SCOSSL_ECC_KEY_PURPOSE_ECDSA,
+} SCOSSL_ECC_KEY_PURPOSE;
+
 typedef struct _SCOSSL_ECC_KEY_CONTEXT {
-    int initialized;
+    SCOSSL_ECC_KEY_PURPOSE purpose;
     PSYMCRYPT_ECKEY key;
 } SCOSSL_ECC_KEY_CONTEXT;
 
@@ -335,7 +342,7 @@ cleanup:
 
 void scossl_ecc_free_key_context(_Inout_ SCOSSL_ECC_KEY_CONTEXT *keyCtx)
 {
-    keyCtx->initialized = 0;
+    keyCtx->purpose = SCOSSL_ECC_KEY_PURPOSE_UNINITIALIZED;
     if( keyCtx->key )
     {
         SymCryptEckeyFree(keyCtx->key);
@@ -351,7 +358,7 @@ void scossl_eckey_finish(_Inout_ EC_KEY *key)
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, scossl_eckey_idx);
     if( keyCtx )
     {
-        if( keyCtx->initialized == 1 )
+        if( keyCtx->purpose != SCOSSL_ECC_KEY_PURPOSE_UNINITIALIZED )
         {
             scossl_ecc_free_key_context(keyCtx);
         }
@@ -407,9 +414,7 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
         goto cleanup;
     }
 
-    scError = SymCryptEckeySetRandom(
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDSA | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH,
-        pKeyCtx->key );
+    scError = SymCryptEckeySetRandom( SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION, pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
@@ -488,7 +493,7 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
         goto cleanup;
     }
 
-    pKeyCtx->initialized = 1;
+    pKeyCtx->purpose = SCOSSL_ECC_KEY_PURPOSE_UNKNOWN;
     res = SCOSSL_SUCCESS;
 
 cleanup:
@@ -516,7 +521,8 @@ cleanup:
 // Imports key using eckey, ecgroup, and pCurve into pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup,
-                                        _Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve)
+                                        _Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, SCOSSL_ECC_KEY_PURPOSE purpose,
+                                        _In_ PCSYMCRYPT_ECURVE pCurve)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PBYTE  pbData = NULL;
@@ -533,6 +539,22 @@ SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_
     BIGNUM* ec_pub_y = NULL;
 
     int res = SCOSSL_FAILURE;
+    UINT32 importFlags = SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_KEY_KEYPAIR_REGENERATION_VALIDATION;
+
+    if( purpose == SCOSSL_ECC_KEY_PURPOSE_ECDSA )
+    {
+        importFlags |= SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDSA;
+    }
+    else if( purpose == SCOSSL_ECC_KEY_PURPOSE_ECDH )
+    {
+        importFlags |= SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH;
+    }
+    else
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_PASSED_INVALID_ARGUMENT,
+            "Unexpected purpose (%x).", purpose);
+        goto cleanup;
+    }
 
     pKeyCtx->key = SymCryptEckeyAllocate(pCurve);
     if( pKeyCtx->key == NULL )
@@ -617,7 +639,7 @@ SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_
         pbPublicKey, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         SYMCRYPT_ECPOINT_FORMAT_XY,
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_KEY_KEYPAIR_REGENERATION_VALIDATION | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDSA | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH,
+        importFlags,
         pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
@@ -626,7 +648,7 @@ SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_
         goto cleanup;
     }
 
-    pKeyCtx->initialized = 1;
+    pKeyCtx->purpose = purpose;
     res = SCOSSL_SUCCESS;
 
 cleanup:
@@ -665,8 +687,9 @@ SCOSSL_STATUS scossl_ecc_init_static()
 // returns SCOSSL_FALLBACK when the eckey is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_ECC_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
+SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, SCOSSL_ECC_KEY_PURPOSE purpose, BOOL generate)
 {
+    SCOSSL_STATUS status = SCOSSL_SUCCESS;
     PCSYMCRYPT_ECURVE pCurve = NULL;
 
     const EC_GROUP* ecgroup = EC_KEY_get0_group(eckey);
@@ -694,14 +717,16 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SymCrypt engine does not yet support this group (nid %d) - falling back to OpenSSL.", groupNid);
-        return SCOSSL_FALLBACK;
+        status = SCOSSL_FALLBACK;
+        goto cleanup;
     }
 
     if( pCurve == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
             "SymCryptEcurveAllocate failed.");
-        return SCOSSL_FAILURE;
+        status = SCOSSL_FALLBACK;
+        goto cleanup;
     }
 
     *ppKeyCtx = (SCOSSL_ECC_KEY_CONTEXT*) EC_KEY_get_ex_data(eckey, scossl_eckey_idx);
@@ -713,7 +738,8 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
                 "OPENSSL_zalloc failed");
-            return SCOSSL_FAILURE;
+            status = SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         if( EC_KEY_set_ex_data(eckey, scossl_eckey_idx, keyCtx) == 0)
@@ -721,33 +747,88 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_OPERATION_FAIL,
                 "EC_KEY_set_ex_data failed");
             OPENSSL_free(keyCtx);
-            return SCOSSL_FAILURE;
+            status = SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         *ppKeyCtx = keyCtx;
     }
 
-    if( (*ppKeyCtx)->initialized == 1 )
+    // If we are asked to generate a key - make sure to free any existing key
+    if( generate && (*ppKeyCtx)->purpose != SCOSSL_ECC_KEY_PURPOSE_UNINITIALIZED)
     {
-        return SCOSSL_SUCCESS;
+        scossl_ecc_free_key_context(*ppKeyCtx);
     }
 
-    if( generate )
+    if( (*ppKeyCtx)->purpose == purpose )
     {
-        return scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, ecgroup, eckey);
+        // We have previously used this key for the given purpose so we can return it
+        goto cleanup;
     }
-    else
+    else if( (*ppKeyCtx)->purpose == SCOSSL_ECC_KEY_PURPOSE_UNINITIALIZED )
     {
-        return scossl_ecc_import_keypair(eckey, ecgroup, *ppKeyCtx, pCurve);
+        // We have not yet initialized this key, either generate it or import it
+        if( generate )
+        {
+            // In the following we set the (*ppKeyCtx)->purpose to SCOSSL_ECC_KEY_PURPOSE_UNKNOWN
+            // If purpose is set to a value, we may need to perform a PCT before first use, so we continue below
+            status = scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, ecgroup, eckey);
+        }
+        else
+        {
+            // We set only need to perform  purpose of the key on import, so we are done afterwards
+            status = scossl_ecc_import_keypair(eckey, ecgroup, *ppKeyCtx, purpose, pCurve);
+            goto cleanup;
+        }
     }
+
+    if( status == SCOSSL_SUCCESS && purpose != SCOSSL_ECC_KEY_PURPOSE_UNKNOWN )
+    {
+        if( (*ppKeyCtx)->purpose == SCOSSL_ECC_KEY_PURPOSE_UNKNOWN )
+        {
+            // This key has been generated but not yet used in an algorithm
+            // We must perform the appropriate self-test before first use
+            if( purpose == SCOSSL_ECC_KEY_PURPOSE_ECDSA )
+            {
+                SymCryptEcDsaSignVerifyTest( (*ppKeyCtx)->key );
+                __atomic_fetch_or( (volatile uint32_t *)(&g_SymCryptFipsSelftestsPerformed), (uint32_t)(SYMCRYPT_SELFTEST_ECDSA), __ATOMIC_RELAXED );
+                (*ppKeyCtx)->purpose = purpose;
+            }
+            else if( purpose == SCOSSL_ECC_KEY_PURPOSE_ECDH )
+            {
+                if( ( g_SymCryptFipsSelftestsPerformed & SYMCRYPT_SELFTEST_ECDH_SECRET_AGREEMENT ) == 0 )
+                {
+                    SymCryptEcDhSecretAgreementSelftest();
+                    __atomic_fetch_or( (volatile uint32_t *)(&g_SymCryptFipsSelftestsPerformed), (uint32_t)(SYMCRYPT_SELFTEST_ECDH_SECRET_AGREEMENT), __ATOMIC_RELAXED );
+                }
+                (*ppKeyCtx)->purpose = purpose;
+            }
+            else
+            {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_PASSED_INVALID_ARGUMENT,
+                    "Unknown SCOSSL_ECC_KEY_PURPOSE (%x).", purpose);
+                status = SCOSSL_FAILURE;
+            }
+        }
+        else if( (*ppKeyCtx)->purpose != purpose )
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_PASSED_INVALID_ARGUMENT,
+                "Attempted to use an EC_KEY for two different purposes. Initialized for SCOSSL_ECC_KEY_PURPOSE (%x), attempted (%x).", 
+                (*ppKeyCtx)->purpose, purpose);
+            status = SCOSSL_FAILURE;
+        }
+    }
+
+cleanup:
+    return status;
 }
 
 // returns SCOSSL_FALLBACK when the eckey is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_ECC_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_ecc_context(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx)
+SCOSSL_STATUS scossl_get_ecc_context(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, SCOSSL_ECC_KEY_PURPOSE purpose)
 {
-    return scossl_get_ecc_context_ex(eckey, ppKeyCtx, FALSE);
+    return scossl_get_ecc_context_ex(eckey, ppKeyCtx, purpose, FALSE);
 }
 
 SCOSSL_STATUS scossl_eckey_sign(int type,
@@ -765,7 +846,7 @@ SCOSSL_STATUS scossl_eckey_sign(int type,
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( scossl_get_ecc_context(eckey, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDSA) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
@@ -835,7 +916,7 @@ SCOSSL_STATUS scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _
     const EC_KEY_METHOD* ossl_eckey_method = EC_KEY_OpenSSL();
     PFN_eckey_sign_setup pfn_eckey_sign_setup = NULL;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( scossl_get_ecc_context(eckey, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDSA) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, ERR_R_OPERATION_FAIL,
@@ -871,7 +952,7 @@ ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* 
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( scossl_get_ecc_context(eckey, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDSA) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
@@ -964,7 +1045,7 @@ SCOSSL_STATUS scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const uns
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( scossl_get_ecc_context(eckey, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDSA) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
@@ -1028,7 +1109,7 @@ SCOSSL_STATUS scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned 
     const BIGNUM* r = NULL;
     const BIGNUM* s = NULL;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( scossl_get_ecc_context(eckey, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDSA) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, ERR_R_OPERATION_FAIL,
@@ -1083,7 +1164,7 @@ SCOSSL_STATUS scossl_eckey_keygen(_Inout_ EC_KEY *key)
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
-    switch( scossl_get_ecc_context_ex(key, &keyCtx, TRUE) )
+    switch( scossl_get_ecc_context_ex(key, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_UNKNOWN, TRUE) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_KEYGEN, ERR_R_OPERATION_FAIL,
@@ -1126,7 +1207,7 @@ SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsign
 
     int res = -1; // fail
 
-    switch( scossl_get_ecc_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor scossl_get_ecc_context
+    switch( scossl_get_ecc_context((EC_KEY*)ecdh, &keyCtx, SCOSSL_ECC_KEY_PURPOSE_ECDH) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor scossl_get_ecc_context
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
