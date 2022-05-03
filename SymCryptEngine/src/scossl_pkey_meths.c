@@ -158,8 +158,11 @@ static EVP_PKEY_METHOD *scossl_pkey_tls1_prf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
+    int flags = 0;
 
-    if((_scossl_pkey_tls1_prf = EVP_PKEY_meth_new(EVP_PKEY_TLS1_PRF, 0)) != NULL)
+    EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_tls1_prf );
+
+    if((_scossl_pkey_tls1_prf = EVP_PKEY_meth_new(EVP_PKEY_TLS1_PRF, flags)) != NULL)
     {
         // Use the default ctrl_str implementation, internally calls our ctrl method
         EVP_PKEY_meth_get_ctrl(_openssl_pkey_tls1_prf, &pctrl, &pctrl_str);
@@ -180,8 +183,11 @@ static EVP_PKEY_METHOD *scossl_pkey_hkdf(void)
 {
     int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
     int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
+    int flags = 0;
 
-    if((_scossl_pkey_hkdf = EVP_PKEY_meth_new(EVP_PKEY_HKDF, 0)) != NULL)
+    EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_hkdf );
+
+    if((_scossl_pkey_hkdf = EVP_PKEY_meth_new(EVP_PKEY_HKDF, flags)) != NULL)
     {
         // Use the default ctrl_str implementation, internally calls our ctrl method
         EVP_PKEY_meth_get_ctrl(_openssl_pkey_hkdf, &pctrl, &pctrl_str);
