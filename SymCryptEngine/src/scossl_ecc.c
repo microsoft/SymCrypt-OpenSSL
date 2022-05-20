@@ -369,7 +369,7 @@ static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 // Generates a new keypair using pCurve, storing the new keypair in eckey and pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
 SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve,
-                                        _Inout_ EC_KEY* eckey)
+                                        _In_ const EC_GROUP* ecgroup, _Inout_ EC_KEY* eckey)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PBYTE  pbData = NULL;
@@ -379,7 +379,9 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
 
-    BIGNUM* ec_privkey = NULL;
+    BIGNUM*   ec_privkey = NULL;
+    EC_POINT* ec_pubkey = NULL;
+    BN_CTX* bn_ctx = NULL;
     BIGNUM* ec_pub_x = NULL;
     BIGNUM* ec_pub_y = NULL;
 
@@ -432,12 +434,27 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
         goto cleanup;
     }
 
+    if( (bn_ctx = BN_CTX_new()) == NULL )
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+            "BN_CTX_new returned NULL.");
+        goto cleanup;
+    }
+    BN_CTX_start(bn_ctx);
+
     if( ((ec_privkey = BN_secure_new()) == NULL) ||
         ((ec_pub_x = BN_new()) == NULL) ||
         ((ec_pub_y = BN_new()) == NULL) )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
+        goto cleanup;
+    }
+
+    if( (ec_pubkey = EC_POINT_new(ecgroup)) == NULL )
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+            "EC_POINT_new returned NULL.");
         goto cleanup;
     }
 
@@ -456,10 +473,18 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
             "EC_KEY_set_private_key failed.");
         goto cleanup;
     }
-    if( EC_KEY_set_public_key_affine_coordinates(eckey, ec_pub_x, ec_pub_y) == 0 )
+
+    if( EC_POINT_set_affine_coordinates(ecgroup, ec_pubkey, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
-            "EC_KEY_set_public_key_affine_coordinates failed.");
+            "EC_POINT_set_affine_coordinates failed.");
+        goto cleanup;
+
+    }
+    if( EC_KEY_set_public_key(eckey, ec_pubkey) == 0 )
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+            "EC_KEY_set_public_key failed.");
         goto cleanup;
     }
 
@@ -478,10 +503,13 @@ cleanup:
         OPENSSL_clear_free(pbData, cbData);
     }
 
-    // Always free the temporary BIGNUMs
+    // Always free the temporary BIGNUMs, EC_POINT, and BN_CTX
     BN_clear_free(ec_privkey);
+    EC_POINT_free(ec_pubkey);
     BN_free(ec_pub_x);
     BN_free(ec_pub_y);
+    BN_CTX_end(bn_ctx);
+    BN_CTX_free(bn_ctx);
     return res;
 }
 
@@ -706,7 +734,7 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
 
     if( generate )
     {
-        return scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, eckey);
+        return scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, ecgroup, eckey);
     }
     else
     {
