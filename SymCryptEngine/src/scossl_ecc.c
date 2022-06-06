@@ -407,9 +407,7 @@ SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCt
         goto cleanup;
     }
 
-    scError = SymCryptEckeySetRandom(
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDSA | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH,
-        pKeyCtx->key );
+    scError = SymCryptEckeySetRandom( SYMCRYPT_FLAG_ECKEY_ECDH, pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
@@ -617,7 +615,7 @@ SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_
         pbPublicKey, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         SYMCRYPT_ECPOINT_FORMAT_XY,
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_KEY_KEYPAIR_REGENERATION_VALIDATION | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDSA | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH,
+        SYMCRYPT_FLAG_ECKEY_ECDSA | SYMCRYPT_FLAG_ECKEY_ECDH,
         pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
@@ -727,6 +725,12 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
         *ppKeyCtx = keyCtx;
     }
 
+    // If we are asked to generate a key - make sure to free any existing key
+    if( generate )
+    {
+        scossl_ecc_free_key_context(*ppKeyCtx);
+    }
+
     if( (*ppKeyCtx)->initialized == 1 )
     {
         return SCOSSL_SUCCESS;
@@ -801,6 +805,14 @@ SCOSSL_STATUS scossl_eckey_sign(int type,
             return SCOSSL_FAILURE;
         }
         return pfn_eckey_sign(type, dgst, dlen, sig, siglen, kinv, r, eckey);
+    }
+
+    scError = SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA);
+    if( scError != SYMCRYPT_NO_ERROR )
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyExtendKeyUsage failed", scError);
+        return SCOSSL_FAILURE;
     }
 
     cbSymCryptSig = 2*SymCryptEcurveSizeofScalarMultiplier( keyCtx->key->pCurve );
@@ -891,6 +903,14 @@ ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* 
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_INTERNAL_ERROR,
             "Unexpected scossl_get_ecc_context value");
+        return NULL;
+    }
+
+    scError = SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA);
+    if( scError != SYMCRYPT_NO_ERROR )
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyExtendKeyUsage failed", scError);
         return NULL;
     }
 
@@ -1202,7 +1222,7 @@ SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsign
         buf, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         SYMCRYPT_ECPOINT_FORMAT_XY,
-        SYMCRYPT_FLAG_KEY_RANGE_AND_PUBLIC_KEY_ORDER_VALIDATION | SYMCRYPT_FLAG_ECKEY_SELFTEST_ECDH,
+        SYMCRYPT_FLAG_ECKEY_ECDH,
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {
