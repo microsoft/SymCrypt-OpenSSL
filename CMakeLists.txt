@@ -19,7 +19,7 @@ if (CMAKE_BUILD_TYPE MATCHES Sanitize)
     add_link_options(-fno-sanitize-recover=all)
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Release)
+if(CMAKE_BUILD_TYPE MATCHES Release|RelWithDebInfo)
     message("Release mode")
 else()
     message("Debug mode")
