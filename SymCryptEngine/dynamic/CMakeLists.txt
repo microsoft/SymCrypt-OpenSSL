@@ -5,6 +5,7 @@ project(scossl_engine_dynamic)
 set(DEFAULT_BUILD_TYPE "Release")
 
 include(GNUInstallDirs)
+include(CheckSymbolExists)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
@@ -14,7 +15,7 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
-add_library(scossl_dynamic SHARED
+set(SCOSSL_SOURCES 
     ../src/scossl.c
     ../src/scossl_ciphers.c
     ../src/scossl_dh.c
@@ -29,6 +30,17 @@ add_library(scossl_dynamic SHARED
     ../src/scossl_tls1prf.c
     ../src/scossl_helpers.c
 )
+
+
+check_symbol_exists(EVP_KDF_SSHKDF "${OPENSSL_INCLUDE_DIR}/openssl/kdf.h" SCOSSL_SSHKDF)
+
+#if (SCOSSL_SSHKDF)
+    set(SCOSSL_SOURCES ${SCOSSL_SOURCES} ../src/scossl_sshkdf.c)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
+#endif()
+
+add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES})
 
 set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
 # target_link_libraries(scossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})

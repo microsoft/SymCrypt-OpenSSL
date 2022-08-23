@@ -6,7 +6,9 @@
 #include "scossl_hkdf.h"
 #include "scossl_tls1prf.h"
 #include "scossl_rsapss.h"
+#include "scossl_sshkdf.h"
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,10 +16,13 @@ extern "C" {
 
 
 static int scossl_evp_nids[] = {
-    EVP_PKEY_RSA,
+    EVP_PKEY_RSA,  
     EVP_PKEY_RSA_PSS,
     EVP_PKEY_TLS1_PRF,
     EVP_PKEY_HKDF,
+#ifdef SCOSSL_SSHKDF
+    EVP_KDF_SSHKDF,
+#endif    
     // EVP_PKEY_X25519 - Future
 };
 static const int scossl_evp_nids_count = sizeof(scossl_evp_nids) / sizeof(scossl_evp_nids[0]);
@@ -200,12 +205,44 @@ static EVP_PKEY_METHOD *scossl_pkey_hkdf(void)
     return _scossl_pkey_hkdf;
 }
 
+#ifdef SCOSSL_SSHKDF  
+
+static const EVP_PKEY_METHOD *_openssl_pkey_sshkdf = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_sshkdf = NULL;
+
+// Creates and returns the internal SSHKDF method structure holding methods for SSHKDF functions
+static EVP_PKEY_METHOD *scossl_pkey_sshkdf(void)
+{
+    int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
+    int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
+    int flags = 0;
+
+    EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_sshkdf );
+
+    if((_scossl_pkey_sshkdf = EVP_PKEY_meth_new(EVP_KDF_SSHKDF, flags)) != NULL)
+    {
+        // Use the default ctrl_str implementation, internally calls our ctrl method
+        EVP_PKEY_meth_get_ctrl(_openssl_pkey_sshkdf, &pctrl, &pctrl_str);
+
+        EVP_PKEY_meth_set_init(_scossl_pkey_sshkdf, scossl_sshkdf_init);
+        EVP_PKEY_meth_set_cleanup(_scossl_pkey_sshkdf, scossl_sshkdf_cleanup);
+        EVP_PKEY_meth_set_derive(_scossl_pkey_sshkdf, scossl_sshkdf_derive_init, scossl_sshkdf_derive);
+        EVP_PKEY_meth_set_ctrl(_scossl_pkey_sshkdf, scossl_sshkdf_ctrl, pctrl_str);
+    }
+    return _scossl_pkey_hkdf;
+}
+#endif // SCOSSL_SSHKDF
+
 SCOSSL_STATUS scossl_pkey_methods_init_static()
 {
     if( (scossl_pkey_rsa() == NULL) ||
         (scossl_pkey_rsa_pss() == NULL) ||
         (scossl_pkey_tls1_prf() == NULL) ||
-        (scossl_pkey_hkdf() == NULL) )
+        (scossl_pkey_hkdf() == NULL)
+#ifdef SCOSSL_SSHKDF  
+        || (scossl_pkey_sshkdf() == NULL) 
+#endif
+        )
     {
         return SCOSSL_FAILURE;
     }
@@ -224,6 +261,9 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
         _openssl_pkey_rsa_pss = EVP_PKEY_meth_find(EVP_PKEY_RSA_PSS);
         _openssl_pkey_tls1_prf = EVP_PKEY_meth_find(EVP_PKEY_TLS1_PRF);
         _openssl_pkey_hkdf = EVP_PKEY_meth_find(EVP_PKEY_HKDF);
+#ifdef SCOSSL_SSHKDF          
+        _openssl_pkey_sshkdf = EVP_PKEY_meth_find(EVP_KDF_SSHKDF);
+#endif
     }
 
     if( !pmeth )
@@ -248,6 +288,13 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
     case EVP_PKEY_HKDF:
         *pmeth = _scossl_pkey_hkdf;
         break;
+
+#ifdef SCOSSL_SSHKDF          
+    case EVP_KDF_SSHKDF:
+        *pmeth = _scossl_pkey_sshkdf;
+        break;
+#endif
+
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_METHODS, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "NID %d not supported");
@@ -269,6 +316,10 @@ void scossl_destroy_pkey_methods(void)
     // EVP_PKEY_meth_free(_scossl_pkey_tls1_prf);
     // EVP_PKEY_meth_free(_scossl_pkey_rsa_pss);
     // EVP_PKEY_meth_free(_scossl_pkey_rsa);
+#ifdef SCOSSL_SSHKDF      
+    _scossl_pkey_sshkdf = NULL;
+    _openssl_pkey_sshkdf = NULL;
+#endif
     _scossl_pkey_hkdf = NULL;
     _scossl_pkey_tls1_prf = NULL;
     _scossl_pkey_rsa_pss = NULL;
