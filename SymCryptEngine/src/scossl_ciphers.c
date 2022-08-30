@@ -132,6 +132,12 @@ static int scossl_cipher_nids[] = {
     NID_aes_128_ccm,
     NID_aes_192_ccm,
     NID_aes_256_ccm,
+
+    NID_aes_128_cbc_hmac_sha1,
+    NID_aes_256_cbc_hmac_sha1,
+
+    NID_aes_128_cbc_hmac_sha256,
+    NID_aes_256_cbc_hmac_sha256,
 };
 
 #define AES_128_KEY_SIZE 16
@@ -540,6 +546,15 @@ int scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
         break;
     case NID_aes_256_ccm:
         *cipher = _hidden_aes_256_ccm;
+        break;
+    case NID_aes_128_cbc_hmac_sha1:
+    case NID_aes_256_cbc_hmac_sha1:
+    case NID_aes_128_cbc_hmac_sha256:
+    case NID_aes_256_cbc_hmac_sha256:
+        // Explicitly disable stitched AES-CBC + HMAC ciphers in SCOSSL
+        // Calling applications need to have fallbacks in case the stitched version
+        // is not available
+        *cipher = NULL;
         break;
     default:
         ok = 0;
