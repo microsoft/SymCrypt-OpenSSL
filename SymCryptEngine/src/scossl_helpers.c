@@ -88,6 +88,9 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_CTRL, 0), "scossl_tls1prf_ctrl"},
     {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_DERIVE, 0), "scossl_tls1prf_derive"},
     {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_INIT, 0), "scossl_tls1prf_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_INIT, 0), "scossl_hmac_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL, 0), "scossl_hmac_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL_STR, 0), "scossl_hmac_ctrl_str"},
     {0, NULL}
 };
 

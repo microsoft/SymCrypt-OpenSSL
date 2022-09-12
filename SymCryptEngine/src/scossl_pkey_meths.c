@@ -6,6 +6,7 @@
 #include "scossl_hkdf.h"
 #include "scossl_tls1prf.h"
 #include "scossl_rsapss.h"
+#include "scossl_hmac.h"
 #include <openssl/evp.h>
 
 #ifdef __cplusplus
@@ -18,6 +19,7 @@ static int scossl_evp_nids[] = {
     EVP_PKEY_RSA_PSS,
     EVP_PKEY_TLS1_PRF,
     EVP_PKEY_HKDF,
+    EVP_PKEY_HMAC,
     // EVP_PKEY_X25519 - Future
 };
 static const int scossl_evp_nids_count = sizeof(scossl_evp_nids) / sizeof(scossl_evp_nids[0]);
@@ -200,12 +202,41 @@ static EVP_PKEY_METHOD *scossl_pkey_hkdf(void)
     return _scossl_pkey_hkdf;
 }
 
+static const EVP_PKEY_METHOD *_openssl_pkey_hmac = NULL;
+static EVP_PKEY_METHOD *_scossl_pkey_hmac = NULL;
+
+// Creates and returns the internal HMAC method structure holding methods for HMAC functions
+static EVP_PKEY_METHOD *scossl_pkey_hmac(void)
+{
+    //int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
+    //int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
+    int flags = 0;
+
+    EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_hmac );
+
+    if((_scossl_pkey_hmac = EVP_PKEY_meth_new(EVP_PKEY_HMAC, flags)) != NULL)
+    {
+        // Use the default ctrl_str implementation, internally calls our ctrl method
+        //EVP_PKEY_meth_get_ctrl(_openssl_pkey_hmac, &pctrl, &pctrl_str);
+
+        EVP_PKEY_meth_set_init(_scossl_pkey_hmac, scossl_hmac_init);
+        EVP_PKEY_meth_set_cleanup(_scossl_pkey_hmac, scossl_hmac_cleanup);
+        EVP_PKEY_meth_set_copy(_scossl_pkey_hmac, scossl_hmac_copy);
+        EVP_PKEY_meth_set_ctrl(_scossl_pkey_hmac, scossl_hmac_ctrl, scossl_hmac_ctrl_str);
+        EVP_PKEY_meth_set_keygen(_scossl_pkey_hmac, NULL, scossl_hmac_keygen);
+        EVP_PKEY_meth_set_signctx(_scossl_pkey_hmac, scossl_hmac_signctx_init, scossl_hmac_signctx);
+    }
+    return _scossl_pkey_hmac;
+}
+
 SCOSSL_STATUS scossl_pkey_methods_init_static()
 {
     if( (scossl_pkey_rsa() == NULL) ||
         (scossl_pkey_rsa_pss() == NULL) ||
         (scossl_pkey_tls1_prf() == NULL) ||
-        (scossl_pkey_hkdf() == NULL) )
+        (scossl_pkey_hkdf() == NULL) ||
+        (scossl_pkey_hmac() == NULL) 
+        )
     {
         return SCOSSL_FAILURE;
     }
@@ -224,6 +255,7 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
         _openssl_pkey_rsa_pss = EVP_PKEY_meth_find(EVP_PKEY_RSA_PSS);
         _openssl_pkey_tls1_prf = EVP_PKEY_meth_find(EVP_PKEY_TLS1_PRF);
         _openssl_pkey_hkdf = EVP_PKEY_meth_find(EVP_PKEY_HKDF);
+        _openssl_pkey_hmac = EVP_PKEY_meth_find(EVP_PKEY_HMAC);
     }
 
     if( !pmeth )
@@ -248,6 +280,9 @@ int scossl_pkey_methods(_Inout_ ENGINE *e, _Out_opt_ EVP_PKEY_METHOD **pmeth,
     case EVP_PKEY_HKDF:
         *pmeth = _scossl_pkey_hkdf;
         break;
+    case EVP_PKEY_HMAC:
+        *pmeth = _scossl_pkey_hmac;
+        break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PKEY_METHODS, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "NID %d not supported");
@@ -265,14 +300,17 @@ void scossl_destroy_pkey_methods(void)
     // (seen in SslPlay with sanitizers on, or in OpenSSL applications using the engine)
     // For now just don't free these methods here, but keep an eye out for memory leaks
 
+    // EVP_PKEY_meth_free(_scossl_pkey_hmac);
     // EVP_PKEY_meth_free(_scossl_pkey_hkdf);
     // EVP_PKEY_meth_free(_scossl_pkey_tls1_prf);
     // EVP_PKEY_meth_free(_scossl_pkey_rsa_pss);
     // EVP_PKEY_meth_free(_scossl_pkey_rsa);
+    _scossl_pkey_hmac = NULL;
     _scossl_pkey_hkdf = NULL;
     _scossl_pkey_tls1_prf = NULL;
     _scossl_pkey_rsa_pss = NULL;
     _scossl_pkey_rsa = NULL;
+    _openssl_pkey_hmac = NULL;
     _openssl_pkey_hkdf = NULL;
     _openssl_pkey_tls1_prf = NULL;
     _openssl_pkey_rsa_pss = NULL;
