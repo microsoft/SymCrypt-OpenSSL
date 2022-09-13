@@ -212,8 +212,8 @@ SCOSSL_STATUS scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 
         if(scossl_hmac_context->mac->expandKeyFunc(&scossl_hmac_context->expandedKey, 
                                                     key->data,
-                                                    key->length) != SYMCRYPT_NO_ERROR)
-        {
+                                                    key->length) != SYMCRYPT_NO_ERROR) {
+
             ret = SCOSSL_FAILURE;
             break;
         }
@@ -228,44 +228,6 @@ SCOSSL_STATUS scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 
     return ret;
 }
-
-SCOSSL_STATUS scossl_hmac_ctrl_str(_Inout_ EVP_PKEY_CTX *ctx, const char *type, const char *value)
-{
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    unsigned char *pbKey = NULL;
-    long cbKey;
-
-    if (!value) {
-        ret =  SCOSSL_FAILURE;
-    }
-    else if (strcmp(type, "key") == 0) {
-        
-        ret = scossl_hmac_ctrl(ctx, EVP_PKEY_CTRL_SET_MAC_KEY, -1, (void*)value);
-    }
-    else if (strcmp(type, "hexkey") == 0) {
-
-        pbKey = OPENSSL_hexstr2buf(value, &cbKey);
-
-        if (!pbKey) {
-            ret = SCOSSL_FAILURE;
-        }
-        else {
-            ret = scossl_hmac_ctrl(ctx, EVP_PKEY_CTRL_SET_MAC_KEY, cbKey, pbKey);
-        }
-    }
-    else {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_CTRL_STR, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-            "SymCrypt Engine does not support ctrl_str (%s)", type);
-        ret = SCOSSL_FAILURE;
-    }
-
-    if(pbKey) {
-        OPENSSL_clear_free(pbKey, cbKey);
-    }
-
-    return ret;
-}
-
 
 SCOSSL_STATUS scossl_hmac_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {

@@ -1754,7 +1754,7 @@ void TestHMAC(void)
     unsigned char pbOutput[sizeof(pbExpected)];
     
     const EVP_MD *md = NULL;
-    EVP_MD_CTX *mdctx = NULL;
+    EVP_MD_CTX *mdctx = NULL, *mdctxCopy = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *pctx = NULL;
     size_t cbOutputLen;
@@ -1768,8 +1768,9 @@ void TestHMAC(void)
         md = EVP_sha256();
 
         mdctx = EVP_MD_CTX_new();
+        mdctxCopy = EVP_MD_CTX_new();
 
-        if(mdctx == NULL) {
+        if(mdctx == NULL || mdctxCopy == NULL) {
             handleOpenSSLError("EVP_MD_CTX_new");
             goto end;
         }
@@ -1785,6 +1786,12 @@ void TestHMAC(void)
             printf("EVP_DigestSignInit returned %d\n", ret);
             handleOpenSSLError("EVP_DigestSignInit");
             goto end;          
+        }
+
+        // make a copy of mdctx for another hmac computation with the same key
+        if (EVP_MD_CTX_copy_ex(mdctxCopy, mdctx) <= 0) {
+            handleOpenSSLError("EVP_MD_CTX_copy_ex");
+            goto end;
         }
 
         if(i & 1) {
@@ -1824,12 +1831,37 @@ void TestHMAC(void)
             printf("HMAC generated the expected value\n");
         }
 
+        //
+        // recompute the tag by making use of the copied EVP_MD_CTX without doing key expansion
+        //
+        if(EVP_DigestSignUpdate(mdctxCopy, pbMsg, sizeof(pbMsg)) <= 0) {
+            handleOpenSSLError("EVP_DigestSignUpdate");
+            goto end;          
+        }
+
+        memset(pbOutput, 0, sizeof(pbOutput));
+        cbOutputLen = sizeof(pbOutput);
+
+        if(EVP_DigestSignFinal(mdctxCopy, pbOutput, &cbOutputLen) <= 0) {
+            handleOpenSSLError("EVP_DigestSignFinal");
+            goto end;          
+        }
+
+        if ((cbOutputLen != sizeof(pbExpected)) || (memcmp(pbOutput, pbExpected, sizeof(pbExpected)) != 0)) {
+
+            handleError("HMAC did not generate the second expected value\n");
+        }
+        else {
+
+            printf("HMAC generated the second expected value\n");
+        }
 
         EVP_MD_CTX_free(mdctx);
+        EVP_MD_CTX_free(mdctxCopy);
         EVP_PKEY_free(pkey);
-        //EVP_PKEY_CTX_free(pctx);
 
         mdctx = NULL;
+        mdctxCopy = NULL;
         pkey = NULL;
         pctx = NULL;
     }
@@ -1837,6 +1869,7 @@ void TestHMAC(void)
  end:
 
     EVP_MD_CTX_free(mdctx);
+    EVP_MD_CTX_free(mdctxCopy);
     EVP_PKEY_free(pkey);
     EVP_PKEY_CTX_free(pctx);
 

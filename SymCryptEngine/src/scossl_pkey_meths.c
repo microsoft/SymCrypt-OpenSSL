@@ -208,8 +208,8 @@ static EVP_PKEY_METHOD *_scossl_pkey_hmac = NULL;
 // Creates and returns the internal HMAC method structure holding methods for HMAC functions
 static EVP_PKEY_METHOD *scossl_pkey_hmac(void)
 {
-    //int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
-    //int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
+    int (*pctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2) = NULL;
+    int (*pctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value) = NULL;
     int flags = 0;
 
     EVP_PKEY_meth_get0_info( NULL, &flags, _openssl_pkey_hmac );
@@ -217,12 +217,12 @@ static EVP_PKEY_METHOD *scossl_pkey_hmac(void)
     if((_scossl_pkey_hmac = EVP_PKEY_meth_new(EVP_PKEY_HMAC, flags)) != NULL)
     {
         // Use the default ctrl_str implementation, internally calls our ctrl method
-        //EVP_PKEY_meth_get_ctrl(_openssl_pkey_hmac, &pctrl, &pctrl_str);
+        EVP_PKEY_meth_get_ctrl(_openssl_pkey_hmac, &pctrl, &pctrl_str);
 
         EVP_PKEY_meth_set_init(_scossl_pkey_hmac, scossl_hmac_init);
         EVP_PKEY_meth_set_cleanup(_scossl_pkey_hmac, scossl_hmac_cleanup);
         EVP_PKEY_meth_set_copy(_scossl_pkey_hmac, scossl_hmac_copy);
-        EVP_PKEY_meth_set_ctrl(_scossl_pkey_hmac, scossl_hmac_ctrl, scossl_hmac_ctrl_str);
+        EVP_PKEY_meth_set_ctrl(_scossl_pkey_hmac, scossl_hmac_ctrl, pctrl_str);
         EVP_PKEY_meth_set_keygen(_scossl_pkey_hmac, NULL, scossl_hmac_keygen);
         EVP_PKEY_meth_set_signctx(_scossl_pkey_hmac, scossl_hmac_signctx_init, scossl_hmac_signctx);
     }

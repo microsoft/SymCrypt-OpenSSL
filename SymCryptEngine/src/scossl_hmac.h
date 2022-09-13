@@ -24,10 +24,6 @@ SCOSSL_STATUS scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src);
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error, or SCOSSL_UNSUPPORTED on not supported.
 SCOSSL_STATUS scossl_hmac_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2);
 
-// Sends a control operation to context ctx, type indicates which operation and value contains
-// the associated data for the operation.
-SCOSSL_STATUS scossl_hmac_ctrl_str(_Inout_ EVP_PKEY_CTX *ctx, const char *type, const char *value);
-
 // Initializes pkey with the HMAC key from the internal context.
 SCOSSL_STATUS scossl_hmac_keygen(_Inout_ EVP_PKEY_CTX *ctx, EVP_PKEY *pkey);
 
