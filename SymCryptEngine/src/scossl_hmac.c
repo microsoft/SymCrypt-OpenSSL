@@ -171,6 +171,7 @@ SCOSSL_STATUS scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     switch (type) {
 
     case EVP_PKEY_CTRL_MD:
+        // Expecting p2 of type EVP_MD* specifying the hash function to be used in HMAC
         if (p2 == NULL) {
             ret = SCOSSL_FAILURE;
             break;
@@ -179,6 +180,8 @@ SCOSSL_STATUS scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         break;
 
     case EVP_PKEY_CTRL_SET_MAC_KEY:
+        // p2 : pointer to the buffer containing the HMAC key, must not be NULL.
+        // p1 : length of the key in bytes. p1 = -1 indicates p2 is a null-terminated string.
         if (p1 < -1 || !p2) {
             ret = SCOSSL_FAILURE;
             break;
