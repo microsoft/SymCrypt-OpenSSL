@@ -4,6 +4,8 @@
 
 #include "scossl_sshkdf.h"
 #include <openssl/kdf.h>
+#include "crypto/evp.h"
+#include "../crypto/evp/evp_local.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,117 +13,47 @@ extern "C" {
 
 #define SSH_KDF_MAX_DIGEST_SIZE (512 / 8)
 
-/* SSH KDF pkey context structure */
-typedef struct {
-    /* Hash function to use */
-    const EVP_MD *md;
-    unsigned char *sharedKey;
-    size_t sharedKey_length;
-    unsigned char hashValue[SSH_KDF_MAX_DIGEST_SIZE];
-    size_t hashValue_length;
-    unsigned char sessionId[SSH_KDF_MAX_DIGEST_SIZE];
-    size_t sessionId_length;
-    unsigned char label;
-} SCOSSL_SSH_KDF_PKEY_CTX;
 
-SCOSSL_STATUS scossl_sshkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
+struct evp_kdf_impl_st {
+    PCSYMCRYPT_HASH pHash;
+    unsigned char*  pbKey;
+    size_t          cbKey;
+    unsigned char   pbHashValue[SSH_KDF_MAX_DIGEST_SIZE];
+    size_t          cbHashValue;
+    unsigned char   pbSessionId[SSH_KDF_MAX_DIGEST_SIZE];
+    size_t          cbSessionId;
+    unsigned char   label;
+};
+
+
+EVP_KDF_IMPL* scossl_sshkdf_new()
 {
-    SCOSSL_SSH_KDF_PKEY_CTX *key_context = NULL;
-    if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_INIT, ERR_R_MALLOC_FAILURE,
+    EVP_KDF_IMPL *impl = OPENSSL_zalloc(sizeof(*impl));
+
+    if (!impl) {
+
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_NEW, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc return NULL");
-        return SCOSSL_FAILURE;
-    }
-    EVP_PKEY_CTX_set_data(ctx, key_context);
-    return SCOSSL_SUCCESS;
-}
-
-void scossl_sshkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
-{
-    SCOSSL_SSH_KDF_PKEY_CTX *key_context = (SCOSSL_SSH_KDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    if (key_context == NULL) {
-        return;
-    }
-    OPENSSL_clear_free(key_context->sharedKey, key_context->sharedKey_length);
-    OPENSSL_cleanse(key_context->hashValue, sizeof(key_context->hashValue));
-    OPENSSL_cleanse(key_context->sessionId, sizeof(key_context->sessionId));
-    OPENSSL_free(key_context);
-    EVP_PKEY_CTX_set_data(ctx, NULL);
-}
-
-SCOSSL_STATUS scossl_sshkdf_setparam(_Inout_ SCOSSL_SSH_KDF_PKEY_CTX *key_context, int p1, _In_ void *p2, unsigned char *buf, size_t *len)
-{
-    if (p1 < 0 || p1 > SSH_KDF_MAX_DIGEST_SIZE)
-        return SCOSSL_FAILURE;
-
-    if(key_context->md && p1 != EVP_MD_size(key_context->md))
-        return SCOSSL_FAILURE;
-
-    OPENSSL_cleanse(buf, *len);
-    *len = 0;
-
-    memcpy(buf, p2, p1);
-    *len = p1;
+    }    
     
-    return SCOSSL_SUCCESS;
+    return impl;
 }
 
-SCOSSL_STATUS scossl_sshkdf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
+void scossl_sshkdf_reset(EVP_KDF_IMPL *impl)
 {
-    SCOSSL_SSH_KDF_PKEY_CTX *key_context = (SCOSSL_SSH_KDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-
-    switch (type) {
-    case EVP_KDF_CTRL_SET_MD:
-        key_context->md = p2;
-        return SCOSSL_SUCCESS;
-
-    case EVP_KDF_CTRL_SET_KEY:
-        if (p1 < 0)
-            return SCOSSL_FAILURE;
-        if (key_context->sharedKey != NULL)
-            OPENSSL_clear_free(key_context->sharedKey, key_context->sharedKey_length);
-        OPENSSL_cleanse(key_context->hashValue, key_context->hashValue_length);
-        key_context->hashValue_length = 0;
-        OPENSSL_cleanse(key_context->sessionId, key_context->sessionId_length);
-        key_context->sessionId_length = 0;
-        key_context->sharedKey = OPENSSL_memdup(p2, p1);
-        if (key_context->sharedKey == NULL)
-            return SCOSSL_FAILURE;
-        key_context->sharedKey_length  = p1;
-        return SCOSSL_SUCCESS;        
-
-    case EVP_KDF_CTRL_SET_SSHKDF_XCGHASH:
-        return scossl_sshkdf_setparam(key_context, p1, p2, key_context->hashValue, &key_context->hashValue_length);        
-
-    case EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID:
-        return scossl_sshkdf_setparam(key_context, p1, p2, key_context->sessionId, &key_context->sessionId_length);        
-
-    case EVP_KDF_CTRL_SET_SSHKDF_TYPE:
-        if (!(p1 >= 0x41 && p1 <= 0x46))
-            return SCOSSL_FAILURE;
-        key_context->label = (unsigned char)p1;
-        return SCOSSL_SUCCESS;        
-
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-            "SymCrypt Engine does not support ctrl type (%d)", type);
-        return SCOSSL_UNSUPPORTED;
-    }
+    OPENSSL_clear_free(impl->pbKey, impl->cbKey);
+    memset(impl, 0, sizeof(*impl));
 }
 
-SCOSSL_STATUS scossl_sshkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
+void scossl_sshkdf_free(EVP_KDF_IMPL *impl)
 {
-    SCOSSL_SSH_KDF_PKEY_CTX *key_context = (SCOSSL_SSH_KDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    OPENSSL_clear_free(key_context->sharedKey, key_context->sharedKey_length);
-    OPENSSL_cleanse(key_context->hashValue, sizeof(key_context->hashValue));
-    OPENSSL_cleanse(key_context->sessionId, sizeof(key_context->sessionId));
-    memset(key_context, 0, sizeof(*key_context));
-    return SCOSSL_SUCCESS;
+    scossl_sshkdf_reset(impl);
+    OPENSSL_free(impl);
 }
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *evp_md)
+static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
 {
-    int type = EVP_MD_type(evp_md);
+    int type = EVP_MD_type(md);
 
     if (type == NID_sha1)
         return SymCryptSha1Algorithm;
@@ -131,51 +63,176 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *evp_md)
         return SymCryptSha384Algorithm;
     if (type == NID_sha512)
         return SymCryptSha512Algorithm;
+ 
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
         "SymCrypt engine does not support hash algorithm %d", type);
+
     return NULL;
 }
 
-SCOSSL_STATUS scossl_sshkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                        _Inout_ size_t *keylen)
-{
-    SCOSSL_SSH_KDF_PKEY_CTX *key_context = (SCOSSL_SSH_KDF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_HASH scossl_hash_alg = NULL;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SYMCRYPT_HASH_STATE state1, state2;
 
-    if (key_context->md == NULL) {
+SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
+{
+    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
+    const unsigned char *buffer;
+    size_t length;
+    int value;
+    const EVP_MD *md;
+
+    switch (cmd) {
+
+        case EVP_KDF_CTRL_SET_MD:
+            md = va_arg(args, EVP_MD*);
+
+            impl->pHash = scossl_get_symcrypt_hash_algorithm(md);
+
+            if(!impl->pHash) {
+                ret = SCOSSL_FAILURE;
+            }
+            break;
+
+        case EVP_KDF_CTRL_SET_KEY:
+            buffer = va_arg(args, const unsigned char *);
+            length = va_arg(args, size_t);
+
+            if(impl->pbKey) {
+                OPENSSL_clear_free(impl->pbKey, impl->cbKey);
+                impl->cbKey = 0;
+            }
+
+            impl->pbKey = OPENSSL_memdup(buffer, length);
+
+            if(!impl->pbKey) {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_MALLOC_FAILURE,
+                    "OPENSSL_memdup return NULL");
+                ret = SCOSSL_FAILURE;
+            }
+            else {
+                impl->cbKey = length;
+            }
+            break;
+
+        case EVP_KDF_CTRL_SET_SSHKDF_XCGHASH:
+            buffer = va_arg(args, const unsigned char *);
+            length = va_arg(args, size_t);
+
+            if(length > sizeof(impl->pbHashValue)) {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                    "Hash value length too large");
+                ret = SCOSSL_FAILURE;
+            }
+
+            memcpy(impl->pbHashValue, buffer, length);
+            impl->cbHashValue = length;
+            break;
+
+        case EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID:
+            buffer = va_arg(args, const unsigned char *);
+            length = va_arg(args, size_t);
+
+            if(length > sizeof(impl->pbSessionId)) {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                    "Session ID length too large");
+                ret = SCOSSL_FAILURE;
+            }
+
+            memcpy(impl->pbSessionId, buffer, length);
+            impl->cbSessionId = length;
+            break;
+
+        case EVP_KDF_CTRL_SET_SSHKDF_TYPE:
+            value = va_arg(args, int);
+            impl->label = value;
+            break;
+
+        default:
+            ret = SCOSSL_FAILURE;
+        }
+
+    return ret;
+}
+
+SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const char *value)
+{
+    // TODO:
+    return SCOSSL_SUCCESS;
+}
+
+size_t scossl_sshkdf_size(EVP_KDF_IMPL *impl)
+{
+    return (size_t)-1;
+}
+
+SCOSSL_STATUS scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, size_t out_len)
+{
+    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
+    SYMCRYPT_ERROR scError; 
+
+    if(!impl->pHash) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
             "Missing Digest");
-        return SCOSSL_FAILURE;
+        ret = SCOSSL_FAILURE;
+        goto end;
     }
 
-    if (key_context->sharedKey == NULL) {
+    if(!impl->pbKey) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing SharedKey");
-        return SCOSSL_FAILURE;
+            "Missing Key");
+        ret = SCOSSL_FAILURE;
+        goto end;
     }
 
-    scossl_hash_alg = scossl_get_symcrypt_hash_algorithm(key_context->md);
-    if( scossl_hash_alg == NULL )
-    {
-        return SCOSSL_FAILURE;
-    }
+    scError = SymCryptSshKdf(impl->pHash,
+                            impl->pbKey, impl->cbKey,
+                            impl->pbHashValue, impl->cbHashValue,
+                            impl->label,
+                            impl->pbSessionId, impl->cbSessionId,
+                            out, out_len);
+                
+    if(scError != SYMCRYPT_NO_ERROR) {
 
-    scError = SymCryptSshKdf(scossl_hash_alg, &state1, &state2, 
-                                key_context->sharedKey, key_context->sharedKey_length,
-                                key_context->hashValue, key_context->hashValue_length,
-                                key_context->sessionId, key_context->sessionId_length,
-                                key_context->label,
-                                key, *keylen);
-
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptSshKdf failed", scError);
-        return SCOSSL_FAILURE;
+        ret = SCOSSL_FAILURE;
     }
-    return SCOSSL_SUCCESS;
+
+end:
+
+   return ret;
+}
+
+
+
+static EVP_KDF_METHOD scossl_sshkdf_meth = {
+    EVP_KDF_SSHKDF,
+    scossl_sshkdf_new,
+    scossl_sshkdf_free,
+    scossl_sshkdf_reset,
+    scossl_sshkdf_ctrl,
+    scossl_sshkdf_ctrl_str,
+    scossl_sshkdf_size,
+    scossl_sshkdf_derive,
+};
+
+EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id)
+{
+    EVP_KDF_CTX *ctx;
+
+    if(id != EVP_KDF_SSHKDF) {
+        return NULL;
+    }
+
+    ctx = OPENSSL_zalloc(sizeof(*ctx));
+    
+    if (!ctx) {
+
+        return NULL;
+    }
+
+    ctx->kmeth = &scossl_sshkdf_meth;
+    ctx->impl = scossl_sshkdf_meth.new();
+
+    return ctx;
 }
 
 #ifdef __cplusplus

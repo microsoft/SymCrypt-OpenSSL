@@ -1894,6 +1894,10 @@ end:
     return ptv;
 }
 
+extern "C" {
+extern EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);    
+}
+
 void TestSshKdf(void)
 {
     const size_t MAX_DERIVED_KEY = 64;
@@ -1967,6 +1971,8 @@ void TestSshKdf(void)
     PSCOSSL_SSHKDF_TEST_VECTOR test_vectors[2] = {nullptr, nullptr};
     EVP_KDF_CTX *kdf_ctx = NULL;
 
+    printf("Testing SSH-KDF\n");
+
     test_vectors[0] = scossl_sshkdf_testvector_new(EVP_sha1(),
                                                     szSharedSecret1, sizeof(szSharedSecret1) - 1,
                                                     szHashValue1, sizeof(szHashValue1) - 1,
@@ -1997,11 +2003,13 @@ void TestSshKdf(void)
         goto end;
     }
 
+
     for(int i = 0; i < sizeof(test_vectors) / sizeof(test_vectors[0]); i++)
     {
         PSCOSSL_SSHKDF_TEST_VECTOR ptv = test_vectors[i];
 
-        kdf_ctx = EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
+        //kdf_ctx = EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
+        kdf_ctx = scossl_EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
 
         if(!kdf_ctx)
         {
@@ -2058,7 +2066,7 @@ void TestSshKdf(void)
         EVP_KDF_CTX_free(kdf_ctx);
         kdf_ctx = NULL;
     }
-
+    
 end:
 
     if(kdf_ctx)
@@ -2066,6 +2074,8 @@ end:
 
     for(int i = 0; i < sizeof(test_vectors) / sizeof(test_vectors[0]); i++)
         scossl_sshkdf_testvector_free(test_vectors[i]);
+
+    printf("SSH-KDF succeeded\n\n");
 
 }
 
@@ -2093,9 +2103,9 @@ int main(int argc, char** argv)
     TestEcc();
     TestDh();
 
-//#ifdef SCOSSL_SSHKDF
+#ifdef SCOSSL_SSHKDF
     TestSshKdf();
-//#endif    
+#endif    
 
     BIO_free(bio_err);
     return 0;
