@@ -1729,6 +1729,153 @@ end:
     return;
 }
 
+void TestHMAC(void)
+{
+    const unsigned char pbKey[] = {
+        0x0a, 0x71, 0xd5, 0xcf, 0x99, 0x84, 0x9b, 0xc1, 0x3d, 0x73, 0x83, 0x2d, 0xcd, 0x86, 0x42, 0x44 
+    };
+
+    const unsigned char pbMsg[] = {
+        0x17, 0xf1, 0xee, 0x0c, 0x67, 0x67, 0xa1, 0xf3, 0xf0, 0x4b, 0xb3, 0xc1, 0xb7, 0xa4, 0xe0, 0xd4, 
+        0xf0, 0xe5, 0x9e, 0x59, 0x63, 0xc1, 0xa3, 0xbf, 0x15, 0x40, 0xa7, 0x6b, 0x25, 0x13, 0x6b, 0xae, 
+        0xf4, 0x25, 0xfa, 0xf4, 0x88, 0x72, 0x2e, 0x3e, 0x33, 0x1c, 0x77, 0xd2, 0x6f, 0xbb, 0xd8, 0x30, 
+        0x0d, 0xf5, 0x32, 0x49, 0x8f, 0x50, 0xc5, 0xec, 0xd2, 0x43, 0xf4, 0x81, 0xf0, 0x93, 0x48, 0xf9, 
+        0x64, 0xdd, 0xb8, 0x05, 0x6f, 0x6e, 0x28, 0x86, 0xbb, 0x5b, 0x2f, 0x45, 0x3f, 0xcf, 0x1d, 0xe5, 
+        0x62, 0x9f, 0x3d, 0x16, 0x63, 0x24, 0x57, 0x0b, 0xf8, 0x49, 0x79, 0x2d, 0x35, 0xe3, 0xf7, 0x11, 
+        0xb0, 0x41, 0xb1, 0xa7, 0xe3, 0x04, 0x94, 0xb5, 0xd1, 0x31, 0x64, 0x84, 0xed, 0x85, 0xb8, 0xda, 
+        0x37, 0x09, 0x46, 0x27, 0xa8, 0xe6, 0x60, 0x03, 0xd0, 0x79, 0xbf, 0xd8, 0xbe, 0xaa, 0x80, 0xdc, 
+    };
+
+    const unsigned char pbExpected[] = {
+        0x2a, 0x0f, 0x54, 0x20, 0x90, 0xb5, 0x1b, 0x84, 0x46, 0x5c, 0xd9, 0x3e, 0x5d, 0xde, 0xea, 0xa1, 
+        0x4c, 0xa5, 0x11, 0x62, 0xf4, 0x80, 0x47, 0x83, 0x5d, 0x2d, 0xf8, 0x45, 0xfb, 0x48, 0x8a, 0xf4 
+    };
+
+    unsigned char pbOutput[sizeof(pbExpected)];
+    
+    const EVP_MD *md = NULL;
+    EVP_MD_CTX *mdctx = NULL, *mdctxCopy = NULL;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY_CTX *pctx = NULL;
+    size_t cbOutputLen;
+    int ret;
+ 
+    printf("Testing HMAC\n");
+
+    /* We do this multiple times to test reuse of the EVP_PKEY_CTX */
+    for (int i = 0; i < 2; i++) {
+
+        md = EVP_sha256();
+
+        mdctx = EVP_MD_CTX_new();
+        mdctxCopy = EVP_MD_CTX_new();
+
+        if(mdctx == NULL || mdctxCopy == NULL) {
+            handleOpenSSLError("EVP_MD_CTX_new");
+            goto end;
+        }
+
+        pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_HMAC, NULL, pbKey, sizeof(pbKey));
+
+        if(pkey == NULL) {
+            handleOpenSSLError("EVP_PKEY_new_raw_private_key");
+            goto end;
+        }
+
+        if((ret = EVP_DigestSignInit(mdctx, &pctx, md, NULL, pkey)) <= 0) {
+            printf("EVP_DigestSignInit returned %d\n", ret);
+            handleOpenSSLError("EVP_DigestSignInit");
+            goto end;          
+        }
+
+        // make a copy of mdctx for another hmac computation with the same key
+        if (EVP_MD_CTX_copy_ex(mdctxCopy, mdctx) <= 0) {
+            handleOpenSSLError("EVP_MD_CTX_copy_ex");
+            goto end;
+        }
+
+        if(i & 1) {
+
+            // update message one byte at a time
+            for(int j = 0; j < sizeof(pbMsg); j++)
+            {
+                if(EVP_DigestSignUpdate(mdctx, pbMsg + j, 1) <= 0) {
+                    handleOpenSSLError("EVP_DigestSignUpdate");
+                    goto end;          
+                }
+            }
+        }
+        else {
+
+            // update message with a single call
+            if(EVP_DigestSignUpdate(mdctx, pbMsg, sizeof(pbMsg)) <= 0) {
+                handleOpenSSLError("EVP_DigestSignUpdate");
+                goto end;          
+            }
+        }
+
+        memset(pbOutput, 0, sizeof(pbOutput));
+        cbOutputLen = sizeof(pbOutput);
+
+        if(EVP_DigestSignFinal(mdctx, pbOutput, &cbOutputLen) <= 0) {
+            handleOpenSSLError("EVP_DigestSignFinal");
+            goto end;          
+        }
+
+        if ((cbOutputLen != sizeof(pbExpected)) || (memcmp(pbOutput, pbExpected, sizeof(pbExpected)) != 0)) {
+
+            handleError("HMAC did not generate the expected value\n");
+        }
+        else {
+
+            printf("HMAC generated the expected value\n");
+        }
+
+        //
+        // recompute the tag by making use of the copied EVP_MD_CTX without doing key expansion
+        //
+        if(EVP_DigestSignUpdate(mdctxCopy, pbMsg, sizeof(pbMsg)) <= 0) {
+            handleOpenSSLError("EVP_DigestSignUpdate");
+            goto end;          
+        }
+
+        memset(pbOutput, 0, sizeof(pbOutput));
+        cbOutputLen = sizeof(pbOutput);
+
+        if(EVP_DigestSignFinal(mdctxCopy, pbOutput, &cbOutputLen) <= 0) {
+            handleOpenSSLError("EVP_DigestSignFinal");
+            goto end;          
+        }
+
+        if ((cbOutputLen != sizeof(pbExpected)) || (memcmp(pbOutput, pbExpected, sizeof(pbExpected)) != 0)) {
+
+            handleError("HMAC did not generate the second expected value\n");
+        }
+        else {
+
+            printf("HMAC generated the second expected value\n");
+        }
+
+        EVP_MD_CTX_free(mdctx);
+        EVP_MD_CTX_free(mdctxCopy);
+        EVP_PKEY_free(pkey);
+
+        mdctx = NULL;
+        mdctxCopy = NULL;
+        pkey = NULL;
+        pctx = NULL;
+    }
+
+ end:
+
+    EVP_MD_CTX_free(mdctx);
+    EVP_MD_CTX_free(mdctxCopy);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_CTX_free(pctx);
+
+    return;
+}
+
 int main(int argc, char** argv)
 {
     int scossl_log_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
@@ -1750,6 +1897,7 @@ int main(int argc, char** argv)
     TestRsaEvpAll();
     TestEcc();
     TestDh();
+    TestHMAC();
 
     BIO_free(bio_err);
     return 0;
