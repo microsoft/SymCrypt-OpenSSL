@@ -28,6 +28,7 @@ set(SCOSSL_SOURCES
     ../src/scossl_rsapss.c
     ../src/scossl_hkdf.c
     ../src/scossl_tls1prf.c
+    ../src/scossl_hmac.c
     ../src/scossl_helpers.c
 )
 

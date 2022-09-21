@@ -27,10 +27,12 @@ will only be built if OpenSSL supports it. This will also require OpenSSL source
    + ECDH (P256, P384, P521)
    + Finite Field DH (ffdhe2048, ffdhe3072, ffdhe4096, modp2048, modp3072, modp4096)
  + Hashing
-   + SHA-1
+   + SHA1
    + SHA2-256
    + SHA2-384
    + SHA2-512
+ + Message Authentication
+   + HMAC (SHA1, SHA2-256, SHA2-384, SHA2-512)
  + Symmetric
    + AES (128, 192, 256)
      + CBC, CCM, ECB, GCM
@@ -41,7 +43,7 @@ will only be built if OpenSSL supports it. This will also require OpenSSL source
 
 ## Known cases where SCOSSL will fail rather than fallback to default OpenSSL
 
-1. Use of an AES-GCM IV which is not 12-bytes (192-bits)
+1. Use of an AES-GCM IV which is not 12-bytes (96-bits)
 2. Use of unsupported digests in RSA signatures and TLS PRF
 3. Use of multi-prime (more than 2-prime) RSA
 
