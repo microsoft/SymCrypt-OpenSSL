@@ -4,7 +4,6 @@
 
 #include "scossl.h"
 #include "scossl_helpers.h"
-//#include "crypto/evp.h"
 
 #ifdef __cplusplus
 extern "C" {

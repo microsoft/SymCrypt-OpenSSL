@@ -36,7 +36,6 @@ EVP_KDF_IMPL* scossl_sshkdf_new()
     EVP_KDF_IMPL *impl = OPENSSL_zalloc(sizeof(*impl));
 
     if (!impl) {
-
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_NEW, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc return NULL");
     }    
@@ -148,7 +147,15 @@ SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
 
         case EVP_KDF_CTRL_SET_SSHKDF_TYPE:
             value = va_arg(args, int);
-            impl->label = value;
+
+            if(value >= 0 && value <= 0xff) {
+                impl->label = value;
+            }
+            else {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                    "Label out of range");
+                ret = SCOSSL_FAILURE;
+            }
             break;
 
         default:
@@ -179,63 +186,46 @@ SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const
     long length;
 
 
-    if(strcmp(type, "digest") == 0 || strcmp(type, "md") == 0)
-    {
+    if(strcmp(type, "digest") == 0 || strcmp(type, "md") == 0) {
         const EVP_MD *md = EVP_get_digestbyname(value);
-
         ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_MD, md);
     }
-    else if(strcmp(type, "hexkey") == 0)
-    {
+    else if(strcmp(type, "hexkey") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
-
-        if(data)
-        {
+        if(data) {
             ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, data, length);
             OPENSSL_free(data);
         }
     }
-    else if(strcmp(type, "hexxcghash") == 0)
-    {
+    else if(strcmp(type, "hexxcghash") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
-
-        if(data)
-        {
+        if(data) {
             ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, data, length);
             OPENSSL_free(data);
         }
     }
-    else if(strcmp(type, "hexsession_id") == 0)
-    {
+    else if(strcmp(type, "hexsession_id") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
-
-        if(data)
-        {
+        if(data) {
             ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, data, length);
             OPENSSL_free(data);
         }
     }
-    else if(strcmp(type, "type") == 0)
-    {
+    else if(strcmp(type, "type") == 0 && strlen(value) == 1) {
         ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_TYPE, (int)(*value));
     }
-    else if(strcmp(type, "key") == 0)
-    {
+    else if(strcmp(type, "key") == 0) {
         ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, value, strlen(value));
     }
-    else if(strcmp(type, "xcghash") == 0)
-    {
+    else if(strcmp(type, "xcghash") == 0) {
         ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, value, strlen(value));
     }
-    else if(strcmp(type, "session_id") == 0)
-    {
+    else if(strcmp(type, "session_id") == 0) {
         ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, value, strlen(value));
     }
-    else
-    {
+    else {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL_STR, ERR_R_INTERNAL_ERROR,
             "Unknown command %s", type);
-        ret = SCOSSL_FAILURE;
     }
 
     return ret;
@@ -307,7 +297,6 @@ EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id)
     ctx = OPENSSL_zalloc(sizeof(*ctx));
     
     if (!ctx) {
-
         return NULL;
     }
 

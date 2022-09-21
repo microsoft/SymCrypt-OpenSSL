@@ -15,7 +15,7 @@ extern "C" {
 
 
 static int scossl_evp_nids[] = {
-    EVP_PKEY_RSA,  
+    EVP_PKEY_RSA,
     EVP_PKEY_RSA_PSS,
     EVP_PKEY_TLS1_PRF,
     EVP_PKEY_HKDF,
