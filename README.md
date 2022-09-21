@@ -16,11 +16,13 @@ has not been tested for use in other environments and should not be considered p
 ## Algorithms that will be routed to a FIPS certifiable SymCrypt module with this version
 
 The following list is not necessarily exhaustive, and will be updated as more functionality is added to SCOSSL.
-Note that just because an algorithm is FIPS certifiable, does not mean it is recommended for use.
+Note that just because an algorithm is FIPS certifiable, does not mean it is recommended for use. SSH-KDF implementation
+will only be built if OpenSSL supports it. This will also require OpenSSL source code as part of the build process.
 
  + Key derivation
    + HKDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
    + TLS 1.2 KDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
+   + SSH-KDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
  + Key Agreement
    + ECDH (P256, P384, P521)
    + Finite Field DH (ffdhe2048, ffdhe3072, ffdhe4096, modp2048, modp3072, modp4096)
