@@ -31,13 +31,11 @@ set(SCOSSL_SOURCES
 
 check_symbol_exists(EVP_KDF_SSHKDF "openssl/kdf.h" SCOSSL_SSHKDF)
 
-set(SCOSSL_SOURCES ${SCOSSL_SOURCES} ../src/scossl_sshkdf.c)
-
-#if (SCOSSL_SSHKDF)
+if (SCOSSL_SSHKDF)
     set(SCOSSL_SOURCES ${SCOSSL_SOURCES} ../src/scossl_sshkdf.c)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
-#endif()
+endif()
 
 
 add_library(scossl_static STATIC ${SCOSSL_SOURCES})

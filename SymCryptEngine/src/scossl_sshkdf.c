@@ -4,8 +4,13 @@
 
 #include "scossl_sshkdf.h"
 #include <openssl/kdf.h>
+
+// EVP_KDF_IMPL and EVP_KDF_METHOD
 #include "crypto/evp.h"
+
+// evp_kdf_ctx_st
 #include "../crypto/evp/evp_local.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +83,7 @@ SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
     size_t length;
     int value;
     const EVP_MD *md;
+
 
     switch (cmd) {
 
@@ -152,10 +158,87 @@ SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
     return ret;
 }
 
+SCOSSL_STATUS scossl_sshkdf_call_ctrl(EVP_KDF_IMPL *impl, int cmd, ...)
+{
+    SCOSSL_STATUS ret;
+    va_list args;
+
+    va_start(args, cmd);
+
+    ret = scossl_sshkdf_ctrl(impl, cmd, args);
+
+    va_end(args);
+    
+    return ret;
+}
+
 SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const char *value)
 {
-    // TODO:
-    return SCOSSL_SUCCESS;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    unsigned char *data;
+    long length;
+
+
+    if(strcmp(type, "digest") == 0 || strcmp(type, "md") == 0)
+    {
+        const EVP_MD *md = EVP_get_digestbyname(value);
+
+        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_MD, md);
+    }
+    else if(strcmp(type, "hexkey") == 0)
+    {
+        data = OPENSSL_hexstr2buf(value, &length);
+
+        if(data)
+        {
+            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, data, length);
+            OPENSSL_free(data);
+        }
+    }
+    else if(strcmp(type, "hexxcghash") == 0)
+    {
+        data = OPENSSL_hexstr2buf(value, &length);
+
+        if(data)
+        {
+            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, data, length);
+            OPENSSL_free(data);
+        }
+    }
+    else if(strcmp(type, "hexsession_id") == 0)
+    {
+        data = OPENSSL_hexstr2buf(value, &length);
+
+        if(data)
+        {
+            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, data, length);
+            OPENSSL_free(data);
+        }
+    }
+    else if(strcmp(type, "type") == 0)
+    {
+        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_TYPE, (int)(*value));
+    }
+    else if(strcmp(type, "key") == 0)
+    {
+        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, value, strlen(value));
+    }
+    else if(strcmp(type, "xcghash") == 0)
+    {
+        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, value, strlen(value));
+    }
+    else if(strcmp(type, "session_id") == 0)
+    {
+        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, value, strlen(value));
+    }
+    else
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL_STR, ERR_R_INTERNAL_ERROR,
+            "Unknown command %s", type);
+        ret = SCOSSL_FAILURE;
+    }
+
+    return ret;
 }
 
 size_t scossl_sshkdf_size(EVP_KDF_IMPL *impl)
@@ -190,7 +273,6 @@ SCOSSL_STATUS scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, size_
                             out, out_len);
                 
     if(scError != SYMCRYPT_NO_ERROR) {
-
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptSshKdf failed", scError);
         ret = SCOSSL_FAILURE;

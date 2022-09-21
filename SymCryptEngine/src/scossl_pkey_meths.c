@@ -6,7 +6,6 @@
 #include "scossl_hkdf.h"
 #include "scossl_tls1prf.h"
 #include "scossl_rsapss.h"
-#include "scossl_sshkdf.h"
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
