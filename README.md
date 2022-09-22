@@ -16,8 +16,7 @@ has not been tested for use in other environments and should not be considered p
 ## Algorithms that will be routed to a FIPS certifiable SymCrypt module with this version
 
 The following list is not necessarily exhaustive, and will be updated as more functionality is added to SCOSSL.
-Note that just because an algorithm is FIPS certifiable, does not mean it is recommended for use. SSH-KDF implementation
-will only be built if OpenSSL supports it. This will also require OpenSSL source code as part of the build process.
+Note that just because an algorithm is FIPS certifiable, does not mean it is recommended for use. SSH-KDF implementation is disabled by default and can be enabled by adding `-DSCOSSL_SSHKDF=1` argument to CMake. This algorithm also requires OpenSSL source code in the build process.
 
  + Key derivation
    + HKDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
