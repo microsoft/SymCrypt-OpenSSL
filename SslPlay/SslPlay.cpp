@@ -1729,6 +1729,7 @@ end:
     return;
 }
 
+
 void TestHMAC(void)
 {
     const unsigned char pbKey[] = {
@@ -1752,14 +1753,14 @@ void TestHMAC(void)
     };
 
     unsigned char pbOutput[sizeof(pbExpected)];
-    
+
     const EVP_MD *md = NULL;
     EVP_MD_CTX *mdctx = NULL, *mdctxCopy = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *pctx = NULL;
     size_t cbOutputLen;
     int ret;
- 
+
     printf("Testing HMAC\n");
 
     /* We do this multiple times to test reuse of the EVP_PKEY_CTX */
@@ -1873,8 +1874,397 @@ void TestHMAC(void)
     EVP_PKEY_free(pkey);
     EVP_PKEY_CTX_free(pctx);
 
+    printf("%s", SeparatorLine);
     return;
 }
+
+
+#ifdef SCOSSL_SSHKDF
+
+//
+// Allocate memory and decode an input string in hexadecimal form into the allocated buffer
+//
+// Parameters
+//      str : Pointer to the hex string containing data, must be of even size.
+//      len : Size of the str buffer on input (excluding the null terminator), size of the decoded buffer on output (i.e., half the input buffer size)
+//      
+// Returns 
+//      Pointer to the allocated buffer containing the decoded data on success, NULL otherwise.
+//
+unsigned char* scossl_decode_hexstr(const char *str, size_t *len)
+{
+    unsigned char* buf = NULL;
+    int bValidInput = 1;
+    size_t buf_len = (*len) / 2;
+
+    if(!str || (*len & 1))
+        goto done;
+
+    buf = (unsigned char*)OPENSSL_malloc(buf_len);
+
+    if(!buf)
+    {
+        *len = 0;
+        goto done;
+    }
+
+    for(size_t i = 0; i < buf_len && bValidInput; i++)
+    {
+        unsigned char val = 0;
+        unsigned char ch;
+
+        for(int j = 0; j < 2; j++)
+        {
+            val <<= 4;
+
+            ch = (unsigned char)str[2 * i + j];
+            if(ch >= '0' && ch <= '9')
+                val |= ch - '0';
+            else if (ch >= 'a' && ch <= 'f')
+                val |= ch  - 'a' + 10;
+            else if (ch >= 'A' && ch <= 'F')
+                val |= ch  - 'A' + 10;
+            else
+                bValidInput = 0;
+        }
+
+        buf[i] = val;
+    }
+
+    if(bValidInput)
+    {
+        *len  = buf_len;        
+    }
+    else
+    {
+        *len = 0;
+        OPENSSL_free(buf);
+        buf = NULL;
+    }
+
+done:
+    return buf;
+}
+
+
+typedef struct _scossl_sshkdf_testvector
+{
+    // KDF inputs
+    const EVP_MD*   md;
+    const char*     md_name;
+    const char*     szSharedSecret;
+    unsigned char*  pbSharedSecret;
+    size_t          cbSharedSecret;
+    const char*     szHashValue;
+    unsigned char*  pbHashValue;
+    size_t          cbHashValue;
+    const char*     szSessionId;
+    unsigned char*  pbSessionId;
+    size_t          cbSessionId;
+
+    // KDF outputs
+    unsigned char*  pbDerivedKeys[6];
+    size_t          cbDerivedKeys[6];
+
+} SCOSSL_SSHKDF_TEST_VECTOR, *PSCOSSL_SSHKDF_TEST_VECTOR;
+
+void scossl_sshkdf_testvector_free(PSCOSSL_SSHKDF_TEST_VECTOR ptv)
+{
+    if(ptv)
+    {
+        OPENSSL_free(ptv->pbSharedSecret);
+        OPENSSL_free(ptv->pbHashValue);
+        OPENSSL_free(ptv->pbSessionId);
+
+        for(int i = 0; i < sizeof(ptv->pbDerivedKeys) / sizeof(ptv->pbDerivedKeys[0]); i++)
+            OPENSSL_free(ptv->pbDerivedKeys[i]);
+
+        OPENSSL_free(ptv);
+    }
+}
+
+
+PSCOSSL_SSHKDF_TEST_VECTOR scossl_sshkdf_testvector_new(const EVP_MD *md, const char *md_name,
+                                                        const char *szSharedSecret, size_t lenSharedSecret,
+                                                        const char *szHashValue, size_t lenHashValue,
+                                                        const char *szSessionId, size_t lenSessionId,
+                                                        const char **szDerivedKeys,
+                                                        const size_t *lenDerivedKeys)
+{
+    bool success = true;
+    PSCOSSL_SSHKDF_TEST_VECTOR ptv = NULL;
+
+    ptv = (PSCOSSL_SSHKDF_TEST_VECTOR)OPENSSL_zalloc(sizeof(*ptv));
+
+    if(!ptv)
+        goto end;
+
+    ptv->md = md;
+    ptv->md_name = md_name;
+
+    ptv->szSharedSecret = szSharedSecret;
+    // Set the length field to the string length first, will contain data length after the scossl_decode_hexstr() call.
+    // Same for szHashValue and szSessionId fields as well.
+    ptv->cbSharedSecret = lenSharedSecret;
+    ptv->pbSharedSecret = scossl_decode_hexstr(szSharedSecret, &ptv->cbSharedSecret);
+
+    ptv->szHashValue = szHashValue;
+    ptv->cbHashValue = lenHashValue;
+    ptv->pbHashValue = scossl_decode_hexstr(szHashValue, &ptv->cbHashValue);
+
+    ptv->szSessionId = szSessionId;
+    ptv->cbSessionId = lenSessionId;
+    ptv->pbSessionId = scossl_decode_hexstr(szSessionId, &ptv->cbSessionId);
+
+    if(!ptv->pbSharedSecret || !ptv->pbHashValue || !ptv->pbSessionId)
+    {
+        success = false;
+        goto end;
+    }
+
+    for(int i = 0; i < sizeof(ptv->pbDerivedKeys) / sizeof(ptv->pbDerivedKeys[0]); i++)
+    {
+        ptv->cbDerivedKeys[i] = lenDerivedKeys[i];
+        ptv->pbDerivedKeys[i] = scossl_decode_hexstr(szDerivedKeys[i], &ptv->cbDerivedKeys[i]);
+
+        if(!ptv->pbDerivedKeys[i])
+        {
+            success = false;
+            break;
+        }
+    }
+
+end:
+
+    if(!success && ptv)
+    {
+        scossl_sshkdf_testvector_free(ptv);
+        ptv = NULL;
+    }
+
+    return ptv;
+}
+
+
+extern "C" {
+extern EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);    
+}
+
+void TestSshKdf(void)
+{
+    const size_t MAX_DERIVED_KEY = 64;
+    unsigned char derivedKey[MAX_DERIVED_KEY];
+    int ret;
+
+    // hash = "SHA-1"
+    // shared secret length = 1024
+    // IV length = 64
+    // encryption key length = 192
+    const char szSharedSecret1[] = "0000008055bae931c07fd824bf10add1902b6fbc7c665347383498a686929ff5a25f8e40cb6645ea814fb1a5e0a11f852f86255641e5ed986e83a78bc8269480eac0b0dfd770cab92e7a28dd87ff452466d6ae867cead63b366b1c286e6c4811a9f14c27aea14c5171d49b78c06e3735d36e6a3be321dd5fc82308f34ee1cb17fba94a59";
+    const char szHashValue1[] = "a4ebd45934f56792b5112dcd75a1075fdc889245";
+    const char szSessionId1[] = "a4ebd45934f56792b5112dcd75a1075fdc889245";
+    const char szInitialIVClientToServer1[] = "e2f627c0b43f1ac1";
+    const char szInitialIVServerToClient1[] = "58471445f342b181";
+    const char szEncryptionKeyClientToServer1[] = "1ca9d310f86d51f6cb8e7007cb2b220d55c5281ce680b533";
+    const char szEncryptionKeyServerToClient1[] = "2c60df8603d34cc1dbb03c11f725a44b44008851c73d6844";
+    const char szIntegrityKeyClientToSever1[] = "472eb8a26166ae6aa8e06868e45c3b26e6eeed06";
+    const char szIntegrityKeyServerToClient1[] = "e3e2fdb9d7bc21165a3dbe47e1eceb7764390bab";
+
+    const char *szDerivedKeys1[] = {
+        szInitialIVClientToServer1,
+        szInitialIVServerToClient1,
+        szEncryptionKeyClientToServer1,
+        szEncryptionKeyServerToClient1,
+        szIntegrityKeyClientToSever1,
+        szIntegrityKeyServerToClient1
+    };
+
+    size_t lenDerivedKeys1[] = {
+        sizeof(szInitialIVClientToServer1) - 1,
+        sizeof(szInitialIVServerToClient1) - 1,
+        sizeof(szEncryptionKeyClientToServer1) - 1,
+        sizeof(szEncryptionKeyServerToClient1) - 1,
+        sizeof(szIntegrityKeyClientToSever1) - 1,
+        sizeof(szIntegrityKeyServerToClient1) - 1
+    };
+
+    // hash = "SHA-256"
+    // shared secret length = 1024
+    // IV length = 64
+    // encryption key length = 192
+    const char szSharedSecret2[] = "0000008100875c551cef526a4a8be1a7df27e9ed354bac9afb71f53dbae905679d14f9faf2469c53457cf80a366be278965ba6255276ca2d9f4a97d271f71e50d8a9ec46253a6a906ac2c5e4f48b27a63ce08d80390a492aa43bad9d882ccac23dac88bcada4b4d426a362083dab6569c54c224dd2d87643aa227693e141ad1630ce13144e";
+    const char szHashValue2[] = "0e683fc8a9ed7c2ff02def23b2745ebc99b267daa86a4aa7697239088253f642";
+    const char szSessionId2[] = "0e683fc8a9ed7c2ff02def23b2745ebc99b267daa86a4aa7697239088253f642";
+    const char szInitialIVClientToServer2[] = "41ff2ead1683f1e6";
+    const char szInitialIVServerToClient2[] = "e619ecfd9edb50cd";
+    const char szEncryptionKeyClientToServer2[] = "4a6314d2f7511bf88fad39fb6892f3f218cafd530e72fe43";
+    const char szEncryptionKeyServerToClient2[] = "084c15fb7f99c65ff134eeb407cee5d540c341dea45a42a5";
+    const char szIntegrityKeyClientToSever2[] = "41ec5a94fecce7707ea156a6ad29239a891621adacbedb8be70675008d6f9274";
+    const char szIntegrityKeyServerToClient2[] = "47d3c20aba60981e47b30533623613ff1cacbcf1642fb4ad86ee712f2aed9af8";
+
+    const char *szDerivedKeys2[] = {
+        szInitialIVClientToServer2,
+        szInitialIVServerToClient2,
+        szEncryptionKeyClientToServer2,
+        szEncryptionKeyServerToClient2,
+        szIntegrityKeyClientToSever2,
+        szIntegrityKeyServerToClient2
+    };
+
+    size_t lenDerivedKeys2[] = {
+        sizeof(szInitialIVClientToServer2) - 1,
+        sizeof(szInitialIVServerToClient2) - 1,
+        sizeof(szEncryptionKeyClientToServer2) - 1,
+        sizeof(szEncryptionKeyServerToClient2) - 1,
+        sizeof(szIntegrityKeyClientToSever2) - 1,
+        sizeof(szIntegrityKeyServerToClient2) - 1
+    };
+
+
+    PSCOSSL_SSHKDF_TEST_VECTOR test_vectors[2] = {nullptr, nullptr};
+    EVP_KDF_CTX *kdf_ctx = nullptr;
+
+    printf("Testing SSH-KDF\n");
+
+    test_vectors[0] = scossl_sshkdf_testvector_new(EVP_sha1(), "sha1",
+                                                    szSharedSecret1, sizeof(szSharedSecret1) - 1,
+                                                    szHashValue1, sizeof(szHashValue1) - 1,
+                                                    szSessionId1, sizeof(szSessionId1) - 1,
+                                                    szDerivedKeys1,
+                                                    lenDerivedKeys1);
+
+    if(!test_vectors[0])
+    {
+        handleError("scossl_sshkdf_testvector_new");
+        goto end;
+    }
+
+    test_vectors[1] = scossl_sshkdf_testvector_new(EVP_sha256(), "sha256",
+                                                    szSharedSecret2, sizeof(szSharedSecret2) - 1,
+                                                    szHashValue2, sizeof(szHashValue2) - 1,
+                                                    szSessionId2, sizeof(szSessionId2) - 1,
+                                                    szDerivedKeys2,
+                                                    lenDerivedKeys2);
+
+    if(!test_vectors[1])
+    {
+        handleError("scossl_sshkdf_testvector_new");
+        goto end;
+    }
+    
+    //
+    // Test both EVP_KDF_ctrl and EVP_KDF_ctrl_str functions.
+    // bCtrlStrMode = 0 uses EVP_KDF_ctrl functions and
+    // bCtrlStrMode = 1 uses EVP_KDF_ctrl_str functions
+    //
+    for(int bCtrlStrMode = 0; bCtrlStrMode < 2; bCtrlStrMode++)
+    {
+        printf("testing %s mode\n", bCtrlStrMode ? "ctrl_str" : "ctrl");
+
+        for(int i = 0; i < sizeof(test_vectors) / sizeof(test_vectors[0]); i++)
+        {
+            PSCOSSL_SSHKDF_TEST_VECTOR ptv = test_vectors[i];
+
+            kdf_ctx = scossl_EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
+
+            if(!kdf_ctx)
+            {
+                handleOpenSSLError("EVP_KDF_CTX_new_id");
+                break;
+            }
+
+            if(bCtrlStrMode)
+                ret = EVP_KDF_ctrl_str(kdf_ctx, "digest", ptv->md_name);
+            else
+                ret = EVP_KDF_ctrl(kdf_ctx, EVP_KDF_CTRL_SET_MD, ptv->md);
+
+            if(ret <= 0)
+            {
+                handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_MD)");
+                break;
+            }
+
+            if(bCtrlStrMode)
+                ret = EVP_KDF_ctrl_str(kdf_ctx, "hexkey", ptv->szSharedSecret);
+            else
+                ret = EVP_KDF_ctrl(kdf_ctx, EVP_KDF_CTRL_SET_KEY, ptv->pbSharedSecret, ptv->cbSharedSecret);
+
+            if(ret <= 0)
+            {
+                handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_KEY)");
+                break;
+            }
+
+            if(bCtrlStrMode)
+                ret = EVP_KDF_ctrl_str(kdf_ctx, "hexxcghash", ptv->szHashValue);
+            else
+                ret = EVP_KDF_ctrl(kdf_ctx, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, ptv->pbHashValue, ptv->cbHashValue);
+
+            if(ret <= 0)
+            {
+                handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_SSHKDF_XCGHASH)");
+                break;
+            }
+
+            if(bCtrlStrMode)
+                ret = EVP_KDF_ctrl_str(kdf_ctx, "hexsession_id", ptv->szSessionId);
+            else
+                ret = EVP_KDF_ctrl(kdf_ctx, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, ptv->pbSessionId, ptv->cbSessionId);
+
+            if(ret <= 0)
+            {
+                handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID)");
+                break;
+            }
+
+            for(int keyIndex = 0; keyIndex < sizeof(ptv->cbDerivedKeys) / sizeof(ptv->cbDerivedKeys[0]); keyIndex++)
+            {    
+                if(bCtrlStrMode)
+                {
+                    char szLabel[] = { (char)('A' + keyIndex), 0};
+                    ret = EVP_KDF_ctrl_str(kdf_ctx, "type", szLabel);
+                }
+                else
+                    ret = EVP_KDF_ctrl(kdf_ctx, EVP_KDF_CTRL_SET_SSHKDF_TYPE, 0x41 + keyIndex);
+
+                if(ret <= 0)
+                {
+                    handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_SSHKDF_TYPE)");
+                    break;
+                }
+    
+                OPENSSL_cleanse(derivedKey, sizeof(derivedKey));
+
+                if(EVP_KDF_derive(kdf_ctx, derivedKey, ptv->cbDerivedKeys[keyIndex]) <= 0)
+                {
+                    handleOpenSSLError("EVP_KDF_derive");
+                    break;
+                }
+
+                if(memcmp(derivedKey, ptv->pbDerivedKeys[keyIndex], ptv->cbDerivedKeys[keyIndex]) != 0)
+                {
+                    handleError("SSHKDF test vector mismatch");
+                }
+            }
+
+            EVP_KDF_CTX_free(kdf_ctx);
+            kdf_ctx = NULL;
+        }
+    }
+    
+end:
+
+    if(kdf_ctx)
+        EVP_KDF_CTX_free(kdf_ctx);
+
+    for(int i = 0; i < sizeof(test_vectors) / sizeof(test_vectors[0]); i++)
+        scossl_sshkdf_testvector_free(test_vectors[i]);
+
+    printf("SSH-KDF succeeded\n");
+    printf("%s", SeparatorLine);
+}
+
+#endif // SCOSSL_SSHKDF
 
 int main(int argc, char** argv)
 {
@@ -1898,6 +2288,10 @@ int main(int argc, char** argv)
     TestEcc();
     TestDh();
     TestHMAC();
+
+#ifdef SCOSSL_SSHKDF
+    TestSshKdf();
+#endif    
 
     BIO_free(bio_err);
     return 0;

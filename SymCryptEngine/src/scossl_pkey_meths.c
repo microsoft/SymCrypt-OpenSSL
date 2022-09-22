@@ -8,6 +8,7 @@
 #include "scossl_rsapss.h"
 #include "scossl_hmac.h"
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 
 #ifdef __cplusplus
 extern "C" {

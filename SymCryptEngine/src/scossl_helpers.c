@@ -91,6 +91,10 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_HMAC_INIT, 0), "scossl_hmac_init"},
     {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL, 0), "scossl_hmac_ctrl"},
     {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL_STR, 0), "scossl_hmac_ctrl_str"},
+    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_NEW, 0), "scossl_sshkdf_new"},
+    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_CTRL, 0), "scossl_sshkdf_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_CTRL_STR, 0), "scossl_sshkdf_ctrl_str"},
+    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_DERIVE, 0), "scossl_sshkdf_derive"},
     {0, NULL}
 };
 

@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-par
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-add_library(scossl_static STATIC
+set(SCOSSL_SOURCES 
     ../src/scossl.c
     ../src/scossl_ciphers.c
     ../src/scossl_dh.c
@@ -28,6 +28,15 @@ add_library(scossl_static STATIC
     ../src/scossl_hmac.c
     ../src/scossl_helpers.c
 )
+
+if (SCOSSL_SSHKDF)
+    list(APPEND SCOSSL_SOURCES ../src/scossl_sshkdf.c)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
+endif()
+
+
+add_library(scossl_static STATIC ${SCOSSL_SOURCES})
 
 set_target_properties(scossl_static PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
 # target_link_libraries(scossl_static ${OPENSSL_CRYPTO_LIBRARY})
