@@ -5,7 +5,6 @@ project(scossl_engine_static)
 set(DEFAULT_BUILD_TYPE "Release")
 
 include(GNUInstallDirs)
-include(CheckSymbolExists)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
@@ -29,8 +28,6 @@ set(SCOSSL_SOURCES
     ../src/scossl_hmac.c
     ../src/scossl_helpers.c
 )
-
-check_symbol_exists(EVP_KDF_SSHKDF "openssl/kdf.h" SCOSSL_SSHKDF)
 
 if (SCOSSL_SSHKDF)
     list(APPEND SCOSSL_SOURCES ../src/scossl_sshkdf.c)
