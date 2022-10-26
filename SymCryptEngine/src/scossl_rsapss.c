@@ -60,6 +60,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     EVP_MD *mgf1Digest;
     int type = 0;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
+    int cbDigest, cbSaltMax;
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
@@ -97,16 +98,19 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
         return SCOSSL_UNSUPPORTED;
     }
 
+    cbDigest = EVP_MD_size(messageDigest);
+    cbSaltMax = (( RSA_bits(rsa) + 6 ) / 8) - cbDigest - 2; // ceil((RSA_bits(rsa) - 1) / 8) - cbDigest - 2
+
     if( cbSalt == RSA_PSS_SALTLEN_DIGEST )
     {
-        cbSalt = EVP_MD_size(messageDigest);
+        cbSalt = cbDigest;
     }
     else if ( (cbSalt == RSA_PSS_SALTLEN_MAX_SIGN) || (cbSalt == RSA_PSS_SALTLEN_MAX) )
     {
-        cbSalt = RSA_size(rsa) - EVP_MD_size(messageDigest) - 2;
+        cbSalt = cbSaltMax;
     }
-    
-    if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
+
+    if ( (cbSalt < 0) || (cbSalt > cbSaltMax) )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_INVALID_ARGUMENT,
             "Invalid cbSalt");
@@ -204,6 +208,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     EVP_MD *mgf1Digest;
     int type = 0;
     int cbSalt = RSA_PSS_SALTLEN_DIGEST;
+    int cbDigest, cbSaltMax;
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
@@ -241,13 +246,16 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
         return SCOSSL_UNSUPPORTED;
     }
 
+    cbDigest = EVP_MD_size(messageDigest);
+    cbSaltMax = (( RSA_bits(rsa) + 6 ) / 8) - cbDigest - 2; // ceil((RSA_bits(rsa) - 1) / 8) - cbDigest - 2
+
     if( cbSalt == RSA_PSS_SALTLEN_DIGEST )
     {
-        cbSalt = EVP_MD_size(messageDigest);
+        cbSalt = cbDigest;
     }
     else if ( cbSalt == RSA_PSS_SALTLEN_MAX )
     {
-        cbSalt = RSA_size(rsa) - EVP_MD_size(messageDigest) - 2;
+        cbSalt = cbSaltMax;
     }
     else if ( cbSalt == RSA_PSS_SALTLEN_AUTO )
     {
@@ -255,8 +263,8 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
             "SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
         return SCOSSL_UNSUPPORTED;
     }
-    
-    if ( (cbSalt < 0) || (cbSalt > (RSA_size(rsa) - EVP_MD_size(messageDigest) - 2)) )
+
+    if ( (cbSalt < 0) || (cbSalt > cbSaltMax) )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_PASSED_INVALID_ARGUMENT,
             "Invalid cbSalt");
