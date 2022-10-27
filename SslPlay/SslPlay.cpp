@@ -380,7 +380,7 @@ void TestRsaEncryptDecrypt(
     if (padding == RSA_NO_PADDING) {
         // PlainText value has to be less than RSA public modulus
         // We can just mask out the most significant bit
-        plaintext[0] &= 0x7f;
+        plaintext[0] &= 0xff >> (8 - ((EVP_PKEY_bits(encryptionKey) - 1) & 7));
     }
 
     //
@@ -498,6 +498,7 @@ void TestRsaSignVerify(
         EVP_PKEY *verificationKey,
         const char* paddingStr,
         int padding,
+        int saltlen,
         const char* digestStr,
         const EVP_MD *digest,
         size_t digest_length
@@ -538,8 +539,8 @@ void TestRsaSignVerify(
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
     {
-        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
-        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSignContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen (%d)\n", saltlen);
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSignContext, saltlen) <= 0)
         {
             handleOpenSSLError("");
             goto end;
@@ -597,8 +598,8 @@ void TestRsaSignVerify(
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
     {
-        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
-        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerifyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen (%d)\n", saltlen);
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerifyContext, saltlen) <= 0)
         {
             handleOpenSSLError("");
             goto end;
@@ -630,6 +631,7 @@ void TestRsaDigestSignVerify(
         EVP_PKEY *verificationKey,
         const char* paddingStr,
         int padding,
+        int saltlen,
         const char* digestStr,
         const EVP_MD *digest
         )
@@ -672,8 +674,8 @@ void TestRsaDigestSignVerify(
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
     {
-        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
-        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSigningKeyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen (%d)\n", saltlen);
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pSigningKeyContext, saltlen) <= 0)
         {
             handleOpenSSLError("");
             goto end;
@@ -730,8 +732,8 @@ void TestRsaDigestSignVerify(
     }
     if (padding == RSA_PKCS1_PSS_PADDING)
     {
-        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen RSA_PSS_SALTLEN_DIGEST\n");
-        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerificationKeyContext, RSA_PSS_SALTLEN_DIGEST) <= 0)
+        printf("Command EVP_PKEY_CTX_set_rsa_pss_saltlen (%d)\n", saltlen);
+        if (EVP_PKEY_CTX_set_rsa_pss_saltlen(pVerificationKeyContext, saltlen) <= 0)
         {
             handleOpenSSLError("");
             goto end;
@@ -1031,29 +1033,33 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     // Sign/Verify
     //
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_MD5", EVP_md5(), 16);
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha1", EVP_sha1(), 20);
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha256", EVP_sha256(), 32);
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha384", EVP_sha384(), 48);
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512(), 64);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5(), 16);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha1", EVP_sha1(), 20);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha384", EVP_sha384(), 48);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha512", EVP_sha512(), 64);
     printf("%s", SeparatorLine);
 
-    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256(), 32);
-    TestRsaSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_DIGEST, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_MAX, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_DIGEST, "EVP_sha256", EVP_sha256(), 32);
+    TestRsaSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_MAX, "EVP_sha256", EVP_sha256(), 32);
     printf("%s", SeparatorLine);
 
     //
     // DigestSign/DigestVerify
     //
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_MD5", EVP_md5());
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha1", EVP_sha1());
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha256", EVP_sha256());
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha384", EVP_sha384());
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, "EVP_sha512", EVP_sha512());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha1", EVP_sha1());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha384", EVP_sha384());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha512", EVP_sha512());
     printf("%s", SeparatorLine);
 
-    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
-    TestRsaDigestSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_DIGEST, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_MAX, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_DIGEST, "EVP_sha256", EVP_sha256());
+    TestRsaDigestSignVerify(privateKeyPss, publicKeyPss, "RSA_PKCS1_PSS_PADDING", RSA_PKCS1_PSS_PADDING, RSA_PSS_SALTLEN_MAX, "EVP_sha256", EVP_sha256());
     printf("%s", SeparatorLine);
 
     //
@@ -1088,6 +1094,7 @@ void TestRsaEvpAll()
 {
     TestRsaEvp(1024, 65537);
     TestRsaEvp(2048, 65537);
+    TestRsaEvp(2049, 65537);
     TestRsaEvp(3072, 65537);
     TestRsaEvp(4096, 65537);
     printf("%s", SeparatorLine);
@@ -1733,23 +1740,23 @@ end:
 void TestHMAC(void)
 {
     const unsigned char pbKey[] = {
-        0x0a, 0x71, 0xd5, 0xcf, 0x99, 0x84, 0x9b, 0xc1, 0x3d, 0x73, 0x83, 0x2d, 0xcd, 0x86, 0x42, 0x44 
+        0x0a, 0x71, 0xd5, 0xcf, 0x99, 0x84, 0x9b, 0xc1, 0x3d, 0x73, 0x83, 0x2d, 0xcd, 0x86, 0x42, 0x44
     };
 
     const unsigned char pbMsg[] = {
-        0x17, 0xf1, 0xee, 0x0c, 0x67, 0x67, 0xa1, 0xf3, 0xf0, 0x4b, 0xb3, 0xc1, 0xb7, 0xa4, 0xe0, 0xd4, 
-        0xf0, 0xe5, 0x9e, 0x59, 0x63, 0xc1, 0xa3, 0xbf, 0x15, 0x40, 0xa7, 0x6b, 0x25, 0x13, 0x6b, 0xae, 
-        0xf4, 0x25, 0xfa, 0xf4, 0x88, 0x72, 0x2e, 0x3e, 0x33, 0x1c, 0x77, 0xd2, 0x6f, 0xbb, 0xd8, 0x30, 
-        0x0d, 0xf5, 0x32, 0x49, 0x8f, 0x50, 0xc5, 0xec, 0xd2, 0x43, 0xf4, 0x81, 0xf0, 0x93, 0x48, 0xf9, 
-        0x64, 0xdd, 0xb8, 0x05, 0x6f, 0x6e, 0x28, 0x86, 0xbb, 0x5b, 0x2f, 0x45, 0x3f, 0xcf, 0x1d, 0xe5, 
-        0x62, 0x9f, 0x3d, 0x16, 0x63, 0x24, 0x57, 0x0b, 0xf8, 0x49, 0x79, 0x2d, 0x35, 0xe3, 0xf7, 0x11, 
-        0xb0, 0x41, 0xb1, 0xa7, 0xe3, 0x04, 0x94, 0xb5, 0xd1, 0x31, 0x64, 0x84, 0xed, 0x85, 0xb8, 0xda, 
-        0x37, 0x09, 0x46, 0x27, 0xa8, 0xe6, 0x60, 0x03, 0xd0, 0x79, 0xbf, 0xd8, 0xbe, 0xaa, 0x80, 0xdc, 
+        0x17, 0xf1, 0xee, 0x0c, 0x67, 0x67, 0xa1, 0xf3, 0xf0, 0x4b, 0xb3, 0xc1, 0xb7, 0xa4, 0xe0, 0xd4,
+        0xf0, 0xe5, 0x9e, 0x59, 0x63, 0xc1, 0xa3, 0xbf, 0x15, 0x40, 0xa7, 0x6b, 0x25, 0x13, 0x6b, 0xae,
+        0xf4, 0x25, 0xfa, 0xf4, 0x88, 0x72, 0x2e, 0x3e, 0x33, 0x1c, 0x77, 0xd2, 0x6f, 0xbb, 0xd8, 0x30,
+        0x0d, 0xf5, 0x32, 0x49, 0x8f, 0x50, 0xc5, 0xec, 0xd2, 0x43, 0xf4, 0x81, 0xf0, 0x93, 0x48, 0xf9,
+        0x64, 0xdd, 0xb8, 0x05, 0x6f, 0x6e, 0x28, 0x86, 0xbb, 0x5b, 0x2f, 0x45, 0x3f, 0xcf, 0x1d, 0xe5,
+        0x62, 0x9f, 0x3d, 0x16, 0x63, 0x24, 0x57, 0x0b, 0xf8, 0x49, 0x79, 0x2d, 0x35, 0xe3, 0xf7, 0x11,
+        0xb0, 0x41, 0xb1, 0xa7, 0xe3, 0x04, 0x94, 0xb5, 0xd1, 0x31, 0x64, 0x84, 0xed, 0x85, 0xb8, 0xda,
+        0x37, 0x09, 0x46, 0x27, 0xa8, 0xe6, 0x60, 0x03, 0xd0, 0x79, 0xbf, 0xd8, 0xbe, 0xaa, 0x80, 0xdc,
     };
 
     const unsigned char pbExpected[] = {
-        0x2a, 0x0f, 0x54, 0x20, 0x90, 0xb5, 0x1b, 0x84, 0x46, 0x5c, 0xd9, 0x3e, 0x5d, 0xde, 0xea, 0xa1, 
-        0x4c, 0xa5, 0x11, 0x62, 0xf4, 0x80, 0x47, 0x83, 0x5d, 0x2d, 0xf8, 0x45, 0xfb, 0x48, 0x8a, 0xf4 
+        0x2a, 0x0f, 0x54, 0x20, 0x90, 0xb5, 0x1b, 0x84, 0x46, 0x5c, 0xd9, 0x3e, 0x5d, 0xde, 0xea, 0xa1,
+        0x4c, 0xa5, 0x11, 0x62, 0xf4, 0x80, 0x47, 0x83, 0x5d, 0x2d, 0xf8, 0x45, 0xfb, 0x48, 0x8a, 0xf4
     };
 
     unsigned char pbOutput[sizeof(pbExpected)];
@@ -1786,7 +1793,7 @@ void TestHMAC(void)
         if((ret = EVP_DigestSignInit(mdctx, &pctx, md, NULL, pkey)) <= 0) {
             printf("EVP_DigestSignInit returned %d\n", ret);
             handleOpenSSLError("EVP_DigestSignInit");
-            goto end;          
+            goto end;
         }
 
         // make a copy of mdctx for another hmac computation with the same key
@@ -1802,7 +1809,7 @@ void TestHMAC(void)
             {
                 if(EVP_DigestSignUpdate(mdctx, pbMsg + j, 1) <= 0) {
                     handleOpenSSLError("EVP_DigestSignUpdate");
-                    goto end;          
+                    goto end;
                 }
             }
         }
@@ -1811,7 +1818,7 @@ void TestHMAC(void)
             // update message with a single call
             if(EVP_DigestSignUpdate(mdctx, pbMsg, sizeof(pbMsg)) <= 0) {
                 handleOpenSSLError("EVP_DigestSignUpdate");
-                goto end;          
+                goto end;
             }
         }
 
@@ -1820,7 +1827,7 @@ void TestHMAC(void)
 
         if(EVP_DigestSignFinal(mdctx, pbOutput, &cbOutputLen) <= 0) {
             handleOpenSSLError("EVP_DigestSignFinal");
-            goto end;          
+            goto end;
         }
 
         if ((cbOutputLen != sizeof(pbExpected)) || (memcmp(pbOutput, pbExpected, sizeof(pbExpected)) != 0)) {
@@ -1837,7 +1844,7 @@ void TestHMAC(void)
         //
         if(EVP_DigestSignUpdate(mdctxCopy, pbMsg, sizeof(pbMsg)) <= 0) {
             handleOpenSSLError("EVP_DigestSignUpdate");
-            goto end;          
+            goto end;
         }
 
         memset(pbOutput, 0, sizeof(pbOutput));
@@ -1845,7 +1852,7 @@ void TestHMAC(void)
 
         if(EVP_DigestSignFinal(mdctxCopy, pbOutput, &cbOutputLen) <= 0) {
             handleOpenSSLError("EVP_DigestSignFinal");
-            goto end;          
+            goto end;
         }
 
         if ((cbOutputLen != sizeof(pbExpected)) || (memcmp(pbOutput, pbExpected, sizeof(pbExpected)) != 0)) {
@@ -1887,8 +1894,8 @@ void TestHMAC(void)
 // Parameters
 //      str : Pointer to the hex string containing data, must be of even size.
 //      len : Size of the str buffer on input (excluding the null terminator), size of the decoded buffer on output (i.e., half the input buffer size)
-//      
-// Returns 
+//
+// Returns
 //      Pointer to the allocated buffer containing the decoded data on success, NULL otherwise.
 //
 unsigned char* scossl_decode_hexstr(const char *str, size_t *len)
@@ -1933,7 +1940,7 @@ unsigned char* scossl_decode_hexstr(const char *str, size_t *len)
 
     if(bValidInput)
     {
-        *len  = buf_len;        
+        *len  = buf_len;
     }
     else
     {
@@ -2047,7 +2054,7 @@ end:
 
 
 extern "C" {
-extern EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);    
+extern EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);
 }
 
 void TestSshKdf(void)
@@ -2151,7 +2158,7 @@ void TestSshKdf(void)
         handleError("scossl_sshkdf_testvector_new");
         goto end;
     }
-    
+
     //
     // Test both EVP_KDF_ctrl and EVP_KDF_ctrl_str functions.
     // bCtrlStrMode = 0 uses EVP_KDF_ctrl functions and
@@ -2218,7 +2225,7 @@ void TestSshKdf(void)
             }
 
             for(int keyIndex = 0; keyIndex < sizeof(ptv->cbDerivedKeys) / sizeof(ptv->cbDerivedKeys[0]); keyIndex++)
-            {    
+            {
                 if(bCtrlStrMode)
                 {
                     char szLabel[] = { (char)('A' + keyIndex), 0};
@@ -2232,7 +2239,7 @@ void TestSshKdf(void)
                     handleOpenSSLError("EVP_KDF_ctrl(EVP_KDF_CTRL_SET_SSHKDF_TYPE)");
                     break;
                 }
-    
+
                 OPENSSL_cleanse(derivedKey, sizeof(derivedKey));
 
                 if(EVP_KDF_derive(kdf_ctx, derivedKey, ptv->cbDerivedKeys[keyIndex]) <= 0)
@@ -2251,7 +2258,7 @@ void TestSshKdf(void)
             kdf_ctx = NULL;
         }
     }
-    
+
 end:
 
     if(kdf_ctx)
@@ -2291,7 +2298,7 @@ int main(int argc, char** argv)
 
 #ifdef SCOSSL_SSHKDF
     TestSshKdf();
-#endif    
+#endif
 
     BIO_free(bio_err);
     return 0;
