@@ -57,6 +57,17 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
 {
     int ret = SCOSSL_FAILURE;
 
+    // Explicitly load all ciphers in order to remove registered stitched algorithms which we want to avoid
+    // This means that applications using EVP_get_cipherbyname will not find stitched algorithms, and will instead use the unstitched versions that SCOSSL supports
+    if( !OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS, NULL) )
+    {
+        goto end;
+    }
+    OBJ_NAME_remove(LN_aes_128_cbc_hmac_sha1, OBJ_NAME_TYPE_CIPHER_METH);
+    OBJ_NAME_remove(LN_aes_256_cbc_hmac_sha1, OBJ_NAME_TYPE_CIPHER_METH);
+    OBJ_NAME_remove(LN_aes_128_cbc_hmac_sha256, OBJ_NAME_TYPE_CIPHER_METH);
+    OBJ_NAME_remove(LN_aes_256_cbc_hmac_sha256, OBJ_NAME_TYPE_CIPHER_METH);
+
     if( !scossl_module_initialized )
     {
         SYMCRYPT_MODULE_INIT();
