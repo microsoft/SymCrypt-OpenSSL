@@ -28,4 +28,5 @@ endif()
 
 add_subdirectory (SymCryptEngine/static)
 add_subdirectory (SymCryptEngine/dynamic)
+add_subdirectory (SymCryptProvider)
 add_subdirectory (SslPlay)

@@ -1,0 +1,20 @@
+#include <openssl/core_names.h>
+#include <openssl/params.h>
+#include <openssl/provider.h>
+
+// Value provided by CMake, defined in top level CMakeLists.txt
+#define SCOSSL_VERSION "@SymCrypt-OpenSSL_VERSION@"
+#define SCOSSL_NAME "SymCrypt"
+
+typedef struct {
+    const OSSL_CORE_HANDLE *handle;
+} SCOSSL_PROV_CTX, *PSCOSSL_PROV_CTX;
+
+static const OSSL_PARAM scossl_prov_param_types[] =
+{
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_NAME, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_VERSION, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_BUILDINFO, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_STATUS, OSSL_PARAM_INTEGER, NULL, 0),
+    OSSL_PARAM_END
+};
