@@ -3,6 +3,55 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/crypto.h>
 
+#define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs}
+#define ALG_TABLE_END { NULL, NULL, NULL, NULL}
+
+static const OSSL_ALGORITHM scossl_prov_digest[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_cipher[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_mac[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_kdf[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_rand[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_keymgmt[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_keyexch[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_signature[] = {
+
+    ALG_TABLE_END
+};
+
+static const OSSL_ALGORITHM scossl_prov_asym_cipher[] = {
+
+    ALG_TABLE_END
+};
+
+
 static int scossl_prov_get_status()
 {
     return 1;
@@ -40,18 +89,27 @@ static int scossl_prov_get_params(void *provctx, OSSL_PARAM params[])
 
 static const OSSL_ALGORITHM *scossl_prov_query_operation(void *provctx, int operation_id, int *no_store)
 {
-    // switch (operation_id)
-    // {
-    //     case OSSL_OP_DIGEST:
-    //     case OSSL_OP_CIPHER:
-    //     case OSSL_OP_MAC:
-    //     case OSSL_OP_KDF:
-    //     case OSSL_OP_RAND:
-    //     case OSSL_OP_KEYMGMT:
-    //     case OSSL_OP_KEYEXCH:
-    //     case OSSL_OP_SIGNATURE:
-    //     case OSSL_OP_ASYM_CIPHER:
-    // }
+    switch (operation_id)
+    {
+        case OSSL_OP_DIGEST:
+            return scossl_prov_digest;
+        case OSSL_OP_CIPHER:
+            return scossl_prov_cipher;
+        case OSSL_OP_MAC:
+            return scossl_prov_mac;
+        case OSSL_OP_KDF:
+            return scossl_prov_kdf;
+        case OSSL_OP_RAND:
+            return scossl_prov_rand;
+        case OSSL_OP_KEYMGMT:
+            return scossl_prov_keymgmt;
+        case OSSL_OP_KEYEXCH:
+            return scossl_prov_keyexch;
+        case OSSL_OP_SIGNATURE:
+            return scossl_prov_signature;
+        case OSSL_OP_ASYM_CIPHER:
+            return scossl_prov_asym_cipher;
+    }
 
     return NULL;
 }
