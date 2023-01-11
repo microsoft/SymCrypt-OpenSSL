@@ -8,8 +8,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unk
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in 
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/scossl_prov_base.h.in 
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/scossl_prov_base.h)
 
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
@@ -17,18 +17,18 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
-    ./src/p_scossl_base.c
+    ./src/scossl_prov_base.c
 )
 
 # if (SCOSSL_SSHKDF)
-#     list(APPEND SCOSSL_SOURCES ./src/p_scossl_sshkdf.c)
+#     list(APPEND SCOSSL_SOURCES ./src/scossl_prov_sshkdf.c)
 #     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
 #     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
 # endif()
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 
-set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/p_scossl_base.h)
+set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/scossl_prov_base.h)
 target_include_directories(scossl_provider PUBLIC ./inc)
 target_include_directories(scossl_provider PRIVATE ./src)
 target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
