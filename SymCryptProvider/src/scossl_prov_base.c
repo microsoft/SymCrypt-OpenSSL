@@ -1,17 +1,25 @@
 #include "scossl_prov_base.h"
+#include "scossl_prov_digests.h"
 
 #include <openssl/core_dispatch.h>
 #include <openssl/crypto.h>
 
-#define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs}
+#define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
 
+// Digests
+extern const OSSL_DISPATCH scossl_prov_Md5_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha1_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha256_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha384_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha512_functions[];
+
 static const OSSL_ALGORITHM scossl_prov_digest[] = {
-    // ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", scossl_prov_md5_functions),
-    // ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", scossl_prov_sha1_functions),
-    // ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", scossl_prov_sha256_functions),
-    // ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", scossl_prov_sha384_functions),
-    // ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", scossl_prov_sha512_functions),
+    ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", scossl_prov_Md5_functions),
+    ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", scossl_prov_Sha1_functions),
+    ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", scossl_prov_Sha256_functions),
+    ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", scossl_prov_Sha384_functions),
+    ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", scossl_prov_Sha512_functions),
     // ALG("SHA3-256:2.16.840.1.101.3.4.2.8", scossl_prov_sha3_256_functions),
     // ALG("SHA3-384:2.16.840.1.101.3.4.2.9", scossl_prov_sha3_384_functions),
     // ALG("SHA3-512:2.16.840.1.101.3.4.2.10", scossl_prov_sha3_512_functions),
