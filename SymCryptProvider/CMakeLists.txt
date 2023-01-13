@@ -18,6 +18,7 @@ find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
     ./src/scossl_prov_base.c
+    ./src/scossl_prov_digests.c
 )
 
 # if (SCOSSL_SSHKDF)
@@ -30,7 +31,9 @@ add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 
 set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/scossl_prov_base.h)
 target_include_directories(scossl_provider PUBLIC ./inc)
+target_include_directories(scossl_provider PUBLIC ../common/inc)
 target_include_directories(scossl_provider PRIVATE ./src)
+target_include_directories(scossl_provider PRIVATE ../common/src)
 target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Remove default "lib" prefix from symcryptprovider.so as OpenSSL provider is not a generic Linux .so

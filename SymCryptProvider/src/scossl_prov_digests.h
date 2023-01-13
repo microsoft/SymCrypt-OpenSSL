@@ -2,10 +2,7 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/core_names.h>
 #include <openssl/params.h>
-#include <symcrypt.h>
-
-#define SCOSSL_SUCCESS 1
-typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
+#include "scossl_helpers.h"
 
 #define IMPLEMENT_SCOSSL_DIGEST_FUNCTIONS(alg, CTX, blocksize, size)                                          \
     static void *scossl_prov_##alg##_newctx(void *prov_ctx)                                                   \
@@ -36,19 +33,7 @@ typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
     }                                                                                                         \
     static SCOSSL_STATUS scossl_prov_##alg##_get_params(OSSL_PARAM params[])                                  \
     {                                                                                                         \
-        OSSL_PARAM *p = NULL;                                                                                 \
-                                                                                                              \
-        p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_BLOCK_SIZE);                                          \
-        if (p != NULL && !OSSL_PARAM_set_size_t(p, blocksize))                                                \
-        {                                                                                                     \
-            return 0;                                                                                         \
-        }                                                                                                     \
-        p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE);                                                \
-        if (p != NULL && !OSSL_PARAM_set_size_t(p, size))                                                     \
-        {                                                                                                     \
-            return 0;                                                                                         \
-        }                                                                                                     \
-        return SCOSSL_SUCCESS;                                                                                \
+        return scossl_prov_digest_get_params_common(params, blocksize, size);                                 \
     }                                                                                                         \
                                                                                                               \
     const OSSL_DISPATCH scossl_prov_##alg##_functions[] = {                                                   \
@@ -61,3 +46,4 @@ typedef _Return_type_success_(return == 1) int SCOSSL_STATUS;
         {OSSL_FUNC_DIGEST_GETTABLE_PARAMS, (void (*)(void))scossl_prov_digest_gettable_params}};
 
 const OSSL_PARAM *scossl_prov_digest_gettable_params(void *dctx, void *provctx);
+SCOSSL_STATUS scossl_prov_digest_get_params_common(OSSL_PARAM params[], size_t blocksize, size_t size);
