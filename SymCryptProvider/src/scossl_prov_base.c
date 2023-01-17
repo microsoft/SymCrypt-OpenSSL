@@ -1,5 +1,4 @@
 #include "scossl_prov_base.h"
-#include "scossl_prov_digests.h"
 
 #include <openssl/core_dispatch.h>
 #include <openssl/crypto.h>
@@ -7,12 +6,15 @@
 #define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
 
-// Digests
+// Digest
 extern const OSSL_DISPATCH scossl_prov_Md5_functions[];
 extern const OSSL_DISPATCH scossl_prov_Sha1_functions[];
 extern const OSSL_DISPATCH scossl_prov_Sha256_functions[];
 extern const OSSL_DISPATCH scossl_prov_Sha384_functions[];
 extern const OSSL_DISPATCH scossl_prov_Sha512_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha3_256_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha3_384_functions[];
+extern const OSSL_DISPATCH scossl_prov_Sha3_512_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_digest[] = {
     ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", scossl_prov_Md5_functions),
@@ -20,11 +22,27 @@ static const OSSL_ALGORITHM scossl_prov_digest[] = {
     ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", scossl_prov_Sha256_functions),
     ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", scossl_prov_Sha384_functions),
     ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", scossl_prov_Sha512_functions),
-    // ALG("SHA3-256:2.16.840.1.101.3.4.2.8", scossl_prov_sha3_256_functions),
-    // ALG("SHA3-384:2.16.840.1.101.3.4.2.9", scossl_prov_sha3_384_functions),
-    // ALG("SHA3-512:2.16.840.1.101.3.4.2.10", scossl_prov_sha3_512_functions),
+    ALG("SHA3-256:2.16.840.1.101.3.4.2.8", scossl_prov_Sha3_256_functions),
+    ALG("SHA3-384:2.16.840.1.101.3.4.2.9", scossl_prov_Sha3_384_functions),
+    ALG("SHA3-512:2.16.840.1.101.3.4.2.10", scossl_prov_Sha3_512_functions),
     ALG_TABLE_END
 };
+
+// Cipher
+extern const OSSL_DISPATCH scossl_prov_aes128cbc_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes192cbc_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes256cbc_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes128ecb_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes192ecb_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes256ecb_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes128gcm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes192gcm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes256gcm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes128ccm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes192ccm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes256ccm_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes256xts_functions[];
+extern const OSSL_DISPATCH scossl_prov_aes128xts_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_cipher[] = {
     // ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", scossl_prov_aes128cbc_functions),
@@ -44,10 +62,18 @@ static const OSSL_ALGORITHM scossl_prov_cipher[] = {
     ALG_TABLE_END
 };
 
+// MAC
+extern const OSSL_DISPATCH scossl_prov_hmac_functions[];
+
 static const OSSL_ALGORITHM scossl_prov_mac[] = {
     // ALG("HMAC", scossl_prov_hmac_functions),
     ALG_TABLE_END
 };
+
+// KDF
+extern const OSSL_DISPATCH scossl_prov_sshkdf_kdf_functions[];
+extern const OSSL_DISPATCH scossl_prov_hkdf_kdf_functions[];
+extern const OSSL_DISPATCH scossl_prov_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_kdf[] = {
     // ALG("SSHKDF", scossl_prov_sshkdf_kdf_functions),
@@ -56,10 +82,18 @@ static const OSSL_ALGORITHM scossl_prov_kdf[] = {
     ALG_TABLE_END
 };
 
+// Rand
+extern const OSSL_DISPATCH scossl_prov_rand_functions[];
+
 static const OSSL_ALGORITHM scossl_prov_rand[] = {
     // ALG("CTR-DRBG", scossl_prov_rand_functions),
     ALG_TABLE_END
 };
+
+// Key management
+extern const OSSL_DISPATCH scossl_prov_dh_keymgmt_functions[];
+extern const OSSL_DISPATCH scossl_prov_rsa_keymgmt_functions[];
+extern const OSSL_DISPATCH scossl_prov_ecc_keymgmt_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_keymgmt[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", scossl_prov_dh_keymgmt_functions),
@@ -69,20 +103,34 @@ static const OSSL_ALGORITHM scossl_prov_keymgmt[] = {
     ALG_TABLE_END
 };
 
+// Key exchange
+extern const OSSL_DISPATCH scossl_prov_dh_functions[];
+extern const OSSL_DISPATCH scossl_prov_ecdh_functions[];
+extern const OSSL_DISPATCH scossl_prov_x25519_functions[];
+extern const OSSL_DISPATCH scossl_prov_hkdf_keyexch_functions[];
+extern const OSSL_DISPATCH scossl_prov_tls1prf_keyexch_functions[];
+
 static const OSSL_ALGORITHM scossl_prov_keyexch[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", scossl_prov_dh_functions),
     // ALG("ECDH", scossl_prov_ecdh_functions),
     // ALG("X25519:1.3.101.110", scossl_prov_x25519_functions),
-    // ALG("HKDF", scossl_prov_keyexch_hkdf_functions),
-    // ALG("TLS1-PRF", scossl_prov_keyexch_tls1prf_functions),
+    // ALG("HKDF", scossl_prov_hkdf_keyexch_functions),
+    // ALG("TLS1-PRF", scossl_prov_tls1prf_keyexch_functions),
     ALG_TABLE_END
 };
+
+// Signature
+extern const OSSL_DISPATCH scossl_prov_rsa_signature_functions[];
+extern const OSSL_DISPATCH scossl_prov_ecdsa_signature_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_signature[] = {
     // ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", scossl_prov_rsa_signature_functions),
     // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", scossl_prov_ecdsa_signature_functions),
     ALG_TABLE_END
 };
+
+// Asymmetric Cipher
+extern const OSSL_DISPATCH scossl_prov_rsa_asym_cipher_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_asym_cipher[] = {
     // ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", scossl_prov_rsa_asym_cipher_functions),
