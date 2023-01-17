@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "scossl.h"
+#include "scossl_common.h"
 #include <symcrypt.h>
 #include <string.h>
 

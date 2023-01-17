@@ -16,12 +16,8 @@ extern "C" {
 #define SCOSSL_LOG_LEVEL_INFO       (2) // DEFAULT for stderr / logging to logfile
 #define SCOSSL_LOG_LEVEL_DEBUG      (3)
 
-void SCOSSL_ENGINE_set_trace_level(int trace_level, int ossl_ERR_level);
-void SCOSSL_ENGINE_set_trace_log_filename(const char *filename);
-
-// SymCrypt-OpenSSL Engine Initialization.
-int SCOSSL_ENGINE_Initialize();
-
+void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
+void SCOSSL_set_trace_log_filename(const char *filename);
 
 #ifdef __cplusplus
 }

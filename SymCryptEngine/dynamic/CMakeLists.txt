@@ -28,7 +28,6 @@ set(SCOSSL_SOURCES
     ../src/scossl_hkdf.c
     ../src/scossl_tls1prf.c
     ../src/scossl_hmac.c
-    ../src/scossl_helpers.c
 )
 
 if (SCOSSL_SSHKDF)
@@ -38,17 +37,20 @@ if (SCOSSL_SSHKDF)
 endif()
 
 add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES})
+add_dependencies(scossl_dynamic scossl_common)
 
 set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
 # target_link_libraries(scossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})
 target_include_directories(scossl_dynamic PUBLIC ../inc)
 target_include_directories(scossl_dynamic PRIVATE ../src)
-target_include_directories (scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(scossl_dynamic PUBLIC ../ScosslCommon/inc)
 
 # Remove default "lib" prefix from symcryptengine.so as OpenSSL engine is not a generic Linux .so
 set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
 set_target_properties(scossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
+target_link_libraries(scossl_dynamic PRIVATE scossl_common)
 target_link_libraries(scossl_dynamic PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
