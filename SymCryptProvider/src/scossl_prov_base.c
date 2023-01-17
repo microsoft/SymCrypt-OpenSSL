@@ -3,8 +3,12 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/crypto.h>
 
+#include <symcrypt.h>
+
 #define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
+
+static int scossl_module_initialized = 0;
 
 // Digest
 extern const OSSL_DISPATCH scossl_prov_Md5_functions[];
@@ -140,7 +144,7 @@ static const OSSL_ALGORITHM scossl_prov_asym_cipher[] = {
 
 static int scossl_prov_get_status()
 {
-    return 1;
+    return scossl_module_initialized;
 }
 
 static void scossl_prov_teardown(PSCOSSL_PROV_CTX *provctx)
@@ -219,6 +223,12 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
     }
 
     *out = scossl_prov_base_dispatch;
+    
+    if (!scossl_module_initialized)
+    {
+        SYMCRYPT_MODULE_INIT();
+        scossl_module_initialized = 1;
+    }
 
     return 1;
 }
