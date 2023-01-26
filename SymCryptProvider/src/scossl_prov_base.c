@@ -11,24 +11,24 @@
 static int scossl_module_initialized = 0;
 
 // Digest
-extern const OSSL_DISPATCH scossl_prov_Md5_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha1_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha256_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha384_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha512_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha3_256_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha3_384_functions[];
-extern const OSSL_DISPATCH scossl_prov_Sha3_512_functions[];
+extern const OSSL_DISPATCH scossl_prov_md5_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha1_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha256_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha384_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha512_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha3_256_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha3_384_functions[];
+extern const OSSL_DISPATCH scossl_prov_sha3_512_functions[];
 
 static const OSSL_ALGORITHM scossl_prov_digest[] = {
-    ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", scossl_prov_Md5_functions),
-    ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", scossl_prov_Sha1_functions),
-    ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", scossl_prov_Sha256_functions),
-    ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", scossl_prov_Sha384_functions),
-    ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", scossl_prov_Sha512_functions),
-    ALG("SHA3-256:2.16.840.1.101.3.4.2.8", scossl_prov_Sha3_256_functions),
-    ALG("SHA3-384:2.16.840.1.101.3.4.2.9", scossl_prov_Sha3_384_functions),
-    ALG("SHA3-512:2.16.840.1.101.3.4.2.10", scossl_prov_Sha3_512_functions),
+    ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", scossl_prov_md5_functions),
+    ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", scossl_prov_sha1_functions),
+    ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", scossl_prov_sha256_functions),
+    ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", scossl_prov_sha384_functions),
+    ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", scossl_prov_sha512_functions),
+    ALG("SHA3-256:2.16.840.1.101.3.4.2.8", scossl_prov_sha3_256_functions),
+    ALG("SHA3-384:2.16.840.1.101.3.4.2.9", scossl_prov_sha3_384_functions),
+    ALG("SHA3-512:2.16.840.1.101.3.4.2.10", scossl_prov_sha3_512_functions),
     ALG_TABLE_END
 };
 
@@ -147,17 +147,17 @@ static int scossl_prov_get_status()
     return scossl_module_initialized;
 }
 
-static void scossl_prov_teardown(PSCOSSL_PROV_CTX *provctx)
+static void scossl_prov_teardown(_Inout_ PSCOSSL_PROV_CTX *provctx)
 {
     OPENSSL_free(provctx);
 }
 
-static const OSSL_PARAM *scossl_prov_gettable_params(PSCOSSL_PROV_CTX *provctx)
+static const OSSL_PARAM *scossl_prov_gettable_params(_Inout_ PSCOSSL_PROV_CTX *provctx)
 {
     return scossl_prov_param_types;
 }
 
-static int scossl_prov_get_params(void *provctx, OSSL_PARAM params[])
+static int scossl_prov_get_params(_Inout_ void *provctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
@@ -177,8 +177,10 @@ static int scossl_prov_get_params(void *provctx, OSSL_PARAM params[])
     return 1;
 }
 
-static const OSSL_ALGORITHM *scossl_prov_query_operation(void *provctx, int operation_id, int *no_store)
+static const OSSL_ALGORITHM *scossl_prov_query_operation(_Inout_ void *provctx, int operation_id, _Out_ int *no_store)
 {
+    // Dispatch tables do not change and may be cached
+    *no_store = 0;
     switch (operation_id)
     {
         case OSSL_OP_DIGEST:
@@ -211,9 +213,10 @@ static const OSSL_DISPATCH scossl_prov_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))scossl_prov_query_operation},
     {0, NULL}};
 
-int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
-                       const OSSL_DISPATCH *in, const OSSL_DISPATCH **out,
-                       void **provctx)
+int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
+                       _In_ const OSSL_DISPATCH *in, 
+                       _Out_ const OSSL_DISPATCH **out,
+                       _Out_ void **provctx)
 {
     PSCOSSL_PROV_CTX p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_CTX));
     if (p_ctx != NULL)
