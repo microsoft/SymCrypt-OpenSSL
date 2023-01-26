@@ -1,5 +1,17 @@
-#define IMPLEMENT_SCOSSL_SIGNATURE(alg)                                                               \
-    const OSSL_DISPATCH scossl_prov_##alg##_signature[] = {                                           \
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
+#include <openssl/core_dispatch.h>
+#include "scossl_helpers.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Prototype definition, subject to change
+#define IMPLEMENT_SCOSSL_SIGNATURE(alg)                                                                                   \
+    const OSSL_DISPATCH scossl_prov_##alg##_signature[] = {                                                               \
         {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))scossl_prov_##alg##_sig_sig_newctx},                                 \
         {OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))scossl_prov_##alg##_sig_sig_sign_init},                           \
         {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))scossl_prov_##alg##_sig_sig_sign},                                     \
@@ -22,3 +34,7 @@
         {OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, (void (*)(void))scossl_prov_##alg##_sig_sig_set_ctx_md_params},           \
         {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, (void (*)(void))scossl_prov_##alg##_sig_sig_settable_ctx_md_params}, \
         {0, NULL}};
+
+#ifdef __cplusplus
+}
+#endif

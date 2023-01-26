@@ -1,6 +1,13 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/core_names.h>
 #include <openssl/params.h>
-#include <openssl/provider.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Value provided by CMake, defined in top level CMakeLists.txt
 #define SCOSSL_VERSION "@SymCrypt-OpenSSL_VERSION@"
@@ -18,3 +25,7 @@ static const OSSL_PARAM scossl_prov_param_types[] =
     OSSL_PARAM_DEFN(OSSL_PROV_PARAM_STATUS, OSSL_PARAM_INTEGER, NULL, 0),
     OSSL_PARAM_END
 };
+
+#ifdef __cplusplus
+}
+#endif

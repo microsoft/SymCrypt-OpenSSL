@@ -1,9 +1,16 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include "scossl_prov_base.h"
 
 #include <openssl/core_dispatch.h>
-#include <openssl/crypto.h>
 
 #include <symcrypt.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
@@ -214,7 +221,7 @@ static const OSSL_DISPATCH scossl_prov_base_dispatch[] = {
     {0, NULL}};
 
 int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
-                       _In_ const OSSL_DISPATCH *in, 
+                       _In_ const OSSL_DISPATCH *in,
                        _Out_ const OSSL_DISPATCH **out,
                        _Out_ void **provctx)
 {
@@ -226,7 +233,7 @@ int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     }
 
     *out = scossl_prov_base_dispatch;
-    
+
     if (!scossl_module_initialized)
     {
         SYMCRYPT_MODULE_INIT();
@@ -235,3 +242,7 @@ int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     return 1;
 }
+
+#ifdef __cplusplus
+}
+#endif

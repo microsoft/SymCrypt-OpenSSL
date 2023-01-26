@@ -1,8 +1,14 @@
-#include <openssl/crypto.h>
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/params.h>
 #include "scossl_helpers.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // lowercase, CamelCase, and UPPERCASE must be provided to reconcile differences
 // between OpenSSL and SymCrypt APIs and macro definitions
@@ -38,6 +44,7 @@
     {                                                                                \
         if (outsz < SYMCRYPT_##UCALG##_RESULT_SIZE)                                  \
             return 0;                                                                \
+                                                                                     \
         SymCrypt##CcAlg##Result(dctx, out);                                          \
         *outl = SYMCRYPT_##UCALG##_RESULT_SIZE;                                      \
         return SCOSSL_SUCCESS;                                                       \
@@ -60,3 +67,7 @@
 
 const OSSL_PARAM *scossl_digest_gettable_params_generic(_Inout_ void *dctx, _In_ void *provctx);
 SCOSSL_STATUS scossl_digest_get_params_generic(_Inout_ OSSL_PARAM params[], size_t blocksize, size_t size);
+
+#ifdef __cplusplus
+}
+#endif

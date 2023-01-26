@@ -1,5 +1,15 @@
-#include <openssl/core_dispatch.h>
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
 
+#include <openssl/core_dispatch.h>
+#include "scossl_helpers.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Prototype definition, subject to change
 #define IMPLEMENT_SCOSSL_KDF_FUNCTIONS(alg)                                                               \
     const OSSL_DISPATCH scossl_prov_##alg##_kdf_functions = {                                             \
         {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))scossl_prov_##alg##_kdf_new},                              \
@@ -12,3 +22,7 @@
         {OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, (void (*)(void))scossl_prov_##alg##_kdf_gettable_ctx_params}, \
         {OSSL_FUNC_KDF_GET_CTX_PARAMS, (void (*)(void))scossl_prov_##alg##_kdf_get_ctx_params},           \
         {0, NULL}};
+
+#ifdef __cplusplus
+}
+#endif
