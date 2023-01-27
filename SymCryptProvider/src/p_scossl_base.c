@@ -5,6 +5,8 @@
 #include "p_scossl_base.h"
 
 #include <openssl/core_dispatch.h>
+#include <openssl/err.h>
+#include <openssl/proverr.h>
 
 #include <symcrypt.h>
 
@@ -148,18 +150,17 @@ static const OSSL_ALGORITHM p_scossl_asym_cipher[] = {
     ALG_TABLE_END
 };
 
-
 static int p_scossl_get_status()
 {
     return scossl_module_initialized;
 }
 
-static void p_scossl_teardown(_Inout_ Pp_scossl_CTX *provctx)
+static void p_scossl_teardown(_Inout_ PSCOSSL_PROVCTX *provctx)
 {
     OPENSSL_free(provctx);
 }
 
-static const OSSL_PARAM *p_scossl_gettable_params(_Inout_ Pp_scossl_CTX *provctx)
+static const OSSL_PARAM *p_scossl_gettable_params(_Inout_ PSCOSSL_PROVCTX *provctx)
 {
     return p_scossl_param_types;
 }
@@ -170,16 +171,28 @@ static int p_scossl_get_params(_Inout_ void *provctx, _Inout_ OSSL_PARAM params[
 
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_NAME);
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_NAME))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
+    }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_VERSION))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
+    }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_VERSION))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
+    }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_STATUS);
     if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_get_status()))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
+    }
 
     return 1;
 }
@@ -225,7 +238,7 @@ int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                        _Out_ const OSSL_DISPATCH **out,
                        _Out_ void **provctx)
 {
-    Pp_scossl_CTX p_ctx = OPENSSL_malloc(sizeof(p_scossl_CTX));
+    PSCOSSL_PROVCTX p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
     if (p_ctx != NULL)
     {
         p_ctx->handle = handle;

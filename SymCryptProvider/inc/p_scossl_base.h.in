@@ -15,7 +15,7 @@ extern "C" {
 
 typedef struct {
     const OSSL_CORE_HANDLE *handle;
-} p_scossl_CTX, *Pp_scossl_CTX;
+} SCOSSL_PROVCTX, *PSCOSSL_PROVCTX;
 
 static const OSSL_PARAM p_scossl_param_types[] =
 {

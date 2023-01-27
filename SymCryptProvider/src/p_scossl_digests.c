@@ -5,6 +5,7 @@
 #include "p_scossl_digests.h"
 
 #include <openssl/core_names.h>
+#include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,11 +27,13 @@ SCOSSL_STATUS scossl_digest_get_params_generic(_Inout_ OSSL_PARAM params[], size
     p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_BLOCK_SIZE);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, blocksize))
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
     }
     p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, size))
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
     }
     return SCOSSL_SUCCESS;
