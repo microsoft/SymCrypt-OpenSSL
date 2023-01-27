@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_prov_digests.h"
+#include "p_scossl_digests.h"
 
 #include <openssl/core_names.h>
 
