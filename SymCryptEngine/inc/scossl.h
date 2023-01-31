@@ -5,7 +5,8 @@
 #include <openssl/ossl_typ.h>
 #include <openssl/crypto.h>
 #include <openssl/engine.h>
-#include "scossl_common.h"
+
+#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,7 +3,6 @@
 //
 
 #include "scossl.h"
-#include "scossl_helpers.h"
 #include <openssl/dsa.h>
 
 #ifdef __cplusplus

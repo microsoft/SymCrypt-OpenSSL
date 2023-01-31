@@ -11,7 +11,6 @@
 #include "scossl_ciphers.h"
 #include "scossl_pkey_meths.h"
 #include "scossl_rand.h"
-#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {

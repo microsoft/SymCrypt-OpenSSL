@@ -3,7 +3,6 @@
 //
 
 #include "scossl.h"
-#include "scossl_helpers.h"
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 #include <openssl/md4.h>
