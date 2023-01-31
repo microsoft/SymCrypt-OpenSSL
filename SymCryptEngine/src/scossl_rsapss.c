@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
+static PCSYMCRYPT_HASH e_scossl_get_symcrypt_hash_algorithm(int type)
 {
     if (type == NID_md5)
         return SymCryptMd5Algorithm;
@@ -27,7 +27,7 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
     return NULL;
 }
 
-static size_t scossl_get_expected_tbs_length(int type)
+static size_t e_scossl_get_expected_tbs_length(int type)
 {
     if (type == NID_md5)
         return 16;
@@ -44,7 +44,7 @@ static size_t scossl_get_expected_tbs_length(int type)
     return -1;
 }
 
-SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen,
+SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen,
                                     _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     BN_ULONG cbModulus = 0;
@@ -54,7 +54,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
-    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    PCSYMCRYPT_HASH e_scossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
     EVP_MD *mgf1Digest;
@@ -117,7 +117,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
         return SCOSSL_UNSUPPORTED;
     }
 
-    keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     if( keyCtx == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
@@ -126,7 +126,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
     }
     if( keyCtx->initialized == 0 )
     {
-        if( scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             return SCOSSL_UNSUPPORTED;
         }
@@ -144,9 +144,9 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
         goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
-    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(type);
-    expectedTbsLength = scossl_get_expected_tbs_length(type);
-    if( !scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
+    e_scossl_mac_algo = e_scossl_get_symcrypt_hash_algorithm(type);
+    expectedTbsLength = e_scossl_get_expected_tbs_length(type);
+    if( !e_scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "Unknown type: %d. Size: %d.", type, tbslen);
@@ -174,7 +174,7 @@ SCOSSL_STATUS scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*si
                 keyCtx->key,
                 tbs,
                 tbslen,
-                scossl_mac_algo,
+                e_scossl_mac_algo,
                 cbSalt,
                 0,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -194,7 +194,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     EVP_PKEY* pkey = NULL;
@@ -202,7 +202,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
-    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    PCSYMCRYPT_HASH e_scossl_mac_algo = NULL;
     size_t expectedTbsLength = -1;
     EVP_MD *messageDigest;
     EVP_MD *mgf1Digest;
@@ -271,7 +271,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
         return SCOSSL_UNSUPPORTED;
     }
 
-    keyCtx = RSA_get_ex_data(rsa, scossl_rsa_idx);
+    keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     if( keyCtx == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
@@ -280,7 +280,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
     }
     if( keyCtx->initialized == 0 )
     {
-        if( scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             return SCOSSL_UNSUPPORTED;
         }
@@ -291,9 +291,9 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
         goto cleanup;
     }
 
-    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(type);
-    expectedTbsLength = scossl_get_expected_tbs_length(type);
-    if( !scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
+    e_scossl_mac_algo = e_scossl_get_symcrypt_hash_algorithm(type);
+    expectedTbsLength = e_scossl_get_expected_tbs_length(type);
+    if( !e_scossl_mac_algo || expectedTbsLength == (SIZE_T) -1 )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "Unknown type: %d. Size: %d.", type, tbslen);
@@ -324,7 +324,7 @@ SCOSSL_STATUS scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(s
                 sig,
                 siglen,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                scossl_mac_algo,
+                e_scossl_mac_algo,
                 cbSalt,
                 0);
 

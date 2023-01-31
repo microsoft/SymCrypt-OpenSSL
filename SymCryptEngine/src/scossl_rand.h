@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-RAND_METHOD *scossl_rand_method(void);
+RAND_METHOD *e_scossl_rand_method(void);
 
 #ifdef __cplusplus
 }

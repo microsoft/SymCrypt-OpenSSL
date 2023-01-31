@@ -23,7 +23,7 @@ typedef struct {
     size_t seed_length;
 } SCOSSL_TLS1_PRF_PKEY_CTX;
 
-SCOSSL_STATUS scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS e_scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
     if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
@@ -35,7 +35,7 @@ SCOSSL_STATUS scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-void scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
+void e_scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     if (key_context == NULL) {
@@ -47,7 +47,7 @@ void scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-SCOSSL_STATUS scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
+SCOSSL_STATUS e_scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
@@ -83,7 +83,7 @@ SCOSSL_STATUS scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _
     }
 }
 
-SCOSSL_STATUS scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
+SCOSSL_STATUS e_scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
     OPENSSL_clear_free(key_context->secret, key_context->secret_length);
@@ -92,7 +92,7 @@ SCOSSL_STATUS scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
+static PCSYMCRYPT_MAC e_scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
 {
     int type = EVP_MD_type(evp_md);
 
@@ -111,11 +111,11 @@ static PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
     return NULL;
 }
 
-SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
+SCOSSL_STATUS e_scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
                                         _Inout_ size_t *keylen)
 {
     SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_MAC scossl_mac_algo = NULL;
+    PCSYMCRYPT_MAC e_scossl_mac_algo = NULL;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     if (key_context->md == NULL) {
@@ -143,14 +143,14 @@ SCOSSL_STATUS scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(
     }
     else
     {
-        scossl_mac_algo = scossl_get_symcrypt_mac_algorithm(key_context->md);
-        if( scossl_mac_algo == NULL )
+        e_scossl_mac_algo = e_scossl_get_symcrypt_mac_algorithm(key_context->md);
+        if( e_scossl_mac_algo == NULL )
         {
             return SCOSSL_FAILURE;
         }
 
         scError = SymCryptTlsPrf1_2(
-            scossl_mac_algo,
+            e_scossl_mac_algo,
             key_context->secret, key_context->secret_length,
             NULL, 0,
             key_context->seed, key_context->seed_length,

@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define ALG(names, funcs) {names, "provider="SCOSSL_NAME, funcs, NULL}
+#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
 
 static int scossl_module_initialized = 0;
@@ -170,19 +170,19 @@ static int p_scossl_get_params(_Inout_ void *provctx, _Inout_ OSSL_PARAM params[
     OSSL_PARAM *p;
 
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_NAME);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_NAME))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_NAME))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
     }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_VERSION))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_VERSION))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
     }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, SCOSSL_VERSION))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_VERSION))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;

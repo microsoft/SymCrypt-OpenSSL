@@ -6,13 +6,13 @@ set(DEFAULT_BUILD_TYPE "Release")
 
 include(GNUInstallDirs)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra  -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unknown-pragmas")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra  -Wno-deprecated-declarations -Wno-unused-parameter")
 
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-set(SCOSSL_SOURCES 
+set(SCOSSL_SOURCES
     ../src/scossl.c
     ../src/scossl_ciphers.c
     ../src/scossl_dh.c

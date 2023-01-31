@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);
+EVP_KDF_CTX* e_scossl_EVP_KDF_CTX_new_id(int id);
 
 #ifdef __cplusplus
 }

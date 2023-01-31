@@ -17,36 +17,36 @@
 extern "C" {
 #endif
 
-int scossl_module_initialized = 0;
+int e_scossl_module_initialized = 0;
 
 /* The constants used when creating the ENGINE */
-static const char* engine_scossl_id = "symcrypt";
-static const char* engine_scossl_name = "SCOSSL (SymCrypt engine for OpenSSL)";
-static EC_KEY_METHOD* scossl_eckey_method = NULL;
-static RSA_METHOD* scossl_rsa_method = NULL;
-// static DSA_METHOD* scossl_dsa_method = NULL;
-static DH_METHOD* scossl_dh_method = NULL;
+static const char* e_scossl_id = "symcrypt";
+static const char* e_scossl_name = "SCOSSL (SymCrypt engine for OpenSSL)";
+static EC_KEY_METHOD* e_scossl_eckey_method = NULL;
+static RSA_METHOD* e_scossl_rsa_method = NULL;
+// static DSA_METHOD* e_scossl_dsa_method = NULL;
+static DH_METHOD* e_scossl_dh_method = NULL;
 
-SCOSSL_STATUS scossl_destroy(ENGINE* e)
+SCOSSL_STATUS e_scossl_destroy(ENGINE* e)
 {
-    if( scossl_eckey_method != NULL )
+    if( e_scossl_eckey_method != NULL )
     {
-        scossl_destroy_digests();
-        scossl_destroy_ciphers();
-        scossl_destroy_pkey_methods();
-        RSA_meth_free(scossl_rsa_method);
-        scossl_rsa_method = NULL;
-        scossl_destroy_ecc_curves();
-        EC_KEY_METHOD_free(scossl_eckey_method);
-        scossl_eckey_method = NULL;
-        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, scossl_rsa_idx);
-        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, scossl_eckey_idx);
-        // DSA_meth_free(scossl_dsa_method);
-        // scossl_dsa_method = NULL;
-        scossl_destroy_safeprime_dlgroups();
-        DH_meth_free(scossl_dh_method);
-        scossl_dh_method = NULL;
-        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, scossl_dh_idx);
+        e_scossl_destroy_digests();
+        e_scossl_destroy_ciphers();
+        e_scossl_destroy_pkey_methods();
+        RSA_meth_free(e_scossl_rsa_method);
+        e_scossl_rsa_method = NULL;
+        e_scossl_destroy_ecc_curves();
+        EC_KEY_METHOD_free(e_scossl_eckey_method);
+        e_scossl_eckey_method = NULL;
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_RSA, e_scossl_rsa_idx);
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_EC_KEY, e_scossl_eckey_idx);
+        // DSA_meth_free(e_scossl_dsa_method);
+        // e_scossl_dsa_method = NULL;
+        e_scossl_destroy_safeprime_dlgroups();
+        DH_meth_free(e_scossl_dh_method);
+        e_scossl_dh_method = NULL;
+        CRYPTO_free_ex_index(CRYPTO_EX_INDEX_DH, e_scossl_dh_idx);
         scossl_destroy_logging();
     }
 
@@ -68,104 +68,104 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     OBJ_NAME_remove(LN_aes_128_cbc_hmac_sha256, OBJ_NAME_TYPE_CIPHER_METH);
     OBJ_NAME_remove(LN_aes_256_cbc_hmac_sha256, OBJ_NAME_TYPE_CIPHER_METH);
 
-    if( !scossl_module_initialized )
+    if( !e_scossl_module_initialized )
     {
         SYMCRYPT_MODULE_INIT();
-        scossl_module_initialized = 1;
+        e_scossl_module_initialized = 1;
     }
 
-    scossl_rsa_method = RSA_meth_dup(RSA_PKCS1_OpenSSL());
-    scossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
-    // scossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
-    scossl_dh_method = DH_meth_dup(DH_OpenSSL());
+    e_scossl_rsa_method = RSA_meth_dup(RSA_PKCS1_OpenSSL());
+    e_scossl_eckey_method = EC_KEY_METHOD_new(EC_KEY_OpenSSL());
+    // e_scossl_dsa_method = DSA_meth_dup(DSA_OpenSSL());
+    e_scossl_dh_method = DH_meth_dup(DH_OpenSSL());
 
-    if( !scossl_rsa_method
-     || !scossl_eckey_method
-     // || !scossl_dsa_method
-     || !scossl_dh_method
+    if( !e_scossl_rsa_method
+     || !e_scossl_eckey_method
+     // || !e_scossl_dsa_method
+     || !e_scossl_dh_method
         )
     {
         goto end;
     }
 
     /* Setup RSA_METHOD */
-    if( (scossl_rsa_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
-        || !RSA_meth_set1_name(scossl_rsa_method, "SCOSSL (SymCrypt engine for OpenSSL) RSA Method")
-        || !RSA_meth_set_pub_enc(scossl_rsa_method, scossl_rsa_pub_enc)
-        || !RSA_meth_set_priv_dec(scossl_rsa_method, scossl_rsa_priv_dec)
-        || !RSA_meth_set_priv_enc(scossl_rsa_method, scossl_rsa_priv_enc)
-        || !RSA_meth_set_pub_dec(scossl_rsa_method, scossl_rsa_pub_dec)
-        || !RSA_meth_set_mod_exp(scossl_rsa_method, scossl_rsa_mod_exp)
-        || !RSA_meth_set_bn_mod_exp(scossl_rsa_method, scossl_rsa_bn_mod_exp)
-        || !RSA_meth_set_init(scossl_rsa_method, scossl_rsa_init)
-        || !RSA_meth_set_finish(scossl_rsa_method, scossl_rsa_finish)
-        || !RSA_meth_set_sign(scossl_rsa_method, scossl_rsa_sign)
-        || !RSA_meth_set_verify(scossl_rsa_method, scossl_rsa_verify)
-        || !RSA_meth_set_keygen(scossl_rsa_method, scossl_rsa_keygen)
+    if( (e_scossl_rsa_idx = RSA_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+        || !RSA_meth_set1_name(e_scossl_rsa_method, "SCOSSL (SymCrypt engine for OpenSSL) RSA Method")
+        || !RSA_meth_set_pub_enc(e_scossl_rsa_method, e_scossl_rsa_pub_enc)
+        || !RSA_meth_set_priv_dec(e_scossl_rsa_method, e_scossl_rsa_priv_dec)
+        || !RSA_meth_set_priv_enc(e_scossl_rsa_method, e_scossl_rsa_priv_enc)
+        || !RSA_meth_set_pub_dec(e_scossl_rsa_method, e_scossl_rsa_pub_dec)
+        || !RSA_meth_set_mod_exp(e_scossl_rsa_method, e_scossl_rsa_mod_exp)
+        || !RSA_meth_set_bn_mod_exp(e_scossl_rsa_method, e_scossl_rsa_bn_mod_exp)
+        || !RSA_meth_set_init(e_scossl_rsa_method, e_scossl_rsa_init)
+        || !RSA_meth_set_finish(e_scossl_rsa_method, e_scossl_rsa_finish)
+        || !RSA_meth_set_sign(e_scossl_rsa_method, e_scossl_rsa_sign)
+        || !RSA_meth_set_verify(e_scossl_rsa_method, e_scossl_rsa_verify)
+        || !RSA_meth_set_keygen(e_scossl_rsa_method, e_scossl_rsa_keygen)
         )
     {
         goto end;
     }
 
     /* Setup EC_METHOD */
-    if( (scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1 )
+    if( (e_scossl_eckey_idx = EC_KEY_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1 )
     {
         goto end;
     }
 
-    EC_KEY_METHOD_set_init(scossl_eckey_method,
+    EC_KEY_METHOD_set_init(e_scossl_eckey_method,
                            NULL, // eckey_init - lazily initialize ex_data only when the engine needs to
-                           scossl_eckey_finish,
+                           e_scossl_eckey_finish,
                            NULL, // eckey_copy
                            NULL, // eckey_set_group
                            NULL, // eckey_set_private
                            NULL); // eckey_set_public
-    EC_KEY_METHOD_set_keygen(scossl_eckey_method,
-                             scossl_eckey_keygen);
-    EC_KEY_METHOD_set_compute_key(scossl_eckey_method,
-                                  scossl_eckey_compute_key);
-    EC_KEY_METHOD_set_sign(scossl_eckey_method,
-                           scossl_eckey_sign,
-                           scossl_eckey_sign_setup,
-                           scossl_eckey_sign_sig);
-    EC_KEY_METHOD_set_verify(scossl_eckey_method,
-                             scossl_eckey_verify,
-                             scossl_eckey_verify_sig);
+    EC_KEY_METHOD_set_keygen(e_scossl_eckey_method,
+                             e_scossl_eckey_keygen);
+    EC_KEY_METHOD_set_compute_key(e_scossl_eckey_method,
+                                  e_scossl_eckey_compute_key);
+    EC_KEY_METHOD_set_sign(e_scossl_eckey_method,
+                           e_scossl_eckey_sign,
+                           e_scossl_eckey_sign_setup,
+                           e_scossl_eckey_sign_sig);
+    EC_KEY_METHOD_set_verify(e_scossl_eckey_method,
+                             e_scossl_eckey_verify,
+                             e_scossl_eckey_verify_sig);
 
     // /* Setup DSA METHOD */
-    // if (   !DSA_meth_set_sign(scossl_dsa_method, scossl_dsa_sign)
-    //     || !DSA_meth_set_sign_setup(scossl_dsa_method, scossl_dsa_sign_setup)
-    //     || !DSA_meth_set_verify(scossl_dsa_method, scossl_dsa_verify)
-    //     || !DSA_meth_set_init(scossl_dsa_method, scossl_dsa_init)
-    //     || !DSA_meth_set_finish(scossl_dsa_method, scossl_dsa_finish)
+    // if (   !DSA_meth_set_sign(e_scossl_dsa_method, e_scossl_dsa_sign)
+    //     || !DSA_meth_set_sign_setup(e_scossl_dsa_method, e_scossl_dsa_sign_setup)
+    //     || !DSA_meth_set_verify(e_scossl_dsa_method, e_scossl_dsa_verify)
+    //     || !DSA_meth_set_init(e_scossl_dsa_method, e_scossl_dsa_init)
+    //     || !DSA_meth_set_finish(e_scossl_dsa_method, e_scossl_dsa_finish)
     //     )
     // {
     //     goto end;
     // }
 
     // /* Setup DH METHOD */
-    if (   (scossl_dh_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
-        || !DH_meth_set1_name(scossl_dh_method, "SCOSSL (SymCrypt engine for OpenSSL) DH Method")
-        || !DH_meth_set_generate_key(scossl_dh_method, scossl_dh_generate_key)
-        || !DH_meth_set_compute_key(scossl_dh_method, scossl_dh_compute_key)
-        || !DH_meth_set_finish(scossl_dh_method, scossl_dh_finish)
+    if (   (e_scossl_dh_idx = DH_get_ex_new_index(0, NULL, NULL, NULL, NULL)) == -1
+        || !DH_meth_set1_name(e_scossl_dh_method, "SCOSSL (SymCrypt engine for OpenSSL) DH Method")
+        || !DH_meth_set_generate_key(e_scossl_dh_method, e_scossl_dh_generate_key)
+        || !DH_meth_set_compute_key(e_scossl_dh_method, e_scossl_dh_compute_key)
+        || !DH_meth_set_finish(e_scossl_dh_method, e_scossl_dh_finish)
         )
     {
         goto end;
     }
 
     // Engine initialization
-    if(    !ENGINE_set_id(e, engine_scossl_id)
-        || !ENGINE_set_name(e, engine_scossl_name)
-        || !ENGINE_set_destroy_function(e, scossl_destroy)
-        || !ENGINE_set_EC(e, scossl_eckey_method)
-        || !ENGINE_set_RSA(e, scossl_rsa_method)
-        //|| !ENGINE_set_DSA(e, scossl_dsa_method)
-        || !ENGINE_set_DH(e, scossl_dh_method)
-        || !ENGINE_set_RAND(e, scossl_rand_method())
-        || !ENGINE_set_digests(e, scossl_digests)
-        || !ENGINE_set_ciphers(e, scossl_ciphers)
-        || !ENGINE_set_pkey_meths(e, scossl_pkey_methods)
+    if(    !ENGINE_set_id(e, e_scossl_id)
+        || !ENGINE_set_name(e, e_scossl_name)
+        || !ENGINE_set_destroy_function(e, e_scossl_destroy)
+        || !ENGINE_set_EC(e, e_scossl_eckey_method)
+        || !ENGINE_set_RSA(e, e_scossl_rsa_method)
+        //|| !ENGINE_set_DSA(e, e_scossl_dsa_method)
+        || !ENGINE_set_DH(e, e_scossl_dh_method)
+        || !ENGINE_set_RAND(e, e_scossl_rand_method())
+        || !ENGINE_set_digests(e, e_scossl_digests)
+        || !ENGINE_set_ciphers(e, e_scossl_ciphers)
+        || !ENGINE_set_pkey_meths(e, e_scossl_pkey_methods)
         )
     {
         goto end;
@@ -194,14 +194,14 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
     scossl_setup_logging();
 
     // Initialize hidden static variables once at Engine load time
-    if(    !scossl_ecc_init_static()
-        || !scossl_dh_init_static()
-        || !scossl_digests_init_static()
-        || !scossl_ciphers_init_static()
-        || !scossl_pkey_methods_init_static()
+    if(    !e_scossl_ecc_init_static()
+        || !e_scossl_dh_init_static()
+        || !e_scossl_digests_init_static()
+        || !e_scossl_ciphers_init_static()
+        || !e_scossl_pkey_methods_init_static()
         )
     {
-        scossl_destroy(e);
+        e_scossl_destroy(e);
         goto end;
     }
 
@@ -213,7 +213,7 @@ end:
 # ifndef OPENSSL_NO_DYNAMIC_ENGINE
 static SCOSSL_STATUS scossl_bind_helper(ENGINE *e, const char *id)
 {
-    if( id && (strcmp(id, engine_scossl_id) != 0) )
+    if( id && (strcmp(id, e_scossl_id) != 0) )
     {
         return SCOSSL_FAILURE;
     }
