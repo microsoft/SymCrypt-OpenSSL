@@ -17,7 +17,7 @@ extern "C" {
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME, funcs, NULL}
 #define ALG_TABLE_END { NULL, NULL, NULL, NULL}
 
-static int scossl_module_initialized = 0;
+static int scossl_prov_initialized = 0;
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -152,20 +152,20 @@ static const OSSL_ALGORITHM p_scossl_asym_cipher[] = {
 
 static int p_scossl_get_status()
 {
-    return scossl_module_initialized;
+    return scossl_prov_initialized;
 }
 
-static void p_scossl_teardown(_Inout_ PSCOSSL_PROVCTX *provctx)
+static void p_scossl_teardown(_Inout_ PSCOSSL_PROVCTX provctx)
 {
     OPENSSL_free(provctx);
 }
 
-static const OSSL_PARAM *p_scossl_gettable_params(_Inout_ PSCOSSL_PROVCTX *provctx)
+static const OSSL_PARAM *p_scossl_gettable_params(_Inout_ PSCOSSL_PROVCTX provctx)
 {
     return p_scossl_param_types;
 }
 
-static int p_scossl_get_params(_Inout_ void *provctx, _Inout_ OSSL_PARAM params[])
+static int p_scossl_get_params(_Inout_ PSCOSSL_PROVCTX provctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
@@ -197,7 +197,7 @@ static int p_scossl_get_params(_Inout_ void *provctx, _Inout_ OSSL_PARAM params[
     return 1;
 }
 
-static const OSSL_ALGORITHM *p_scossl_query_operation(_Inout_ void *provctx, int operation_id, _Out_ int *no_store)
+static const OSSL_ALGORITHM *p_scossl_query_operation(_Inout_ PSCOSSL_PROVCTX provctx, int operation_id, _Out_ int *no_store)
 {
     // Dispatch tables do not change and may be cached
     *no_store = 0;
@@ -247,10 +247,10 @@ int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     *out = p_scossl_base_dispatch;
 
-    if (!scossl_module_initialized)
+    if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
-        scossl_module_initialized = 1;
+        scossl_prov_initialized = 1;
     }
 
     return 1;

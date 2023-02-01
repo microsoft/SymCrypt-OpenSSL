@@ -11,16 +11,16 @@
 extern "C" {
 #endif
 
-static const OSSL_PARAM scossl_digest_param_types[] = {
+static const OSSL_PARAM p_scossl_digest_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_BLOCK_SIZE, NULL),
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL)};
 
-const OSSL_PARAM *scossl_digest_gettable_params_generic(_Inout_ void *dctx, _In_ void *provctx)
+const OSSL_PARAM *p_scossl_digest_gettable_params(_Inout_ void *dctx, _In_ void *provctx)
 {
     return scossl_digest_param_types;
 }
 
-SCOSSL_STATUS scossl_digest_get_params_generic(_Inout_ OSSL_PARAM params[], size_t blocksize, size_t size)
+SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blocksize, size_t size)
 {
     OSSL_PARAM *p = NULL;
 
