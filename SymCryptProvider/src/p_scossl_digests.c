@@ -17,7 +17,7 @@ static const OSSL_PARAM p_scossl_digest_param_types[] = {
 
 const OSSL_PARAM *p_scossl_digest_gettable_params(_Inout_ void *dctx, _In_ void *provctx)
 {
-    return scossl_digest_param_types;
+    return p_scossl_digest_param_types;
 }
 
 SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blocksize, size_t size)
@@ -39,14 +39,14 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
     return SCOSSL_SUCCESS;
 }
 
-IMPLEMENT_SCOSSL_DIGEST(md5, Md5, MD5);
-IMPLEMENT_SCOSSL_DIGEST(sha1, Sha1, SHA1);
-IMPLEMENT_SCOSSL_DIGEST(sha256, Sha256, SHA256);
-IMPLEMENT_SCOSSL_DIGEST(sha384, Sha384, SHA384);
-IMPLEMENT_SCOSSL_DIGEST(sha512, Sha512, SHA512);
-IMPLEMENT_SCOSSL_DIGEST(sha3_256, Sha3_256, SHA3_256);
-IMPLEMENT_SCOSSL_DIGEST(sha3_384, Sha3_384, SHA3_384);
-IMPLEMENT_SCOSSL_DIGEST(sha3_512, Sha3_512, SHA3_512);
+IMPLEMENT_SCOSSL_DIGEST(md5, Md5, MD5)
+IMPLEMENT_SCOSSL_DIGEST(sha1, Sha1, SHA1)
+IMPLEMENT_SCOSSL_DIGEST(sha256, Sha256, SHA256)
+IMPLEMENT_SCOSSL_DIGEST(sha384, Sha384, SHA384)
+IMPLEMENT_SCOSSL_DIGEST(sha512, Sha512, SHA512)
+IMPLEMENT_SCOSSL_DIGEST(sha3_256, Sha3_256, SHA3_256)
+IMPLEMENT_SCOSSL_DIGEST(sha3_384, Sha3_384, SHA3_384)
+IMPLEMENT_SCOSSL_DIGEST(sha3_512, Sha3_512, SHA3_512)
 
 #ifdef __cplusplus
 }
