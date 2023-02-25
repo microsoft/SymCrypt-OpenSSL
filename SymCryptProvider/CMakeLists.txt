@@ -21,12 +21,6 @@ set(SCOSSL_SOURCES
     ./src/p_scossl_digests.c
 )
 
-# if (SCOSSL_SSHKDF)
-#     list(APPEND SCOSSL_SOURCES ./src/p_scossl_sshkdf.c)
-#     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
-#     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
-# endif()
-
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 add_dependencies(scossl_provider scossl_common)
 

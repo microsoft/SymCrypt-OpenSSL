@@ -13,7 +13,8 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_digest_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_BLOCK_SIZE, NULL),
-    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL)};
+    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL),
+    OSSL_PARAM_END};
 
 const OSSL_PARAM *p_scossl_digest_gettable_params(_Inout_ void *dctx, _In_ void *provctx)
 {

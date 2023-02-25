@@ -4,6 +4,8 @@
 
 #include "p_scossl_base.h"
 
+#include "scossl_helpers.h"
+
 #include <openssl/core_dispatch.h>
 #include <openssl/err.h>
 #include <openssl/proverr.h>
@@ -233,7 +235,7 @@ static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))p_scossl_query_operation},
     {0, NULL}};
 
-int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
+SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                        _In_ const OSSL_DISPATCH *in,
                        _Out_ const OSSL_DISPATCH **out,
                        _Out_ void **provctx)
@@ -253,7 +255,9 @@ int OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         scossl_prov_initialized = 1;
     }
 
-    return 1;
+    scossl_setup_logging();
+
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus
