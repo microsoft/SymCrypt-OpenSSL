@@ -43,12 +43,7 @@ extern "C" {
         _In_reads_bytes_(inl) const unsigned char *in,                                \
         size_t inl)                                                                   \
     {                                                                                 \
-        if (in == NULL)                                                               \
-            return SCOSSL_FAILURE;                                                    \
-                                                                                      \
-        if (inl > 0)                                                                  \
-            SymCrypt##CcAlg##Append(dctx, in, inl);                                   \
-                                                                                      \
+        SymCrypt##CcAlg##Append(dctx, in, inl);                                       \
         return SCOSSL_SUCCESS;                                                        \
     }                                                                                 \
     static SCOSSL_STATUS p_scossl_##lcalg##_final(                                    \
@@ -56,8 +51,6 @@ extern "C" {
         _Out_writes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,              \
         _Out_ size_t *outl, size_t outsz)                                             \
     {                                                                                 \
-        if (out == NULL || outl == NULL)                                              \
-            return SCOSSL_FAILURE;                                                    \
         if (outsz < SYMCRYPT_##UCALG##_RESULT_SIZE)                                   \
         {                                                                             \
             ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);                  \
@@ -74,9 +67,6 @@ extern "C" {
         _Out_writes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,              \
         _Out_ size_t *outl, size_t outsz)                                             \
     {                                                                                 \
-        if (in == NULL || out == NULL || outl == NULL)                                \
-            return SCOSSL_FAILURE;                                                    \
-                                                                                      \
         if (outsz < SYMCRYPT_##UCALG##_RESULT_SIZE)                                   \
         {                                                                             \
             ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);                  \
