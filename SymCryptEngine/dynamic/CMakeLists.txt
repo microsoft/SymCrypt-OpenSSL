@@ -6,15 +6,15 @@ set(DEFAULT_BUILD_TYPE "Release")
 
 include(GNUInstallDirs)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unknown-pragmas")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter")
 
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
-set(SCOSSL_SOURCES 
+set(SCOSSL_SOURCES
     ../src/scossl.c
     ../src/scossl_ciphers.c
     ../src/scossl_dh.c
@@ -28,7 +28,6 @@ set(SCOSSL_SOURCES
     ../src/scossl_hkdf.c
     ../src/scossl_tls1prf.c
     ../src/scossl_hmac.c
-    ../src/scossl_helpers.c
 )
 
 if (SCOSSL_SSHKDF)
@@ -38,17 +37,20 @@ if (SCOSSL_SSHKDF)
 endif()
 
 add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES})
+add_dependencies(scossl_dynamic scossl_common)
 
 set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
 # target_link_libraries(scossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})
 target_include_directories(scossl_dynamic PUBLIC ../inc)
 target_include_directories(scossl_dynamic PRIVATE ../src)
-target_include_directories (scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(scossl_dynamic PUBLIC ../ScosslCommon/inc)
 
 # Remove default "lib" prefix from symcryptengine.so as OpenSSL engine is not a generic Linux .so
 set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
 set_target_properties(scossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
+target_link_libraries(scossl_dynamic PRIVATE scossl_common)
 target_link_libraries(scossl_dynamic PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 

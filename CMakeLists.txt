@@ -26,6 +26,8 @@ else()
     add_compile_options(-DDBG=1)
 endif()
 
+add_subdirectory (ScosslCommon)
 add_subdirectory (SymCryptEngine/static)
 add_subdirectory (SymCryptEngine/dynamic)
+add_subdirectory (SymCryptProvider)
 add_subdirectory (SslPlay)

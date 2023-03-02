@@ -1707,11 +1707,11 @@ void TestTls1Prf(void)
             handleOpenSSLError("EVP_PKEY_CTX_set_tls1_prf_md");
             goto end;
         }
-        if (EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, "secret", 6) <= 0) {
+        if (EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, reinterpret_cast<const unsigned char*>("secret"), 6) <= 0) {
             handleOpenSSLError("EVP_PKEY_CTX_set1_tls1_prf_secret");
             goto end;
         }
-        if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, "seed", 4) <= 0) {
+        if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, reinterpret_cast<const unsigned char*>("seed"), 4) <= 0) {
             handleOpenSSLError("EVP_PKEY_CTX_add1_tls1_prf_seed");
             goto end;
         }
@@ -2283,7 +2283,7 @@ int main(int argc, char** argv)
     if (argc >= 3) {
         scossl_ossl_ERR_level = atoi(argv[2]);
     }
-    SCOSSL_ENGINE_set_trace_level(scossl_log_level, scossl_ossl_ERR_level);
+    SCOSSL_set_trace_level(scossl_log_level, scossl_ossl_ERR_level);
     SCOSSL_ENGINE_Initialize();
     bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
 

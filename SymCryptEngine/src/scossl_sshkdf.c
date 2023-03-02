@@ -31,31 +31,31 @@ struct evp_kdf_impl_st {
 };
 
 
-EVP_KDF_IMPL* scossl_sshkdf_new()
+EVP_KDF_IMPL* e_scossl_sshkdf_new()
 {
     EVP_KDF_IMPL *impl = OPENSSL_zalloc(sizeof(*impl));
 
     if (!impl) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_NEW, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc return NULL");
-    }    
-    
+    }
+
     return impl;
 }
 
-void scossl_sshkdf_reset(EVP_KDF_IMPL *impl)
+void e_scossl_sshkdf_reset(EVP_KDF_IMPL *impl)
 {
     OPENSSL_clear_free(impl->pbKey, impl->cbKey);
     memset(impl, 0, sizeof(*impl));
 }
 
-void scossl_sshkdf_free(EVP_KDF_IMPL *impl)
+void e_scossl_sshkdf_free(EVP_KDF_IMPL *impl)
 {
-    scossl_sshkdf_reset(impl);
+    e_scossl_sshkdf_reset(impl);
     OPENSSL_free(impl);
 }
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
+static PCSYMCRYPT_HASH e_scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
 {
     int type = EVP_MD_type(md);
 
@@ -75,7 +75,7 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
 }
 
 
-SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
+SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
     const unsigned char *buffer;
@@ -89,7 +89,7 @@ SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
         case EVP_KDF_CTRL_SET_MD:
             md = va_arg(args, EVP_MD*);
 
-            impl->pHash = scossl_get_symcrypt_hash_algorithm(md);
+            impl->pHash = e_scossl_get_symcrypt_hash_algorithm(md);
 
             if(!impl->pHash) {
                 ret = SCOSSL_FAILURE;
@@ -165,21 +165,21 @@ SCOSSL_STATUS scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
     return ret;
 }
 
-SCOSSL_STATUS scossl_sshkdf_call_ctrl(EVP_KDF_IMPL *impl, int cmd, ...)
+SCOSSL_STATUS e_scossl_sshkdf_call_ctrl(EVP_KDF_IMPL *impl, int cmd, ...)
 {
     SCOSSL_STATUS ret;
     va_list args;
 
     va_start(args, cmd);
 
-    ret = scossl_sshkdf_ctrl(impl, cmd, args);
+    ret = e_scossl_sshkdf_ctrl(impl, cmd, args);
 
     va_end(args);
-    
+
     return ret;
 }
 
-SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const char *value)
+SCOSSL_STATUS e_scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const char *value)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     unsigned char *data;
@@ -188,40 +188,40 @@ SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const
 
     if(strcmp(type, "digest") == 0 || strcmp(type, "md") == 0) {
         const EVP_MD *md = EVP_get_digestbyname(value);
-        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_MD, md);
+        ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_MD, md);
     }
     else if(strcmp(type, "hexkey") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
         if(data) {
-            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, data, length);
+            ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, data, length);
             OPENSSL_free(data);
         }
     }
     else if(strcmp(type, "hexxcghash") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
         if(data) {
-            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, data, length);
+            ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, data, length);
             OPENSSL_free(data);
         }
     }
     else if(strcmp(type, "hexsession_id") == 0) {
         data = OPENSSL_hexstr2buf(value, &length);
         if(data) {
-            ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, data, length);
+            ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, data, length);
             OPENSSL_free(data);
         }
     }
     else if(strcmp(type, "type") == 0 && strlen(value) == 1) {
-        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_TYPE, (int)(*value));
+        ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_TYPE, (int)(*value));
     }
     else if(strcmp(type, "key") == 0) {
-        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, value, strlen(value));
+        ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_KEY, value, strlen(value));
     }
     else if(strcmp(type, "xcghash") == 0) {
-        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, value, strlen(value));
+        ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, value, strlen(value));
     }
     else if(strcmp(type, "session_id") == 0) {
-        ret = scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, value, strlen(value));
+        ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, value, strlen(value));
     }
     else {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL_STR, ERR_R_INTERNAL_ERROR,
@@ -231,15 +231,15 @@ SCOSSL_STATUS scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, const
     return ret;
 }
 
-size_t scossl_sshkdf_size(EVP_KDF_IMPL *impl)
+size_t e_scossl_sshkdf_size(EVP_KDF_IMPL *impl)
 {
     return (size_t)-1;
 }
 
-SCOSSL_STATUS scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, size_t out_len)
+SCOSSL_STATUS e_scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, size_t out_len)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    SYMCRYPT_ERROR scError; 
+    SYMCRYPT_ERROR scError;
 
     if(!impl->pHash) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
@@ -261,7 +261,7 @@ SCOSSL_STATUS scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, size_
                             impl->label,
                             impl->pbSessionId, impl->cbSessionId,
                             out, out_len);
-                
+
     if(scError != SYMCRYPT_NO_ERROR) {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptSshKdf failed", scError);
@@ -275,18 +275,18 @@ end:
 
 
 
-static EVP_KDF_METHOD scossl_sshkdf_meth = {
+static EVP_KDF_METHOD e_scossl_sshkdf_meth = {
     EVP_KDF_SSHKDF,
-    scossl_sshkdf_new,
-    scossl_sshkdf_free,
-    scossl_sshkdf_reset,
-    scossl_sshkdf_ctrl,
-    scossl_sshkdf_ctrl_str,
-    scossl_sshkdf_size,
-    scossl_sshkdf_derive,
+    e_scossl_sshkdf_new,
+    e_scossl_sshkdf_free,
+    e_scossl_sshkdf_reset,
+    e_scossl_sshkdf_ctrl,
+    e_scossl_sshkdf_ctrl_str,
+    e_scossl_sshkdf_size,
+    e_scossl_sshkdf_derive,
 };
 
-EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id)
+EVP_KDF_CTX* e_scossl_EVP_KDF_CTX_new_id(int id)
 {
     EVP_KDF_CTX *ctx;
 
@@ -295,13 +295,13 @@ EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id)
     }
 
     ctx = OPENSSL_zalloc(sizeof(*ctx));
-    
+
     if (!ctx) {
         return NULL;
     }
 
-    ctx->kmeth = &scossl_sshkdf_meth;
-    ctx->impl = scossl_sshkdf_meth.new();
+    ctx->kmeth = &e_scossl_sshkdf_meth;
+    ctx->impl = e_scossl_sshkdf_meth.new();
 
     return ctx;
 }

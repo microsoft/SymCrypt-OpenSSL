@@ -37,7 +37,7 @@ typedef struct _SCOSSL_ECC_KEY_CONTEXT {
     PSYMCRYPT_ECKEY key;
 } SCOSSL_ECC_KEY_CONTEXT;
 
-int scossl_eckey_idx = -1;
+int e_scossl_eckey_idx = -1;
 
 
 // If r and s are both 0, the DER encoding would be 8 bytes
@@ -55,7 +55,7 @@ int scossl_eckey_idx = -1;
 // Largest supported curve is P521 => 66 * 2 byte Public key
 #define SCOSSL_ECDH_MAX_PUBLIC_KEY_LEN (132)
 
-static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(
+static SCOSSL_STATUS e_scossl_ecdsa_der_check_tag_and_get_value_and_length(
     _In_reads_bytes_(cbDerField) PCBYTE pbDerField, SIZE_T cbDerField, BYTE expectedTag, _Out_writes_bytes_(pcbContent) PCBYTE* ppbContent, SIZE_T* pcbContent )
 {
     PCBYTE pbContent = NULL;
@@ -118,7 +118,7 @@ cleanup:
 // Quick hack function to parse precisely the DER encodings which we expect for ECDSA signatures for the NIST prime curves
 // Extracts the encoded R and S and places them in a buffer with 2 same-sized big-endian encodings (BER encoding expected by SymCrypt)
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on failure.
-static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PCBYTE pbDerSignature, SIZE_T cbDerSignature,
+static SCOSSL_STATUS e_scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PCBYTE pbDerSignature, SIZE_T cbDerSignature,
                                                 _Out_writes_bytes_(cbSymCryptSignature) PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature)
 {
     PCBYTE pbSeq = NULL;
@@ -145,7 +145,7 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
     }
 
 
-    if( scossl_ecdsa_der_check_tag_and_get_value_and_length(
+    if( e_scossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbDerSignature, cbDerSignature, 0x30, &pbSeq, &cbSeq) == 0 )
     {
         goto cleanup;
@@ -160,7 +160,7 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         goto cleanup;
     }
 
-    if( scossl_ecdsa_der_check_tag_and_get_value_and_length(
+    if( e_scossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbSeq, cbSeq, 0x02, &pbR, &cbR) == 0 )
     {
         goto cleanup;
@@ -175,7 +175,7 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         goto cleanup;
     }
 
-    if( scossl_ecdsa_der_check_tag_and_get_value_and_length(
+    if( e_scossl_ecdsa_der_check_tag_and_get_value_and_length(
             pbR+cbR, (pbSeq+cbSeq)-(pbR+cbR), 0x02, &pbS, &cbS) == 0 )
     {
         goto cleanup;
@@ -234,7 +234,7 @@ cleanup:
 // Quick hack function to generate precisely the DER encodings which we want for ECDSA signatures for the NIST prime curves
 // Takes 2 same-size big-endian integers output from SymCrypt and encodes them in the minimally sized (strict) equivalent DER encoding
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on failure.
-static SCOSSL_STATUS scossl_ecdsa_apply_der(_In_reads_bytes_(cbSymCryptSignature) PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
+static SCOSSL_STATUS e_scossl_ecdsa_apply_der(_In_reads_bytes_(cbSymCryptSignature) PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
                                                 _Out_writes_bytes_(cbDerSignature) PBYTE pbDerSignature, unsigned int* cbDerSignature)
 {
     PBYTE  pbWrite = pbDerSignature;
@@ -333,7 +333,7 @@ cleanup:
     return res;
 }
 
-void scossl_ecc_free_key_context(_Inout_ SCOSSL_ECC_KEY_CONTEXT *keyCtx)
+void e_scossl_ecc_free_key_context(_Inout_ SCOSSL_ECC_KEY_CONTEXT *keyCtx)
 {
     keyCtx->initialized = 0;
     if( keyCtx->key )
@@ -346,17 +346,17 @@ void scossl_ecc_free_key_context(_Inout_ SCOSSL_ECC_KEY_CONTEXT *keyCtx)
 #define NID_secp192r1 (NID_X9_62_prime192v1)
 #define NID_secp256r1 (NID_X9_62_prime256v1)
 
-void scossl_eckey_finish(_Inout_ EC_KEY *key)
+void e_scossl_eckey_finish(_Inout_ EC_KEY *key)
 {
-    SCOSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, scossl_eckey_idx);
+    SCOSSL_ECC_KEY_CONTEXT *keyCtx = EC_KEY_get_ex_data(key, e_scossl_eckey_idx);
     if( keyCtx )
     {
         if( keyCtx->initialized == 1 )
         {
-            scossl_ecc_free_key_context(keyCtx);
+            e_scossl_ecc_free_key_context(keyCtx);
         }
         OPENSSL_free(keyCtx);
-        EC_KEY_set_ex_data(key, scossl_eckey_idx, NULL);
+        EC_KEY_set_ex_data(key, e_scossl_eckey_idx, NULL);
     }
 }
 
@@ -368,7 +368,7 @@ static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 
 // Generates a new keypair using pCurve, storing the new keypair in eckey and pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve,
+SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve,
                                         _In_ const EC_GROUP* ecgroup, _Inout_ EC_KEY* eckey)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -493,7 +493,7 @@ cleanup:
     if( res != SCOSSL_SUCCESS )
     {
         // On error free the partially constructed key context
-        scossl_ecc_free_key_context(pKeyCtx);
+        e_scossl_ecc_free_key_context(pKeyCtx);
     }
 
     if( pbData )
@@ -513,7 +513,7 @@ cleanup:
 
 // Imports key using eckey, ecgroup, and pCurve into pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup,
+SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const EC_GROUP* ecgroup,
                                         _Inout_ SCOSSL_ECC_KEY_CONTEXT* pKeyCtx, _In_ PCSYMCRYPT_ECURVE pCurve)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -631,7 +631,7 @@ cleanup:
     if( res != SCOSSL_SUCCESS )
     {
         // On error free the partially constructed key context
-        scossl_ecc_free_key_context(pKeyCtx);
+        e_scossl_ecc_free_key_context(pKeyCtx);
     }
 
     if( pbData )
@@ -647,7 +647,7 @@ cleanup:
     return res;
 }
 
-SCOSSL_STATUS scossl_ecc_init_static()
+SCOSSL_STATUS e_scossl_ecc_init_static()
 {
     if( ((_hidden_curve_P192 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP192, 0)) == NULL) ||
         ((_hidden_curve_P224 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP224, 0)) == NULL) ||
@@ -663,7 +663,7 @@ SCOSSL_STATUS scossl_ecc_init_static()
 // returns SCOSSL_FALLBACK when the eckey is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_ECC_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
+SCOSSL_STATUS e_scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
 {
     PCSYMCRYPT_ECURVE pCurve = NULL;
 
@@ -702,7 +702,7 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
         return SCOSSL_FAILURE;
     }
 
-    *ppKeyCtx = (SCOSSL_ECC_KEY_CONTEXT*) EC_KEY_get_ex_data(eckey, scossl_eckey_idx);
+    *ppKeyCtx = (SCOSSL_ECC_KEY_CONTEXT*) EC_KEY_get_ex_data(eckey, e_scossl_eckey_idx);
 
     if( *ppKeyCtx == NULL )
     {
@@ -714,7 +714,7 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
             return SCOSSL_FAILURE;
         }
 
-        if( EC_KEY_set_ex_data(eckey, scossl_eckey_idx, keyCtx) == 0)
+        if( EC_KEY_set_ex_data(eckey, e_scossl_eckey_idx, keyCtx) == 0)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_OPERATION_FAIL,
                 "EC_KEY_set_ex_data failed");
@@ -728,7 +728,7 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
     // If we are asked to generate a key - make sure to free any existing key
     if( generate )
     {
-        scossl_ecc_free_key_context(*ppKeyCtx);
+        e_scossl_ecc_free_key_context(*ppKeyCtx);
     }
 
     if( (*ppKeyCtx)->initialized == 1 )
@@ -738,23 +738,23 @@ SCOSSL_STATUS scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_
 
     if( generate )
     {
-        return scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, ecgroup, eckey);
+        return e_scossl_ecc_generate_keypair(*ppKeyCtx, pCurve, ecgroup, eckey);
     }
     else
     {
-        return scossl_ecc_import_keypair(eckey, ecgroup, *ppKeyCtx, pCurve);
+        return e_scossl_ecc_import_keypair(eckey, ecgroup, *ppKeyCtx, pCurve);
     }
 }
 
 // returns SCOSSL_FALLBACK when the eckey is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_ECC_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_ecc_context(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx)
+SCOSSL_STATUS e_scossl_get_ecc_context(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx)
 {
-    return scossl_get_ecc_context_ex(eckey, ppKeyCtx, FALSE);
+    return e_scossl_get_ecc_context_ex(eckey, ppKeyCtx, FALSE);
 }
 
-SCOSSL_STATUS scossl_eckey_sign(int type,
+SCOSSL_STATUS e_scossl_eckey_sign(int type,
                         _In_reads_bytes_(dlen) const unsigned char* dgst,
                         int dlen,
                         _Out_writes_bytes_(*siglen) unsigned char* sig,
@@ -769,11 +769,11 @@ SCOSSL_STATUS scossl_eckey_sign(int type,
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -788,7 +788,7 @@ SCOSSL_STATUS scossl_eckey_sign(int type,
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
 
@@ -831,27 +831,27 @@ SCOSSL_STATUS scossl_eckey_sign(int type,
         return SCOSSL_FAILURE;
     }
 
-    if( scossl_ecdsa_apply_der(buf, cbSymCryptSig, sig, siglen) == 0 )
+    if( e_scossl_ecdsa_apply_der(buf, cbSymCryptSig, sig, siglen) == 0 )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
-            "scossl_ecdsa_apply_der failed");
+            "e_scossl_ecdsa_apply_der failed");
         return SCOSSL_FAILURE;
     }
 
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _Out_ BIGNUM** kinvp, _Out_ BIGNUM** rp)
+SCOSSL_STATUS e_scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _Out_ BIGNUM** kinvp, _Out_ BIGNUM** rp)
 {
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
     const EC_KEY_METHOD* ossl_eckey_method = EC_KEY_OpenSSL();
     PFN_eckey_sign_setup pfn_eckey_sign_setup = NULL;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
     case SCOSSL_SUCCESS:
@@ -865,12 +865,12 @@ SCOSSL_STATUS scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _
         return pfn_eckey_sign_setup(eckey, ctx_in, kinvp, rp);
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
 }
 
-ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* dgst, int dgst_len,
+ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* dgst, int dgst_len,
                                    _In_opt_ const BIGNUM* in_kinv, _In_opt_ const BIGNUM* in_r,
                                    _In_ EC_KEY* eckey)
 {
@@ -883,11 +883,11 @@ ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* 
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return NULL;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -902,7 +902,7 @@ ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* 
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return NULL;
     }
 
@@ -975,7 +975,7 @@ ECDSA_SIG* scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char* 
     return returnSignature;
 }
 
-SCOSSL_STATUS scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
                           _In_reads_bytes_(sig_len) const unsigned char* sigbuf, int sig_len, _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
@@ -984,11 +984,11 @@ SCOSSL_STATUS scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const uns
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = { 0 };
     SIZE_T cbSymCryptSig = 0;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -1003,15 +1003,15 @@ SCOSSL_STATUS scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const uns
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
 
     cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement( keyCtx->key->pCurve );
-    if( scossl_ecdsa_remove_der(sigbuf, sig_len, &buf[0], cbSymCryptSig) == 0 )
+    if( e_scossl_ecdsa_remove_der(sigbuf, sig_len, &buf[0], cbSymCryptSig) == 0 )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
-            "scossl_ecdsa_remove_der failed");
+            "e_scossl_ecdsa_remove_der failed");
         return SCOSSL_FAILURE;
     }
 
@@ -1036,7 +1036,7 @@ SCOSSL_STATUS scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const uns
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
                               _In_ const ECDSA_SIG* sig, _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
@@ -1048,11 +1048,11 @@ SCOSSL_STATUS scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned 
     const BIGNUM* r = NULL;
     const BIGNUM* s = NULL;
 
-    switch( scossl_get_ecc_context(eckey, &keyCtx) )
+    switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -1067,7 +1067,7 @@ SCOSSL_STATUS scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned 
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
 
@@ -1098,16 +1098,16 @@ SCOSSL_STATUS scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned 
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_eckey_keygen(_Inout_ EC_KEY *key)
+SCOSSL_STATUS e_scossl_eckey_keygen(_Inout_ EC_KEY *key)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
-    switch( scossl_get_ecc_context_ex(key, &keyCtx, TRUE) )
+    switch( e_scossl_get_ecc_context_ex(key, &keyCtx, TRUE) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_KEYGEN, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context_ex failed.");
+            "e_scossl_get_ecc_context_ex failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -1122,12 +1122,12 @@ SCOSSL_STATUS scossl_eckey_keygen(_Inout_ EC_KEY *key)
         return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_KEYGEN, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context_ex value");
+            "Unexpected e_scossl_get_ecc_context_ex value");
         return SCOSSL_FAILURE;
     }
 }
 
-SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsigned char **psec,
+SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsigned char **psec,
                                                 _Out_ size_t *pseclen,
                                                 _In_ const EC_POINT *pub_key,
                                                 _In_ const EC_KEY *ecdh)
@@ -1146,11 +1146,11 @@ SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsign
 
     int res = -1; // fail
 
-    switch( scossl_get_ecc_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor scossl_get_ecc_context
+    switch( e_scossl_get_ecc_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor e_scossl_get_ecc_context
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
-            "scossl_get_ecc_context failed.");
+            "e_scossl_get_ecc_context failed.");
         return -1;
     case SCOSSL_FALLBACK:
         ossl_eckey_method = EC_KEY_OpenSSL();
@@ -1165,7 +1165,7 @@ SCOSSL_RETURNLENGTH scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsign
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_ecc_context value");
+            "Unexpected e_scossl_get_ecc_context value");
         return -1;
     }
 
@@ -1280,7 +1280,7 @@ cleanup:
     return res;
 }
 
-void scossl_destroy_ecc_curves(void)
+void e_scossl_destroy_ecc_curves(void)
 {
     if( _hidden_curve_P192 )
     {

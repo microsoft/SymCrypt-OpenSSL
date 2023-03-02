@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCOSSL_ENGINE_TRACELOG_PARA_LENGTH  (256)
+#define SCOSSL_TRACELOG_PARA_LENGTH  (256)
 
 #define SCOSSL_LOG_LEVEL_PREFIX_ERROR       "ERROR"
 #define SCOSSL_LOG_LEVEL_PREFIX_INFO        "INFO"
@@ -125,7 +125,7 @@ void scossl_setup_logging()
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_reason_strings);
 
         _loggingLock = CRYPTO_THREAD_lock_new();
-        SCOSSL_ENGINE_set_trace_log_filename(NULL);
+        SCOSSL_set_trace_log_filename(NULL);
     }
 }
 
@@ -134,7 +134,7 @@ void scossl_destroy_logging()
     CRYPTO_THREAD_lock_free(_loggingLock);
 }
 
-void SCOSSL_ENGINE_set_trace_level(int trace_level, int ossl_ERR_level)
+void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level)
 {
     if( trace_level >= SCOSSL_LOG_LEVEL_OFF &&
         trace_level <= SCOSSL_LOG_LEVEL_DEBUG )
@@ -148,7 +148,7 @@ void SCOSSL_ENGINE_set_trace_level(int trace_level, int ossl_ERR_level)
     }
 }
 
-void SCOSSL_ENGINE_set_trace_log_filename(const char *filename)
+void SCOSSL_set_trace_log_filename(const char *filename)
 {
     if( _traceLogFilename )
     {
@@ -188,8 +188,8 @@ static void _scossl_log_bytes_valist(
     const char *format,
     va_list args)
 {
-    char errStringBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
-    char paraBuf[SCOSSL_ENGINE_TRACELOG_PARA_LENGTH];
+    char errStringBuf[SCOSSL_TRACELOG_PARA_LENGTH];
+    char paraBuf[SCOSSL_TRACELOG_PARA_LENGTH];
     char *trace_level_prefix = "";
 
     if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )

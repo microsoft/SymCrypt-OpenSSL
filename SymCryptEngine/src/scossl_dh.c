@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-int scossl_dh_idx = -1;
+int e_scossl_dh_idx = -1;
 
 // Largest supported safe-prime group is 4096b => 512 byte Public key
 #define SCOSSL_DH_MAX_PUBLIC_KEY_LEN (512)
@@ -27,7 +27,7 @@ typedef struct _SCOSSL_DH_KEY_CONTEXT {
 } SCOSSL_DH_KEY_CONTEXT;
 typedef       SCOSSL_DH_KEY_CONTEXT * PSCOSSL_DH_KEY_CONTEXT;
 
-void scossl_dh_free_key_context(_Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx)
+void e_scossl_dh_free_key_context(_Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx)
 {
     pKeyCtx->initialized = 0;
     if( pKeyCtx->dlkey )
@@ -49,7 +49,7 @@ static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
 
 // Generates a new keypair using pDlgroup, storing the new keypair in dh and pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_dh_generate_keypair(
+SCOSSL_STATUS e_scossl_dh_generate_keypair(
     _Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup, _Inout_ DH* dh)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -155,7 +155,7 @@ cleanup:
     if( res != SCOSSL_SUCCESS )
     {
         // On error free the partially constructed key context
-        scossl_dh_free_key_context(pKeyCtx);
+        e_scossl_dh_free_key_context(pKeyCtx);
     }
 
     BN_clear_free(dh_privkey);
@@ -172,7 +172,7 @@ cleanup:
 // Imports key using dh and dlGroup, into pKeyCtx.
 // Also populates the public key of dh if it only currently has a private key specified.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_dh_import_keypair(
+SCOSSL_STATUS e_scossl_dh_import_keypair(
     _Inout_ DH* dh, _Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup )
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -325,7 +325,7 @@ cleanup:
     if( res != SCOSSL_SUCCESS )
     {
         // On error free the partially constructed key context
-        scossl_dh_free_key_context(pKeyCtx);
+        e_scossl_dh_free_key_context(pKeyCtx);
     }
 
     BN_free(generated_dh_pubkey);
@@ -338,7 +338,7 @@ cleanup:
     return res;
 }
 
-PSYMCRYPT_DLGROUP scossl_initialize_safeprime_dlgroup(_Inout_ PSYMCRYPT_DLGROUP* ppDlgroup,
+PSYMCRYPT_DLGROUP e_scossl_initialize_safeprime_dlgroup(_Inout_ PSYMCRYPT_DLGROUP* ppDlgroup,
     SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE dhSafePrimeType, UINT32 nBitsOfP )
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -360,14 +360,14 @@ cleanup:
     return *ppDlgroup;
 }
 
-SCOSSL_STATUS scossl_dh_init_static()
+SCOSSL_STATUS e_scossl_dh_init_static()
 {
-    if( (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048 ) == NULL) ||
-        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072 ) == NULL) ||
-        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096 ) == NULL) ||
-        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048 ) == NULL) ||
-        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072 ) == NULL) ||
-        (scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096 ) == NULL) ||
+    if( (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048 ) == NULL) ||
+        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072 ) == NULL) ||
+        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096 ) == NULL) ||
+        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048 ) == NULL) ||
+        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072 ) == NULL) ||
+        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096 ) == NULL) ||
         ((_hidden_bignum_modp2048 = BN_get_rfc3526_prime_2048(NULL)) == NULL) ||
         ((_hidden_bignum_modp3072 = BN_get_rfc3526_prime_3072(NULL)) == NULL) ||
         ((_hidden_bignum_modp4096 = BN_get_rfc3526_prime_4096(NULL)) == NULL) )
@@ -380,7 +380,7 @@ SCOSSL_STATUS scossl_dh_init_static()
 // returns SCOSSL_FALLBACK when the dh is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_DH_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx, BOOL generate)
+SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx, BOOL generate)
 {
     PSYMCRYPT_DLGROUP pDlgroup = NULL;
 
@@ -443,7 +443,7 @@ SCOSSL_STATUS scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONT
         return SCOSSL_FAILURE;
     }
 
-    *ppKeyCtx = (PSCOSSL_DH_KEY_CONTEXT) DH_get_ex_data(dh, scossl_dh_idx);
+    *ppKeyCtx = (PSCOSSL_DH_KEY_CONTEXT) DH_get_ex_data(dh, e_scossl_dh_idx);
 
     if( *ppKeyCtx == NULL )
     {
@@ -455,7 +455,7 @@ SCOSSL_STATUS scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONT
             return SCOSSL_FAILURE;
         }
 
-        if( DH_set_ex_data(dh, scossl_dh_idx, pKeyCtx) == 0)
+        if( DH_set_ex_data(dh, e_scossl_dh_idx, pKeyCtx) == 0)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_OPERATION_FAIL,
                 "DH_set_ex_data failed");
@@ -477,32 +477,32 @@ SCOSSL_STATUS scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONT
 
     if( generate && (dh_privkey == NULL) )
     {
-        return scossl_dh_generate_keypair(*ppKeyCtx, pDlgroup, dh);
+        return e_scossl_dh_generate_keypair(*ppKeyCtx, pDlgroup, dh);
     }
     else
     {
-        return scossl_dh_import_keypair(dh, *ppKeyCtx, pDlgroup);
+        return e_scossl_dh_import_keypair(dh, *ppKeyCtx, pDlgroup);
     }
 }
 
 // returns SCOSSL_FALLBACK when the dh is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_DH_KEY_CONTEXT on success
-SCOSSL_STATUS scossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx)
+SCOSSL_STATUS e_scossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx)
 {
-    return scossl_get_dh_context_ex(dh, ppKeyCtx, FALSE);
+    return e_scossl_get_dh_context_ex(dh, ppKeyCtx, FALSE);
 }
 
-SCOSSL_STATUS scossl_dh_generate_key(_Inout_ DH* dh)
+SCOSSL_STATUS e_scossl_dh_generate_key(_Inout_ DH* dh)
 {
     PFN_DH_meth_generate_key pfn_dh_meth_generate_key = NULL;
     PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
 
-    switch( scossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
+    switch( e_scossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEY, ERR_R_OPERATION_FAIL,
-            "scossl_get_dh_context_ex failed.");
+            "e_scossl_get_dh_context_ex failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
         pfn_dh_meth_generate_key = DH_meth_get_generate_key(DH_OpenSSL());
@@ -515,12 +515,12 @@ SCOSSL_STATUS scossl_dh_generate_key(_Inout_ DH* dh)
         return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEY, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_dh_context_ex value");
+            "Unexpected e_scossl_get_dh_context_ex value");
         return SCOSSL_FAILURE;
     }
 }
 
-SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsigned char* key,
+SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsigned char* key,
                                             _In_ const BIGNUM* pub_key,
                                             _In_ DH* dh)
 {
@@ -534,11 +534,11 @@ SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsign
 
     int res = -1; // fail
 
-    switch( scossl_get_dh_context(dh, &pKeyCtx) )
+    switch( e_scossl_get_dh_context(dh, &pKeyCtx) )
     {
     case SCOSSL_FAILURE:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
-            "scossl_get_dh_context failed.");
+            "e_scossl_get_dh_context failed.");
         return res;
     case SCOSSL_FALLBACK:
         pfn_dh_meth_compute_key = DH_meth_get_compute_key(DH_OpenSSL());
@@ -551,7 +551,7 @@ SCOSSL_RETURNLENGTH scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsign
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
-            "Unexpected scossl_get_dh_context_ex value");
+            "Unexpected e_scossl_get_dh_context_ex value");
         return res;
     }
 
@@ -612,18 +612,18 @@ cleanup:
     return res;
 }
 
-SCOSSL_STATUS scossl_dh_finish(_Inout_ DH* dh)
+SCOSSL_STATUS e_scossl_dh_finish(_Inout_ DH* dh)
 {
     PFN_DH_meth_finish pfn_dh_meth_finish = DH_meth_get_finish(DH_OpenSSL());
-    PSCOSSL_DH_KEY_CONTEXT pKeyCtx = DH_get_ex_data(dh, scossl_dh_idx);
+    PSCOSSL_DH_KEY_CONTEXT pKeyCtx = DH_get_ex_data(dh, e_scossl_dh_idx);
     if( pKeyCtx )
     {
         if( pKeyCtx->initialized == 1 )
         {
-            scossl_dh_free_key_context(pKeyCtx);
+            e_scossl_dh_free_key_context(pKeyCtx);
         }
         OPENSSL_free(pKeyCtx);
-        DH_set_ex_data(dh, scossl_dh_idx, NULL);
+        DH_set_ex_data(dh, e_scossl_dh_idx, NULL);
     }
 
     // Ensure any buffers initialized by DH_OpenSSL are freed
@@ -634,7 +634,7 @@ SCOSSL_STATUS scossl_dh_finish(_Inout_ DH* dh)
     return pfn_dh_meth_finish(dh);
 }
 
-void scossl_destroy_safeprime_dlgroups(void)
+void e_scossl_destroy_safeprime_dlgroups(void)
 {
     if( _hidden_dlgroup_ffdhe2048 )
     {

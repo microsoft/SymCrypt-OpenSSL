@@ -138,24 +138,24 @@ static int scossl_cipher_nids[] = {
 #define AES_192_KEY_SIZE 24
 #define AES_256_KEY_SIZE 32
 
-SCOSSL_STATUS scossl_aes_cbc_init_key(
+SCOSSL_STATUS e_scossl_aes_cbc_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
-SCOSSL_STATUS scossl_aes_cbc_cipher(
+SCOSSL_STATUS e_scossl_aes_cbc_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CBC_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE|EVP_CIPH_CUSTOM_COPY \
                          |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_FLAG_FIPS)
 
 /* AES128 - CBC */
 static EVP_CIPHER *_hidden_aes_128_cbc = NULL;
-static const EVP_CIPHER *scossl_aes_128_cbc(void)
+static const EVP_CIPHER *e_scossl_aes_128_cbc(void)
 {
     if( (_hidden_aes_128_cbc = EVP_CIPHER_meth_new(NID_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_cbc, AES_CBC_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_cbc, scossl_aes_cbc_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_cbc, scossl_aes_cbc_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_cbc, scossl_aes_cbc_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_cbc, e_scossl_aes_cbc_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_cbc, e_scossl_aes_cbc_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_cbc, e_scossl_aes_cbc_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_cbc, sizeof(struct cipher_cbc_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_cbc);
@@ -166,14 +166,14 @@ static const EVP_CIPHER *scossl_aes_128_cbc(void)
 
 /* AES192 - CBC */
 static EVP_CIPHER *_hidden_aes_192_cbc = NULL;
-static const EVP_CIPHER *scossl_aes_192_cbc(void)
+static const EVP_CIPHER *e_scossl_aes_192_cbc(void)
 {
     if( (_hidden_aes_192_cbc = EVP_CIPHER_meth_new(NID_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_cbc, AES_CBC_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_cbc, scossl_aes_cbc_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_cbc, scossl_aes_cbc_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_cbc, scossl_aes_cbc_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_cbc, e_scossl_aes_cbc_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_cbc, e_scossl_aes_cbc_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_cbc, e_scossl_aes_cbc_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_cbc, sizeof(struct cipher_cbc_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_cbc);
@@ -184,14 +184,14 @@ static const EVP_CIPHER *scossl_aes_192_cbc(void)
 
 /* AES256 - CBC */
 static EVP_CIPHER *_hidden_aes_256_cbc = NULL;
-static const EVP_CIPHER *scossl_aes_256_cbc(void)
+static const EVP_CIPHER *e_scossl_aes_256_cbc(void)
 {
     if( (_hidden_aes_256_cbc = EVP_CIPHER_meth_new(NID_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_cbc, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_cbc, AES_CBC_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_cbc, scossl_aes_cbc_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_cbc, scossl_aes_cbc_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_cbc, scossl_aes_cbc_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_cbc, e_scossl_aes_cbc_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_cbc, e_scossl_aes_cbc_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_cbc, e_scossl_aes_cbc_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_cbc, sizeof(struct cipher_cbc_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_cbc);
@@ -200,23 +200,23 @@ static const EVP_CIPHER *scossl_aes_256_cbc(void)
     return _hidden_aes_256_cbc;
 }
 
-SCOSSL_STATUS scossl_aes_ecb_init_key(
+SCOSSL_STATUS e_scossl_aes_ecb_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
-SCOSSL_STATUS scossl_aes_ecb_cipher(
+SCOSSL_STATUS e_scossl_aes_ecb_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY \
                          |EVP_CIPH_FLAG_FIPS)
 
 /* AES128 - ecb */
 static EVP_CIPHER *_hidden_aes_128_ecb = NULL;
-static const EVP_CIPHER *scossl_aes_128_ecb(void)
+static const EVP_CIPHER *e_scossl_aes_128_ecb(void)
 {
     if( (_hidden_aes_128_ecb = EVP_CIPHER_meth_new(NID_aes_128_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ecb, AES_ECB_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ecb, scossl_aes_ecb_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ecb, scossl_aes_ecb_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ecb, scossl_aes_ecb_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ecb, e_scossl_aes_ecb_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ecb, e_scossl_aes_ecb_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ecb, e_scossl_aes_ecb_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_ecb, sizeof(struct cipher_ecb_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_ecb);
@@ -227,13 +227,13 @@ static const EVP_CIPHER *scossl_aes_128_ecb(void)
 
 /* AES192 - ecb */
 static EVP_CIPHER *_hidden_aes_192_ecb = NULL;
-static const EVP_CIPHER *scossl_aes_192_ecb(void)
+static const EVP_CIPHER *e_scossl_aes_192_ecb(void)
 {
     if( (_hidden_aes_192_ecb = EVP_CIPHER_meth_new(NID_aes_192_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_192_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ecb, AES_ECB_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ecb, scossl_aes_ecb_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ecb, scossl_aes_ecb_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ecb, scossl_aes_ecb_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ecb, e_scossl_aes_ecb_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ecb, e_scossl_aes_ecb_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ecb, e_scossl_aes_ecb_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_ecb, sizeof(struct cipher_ecb_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_ecb);
@@ -244,13 +244,13 @@ static const EVP_CIPHER *scossl_aes_192_ecb(void)
 
 /* AES256 - ecb */
 static EVP_CIPHER *_hidden_aes_256_ecb = NULL;
-static const EVP_CIPHER *scossl_aes_256_ecb(void)
+static const EVP_CIPHER *e_scossl_aes_256_ecb(void)
 {
     if( (_hidden_aes_256_ecb = EVP_CIPHER_meth_new(NID_aes_256_ecb, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ecb, AES_ECB_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ecb, scossl_aes_ecb_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ecb, scossl_aes_ecb_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ecb, scossl_aes_ecb_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ecb, e_scossl_aes_ecb_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ecb, e_scossl_aes_ecb_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ecb, e_scossl_aes_ecb_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_ecb, sizeof(struct cipher_ecb_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_ecb);
@@ -261,24 +261,24 @@ static const EVP_CIPHER *scossl_aes_256_ecb(void)
 
 // Disabling XTS for now - remove with if region to avoid unused function warning
 #if 0
-SCOSSL_STATUS scossl_aes_xts_init_key(
+SCOSSL_STATUS e_scossl_aes_xts_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
-SCOSSL_STATUS scossl_aes_xts_cipher(
+SCOSSL_STATUS e_scossl_aes_xts_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS scossl_aes_xts_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_XTS_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER)
 
 /* AES128 - XTS */
 static EVP_CIPHER *_hidden_aes_128_xts = NULL;
-static const EVP_CIPHER *scossl_aes_128_xts(void)
+static const EVP_CIPHER *e_scossl_aes_128_xts(void)
 {
     if( (_hidden_aes_128_xts = EVP_CIPHER_meth_new(NID_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_128_KEY_SIZE * 2)) == NULL
         || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_xts, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_xts, AES_XTS_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_xts, scossl_aes_xts_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_xts, scossl_aes_xts_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_xts, scossl_aes_xts_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_xts, e_scossl_aes_xts_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_xts, e_scossl_aes_xts_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_xts, e_scossl_aes_xts_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_xts, sizeof(struct cipher_xts_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_xts);
@@ -289,14 +289,14 @@ static const EVP_CIPHER *scossl_aes_128_xts(void)
 
 /* AES256 - XTS */
 static EVP_CIPHER *_hidden_aes_256_xts = NULL;
-static const EVP_CIPHER *scossl_aes_256_xts(void)
+static const EVP_CIPHER *e_scossl_aes_256_xts(void)
 {
     if( (_hidden_aes_256_xts = EVP_CIPHER_meth_new(NID_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE , AES_256_KEY_SIZE * 2)) == NULL
         || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_xts, SYMCRYPT_AES_BLOCK_SIZE)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_xts, AES_XTS_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_xts, scossl_aes_xts_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_xts, scossl_aes_xts_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_xts, scossl_aes_xts_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_xts, e_scossl_aes_xts_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_xts, e_scossl_aes_xts_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_xts, e_scossl_aes_xts_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_xts, sizeof(struct cipher_xts_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_xts);
@@ -307,11 +307,11 @@ static const EVP_CIPHER *scossl_aes_256_xts(void)
 #endif
 
 
-SCOSSL_STATUS scossl_aes_gcm_init_key(
+SCOSSL_STATUS e_scossl_aes_gcm_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
-SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(
+SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static _Success_(return > 0) int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static _Success_(return > 0) int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER \
@@ -319,13 +319,13 @@ static _Success_(return > 0) int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx
 
 /* AES128 - GCM */
 static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
-static const EVP_CIPHER *scossl_aes_128_gcm(void)
+static const EVP_CIPHER *e_scossl_aes_128_gcm(void)
 {
     if( (_hidden_aes_128_gcm = EVP_CIPHER_meth_new(NID_aes_128_gcm, 1, AES_128_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_gcm, AES_GCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, scossl_aes_gcm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, scossl_aes_gcm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_gcm, scossl_aes_gcm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, e_scossl_aes_gcm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_gcm, sizeof(struct cipher_gcm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_gcm);
@@ -336,13 +336,13 @@ static const EVP_CIPHER *scossl_aes_128_gcm(void)
 
 /* AES192 - GCM */
 static EVP_CIPHER *_hidden_aes_192_gcm = NULL;
-static const EVP_CIPHER *scossl_aes_192_gcm(void)
+static const EVP_CIPHER *e_scossl_aes_192_gcm(void)
 {
     if( (_hidden_aes_192_gcm = EVP_CIPHER_meth_new(NID_aes_192_gcm, 1, AES_192_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_gcm, AES_GCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, scossl_aes_gcm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, scossl_aes_gcm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_gcm, scossl_aes_gcm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, e_scossl_aes_gcm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_gcm, sizeof(struct cipher_gcm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_gcm);
@@ -353,13 +353,13 @@ static const EVP_CIPHER *scossl_aes_192_gcm(void)
 
 /* AES256 - GCM */
 static EVP_CIPHER *_hidden_aes_256_gcm = NULL;
-static const EVP_CIPHER *scossl_aes_256_gcm(void)
+static const EVP_CIPHER *e_scossl_aes_256_gcm(void)
 {
     if( (_hidden_aes_256_gcm = EVP_CIPHER_meth_new(NID_aes_256_gcm, 1, AES_256_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_gcm, AES_GCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, scossl_aes_gcm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, scossl_aes_gcm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_gcm, scossl_aes_gcm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, e_scossl_aes_gcm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_gcm, sizeof(struct cipher_gcm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_gcm);
@@ -368,11 +368,11 @@ static const EVP_CIPHER *scossl_aes_256_gcm(void)
     return _hidden_aes_256_gcm;
 }
 
-SCOSSL_STATUS scossl_aes_ccm_init_key(
+SCOSSL_STATUS e_scossl_aes_ccm_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
-SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(
+SCOSSL_RETURNLENGTH e_scossl_aes_ccm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static _Success_(return > 0) int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static _Success_(return > 0) int e_scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_CCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
                         |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_CTRL_INIT|EVP_CIPH_FLAG_AEAD_CIPHER \
@@ -380,13 +380,13 @@ static _Success_(return > 0) int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx
 
 /* AES128 - CCM */
 static EVP_CIPHER *_hidden_aes_128_ccm = NULL;
-static const EVP_CIPHER *scossl_aes_128_ccm(void)
+static const EVP_CIPHER *e_scossl_aes_128_ccm(void)
 {
     if( (_hidden_aes_128_ccm = EVP_CIPHER_meth_new(NID_aes_128_ccm, 1, AES_128_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_ccm, AES_CCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ccm, scossl_aes_ccm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ccm, scossl_aes_ccm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ccm, scossl_aes_ccm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_128_ccm, e_scossl_aes_ccm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_ccm, e_scossl_aes_ccm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_ccm, e_scossl_aes_ccm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_ccm, sizeof(struct cipher_ccm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_128_ccm);
@@ -397,13 +397,13 @@ static const EVP_CIPHER *scossl_aes_128_ccm(void)
 
 /* AES192 - CCM */
 static EVP_CIPHER *_hidden_aes_192_ccm = NULL;
-static const EVP_CIPHER *scossl_aes_192_ccm(void)
+static const EVP_CIPHER *e_scossl_aes_192_ccm(void)
 {
     if( (_hidden_aes_192_ccm = EVP_CIPHER_meth_new(NID_aes_192_ccm, 1, AES_192_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_ccm, AES_CCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ccm, scossl_aes_ccm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ccm, scossl_aes_ccm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ccm, scossl_aes_ccm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_192_ccm, e_scossl_aes_ccm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_ccm, e_scossl_aes_ccm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_ccm, e_scossl_aes_ccm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_ccm, sizeof(struct cipher_ccm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_192_ccm);
@@ -414,13 +414,13 @@ static const EVP_CIPHER *scossl_aes_192_ccm(void)
 
 /* AES256 - CCM */
 static EVP_CIPHER *_hidden_aes_256_ccm = NULL;
-static const EVP_CIPHER *scossl_aes_256_ccm(void)
+static const EVP_CIPHER *e_scossl_aes_256_ccm(void)
 {
     if( (_hidden_aes_256_ccm = EVP_CIPHER_meth_new(NID_aes_256_ccm, 1, AES_256_KEY_SIZE)) == NULL
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_ccm, AES_CCM_FLAGS)
-        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ccm, scossl_aes_ccm_init_key)
-        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ccm, scossl_aes_ccm_cipher)
-        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ccm, scossl_aes_ccm_ctrl)
+        || !EVP_CIPHER_meth_set_init(_hidden_aes_256_ccm, e_scossl_aes_ccm_init_key)
+        || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_ccm, e_scossl_aes_ccm_cipher)
+        || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_ccm, e_scossl_aes_ccm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_ccm, sizeof(struct cipher_ccm_ctx)) )
     {
         EVP_CIPHER_meth_free(_hidden_aes_256_ccm);
@@ -430,7 +430,7 @@ static const EVP_CIPHER *scossl_aes_256_ccm(void)
 }
 
 
-void scossl_destroy_ciphers(void)
+void e_scossl_destroy_ciphers(void)
 {
     EVP_CIPHER_meth_free(_hidden_aes_128_cbc);
     EVP_CIPHER_meth_free(_hidden_aes_192_cbc);
@@ -462,29 +462,29 @@ void scossl_destroy_ciphers(void)
     _hidden_aes_256_ccm = NULL;
 }
 
-SCOSSL_STATUS scossl_ciphers_init_static()
+SCOSSL_STATUS e_scossl_ciphers_init_static()
 {
-    if( (scossl_aes_128_cbc() == NULL) ||
-        (scossl_aes_192_cbc() == NULL) ||
-        (scossl_aes_256_cbc() == NULL) ||
-        (scossl_aes_128_ecb() == NULL) ||
-        (scossl_aes_192_ecb() == NULL) ||
-        (scossl_aes_256_ecb() == NULL) ||
-        // (scossl_aes_128_xts() == NULL) ||
-        // (scossl_aes_256_xts() == NULL) ||
-        (scossl_aes_128_gcm() == NULL) ||
-        (scossl_aes_192_gcm() == NULL) ||
-        (scossl_aes_256_gcm() == NULL) ||
-        (scossl_aes_128_ccm() == NULL) ||
-        (scossl_aes_192_ccm() == NULL) ||
-        (scossl_aes_256_ccm() == NULL) )
+    if( (e_scossl_aes_128_cbc() == NULL) ||
+        (e_scossl_aes_192_cbc() == NULL) ||
+        (e_scossl_aes_256_cbc() == NULL) ||
+        (e_scossl_aes_128_ecb() == NULL) ||
+        (e_scossl_aes_192_ecb() == NULL) ||
+        (e_scossl_aes_256_ecb() == NULL) ||
+        // (e_scossl_aes_128_xts() == NULL) ||
+        // (e_scossl_aes_256_xts() == NULL) ||
+        (e_scossl_aes_128_gcm() == NULL) ||
+        (e_scossl_aes_192_gcm() == NULL) ||
+        (e_scossl_aes_256_gcm() == NULL) ||
+        (e_scossl_aes_128_ccm() == NULL) ||
+        (e_scossl_aes_192_ccm() == NULL) ||
+        (e_scossl_aes_256_ccm() == NULL) )
     {
         return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;
 }
 
-int scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
+int e_scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
                      const int **nids, int nid)
 {
     int ok = 1;
@@ -555,7 +555,7 @@ int scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+SCOSSL_STATUS e_scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -573,7 +573,7 @@ SCOSSL_STATUS scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+SCOSSL_STATUS e_scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -592,7 +592,7 @@ SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned 
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_cbc_ctx *srcCtx;
@@ -620,7 +620,7 @@ static SCOSSL_STATUS scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+SCOSSL_STATUS e_scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -638,7 +638,7 @@ SCOSSL_STATUS scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+SCOSSL_STATUS e_scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -656,7 +656,7 @@ SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned 
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_ecb_ctx *srcCtx;
@@ -686,7 +686,7 @@ static SCOSSL_STATUS scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+SCOSSL_STATUS e_scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -713,7 +713,7 @@ SCOSSL_STATUS scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
 // return negative value on failure, and number of bytes written to out on success (may be 0)
-SCOSSL_RETURNLENGTH scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+SCOSSL_RETURNLENGTH e_scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = 0;
@@ -760,7 +760,7 @@ SCOSSL_RETURNLENGTH scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     switch( type )
@@ -791,7 +791,7 @@ static SCOSSL_STATUS scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+SCOSSL_STATUS e_scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -817,7 +817,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns length of out on success, or -1 on error.
-static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
+static SCOSSL_RETURNLENGTH e_scossl_aes_gcm_tls(_In_ EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_gcm_ctx *cipherCtx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl, BOOL enc)
 {
     int ret = -1;
@@ -862,7 +862,7 @@ static SCOSSL_RETURNLENGTH scossl_aes_gcm_tls(_In_ EVP_CIPHER_CTX *ctx, _Inout_ 
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
         // Generate it using the IV invocation field to ensure distinct IVs are used
-        if( scossl_aes_gcm_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, EVP_GCM_TLS_EXPLICIT_IV_LEN, out) != SCOSSL_SUCCESS )
+        if( e_scossl_aes_gcm_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, EVP_GCM_TLS_EXPLICIT_IV_LEN, out) != SCOSSL_SUCCESS )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_INTERNAL_ERROR,
                 "AES-GCM TLS failed to generate IV");
@@ -911,7 +911,7 @@ cleanup:
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
 // return negative value on failure, and number of bytes written to out on success (may be 0)
-SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
@@ -920,7 +920,7 @@ SCOSSL_RETURNLENGTH scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
 
     if( cipherCtx->tlsAadSet )
     {
-        return scossl_aes_gcm_tls(ctx, cipherCtx, out, in, inl, EVP_CIPHER_CTX_encrypting(ctx));
+        return e_scossl_aes_gcm_tls(ctx, cipherCtx, out, in, inl, EVP_CIPHER_CTX_encrypting(ctx));
     }
 
     if( !cipherCtx->operationInProgress )
@@ -979,7 +979,7 @@ cleanup:
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, SCOSSL_FAILURE on error, or taglen on successful query of
 // EVP_CTRL_AEAD_TLS1_AAD.
-static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_gcm_ctx *cipherCtx = (struct cipher_gcm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -1150,7 +1150,7 @@ static int scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
 
 // Initializes ctx with the provided key and iv, along with enc/dec mode.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
+SCOSSL_STATUS e_scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
                              _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -1175,7 +1175,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const un
 
 // Encrypts or decrypts in, storing result in out, depending on mode set in ctx.
 // Returns length of out on success, or -1 on error.
-static SCOSSL_RETURNLENGTH scossl_aes_ccm_tls(_In_ const EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_ccm_ctx *cipherCtx, _Out_ unsigned char *out,
+static SCOSSL_RETURNLENGTH e_scossl_aes_ccm_tls(_In_ const EVP_CIPHER_CTX *ctx, _Inout_ struct cipher_ccm_ctx *cipherCtx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
@@ -1272,7 +1272,7 @@ cleanup:
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
 // return negative value on failure, and number of bytes written to out on success (may be 0)
-SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
+SCOSSL_RETURNLENGTH e_scossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out,
                                _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     int ret = -1;
@@ -1283,7 +1283,7 @@ SCOSSL_RETURNLENGTH scossl_aes_ccm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ uns
 
     if( cipherCtx->tlsAadSet )
     {
-        return scossl_aes_ccm_tls(ctx, cipherCtx, out, in, inl);
+        return e_scossl_aes_ccm_tls(ctx, cipherCtx, out, in, inl);
     }
 
     // See SCOSSL_CCM_STAGE definition above - callers to CCM must use the API in a very particular way
@@ -1398,7 +1398,7 @@ cleanup:
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, SCOSSL_FAILURE on error, or taglen on successful query of
 // EVP_CTRL_AEAD_TLS1_AAD.
-static int scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static int e_scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_ccm_ctx *cipherCtx = (struct cipher_ccm_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
