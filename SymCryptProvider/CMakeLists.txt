@@ -17,8 +17,9 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
-    ./src/p_scossl_base.c
     ./src/p_scossl_digests.c
+    ./src/p_scossl_rand.c
+    ./src/p_scossl_base.c
 )
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})

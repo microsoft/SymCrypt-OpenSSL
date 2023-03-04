@@ -60,9 +60,9 @@ extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
 extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
 
 static const OSSL_ALGORITHM p_scossl_cipher[] = {
-    // ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", p_scossl_aes128cbc_functions),
-    // ALG("AES-192-CBC:AES192:2.16.840.1.101.3.4.1.22", p_scossl_aes192cbc_functions),
-    // ALG("AES-256-CBC:AES256:2.16.840.1.101.3.4.1.42", p_scossl_aes256cbc_functions),
+    ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", p_scossl_aes128cbc_functions),
+    ALG("AES-192-CBC:AES192:2.16.840.1.101.3.4.1.22", p_scossl_aes192cbc_functions),
+    ALG("AES-256-CBC:AES256:2.16.840.1.101.3.4.1.42", p_scossl_aes256cbc_functions),
     // ALG("AES-128-ECB:2.16.840.1.101.3.4.1.1", p_scossl_aes128ecb_functions),
     // ALG("AES-192-ECB:2.16.840.1.101.3.4.1.21", p_scossl_aes192ecb_functions),
     // ALG("AES-256-ECB:2.16.840.1.101.3.4.1.41", p_scossl_aes256ecb_functions),
@@ -101,7 +101,7 @@ static const OSSL_ALGORITHM p_scossl_kdf[] = {
 extern const OSSL_DISPATCH p_scossl_rand_functions[];
 
 static const OSSL_ALGORITHM p_scossl_rand[] = {
-    // ALG("CTR-DRBG", p_scossl_rand_functions),
+    ALG("CTR-DRBG", p_scossl_rand_functions),
     ALG_TABLE_END
 };
 
