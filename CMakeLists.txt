@@ -5,7 +5,18 @@ project(SymCrypt-OpenSSL
     DESCRIPTION "The SymCrypt engine for OpenSSL (SCOSSL)"
     HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
-include_directories(${SYMCRYPT_ROOT_DIR}/inc)
+if (SYMCRYPT_ROOT_DIR)
+    include_directories(${SYMCRYPT_ROOT_DIR}/inc)
+else()
+    find_package(PkgConfig)
+    if (PKG_CONFIG_FOUND)
+	    pkg_check_modules(SYMCRYPT REQUIRED symcrypt)
+	    message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
+	    include_directories(${SYMCRYPT_INCLUDE_DIRS})
+    else()
+	    message(FATAL_ERROR "Provide symcrypt pkg-config or set SYMCRYPT_ROOT_DIR variable")
+    endif()
+endif (SYMCRYPT_ROOT_DIR)
 
 # In Sanitize version, enable sanitizers
 if (CMAKE_BUILD_TYPE MATCHES Sanitize)
