@@ -2,13 +2,14 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl.h"
+#include "e_scossl.h"
+#include <openssl/rand.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-EVP_KDF_CTX* e_scossl_EVP_KDF_CTX_new_id(int id);
+RAND_METHOD *e_scossl_rand_method(void);
 
 #ifdef __cplusplus
 }

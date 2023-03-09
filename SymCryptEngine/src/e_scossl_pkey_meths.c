@@ -2,11 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_pkey_meths.h"
-#include "scossl_hkdf.h"
-#include "scossl_tls1prf.h"
-#include "scossl_rsapss.h"
-#include "scossl_hmac.h"
+#include "e_scossl_pkey_meths.h"
+#include "e_scossl_hkdf.h"
+#include "e_scossl_tls1prf.h"
+#include "e_scossl_rsapss.h"
+#include "e_scossl_hmac.h"
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 

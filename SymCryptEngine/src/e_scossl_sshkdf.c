@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_sshkdf.h"
+#include "e_scossl_sshkdf.h"
 #include <openssl/kdf.h>
 
 // EVP_KDF_IMPL and EVP_KDF_METHOD

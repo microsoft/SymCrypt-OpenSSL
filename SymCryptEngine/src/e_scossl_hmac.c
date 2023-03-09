@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_hmac.h"
+#include "e_scossl_hmac.h"
 #include <openssl/hmac.h>
 #include <openssl/kdf.h>
 

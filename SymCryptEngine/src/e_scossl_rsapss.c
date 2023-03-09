@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_rsa.h"
+#include "e_scossl_rsa.h"
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
 

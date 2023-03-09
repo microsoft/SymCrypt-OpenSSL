@@ -2,15 +2,15 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl.h"
-#include "scossl_ecc.h"
-#include "scossl_rsa.h"
-#include "scossl_dsa.h"
-#include "scossl_dh.h"
-#include "scossl_digests.h"
-#include "scossl_ciphers.h"
-#include "scossl_pkey_meths.h"
-#include "scossl_rand.h"
+#include "e_scossl.h"
+#include "e_scossl_ecc.h"
+#include "e_scossl_rsa.h"
+#include "e_scossl_dsa.h"
+#include "e_scossl_dh.h"
+#include "e_scossl_digests.h"
+#include "e_scossl_ciphers.h"
+#include "e_scossl_pkey_meths.h"
+#include "e_scossl_rand.h"
 
 #ifdef __cplusplus
 extern "C" {

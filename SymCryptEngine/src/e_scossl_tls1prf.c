@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_tls1prf.h"
+#include "e_scossl_tls1prf.h"
 #include <openssl/kdf.h>
 
 #ifdef __cplusplus

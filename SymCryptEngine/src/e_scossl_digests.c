@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_digests.h"
+#include "e_scossl_digests.h"
 
 #ifdef __cplusplus
 extern "C" {

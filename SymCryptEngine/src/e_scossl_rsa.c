@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_rsa.h"
+#include "e_scossl_rsa.h"
 
 #ifdef __cplusplus
 extern "C" {

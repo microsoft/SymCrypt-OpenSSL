@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_rand.h"
+#include "e_scossl_rand.h"
 
 #ifdef __cplusplus
 extern "C" {

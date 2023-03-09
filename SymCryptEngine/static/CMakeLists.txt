@@ -13,19 +13,19 @@ find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
 set(SCOSSL_SOURCES
-    ../src/scossl.c
-    ../src/scossl_ciphers.c
-    ../src/scossl_dh.c
-    ../src/scossl_digests.c
-    ../src/scossl_dsa.c
-    ../src/scossl_ecc.c
-    ../src/scossl_pkey_meths.c
-    ../src/scossl_rand.c
-    ../src/scossl_rsa.c
-    ../src/scossl_rsapss.c
-    ../src/scossl_hkdf.c
-    ../src/scossl_tls1prf.c
-    ../src/scossl_hmac.c
+    ../src/e_scossl.c
+    ../src/e_scossl_ciphers.c
+    ../src/e_scossl_dh.c
+    ../src/e_scossl_digests.c
+    ../src/e_scossl_dsa.c
+    ../src/e_scossl_ecc.c
+    ../src/e_scossl_pkey_meths.c
+    ../src/e_scossl_rand.c
+    ../src/e_scossl_rsa.c
+    ../src/e_scossl_rsapss.c
+    ../src/e_scossl_hkdf.c
+    ../src/e_scossl_tls1prf.c
+    ../src/e_scossl_hmac.c
 )
 
 if (SCOSSL_SSHKDF)
