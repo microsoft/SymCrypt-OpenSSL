@@ -59,7 +59,6 @@ SCOSSL_STATUS p_scossl_aes_init_internal(SCOSSL_AES_CTX *ctx,
         SYMCRYPT_ERROR scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                                       "SymCryptAesExpandKey failed", scError);
             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -88,8 +87,6 @@ SCOSSL_STATUS p_scossl_aes_encrypt_init(SCOSSL_AES_CTX *ctx,
                                         const OSSL_PARAM params[])
 {
     ctx->encrypt = 1;
-    
-
     return p_scossl_aes_init_internal(ctx, key, keylen, iv, ivlen, params);
 }
 
@@ -99,8 +96,6 @@ SCOSSL_STATUS p_scossl_aes_decrypt_init(SCOSSL_AES_CTX *ctx,
                                         const OSSL_PARAM params[])
 {
     ctx->encrypt = 0;
-    
-
     return p_scossl_aes_init_internal(ctx, key, keylen, iv, ivlen, params);
 }
 
@@ -293,19 +288,24 @@ const OSSL_PARAM *p_scossl_cipher_settable_ctx_params(void *cctx, void *provctx)
     return p_scossl_cipher_settable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_cipher_get_params(_Inout_ OSSL_PARAM params[], unsigned int mode, size_t keylen, size_t ivlen, unsigned int flags)
+SCOSSL_STATUS p_scossl_cipher_get_params(_Inout_ OSSL_PARAM params[],
+                                         unsigned int mode,
+                                         size_t keylen,
+                                         size_t ivlen,
+                                         size_t block_size,
+                                         unsigned int flags)
 {
-    
+
     OSSL_PARAM *p = NULL;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
+    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_MODE);
     if (p != NULL && !OSSL_PARAM_set_uint(p, mode))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, keylen << 3))
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
@@ -317,7 +317,7 @@ SCOSSL_STATUS p_scossl_cipher_get_params(_Inout_ OSSL_PARAM params[], unsigned i
         return 0;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_BLOCK_SIZE);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SYMCRYPT_AES_BLOCK_SIZE))
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, block_size))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return 0;
@@ -395,7 +395,7 @@ SCOSSL_STATUS p_scossl_aes_set_ctx_params(SCOSSL_AES_CTX *ctx, const OSSL_PARAM 
 
 static SCOSSL_STATUS scossl_aes_cbc_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key,
                                            _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
-                                           int encrypt,
+                                           BOOL encrypt,
                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
@@ -418,11 +418,11 @@ static SCOSSL_STATUS scossl_aes_cbc_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key,
 
 static SCOSSL_STATUS scossl_aes_ecb_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key,
                                            _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
-                                           int encrypt,
+                                           BOOL encrypt,
                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    
+
     if (outl != NULL)
     {
         *outl = inl;
@@ -447,10 +447,6 @@ IMPLEMENT_SCOSSL_AES_CIPHER_FUNCTIONS(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER_FUNCTIONS(128, 0, ecb, ECB, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER_FUNCTIONS(192, 0, ecb, ECB, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER_FUNCTIONS(256, 0, ecb, ECB, 0)
-
-// extern const OSSL_DISPATCH p_scossl_aes128gcm_functions[]; IMPLEMENT_aead_cipher, static IV length
-// extern const OSSL_DISPATCH p_scossl_aes192gcm_functions[]; IMPLEMENT_aead_cipher, static IV length
-// extern const OSSL_DISPATCH p_scossl_aes256gcm_functions[]; IMPLEMENT_aead_cipher, static IV length
 
 // extern const OSSL_DISPATCH p_scossl_aes128ccm_functions[]; IMPLEMENT_aead_cipher, settable IV
 // extern const OSSL_DISPATCH p_scossl_aes192ccm_functions[]; IMPLEMENT_aead_cipher, settable IV

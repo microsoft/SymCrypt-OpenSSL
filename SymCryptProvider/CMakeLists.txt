@@ -18,6 +18,7 @@ find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
     ./src/p_scossl_digests.c
+    ./src/p_scossl_aead_ciphers.c
     ./src/p_scossl_ciphers.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_base.c
