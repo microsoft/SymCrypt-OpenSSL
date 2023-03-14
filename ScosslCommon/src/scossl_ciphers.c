@@ -1,6 +1,6 @@
 #include "scossl_ciphers.h"
 
-void scossl_cipher_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, _In_opt_ const unsigned char *iv)
+void scossl_aes_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, _In_opt_ const unsigned char *iv)
 {
     ctx->keylen = keylen;
     ctx->ivlen = SCOSSL_GCM_IV_LENGTH;
@@ -15,7 +15,7 @@ void scossl_cipher_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keyle
     ctx->useInvocation = 0;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_init_key(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
                                          _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                          _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
 {
@@ -27,7 +27,7 @@ SCOSSL_STATUS scossl_cipher_gcm_init_key(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
         if (ivlen != SCOSSL_GCM_IV_LENGTH)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "SymCrypt OpenSSL only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
+                             "SymCrypt for OpenSSL only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         ctx->ivlen = ivlen;
@@ -90,7 +90,7 @@ static SCOSSL_STATUS scossl_aes_gcm_tls(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL
     {
         // First 8B of ESP payload data are the variable part of the IV (last 8B)
         // Generate it using the IV invocation field to ensure distinct IVs are used
-        if (scossl_cipher_gcm_iv_gen(ctx, out, EVP_GCM_TLS_EXPLICIT_IV_LEN) != SCOSSL_SUCCESS)
+        if (scossl_aes_gcm_iv_gen(ctx, out, EVP_GCM_TLS_EXPLICIT_IV_LEN) != SCOSSL_SUCCESS)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_INTERNAL_ERROR,
                              "AES-GCM TLS failed to generate IV");
@@ -197,7 +197,7 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL enc
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_get_aead_tag(_In_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(_In_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
                                              _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
@@ -209,7 +209,7 @@ SCOSSL_STATUS scossl_cipher_gcm_get_aead_tag(_In_ SCOSSL_CIPHER_GCM_CTX *ctx, BO
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
                                              _In_ unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
@@ -223,7 +223,7 @@ SCOSSL_STATUS scossl_cipher_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+SCOSSL_STATUS scossl_aes_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
                                        _Out_writes_bytes_(outsize) unsigned char *out, size_t outsize)
 {
     if (ctx->useInvocation == 0)
@@ -244,7 +244,7 @@ SCOSSL_STATUS scossl_cipher_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
                                              _In_ unsigned char *iv, size_t ivlen)
 {
     if (ctx->ivlen != EVP_GCM_TLS_IV_LEN)
@@ -268,7 +268,7 @@ SCOSSL_STATUS scossl_cipher_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
                          "set_iv_fixed incorrect length");
         return SCOSSL_FAILURE;
     }
-    // Set first up to 4B of IV to iv value
+    // Set first up to 4B of IV
     memcpy(ctx->iv, iv, ivlen);
     // If encrypting, randomly set the invocation field
     if (encrypt &&
@@ -283,7 +283,7 @@ SCOSSL_STATUS scossl_cipher_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS scossl_cipher_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
                                            _In_ unsigned char *iv, size_t ivlen)
 {
     if (ctx->useInvocation == 0 ||
@@ -300,7 +300,7 @@ SCOSSL_STATUS scossl_cipher_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, B
     return SCOSSL_SUCCESS;
 }
 
-UINT16 scossl_cipher_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
                                       _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
 {
     UINT16 tls_buffer_len = 0;
@@ -337,4 +337,379 @@ UINT16 scossl_cipher_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL e
     SYMCRYPT_STORE_MSBFIRST16(ctx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
 
     return EVP_GCM_TLS_TAG_LEN; // <-- Special case return
+}
+
+void scossl_aes_ccm_init_ctx(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                size_t keylen,
+                                _In_opt_ const unsigned char *iv)
+{
+    ctx->keylen = keylen;
+    ctx->ivlen = SCOSSL_CCM_MIN_IV_LENGTH;
+    if (iv)
+    {
+        memcpy(ctx->iv, iv, ctx->ivlen);
+    }
+    ctx->taglen = SCOSSL_CCM_MAX_TAG_LENGTH;
+    ctx->tlsAadSet = 0;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                         _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    ctx->ccmStage = SCOSSL_CCM_STAGE_INIT;
+    ctx->cbData = 0;
+    if (iv)
+    {
+        if( !scossl_aes_ccm_set_iv_len(ctx, ivlen) )
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->ivlen = ivlen;
+        memcpy(ctx->iv, iv, ctx->ivlen);
+    }
+    if (key)
+    {
+        scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            return SCOSSL_FAILURE;
+        }
+        ctx->keylen = keylen;
+    }
+    return SCOSSL_SUCCESS;
+}
+
+static SCOSSL_STATUS scossl_aes_ccm_tls(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                        _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
+                                        _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PBYTE pbPayload = NULL;
+    SIZE_T cbPayload = 0;
+
+    // For TLS we only support in-place en/decryption of an ESP taking the form:
+    // IV (8B) || Ciphertext (variable) || ICV (Auth Tag) (8 or 16B)
+
+    // When encrypting, the space for the IV and ICV should be provided by the caller with the
+    // plaintext starting 8B from the start of the buffer and ending 8 or 16B from the end
+    if (in != out)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "AES-CCM TLS does not support out-of-place operation");
+        goto cleanup;
+    }
+    if (inl < (SIZE_T)EVP_CCM_TLS_EXPLICIT_IV_LEN + ctx->taglen)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "AES-CCM TLS buffer too small");
+        goto cleanup;
+    }
+    if (ctx->ccmStage != SCOSSL_CCM_STAGE_INIT)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "AES-CCM TLS operation cannot be multi-stage");
+        goto cleanup;
+    }
+    if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "AES-CCM TLS operation with incorrect IV length");
+        goto cleanup;
+    }
+    if (ctx->taglen != EVP_CCM_TLS_TAG_LEN && ctx->taglen != EVP_CCM8_TLS_TAG_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "AES-CCM TLS operation with incorrect tag length");
+        goto cleanup;
+    }
+
+    pbPayload = out + EVP_CCM_TLS_EXPLICIT_IV_LEN;
+    cbPayload = inl - (EVP_CCM_TLS_EXPLICIT_IV_LEN + ctx->taglen);
+
+    if (encrypt)
+    {
+        // First 8B of ESP payload data are the variable part of the IV (last 8B)
+        // Copy it from the context
+        memcpy(out, ctx->iv + ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, EVP_CCM_TLS_EXPLICIT_IV_LEN);
+
+        // Encrypt payload
+        SymCryptCcmEncrypt(
+            SymCryptAesBlockCipher,
+            &ctx->key,
+            ctx->iv, ctx->ivlen,
+            ctx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload + cbPayload, ctx->taglen);
+
+        *outl = inl;
+    }
+    else
+    {
+        // First 8B of ESP payload data are the variable part of the IV (last 8B)
+        // Copy it to the context
+        memcpy(ctx->iv + ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, out, EVP_CCM_TLS_EXPLICIT_IV_LEN);
+
+        // Check ICV
+        scError = SymCryptCcmDecrypt(
+            SymCryptAesBlockCipher,
+            &ctx->key,
+            ctx->iv, ctx->ivlen,
+            ctx->tlsAad, EVP_AEAD_TLS1_AAD_LEN,
+            pbPayload, pbPayload, cbPayload,
+            pbPayload + cbPayload, ctx->taglen);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            goto cleanup;
+        }
+
+        *outl = cbPayload;
+    }
+
+    return SCOSSL_SUCCESS;
+cleanup:
+    OPENSSL_cleanse(out, inl);
+    return SCOSSL_FAILURE;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                    _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
+                                    _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    PCBYTE pbAuthData = NULL;
+    SIZE_T cbAuthdata = 0;
+
+    if (ctx->tlsAadSet)
+    {
+        return scossl_aes_ccm_tls(ctx, encrypt, out, outl, in, inl);
+    }
+
+    // See SCOSSL_CCM_STAGE definition above - callers to CCM must use the API in a very particular way
+    if (ctx->ccmStage == SCOSSL_CCM_STAGE_COMPLETE)
+    {
+        if (in == NULL)
+        {
+            if (out != NULL)
+            {
+                // Expected redundant Finalize call - allow context to be reused but do nothing else
+                ctx->ccmStage = SCOSSL_CCM_STAGE_INIT;
+            }
+            else
+            {
+                // Special case for openssl speed encrypt loop - set cbData
+                ctx->cbData = inl;
+                ctx->ccmStage = SCOSSL_CCM_STAGE_SET_CBDATA;
+            }
+            *outl = 0;
+            return SCOSSL_SUCCESS;
+        }
+        else
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
+                             "Data provided to CCM after CCM operation is complete");
+            return SCOSSL_FAILURE;
+        }
+    }
+    else if (ctx->ccmStage == SCOSSL_CCM_STAGE_INIT)
+    {
+        if (in != NULL && out == NULL)
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
+                             "AAD provided to CCM before cbData has been set");
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->cbData = inl;
+        ctx->ccmStage = SCOSSL_CCM_STAGE_SET_CBDATA;
+
+        if (in == NULL)
+        {
+            // Setting cbData for following call which may provide AAD
+            *outl = 0;
+            return SCOSSL_SUCCESS;
+        }
+        // otherwise continue so we can perform the en/decryption with no AAD
+    }
+
+    if (ctx->ccmStage == SCOSSL_CCM_STAGE_SET_CBDATA)
+    {
+        if (out == NULL)
+        {
+            // Auth Data Passed in
+            pbAuthData = in;
+            cbAuthdata = inl;
+        }
+
+        SymCryptCcmInit(
+            &ctx->state,
+            SymCryptAesBlockCipher,
+            &ctx->key,
+            ctx->iv, ctx->ivlen,
+            pbAuthData, cbAuthdata,
+            ctx->cbData,
+            ctx->taglen);
+        ctx->ccmStage = SCOSSL_CCM_STAGE_SET_AAD;
+
+        if (out == NULL)
+        {
+            // Auth Data Passed in
+            *outl = 0;
+            return SCOSSL_SUCCESS;
+        }
+    }
+
+    if (ctx->ccmStage == SCOSSL_CCM_STAGE_SET_AAD)
+    {
+        if (encrypt)
+        {
+            // Encryption
+            if (in != NULL)
+            {
+                SymCryptCcmEncryptPart(&ctx->state, in, out, inl);
+            }
+            SymCryptCcmEncryptFinal(&ctx->state, ctx->tag, ctx->taglen);
+            ctx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
+        }
+        else
+        {
+            // Decryption
+            if (in != NULL)
+            {
+                SymCryptCcmDecryptPart(&ctx->state, in, out, inl);
+            }
+            scError = SymCryptCcmDecryptFinal(&ctx->state, ctx->tag, ctx->taglen);
+            ctx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+        *outl = inl;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                             _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
+{
+    if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
+        taglen > ctx->taglen || !encrypt)
+    {
+        return SCOSSL_FAILURE;
+    }
+    memcpy(tag, ctx->tag, taglen);
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                             _In_reads_bytes_(taglen) unsigned char *tag, size_t taglen)
+{
+    if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
+        (encrypt && tag != NULL))
+    {
+        return SCOSSL_FAILURE;
+    }
+    if (tag != NULL)
+    {
+        memcpy(ctx->tag, tag, taglen);
+    }
+    ctx->taglen = taglen;
+
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_set_iv_len(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen)
+{
+    if( ivlen < SCOSSL_CCM_MIN_IV_LENGTH || ivlen > SCOSSL_CCM_MAX_IV_LENGTH )
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+            "SymCrypt for OpenSSL only supports [%d-%d] byte IVs for AES-CCM",
+            SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
+        return SCOSSL_FAILURE;
+    }
+
+    ctx->ivlen = ivlen;
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                             _In_ unsigned char *iv, size_t ivlen)
+{
+    if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "set_iv_fixed only works with TLS IV length");
+        return SCOSSL_FAILURE;
+    }
+    if (ivlen == (size_t)-1)
+    {
+        memcpy(ctx->iv, iv, ctx->ivlen);
+        return SCOSSL_SUCCESS;
+    }
+    if (ivlen != ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "set_iv_fixed incorrect length");
+        return SCOSSL_FAILURE;
+    }
+    // Set first 4B of IV
+    memcpy(ctx->iv, iv, ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN);
+    // If encrypting, randomly set the last 8B of IV
+    if (encrypt &&
+        (RAND_bytes(ctx->iv + ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN, EVP_CCM_TLS_EXPLICIT_IV_LEN) <= 0))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+UINT16 scossl_aes_ccm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                      _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
+{
+    UINT16 tls_buffer_len = 0;
+    UINT16 min_tls_buffer_len = 0;
+    if (aadlen != EVP_AEAD_TLS1_AAD_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "tls1_aad only works with TLS1 AAD length");
+        return SCOSSL_FAILURE;
+    }
+    if (ctx->taglen != EVP_CCM_TLS_TAG_LEN && ctx->taglen != EVP_CCM8_TLS_TAG_LEN)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "Invalid taglen for TLS");
+        return SCOSSL_FAILURE;
+    }
+    memcpy(ctx->tlsAad, aad, EVP_AEAD_TLS1_AAD_LEN);
+    ctx->tlsAadSet = 1;
+
+    if (encrypt)
+    {
+        // Provided AAD contains len of plaintext + IV (8B)
+        min_tls_buffer_len = EVP_CCM_TLS_EXPLICIT_IV_LEN;
+    }
+    else
+    {
+        // Provided AAD contains len of ciphertext + IV (8B) + ICV (16B)
+        min_tls_buffer_len = EVP_CCM_TLS_EXPLICIT_IV_LEN + ctx->taglen;
+    }
+
+    tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(ctx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
+    if (tls_buffer_len < min_tls_buffer_len)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "tls_buffer_len too short");
+        return SCOSSL_FAILURE;
+    }
+    tls_buffer_len -= min_tls_buffer_len;
+    SYMCRYPT_STORE_MSBFIRST16(ctx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2, tls_buffer_len);
+
+    return ctx->taglen;
 }
