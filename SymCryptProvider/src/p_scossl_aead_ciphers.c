@@ -1,12 +1,23 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/core_dispatch.h>
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
-#include "scossl_ciphers.h"
+#include "scossl_aead_ciphers.h"
 #include "p_scossl_ciphers.h"
 #include "p_scossl_aead_ciphers.h"
 
-SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(SCOSSL_CIPHER_GCM_CTX *ctx)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+ * AES-GCM Implementation
+ */
+SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
     SCOSSL_CIPHER_GCM_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_GCM_CTX));
     if (copy_ctx != NULL)
@@ -22,51 +33,47 @@ SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(SCOSSL_CIPHER_GCM_CTX *ctx)
     return copy_ctx;
 }
 
-void p_scossl_aes_gcm_freectx(SCOSSL_CIPHER_GCM_CTX *ctx)
+void p_scossl_aes_gcm_freectx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_GCM_CTX));
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                                    const unsigned char *key, size_t keylen,
-                                                    const unsigned char *iv, size_t ivlen,
-                                                    const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+                                                    _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                    _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                    _In_ const OSSL_PARAM params[])
 {
     ctx->encrypt = encrypt;
 
-    if (!scossl_aes_gcm_init_key(ctx, key, keylen, iv, ivlen))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return p_scossl_aes_gcm_set_ctx_params(ctx, params);
+    return scossl_aes_gcm_init_key(ctx, key, keylen, iv, ivlen) &&
+           p_scossl_aes_gcm_set_ctx_params(ctx, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_encrypt_init(SCOSSL_CIPHER_GCM_CTX *ctx,
-                                                   const unsigned char *key, size_t keylen,
-                                                   const unsigned char *iv, size_t ivlen,
-                                                   const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_gcm_encrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+                                                   _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                   _In_reads_bytes_opt_(keylen) const unsigned char *iv, size_t ivlen,
+                                                   _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_gcm_init_internal(ctx, 1, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(SCOSSL_CIPHER_GCM_CTX *ctx,
-                                                   const unsigned char *key, size_t keylen,
-                                                   const unsigned char *iv, size_t ivlen,
-                                                   const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+                                                   _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                   _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                   _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_gcm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_final(SCOSSL_CIPHER_GCM_CTX *ctx,
-                                            unsigned char *out, size_t *outl, size_t outsize)
+static SCOSSL_STATUS p_scossl_aes_gcm_final(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+                                            _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
 {
     return scossl_aes_gcm_cipher(ctx, ctx->encrypt, out, outl, NULL, 0);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx,
-                                             unsigned char *out, size_t *outl, size_t outsize,
-                                             const unsigned char *in, size_t inl)
+static SCOSSL_STATUS p_scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
+                                             _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     if (outsize < inl)
     {
@@ -81,12 +88,13 @@ const OSSL_PARAM *p_scossl_aes_gcm_gettable_ctx_params(void *cctx, void *provctx
 {
     return p_scossl_aes_gcm_gettable_ctx_param_types;
 }
+
 const OSSL_PARAM *p_scossl_aes_gcm_settable_ctx_params(void *cctx, void *provctx)
 {
     return p_scossl_aes_gcm_settable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(SCOSSL_CIPHER_GCM_CTX *ctx, OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p = NULL;
 
@@ -166,7 +174,7 @@ SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(SCOSSL_CIPHER_GCM_CTX *ctx, OSSL_P
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(SCOSSL_CIPHER_GCM_CTX *ctx, const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p = NULL;
 
@@ -234,8 +242,10 @@ SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(SCOSSL_CIPHER_GCM_CTX *ctx, const 
     return SCOSSL_SUCCESS;
 }
 
-
-SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(SCOSSL_CIPHER_CCM_CTX *ctx)
+/*
+ * AES-CCM Implementation
+ */
+SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX *ctx)
 {
     SCOSSL_CIPHER_CCM_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_CCM_CTX));
     if (copy_ctx != NULL)
@@ -249,15 +259,15 @@ SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(SCOSSL_CIPHER_CCM_CTX *ctx)
     return copy_ctx;
 }
 
-void p_scossl_aes_ccm_freectx(SCOSSL_CIPHER_CCM_CTX *ctx)
+void p_scossl_aes_ccm_freectx(_Inout_  SCOSSL_CIPHER_CCM_CTX *ctx)
 {
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_CCM_CTX));
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
-                                                    const unsigned char *key, size_t keylen,
-                                                    const unsigned char *iv, size_t ivlen,
-                                                    const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+                                                    _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                    _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                    _In_ const OSSL_PARAM params[])
 {
     ctx->encrypt = encrypt;
 
@@ -269,31 +279,31 @@ static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(SCOSSL_CIPHER_CCM_CTX *ctx, 
     return p_scossl_aes_ccm_set_ctx_params(ctx, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_encrypt_init(SCOSSL_CIPHER_CCM_CTX *ctx,
-                                                   const unsigned char *key, size_t keylen,
-                                                   const unsigned char *iv, size_t ivlen,
-                                                   const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_ccm_encrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                                   _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                   _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                   _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_ccm_init_internal(ctx, 1, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(SCOSSL_CIPHER_CCM_CTX *ctx,
-                                                   const unsigned char *key, size_t keylen,
-                                                   const unsigned char *iv, size_t ivlen,
-                                                   const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                                   _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                   _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                   _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_ccm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_final(SCOSSL_CIPHER_CCM_CTX *ctx,
-                                            unsigned char *out, size_t *outl, size_t outsize)
+static SCOSSL_STATUS p_scossl_aes_ccm_final(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                            _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
 {
     return scossl_aes_ccm_cipher(ctx, ctx->encrypt, out, outl, NULL, 0);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx,
-                                             unsigned char *out, size_t *outl, size_t outsize,
-                                             const unsigned char *in, size_t inl)
+static SCOSSL_STATUS p_scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
+                                             _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     if (outsize < inl)
     {
@@ -308,12 +318,13 @@ const OSSL_PARAM *p_scossl_aes_ccm_gettable_ctx_params(void *cctx, void *provctx
 {
     return p_scossl_aes_ccm_gettable_ctx_param_types;
 }
+
 const OSSL_PARAM *p_scossl_aes_ccm_settable_ctx_params(void *cctx, void *provctx)
 {
     return p_scossl_aes_ccm_settable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(SCOSSL_CIPHER_CCM_CTX *ctx, OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p = NULL;
 
@@ -384,7 +395,7 @@ SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(SCOSSL_CIPHER_CCM_CTX *ctx, OSSL_P
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(SCOSSL_CIPHER_CCM_CTX *ctx, const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p = NULL;
     p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
@@ -453,10 +464,14 @@ SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(SCOSSL_CIPHER_CCM_CTX *ctx, const 
     return SCOSSL_SUCCESS;
 }
 
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(128, SCOSSL_GCM_IV_LENGTH, gcm, GCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(192, SCOSSL_GCM_IV_LENGTH, gcm, GCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(256, SCOSSL_GCM_IV_LENGTH, gcm, GCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(128, SCOSSL_GCM_IV_LENGTH, gcm, GCM)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(192, SCOSSL_GCM_IV_LENGTH, gcm, GCM)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(256, SCOSSL_GCM_IV_LENGTH, gcm, GCM)
 
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(128, SCOSSL_CCM_MAX_IV_LENGTH, ccm, CCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(192, SCOSSL_CCM_MAX_IV_LENGTH, ccm, CCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
-IMPLEMENT_SCOSSL_AES_AEAD_FUNCTIONS(256, SCOSSL_CCM_MAX_IV_LENGTH, ccm, CCM, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(128, SCOSSL_CCM_MIN_IV_LENGTH, ccm, CCM)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(192, SCOSSL_CCM_MIN_IV_LENGTH, ccm, CCM)
+IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(256, SCOSSL_CCM_MIN_IV_LENGTH, ccm, CCM)
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,16 @@
-#include "scossl_ciphers.h"
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
 
+#include "scossl_aead_ciphers.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+ * AES-GCM Implementation
+ */
 void scossl_aes_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, _In_opt_ const unsigned char *iv)
 {
     ctx->keylen = keylen;
@@ -16,8 +27,8 @@ void scossl_aes_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, 
 }
 
 SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
-                                         _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
-                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
+                                      _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                      _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -198,7 +209,7 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL enc
 }
 
 SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(_In_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                             _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
+                                          _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
         taglen > ctx->taglen || encrypt)
@@ -210,7 +221,7 @@ SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(_In_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL 
 }
 
 SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                             _In_ unsigned char *tag, size_t taglen)
+                                          _In_ unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
         encrypt)
@@ -224,7 +235,7 @@ SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BO
 }
 
 SCOSSL_STATUS scossl_aes_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
-                                       _Out_writes_bytes_(outsize) unsigned char *out, size_t outsize)
+                                    _Out_writes_bytes_(outsize) unsigned char *out, size_t outsize)
 {
     if (ctx->useInvocation == 0)
     {
@@ -245,7 +256,7 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
 }
 
 SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                             _In_ unsigned char *iv, size_t ivlen)
+                                          _In_ unsigned char *iv, size_t ivlen)
 {
     if (ctx->ivlen != EVP_GCM_TLS_IV_LEN)
     {
@@ -284,7 +295,7 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BO
 }
 
 SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                           _In_ unsigned char *iv, size_t ivlen)
+                                        _In_ unsigned char *iv, size_t ivlen)
 {
     if (ctx->useInvocation == 0 ||
         encrypt ||
@@ -301,7 +312,7 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL
 }
 
 UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
-                                      _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
+                                   _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
 {
     UINT16 tls_buffer_len = 0;
     UINT16 min_tls_buffer_len = 0;
@@ -339,9 +350,12 @@ UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encr
     return EVP_GCM_TLS_TAG_LEN; // <-- Special case return
 }
 
+/*
+ * AES-CCM Implementation
+ */
 void scossl_aes_ccm_init_ctx(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
-                                size_t keylen,
-                                _In_opt_ const unsigned char *iv)
+                             size_t keylen,
+                             _In_opt_ const unsigned char *iv)
 {
     ctx->keylen = keylen;
     ctx->ivlen = SCOSSL_CCM_MIN_IV_LENGTH;
@@ -354,8 +368,8 @@ void scossl_aes_ccm_init_ctx(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
 }
 
 SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
-                                         _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
-                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
+                                      _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                      _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -363,7 +377,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
     ctx->cbData = 0;
     if (iv)
     {
-        if( !scossl_aes_ccm_set_iv_len(ctx, ivlen) )
+        if (!scossl_aes_ccm_set_iv_len(ctx, ivlen))
         {
             return SCOSSL_FAILURE;
         }
@@ -596,7 +610,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL enc
 }
 
 SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
-                                             _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
+                                          _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen)
 {
     if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
         taglen > ctx->taglen || !encrypt)
@@ -608,7 +622,7 @@ SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BO
 }
 
 SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
-                                             _In_reads_bytes_(taglen) unsigned char *tag, size_t taglen)
+                                          _In_reads_bytes_(taglen) unsigned char *tag, size_t taglen)
 {
     if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
         (encrypt && tag != NULL))
@@ -626,11 +640,11 @@ SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BO
 
 SCOSSL_STATUS scossl_aes_ccm_set_iv_len(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen)
 {
-    if( ivlen < SCOSSL_CCM_MIN_IV_LENGTH || ivlen > SCOSSL_CCM_MAX_IV_LENGTH )
+    if (ivlen < SCOSSL_CCM_MIN_IV_LENGTH || ivlen > SCOSSL_CCM_MAX_IV_LENGTH)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-            "SymCrypt for OpenSSL only supports [%d-%d] byte IVs for AES-CCM",
-            SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
+                         "SymCrypt for OpenSSL only supports [%d-%d] byte IVs for AES-CCM",
+                         SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
         return SCOSSL_FAILURE;
     }
 
@@ -639,7 +653,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_len(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, size
 }
 
 SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
-                                             _In_ unsigned char *iv, size_t ivlen)
+                                          _In_ unsigned char *iv, size_t ivlen)
 {
     if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
     {
@@ -671,7 +685,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BO
 }
 
 UINT16 scossl_aes_ccm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
-                                      _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
+                                   _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen)
 {
     UINT16 tls_buffer_len = 0;
     UINT16 min_tls_buffer_len = 0;
@@ -713,3 +727,7 @@ UINT16 scossl_aes_ccm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encr
 
     return ctx->taglen;
 }
+
+#ifdef __cplusplus
+}
+#endif
