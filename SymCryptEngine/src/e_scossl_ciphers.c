@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_aead_ciphers.h"
+#include "scossl_aes_aead.h"
 #include "e_scossl_ciphers.h"
 
 #ifdef __cplusplus

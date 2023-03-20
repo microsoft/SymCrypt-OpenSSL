@@ -2,13 +2,58 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_ciphers.h"
+#include "p_scossl_aes.h"
 
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static const OSSL_PARAM p_scossl_aes_generic_param_types[] = {
+    OSSL_PARAM_uint(OSSL_CIPHER_PARAM_MODE, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_IVLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_BLOCK_SIZE, NULL),
+    OSSL_PARAM_int(OSSL_CIPHER_PARAM_AEAD, NULL),
+    OSSL_PARAM_int(OSSL_CIPHER_PARAM_CUSTOM_IV, NULL),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_aes_generic_gettable_ctx_param_types[] = {
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_IVLEN, NULL),
+    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_aes_generic_settable_ctx_param_types[] = {
+    OSSL_PARAM_uint(OSSL_CIPHER_PARAM_PADDING, NULL),
+    OSSL_PARAM_END};
+
+typedef SCOSSL_STATUS(scossl_cipher_fn)(_In_ SYMCRYPT_AES_EXPANDED_KEY *key, BOOL encrypt,
+                                        _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
+                                        _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
+                                        _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+
+typedef struct
+{
+    SYMCRYPT_AES_EXPANDED_KEY key;
+    SIZE_T keylen;
+
+    BYTE iv[SYMCRYPT_AES_BLOCK_SIZE];
+    BYTE pbChainingValue[SYMCRYPT_AES_BLOCK_SIZE];
+    BOOL encrypt;
+    BOOL pad;
+
+    // Provider is responsible for buffering
+    // incomplete blocks in update calls
+    BYTE buf[SYMCRYPT_AES_BLOCK_SIZE];
+    SIZE_T cbBuf;
+
+    scossl_cipher_fn *cipher;
+} SCOSSL_AES_CTX;
+
+static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 // Populates remaining space in the buffer
 static size_t p_scossl_aes_generic_fill_buffer(_Inout_updates_bytes_(*cbBuf) unsigned char *buf, _Inout_ size_t *cbBuf,
@@ -42,12 +87,12 @@ static SCOSSL_STATUS p_scossl_aes_generic_buffer_trailing_data(_Inout_updates_by
     return SCOSSL_SUCCESS;
 }
 
-void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
+static void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
 {
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_AES_CTX));
 }
 
-SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
+static SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
 {
     SCOSSL_AES_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_AES_CTX));
     if (copy_ctx != NULL)
@@ -58,15 +103,20 @@ SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
     return copy_ctx;
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_init_internal(SCOSSL_AES_CTX *ctx, BOOL encrypt,
-                                                 const unsigned char *key, size_t keylen,
-                                                 const unsigned char *iv, size_t ivlen,
-                                                 const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *ctx, BOOL encrypt,
+                                                        _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
 {
     ctx->encrypt = encrypt;
 
     if (key != NULL)
     {
+        if (keylen != ctx->keylen)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            return SCOSSL_FAILURE;
+        }
         SYMCRYPT_ERROR scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -90,25 +140,25 @@ SCOSSL_STATUS p_scossl_aes_generic_init_internal(SCOSSL_AES_CTX *ctx, BOOL encry
     return p_scossl_aes_generic_set_ctx_params(ctx, params);
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_encrypt_init(SCOSSL_AES_CTX *ctx,
-                                                const unsigned char *key, size_t keylen,
-                                                const unsigned char *iv, size_t ivlen,
-                                                const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_generic_encrypt_init(_Inout_ SCOSSL_AES_CTX *ctx,
+                                                       _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                       _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                       _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_generic_init_internal(ctx, 1, key, keylen, iv, ivlen, params);
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(SCOSSL_AES_CTX *ctx,
-                                                const unsigned char *key, size_t keylen,
-                                                const unsigned char *iv, size_t ivlen,
-                                                const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *ctx,
+                                                       _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
+                                                       _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                       _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_generic_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_update(SCOSSL_AES_CTX *ctx,
-                                          unsigned char *out, size_t *outl, size_t outsize,
-                                          const unsigned char *in, size_t inl)
+static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
+                                                 _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                                 _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     size_t outl_int = 0;
     size_t cBlocksRemaining = 0;
@@ -176,8 +226,8 @@ SCOSSL_STATUS p_scossl_aes_generic_update(SCOSSL_AES_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_final(SCOSSL_AES_CTX *ctx,
-                                         unsigned char *out, size_t *outl, size_t outsize)
+static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
+                                                _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
 {
     if (ctx->encrypt)
     {
@@ -272,9 +322,9 @@ SCOSSL_STATUS p_scossl_aes_generic_final(SCOSSL_AES_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_cipher(SCOSSL_AES_CTX *ctx,
-                                          unsigned char *out, size_t *outl, size_t outsize,
-                                          const unsigned char *in, size_t inl)
+static SCOSSL_STATUS p_scossl_aes_generic_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
+                                                 _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                                 _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     return ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out, outl, in, inl);
 }
@@ -284,12 +334,12 @@ const OSSL_PARAM *p_scossl_aes_generic_gettable_params(void *provctx)
     return p_scossl_aes_generic_param_types;
 }
 
-const OSSL_PARAM *p_scossl_aes_generic_gettable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_generic_gettable_ctx_params(void *cctx, void *provctx)
 {
     return p_scossl_aes_generic_gettable_ctx_param_types;
 }
 
-const OSSL_PARAM *p_scossl_aes_generic_settable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_generic_settable_ctx_params(void *cctx, void *provctx)
 {
     return p_scossl_aes_generic_settable_ctx_param_types;
 }
@@ -343,7 +393,7 @@ SCOSSL_STATUS p_scossl_aes_generic_get_params(_Inout_ OSSL_PARAM params[],
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(SCOSSL_AES_CTX *ctx, OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(_In_ SCOSSL_AES_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p = NULL;
 
@@ -378,7 +428,7 @@ SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(SCOSSL_AES_CTX *ctx, OSSL_PARA
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(SCOSSL_AES_CTX *ctx, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p = NULL;
 
@@ -450,9 +500,6 @@ IMPLEMENT_SCOSSL_AES_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER(128, 0, ecb, ECB, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER(192, 0, ecb, ECB, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER(256, 0, ecb, ECB, 0)
-
-// extern const OSSL_DISPATCH p_scossl_aes256xts_functions[]; IMPLEMENT_cipher
-// extern const OSSL_DISPATCH p_scossl_aes128xts_functions[]; IMPLEMENT_cipher
 
 #ifdef __cplusplus
 }

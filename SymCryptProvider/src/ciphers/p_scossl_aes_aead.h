@@ -11,42 +11,6 @@
 extern "C" {
 #endif
 
-static const OSSL_PARAM p_scossl_aes_gcm_gettable_ctx_param_types[] = {
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_IVLEN, NULL),
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TAGLEN, NULL),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN, NULL, 0),
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_aes_gcm_settable_ctx_param_types[] = {
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV, NULL, 0),
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_aes_ccm_gettable_ctx_param_types[] = {
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_IVLEN, NULL),
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TAGLEN, NULL),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_aes_ccm_settable_ctx_param_types[] = {
-    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_IVLEN, NULL),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED, NULL, 0),
-    OSSL_PARAM_END};
-
-SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ const OSSL_PARAM params[]);
-SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ const OSSL_PARAM params[]);
-
 #define IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(kbits, ivlen, lcmode, UCMODE)                                       \
     SCOSSL_CIPHER_##UCMODE##_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                 \
     {                                                                                                        \

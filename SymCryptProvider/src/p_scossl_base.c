@@ -56,8 +56,13 @@ extern const OSSL_DISPATCH p_scossl_aes256gcm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes128ccm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes192ccm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes256ccm_functions[];
-extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
-extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
+
+// Disabling XTS for now, also disabled in engine pending
+// the same dependencies.
+// Need to push the FIPS mode XTS flag into the SymCrypt API, 
+// and expose an XTS key copy method. Addi
+// extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
+// extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
 
 static const OSSL_ALGORITHM p_scossl_cipher[] = {
     ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", p_scossl_aes128cbc_functions),

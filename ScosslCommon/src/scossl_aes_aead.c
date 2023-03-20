@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_aead_ciphers.h"
+#include "scossl_aes_aead.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -387,6 +387,10 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
     }
     if (key)
     {
+        if (keylen != ctx->keylen)
+        {
+            return SCOSSL_FAILURE;
+        }
         scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
         {
