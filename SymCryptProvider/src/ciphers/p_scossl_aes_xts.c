@@ -7,6 +7,10 @@
 
 #include <openssl/proverr.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct
 {
     SYMCRYPT_XTS_AES_EXPANDED_KEY key;
@@ -186,13 +190,13 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
     if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_XTS_IV_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
     if (p != NULL &&
@@ -200,7 +204,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
         !OSSL_PARAM_set_octet_string(p, &ctx->iv, SCOSSL_XTS_IV_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
     if (p != NULL &&
@@ -208,7 +212,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
         !OSSL_PARAM_set_octet_string(p, &ctx->iv, SCOSSL_XTS_IV_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;
 }
@@ -222,3 +226,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
 
 IMPLEMENT_SCOSSL_AES_XTS_CIPHER(128)
 IMPLEMENT_SCOSSL_AES_XTS_CIPHER(256)
+
+#ifdef __cplusplus
+}
+#endif

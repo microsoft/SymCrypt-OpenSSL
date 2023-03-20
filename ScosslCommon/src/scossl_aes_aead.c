@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /*
- * AES-GCM Implementation
+ * AES-GCM Common Functions
  */
 void scossl_aes_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, _In_opt_ const unsigned char *iv)
 {
@@ -351,7 +351,7 @@ UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encr
 }
 
 /*
- * AES-CCM Implementation
+ * AES-CCM Common Functions
  */
 void scossl_aes_ccm_init_ctx(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
                              size_t keylen,

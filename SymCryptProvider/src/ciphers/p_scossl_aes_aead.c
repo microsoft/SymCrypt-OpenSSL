@@ -442,13 +442,13 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
         if (!OSSL_PARAM_get_size_t(p, &ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
+            return SCOSSL_FAILURE;
         }
 
         if (!scossl_aes_ccm_set_iv_len(ctx, ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
-            return 0;
+            return SCOSSL_FAILURE;
         }
     }
     p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);

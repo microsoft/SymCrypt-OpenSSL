@@ -7,6 +7,10 @@
 
 #include "scossl_helpers.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SCOSSL_XTS_IV_LENGTH 8
 
 #define IMPLEMENT_SCOSSL_AES_XTS_CIPHER(kbits)                                                        \
@@ -36,3 +40,7 @@
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_settable_ctx_params}, \
         {0, NULL}};
+
+#ifdef __cplusplus
+}
+#endif
