@@ -36,7 +36,6 @@ set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
 
 target_link_libraries(scossl_provider PRIVATE scossl_common)
 target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
-target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 # Install the engine to the OpenSSL modules directory
 # NB: this won't work if the distro has a custom modules directory that doesn't match
