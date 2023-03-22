@@ -489,7 +489,6 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-
 #define IMPLEMENT_SCOSSL_AES_CIPHER(kbits, ivlen, lcmode, UCMODE, flags)                                  \
     SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                            \
     {                                                                                                     \
@@ -525,7 +524,6 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_settable_ctx_params}, \
         {0, NULL}};
-
 
 IMPLEMENT_SCOSSL_AES_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
 IMPLEMENT_SCOSSL_AES_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)

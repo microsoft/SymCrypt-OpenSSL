@@ -241,7 +241,6 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
         {OSSL_FUNC_CIPHER_GET_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_get_ctx_params},           \
         {0, NULL}};
 
-
 IMPLEMENT_SCOSSL_AES_XTS_CIPHER(128)
 IMPLEMENT_SCOSSL_AES_XTS_CIPHER(256)
 
