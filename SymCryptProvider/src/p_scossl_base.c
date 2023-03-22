@@ -153,7 +153,7 @@ static int p_scossl_get_status()
     return scossl_prov_initialized;
 }
 
-static void p_scossl_teardown(_Inout_ PSCOSSL_PROVCTX provctx)
+static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
     OPENSSL_free(provctx);
 }
@@ -163,7 +163,7 @@ static const OSSL_PARAM *p_scossl_gettable_params(ossl_unused void *provctx)
     return p_scossl_param_types;
 }
 
-static int p_scossl_get_params(ossl_unused void *provctx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_get_params(ossl_unused void *provctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
@@ -171,28 +171,28 @@ static int p_scossl_get_params(ossl_unused void *provctx, _Inout_ OSSL_PARAM par
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_NAME))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_VERSION))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, P_SCOSSL_VERSION))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_STATUS);
     if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_get_status()))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx, int operation_id, _Out_ int *no_store)
@@ -236,7 +236,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    PSCOSSL_PROVCTX p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    SCOSSL_PROVCTX *p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
     if (p_ctx != NULL)
     {
         p_ctx->handle = handle;
