@@ -2,15 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_base.h"
-
-#include "scossl_helpers.h"
-
 #include <openssl/core_dispatch.h>
-#include <openssl/err.h>
 #include <openssl/proverr.h>
 
-#include <symcrypt.h>
+#include "scossl_helpers.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -2,10 +2,9 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/core_names.h>
 #include <openssl/core_dispatch.h>
+#include <openssl/core_names.h>
 #include <openssl/proverr.h>
-#include <openssl/types.h>
 
 #include "scossl_helpers.h"
 

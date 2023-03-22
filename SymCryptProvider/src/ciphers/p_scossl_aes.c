@@ -3,6 +3,7 @@
 //
 
 #include <openssl/core_dispatch.h>
+#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #include "scossl_helpers.h"
