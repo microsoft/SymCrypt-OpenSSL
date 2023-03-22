@@ -11,7 +11,7 @@ extern "C" {
 #define SCOSSL_FLAG_AEAD 0x01
 #define SCOSSL_FLAG_CUSTOM_IV 0x02
 
-const OSSL_PARAM *p_scossl_aes_generic_gettable_params(void *provctx);
+const OSSL_PARAM *p_scossl_aes_generic_gettable_params(ossl_unused void *provctx);
 SCOSSL_STATUS p_scossl_aes_generic_get_params(_Inout_ OSSL_PARAM params[],
                                               unsigned int mode,
                                               size_t keylen,

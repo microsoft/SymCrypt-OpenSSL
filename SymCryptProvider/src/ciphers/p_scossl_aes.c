@@ -32,11 +32,6 @@ static const OSSL_PARAM p_scossl_aes_generic_settable_ctx_param_types[] = {
     OSSL_PARAM_uint(OSSL_CIPHER_PARAM_PADDING, NULL),
     OSSL_PARAM_END};
 
-typedef SCOSSL_STATUS(scossl_cipher_fn)(_In_ SYMCRYPT_AES_EXPANDED_KEY *key, BOOL encrypt,
-                                        _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
-                                        _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
-                                        _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-
 typedef struct
 {
     SYMCRYPT_AES_EXPANDED_KEY key;
@@ -52,7 +47,7 @@ typedef struct
     BYTE buf[SYMCRYPT_AES_BLOCK_SIZE];
     SIZE_T cbBuf;
 
-    scossl_cipher_fn *cipher;
+    OSSL_FUNC_cipher_cipher_fn *cipher;
 } SCOSSL_AES_CTX;
 
 static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX *ctx, _In_ const OSSL_PARAM params[]);
@@ -175,13 +170,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
     // First encrypt the buffer if it is filled
     if (ctx->cbBuf == SYMCRYPT_AES_BLOCK_SIZE)
     {
-        if (outsize < SYMCRYPT_AES_BLOCK_SIZE)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-            return SCOSSL_FAILURE;
-        }
-
-        if (!ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out, NULL, ctx->buf, ctx->cbBuf))
+        if (!ctx->cipher(ctx, out, NULL, outsize, ctx->buf, ctx->cbBuf))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
             return SCOSSL_FAILURE;
@@ -198,13 +187,15 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
     if (cBlocksRemaining > 0)
     {
         outl_int += cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE;
+        // Need to verify outsize here is not smaller than the 
+        // result of the entire update operation
         if (outsize < outl_int)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
             return SCOSSL_FAILURE;
         }
 
-        if (!ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out, NULL, in, cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE))
+        if (!ctx->cipher(ctx, out, NULL, outsize, in, cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
             return SCOSSL_FAILURE;
@@ -233,12 +224,6 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
 {
     if (ctx->encrypt)
     {
-        if (outsize < SYMCRYPT_AES_BLOCK_SIZE)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-            return SCOSSL_FAILURE;
-        }
-
         // Pad
         if (ctx->pad)
         {
@@ -269,7 +254,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
         }
 
         // Encrypt
-        if (!ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out, outl, ctx->buf, ctx->cbBuf))
+        if (!ctx->cipher(ctx, out, outl, outsize, ctx->buf, ctx->cbBuf))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
             return SCOSSL_FAILURE;
@@ -294,7 +279,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
     size_t outl_int;
 
     // Decrypt
-    if (!ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out_int, &outl_int, ctx->buf, ctx->cbBuf))
+    if (!ctx->cipher(ctx, out_int, &outl_int, SYMCRYPT_AES_BLOCK_SIZE, ctx->buf, ctx->cbBuf))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
         return SCOSSL_FAILURE;
@@ -328,20 +313,20 @@ static SCOSSL_STATUS p_scossl_aes_generic_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
                                                  _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                                  _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    return ctx->cipher(&ctx->key, ctx->encrypt, ctx->pbChainingValue, out, outl, in, inl);
+    return ctx->cipher(ctx, out, outl, outsize, in, inl);
 }
 
-const OSSL_PARAM *p_scossl_aes_generic_gettable_params(void *provctx)
+const OSSL_PARAM *p_scossl_aes_generic_gettable_params(ossl_unused void *provctx)
 {
     return p_scossl_aes_generic_param_types;
 }
 
-static const OSSL_PARAM *p_scossl_aes_generic_gettable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_generic_gettable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_generic_gettable_ctx_param_types;
 }
 
-static const OSSL_PARAM *p_scossl_aes_generic_settable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_generic_settable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_generic_settable_ctx_param_types;
 }
@@ -450,46 +435,55 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS scossl_aes_cbc_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key, BOOL encrypt,
-                                           _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
-                                           _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
+static SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
+    if (outsize < inl)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
     if (outl != NULL)
     {
         *outl = inl;
     }
 
-    if (encrypt)
+    if (ctx->encrypt)
     {
-        SymCryptAesCbcEncrypt(key, pbChainingValue, in, out, inl);
+        SymCryptAesCbcEncrypt(&ctx->key, ctx->pbChainingValue, in, out, inl);
     }
     else
     {
-        SymCryptAesCbcDecrypt(key, pbChainingValue, in, out, inl);
+        SymCryptAesCbcDecrypt(&ctx->key, ctx->pbChainingValue, in, out, inl);
     }
 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS scossl_aes_ecb_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key, BOOL encrypt,
-                                           _Inout_updates_(SYMCRYPT_AES_BLOCK_SIZE) PBYTE pbChainingValue,
-                                           _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl,
+static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
+    if (outsize < inl)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
 
     if (outl != NULL)
     {
         *outl = inl;
     }
 
-    if (encrypt)
+    if (ctx->encrypt)
     {
-        SymCryptAesEcbEncrypt(key, in, out, inl);
+        SymCryptAesEcbEncrypt(&ctx->key, in, out, inl);
     }
     else
     {
-        SymCryptAesEcbDecrypt(key, in, out, inl);
+        SymCryptAesEcbDecrypt(&ctx->key, in, out, inl);
     }
 
     return SCOSSL_SUCCESS;
@@ -504,7 +498,7 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_In_ SYMCRYPT_AES_EXPANDED_KEY *key, 
         {                                                                                                 \
             ctx->keylen = kbits >> 3;                                                                     \
             ctx->pad = 1;                                                                                 \
-            ctx->cipher = &scossl_aes_##lcmode##_cipher;                                                  \
+            ctx->cipher = (OSSL_FUNC_cipher_cipher_fn*)&scossl_aes_##lcmode##_cipher;                     \
         }                                                                                                 \
                                                                                                           \
         return ctx;                                                                                       \

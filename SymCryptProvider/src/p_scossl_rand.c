@@ -18,24 +18,30 @@ extern "C" {
 
 const BYTE dummy_scossl_ctx = 0;
 
+static const OSSL_PARAM gettable_ctx_param_types[] = {
+    OSSL_PARAM_int(OSSL_RAND_PARAM_STATE, NULL),
+    OSSL_PARAM_uint(OSSL_RAND_PARAM_STRENGTH, NULL),
+    OSSL_PARAM_size_t(OSSL_RAND_PARAM_MAX_REQUEST, NULL),
+    OSSL_PARAM_END};
+
 // All state is maintained inside SymCrypt, but newctx and
 // freectx are expected. These do nothing in the SymCrypt provider
-static void *p_scossl_rand_newctx(void *provctx,
-                                  void *parent,
-                                  const OSSL_DISPATCH *parent_calls)
+static void *p_scossl_rand_newctx(ossl_unused void *provctx,
+                                  ossl_unused void *parent,
+                                  ossl_unused const OSSL_DISPATCH *parent_calls)
 {
     return (void *)&dummy_scossl_ctx;
 }
 
-static void p_scossl_rand_freectx(void *ctx){}
+static void p_scossl_rand_freectx(ossl_unused void *ctx){}
 
 // RNG state is internally managed by SymCrypt. This function is
 // required, but does not actually instantiate SymCrypt's RNG state
-static SCOSSL_STATUS p_scossl_rand_instantiate(void *ctx,
-                                               unsigned int strength,
-                                               int prediction_resistance,
+static SCOSSL_STATUS p_scossl_rand_instantiate(ossl_unused void *ctx,
+                                               ossl_unused unsigned int strength,
+                                               ossl_unused int prediction_resistance,
                                                _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len,
-                                               const OSSL_PARAM params[])
+                                               ossl_unused const OSSL_PARAM params[])
 {
     if (addin_len > 0)
     {
@@ -48,15 +54,15 @@ static SCOSSL_STATUS p_scossl_rand_instantiate(void *ctx,
 // RNG state is internally managed by SymCrypt. This function is
 // required, but does not actually uninstantiate SymCrypt's RNG state.
 // RNG is uninstantiated on SymCrypt unload
-SCOSSL_STATUS p_scossl_rand_uninstantiate(void *ctx)
+SCOSSL_STATUS p_scossl_rand_uninstantiate(ossl_unused void *ctx)
 {
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_rand_generate(void *ctx,
+static SCOSSL_STATUS p_scossl_rand_generate(ossl_unused void *ctx,
                                             _Out_writes_bytes_(outlen) unsigned char *out, size_t outlen,
-                                            unsigned int strength,
-                                            int prediction_resistance,
+                                            ossl_unused unsigned int strength,
+                                            ossl_unused int prediction_resistance,
                                             _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len)
 {
     if (addin_len > 0)
@@ -68,9 +74,9 @@ static SCOSSL_STATUS p_scossl_rand_generate(void *ctx,
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_rand_reseed(void *ctx,
-                                          int prediction_resistance,
-                                          const unsigned char *ent, size_t ent_len,
+static SCOSSL_STATUS p_scossl_rand_reseed(ossl_unused void *ctx,
+                                          ossl_unused int prediction_resistance,
+                                          ossl_unused const unsigned char *ent, ossl_unused size_t ent_len,
                                           _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len)
 {
     SymCryptProvideEntropy(addin, addin_len);
@@ -79,23 +85,17 @@ static SCOSSL_STATUS p_scossl_rand_reseed(void *ctx,
 
 // SymCrypt internally mangages locking, so the provider does not need
 // to. This function is required but does nothing
-static SCOSSL_STATUS p_scossl_rand_enable_locking(void *ctx)
+static SCOSSL_STATUS p_scossl_rand_enable_locking(ossl_unused void *ctx)
 {
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_PARAM *p_scossl_rand_gettable_ctx_params(void *ctx, void *provctx)
+static const OSSL_PARAM *p_scossl_rand_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
-    static const OSSL_PARAM gettable_ctx_param_types[] = {
-        OSSL_PARAM_int(OSSL_RAND_PARAM_STATE, NULL),
-        OSSL_PARAM_uint(OSSL_RAND_PARAM_STRENGTH, NULL),
-        OSSL_PARAM_size_t(OSSL_RAND_PARAM_MAX_REQUEST, NULL),
-        OSSL_PARAM_END};
-
     return gettable_ctx_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_rand_get_ctx_params(void *ctx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rand_get_ctx_params(ossl_unused void *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p = NULL;
 

@@ -179,7 +179,7 @@ void SCOSSL_set_trace_log_filename(const char *filename)
 
 static void _scossl_log_bytes_valist(
     int trace_level,
-    SCOSSL_ERR_FUNC func_code,
+    ossl_unused SCOSSL_ERR_FUNC func_code, // unused in openssl 3
     SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,

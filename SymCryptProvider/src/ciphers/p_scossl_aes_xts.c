@@ -124,6 +124,12 @@ static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
+    if (outsize < inl)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
     // It appears that the EVP API for exposing AES-XTS does not allow definition of the size of
     // a data unit. My understanding is that callers are expected to make a single call through
     // the EVP interface per data unit - so we pass inl to both cbDataUnit and cbData.
@@ -158,31 +164,20 @@ static SCOSSL_STATUS p_scossl_aes_xts_update(_Inout_ SCOSSL_AES_XTS_CTX *ctx,
                                              _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                              _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    if (outsize < inl)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
-    }    
-
     return p_scossl_aes_xts_cipher(ctx, out, outl, outsize, in, inl);
 }
 
-static SCOSSL_STATUS p_scossl_aes_xts_final(_Inout_ SCOSSL_AES_XTS_CTX *ctx,
-                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
+static SCOSSL_STATUS p_scossl_aes_xts_final(ossl_unused SCOSSL_AES_XTS_CTX *ctx,
+                                            ossl_unused unsigned char *out, _Out_ size_t *outl, ossl_unused size_t outsize)
 {
     *outl = 0;
 
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_PARAM *p_scossl_aes_xts_gettable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_xts_gettable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_xts_gettable_ctx_param_types;
-}
-
-static const OSSL_PARAM *p_scossl_aes_xts_settable_ctx_params(void *cctx, void *provctx)
-{
-    return p_scossl_aes_xts_settable_ctx_param_types;
 }
 
 static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ctx, _Inout_ OSSL_PARAM params[])
@@ -220,13 +215,6 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ const OSSL_PARAM params[])
-{
-    // const OSSL_PARAM *p = NULL;
-
-    return SCOSSL_SUCCESS;
-}
-
 #define IMPLEMENT_SCOSSL_AES_XTS_CIPHER(kbits)                                                        \
     SCOSSL_AES_XTS_CTX *p_scossl_aes_##kbits##_xts_newctx()                                           \
     {                                                                                                 \
@@ -247,12 +235,10 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
         {OSSL_FUNC_CIPHER_UPDATE, (void (*)(void))p_scossl_aes_xts_update},                           \
         {OSSL_FUNC_CIPHER_FINAL, (void (*)(void))p_scossl_aes_xts_final},                             \
         {OSSL_FUNC_CIPHER_CIPHER, (void (*)(void))p_scossl_aes_xts_cipher},                           \
-        {OSSL_FUNC_CIPHER_GET_PARAMS, (void (*)(void))p_scossl_aes_##kbits##_xts_get_params},         \
-        {OSSL_FUNC_CIPHER_GET_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_get_ctx_params},           \
-        {OSSL_FUNC_CIPHER_SET_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_set_ctx_params},           \
         {OSSL_FUNC_CIPHER_GETTABLE_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_params},     \
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_gettable_ctx_params}, \
-        {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_settable_ctx_params}, \
+        {OSSL_FUNC_CIPHER_GET_PARAMS, (void (*)(void))p_scossl_aes_##kbits##_xts_get_params},         \
+        {OSSL_FUNC_CIPHER_GET_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_get_ctx_params},           \
         {0, NULL}};
 
 

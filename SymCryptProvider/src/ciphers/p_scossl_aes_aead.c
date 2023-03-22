@@ -101,7 +101,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX
 }
 
 static SCOSSL_STATUS p_scossl_aes_gcm_final(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
-                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
+                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, ossl_unused size_t outsize)
 {
     return scossl_aes_gcm_cipher(ctx, ctx->encrypt, out, outl, NULL, 0);
 }
@@ -119,12 +119,12 @@ static SCOSSL_STATUS p_scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
     return scossl_aes_gcm_cipher(ctx, ctx->encrypt, out, outl, in, inl);
 }
 
-static const OSSL_PARAM *p_scossl_aes_gcm_gettable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_gcm_gettable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_gcm_gettable_ctx_param_types;
 }
 
-static const OSSL_PARAM *p_scossl_aes_gcm_settable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_gcm_settable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_gcm_settable_ctx_param_types;
 }
@@ -331,7 +331,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX
 }
 
 static SCOSSL_STATUS p_scossl_aes_ccm_final(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
-                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
+                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, ossl_unused size_t outsize)
 {
     return scossl_aes_ccm_cipher(ctx, ctx->encrypt, out, outl, NULL, 0);
 }
@@ -349,12 +349,12 @@ static SCOSSL_STATUS p_scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
     return scossl_aes_ccm_cipher(ctx, ctx->encrypt, out, outl, in, inl);
 }
 
-static const OSSL_PARAM *p_scossl_aes_ccm_gettable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_ccm_gettable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_ccm_gettable_ctx_param_types;
 }
 
-static const OSSL_PARAM *p_scossl_aes_ccm_settable_ctx_params(void *cctx, void *provctx)
+static const OSSL_PARAM *p_scossl_aes_ccm_settable_ctx_params(ossl_unused void *cctx, ossl_unused void *provctx)
 {
     return p_scossl_aes_ccm_settable_ctx_param_types;
 }

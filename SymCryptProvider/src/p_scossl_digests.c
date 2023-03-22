@@ -2,12 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_digests.h"
-#include "scossl_helpers.h"
-
 #include <openssl/core_names.h>
 #include <openssl/core_dispatch.h>
 #include <openssl/proverr.h>
+
+#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +17,7 @@ static const OSSL_PARAM p_scossl_digest_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
-const OSSL_PARAM *p_scossl_digest_gettable_params(_Inout_ void *dctx, _In_ void *provctx)
+const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *dctx, ossl_unused void *provctx)
 {
     return p_scossl_digest_param_types;
 }
@@ -45,7 +44,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
 // lowercase, CamelCase, and UPPERCASE must be provided to reconcile differences
 // between OpenSSL and SymCrypt APIs and macro definitions
 #define IMPLEMENT_SCOSSL_DIGEST(lcalg, CcAlg, UCALG)                                  \
-    static void *p_scossl_##lcalg##_newctx(_Inout_ void *prov_ctx)                    \
+    static void *p_scossl_##lcalg##_newctx(ossl_unused void *prov_ctx)                \
     {                                                                                 \
         return OPENSSL_malloc(sizeof(SYMCRYPT_##UCALG##_STATE));                      \
     }                                                                                 \
@@ -65,7 +64,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
     }                                                                                 \
     static SCOSSL_STATUS p_scossl_##lcalg##_init(                                     \
         _Inout_ SYMCRYPT_##UCALG##_STATE *dctx,                                       \
-        _In_ const OSSL_PARAM params[])                                               \
+        ossl_unused const OSSL_PARAM params[])                                        \
     {                                                                                 \
         SymCrypt##CcAlg##Init(dctx);                                                  \
         return SCOSSL_SUCCESS;                                                        \
@@ -80,7 +79,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
     }                                                                                 \
     static SCOSSL_STATUS p_scossl_##lcalg##_final(                                    \
         _Inout_ SYMCRYPT_##UCALG##_STATE *dctx,                                       \
-        _Out_writes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,              \
+        _Out_writes_bytes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,        \
         _Out_ size_t *outl, size_t outsz)                                             \
     {                                                                                 \
         if (outsz < SYMCRYPT_##UCALG##_RESULT_SIZE)                                   \
@@ -94,9 +93,9 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
         return SCOSSL_SUCCESS;                                                        \
     }                                                                                 \
     static SCOSSL_STATUS p_scossl_##lcalg##_digest(                                   \
-        _Inout_ void *provctx,                                                        \
+        ossl_unused void *provctx,                                                    \
         _In_ const unsigned char *in, size_t inl,                                     \
-        _Out_writes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,              \
+        _Out_writes_bytes_(SYMCRYPT_##UCALG##_RESULT_SIZE) unsigned char *out,        \
         _Out_ size_t *outl, size_t outsz)                                             \
     {                                                                                 \
         if (outsz < SYMCRYPT_##UCALG##_RESULT_SIZE)                                   \
