@@ -21,6 +21,11 @@ extern "C" {
 
 static int scossl_prov_initialized = 0;
 
+static OSSL_FUNC_CRYPTO_malloc_fn *c_CRYPTO_malloc;
+static OSSL_FUNC_CRYPTO_zalloc_fn *c_CRYPTO_zalloc;
+static OSSL_FUNC_CRYPTO_free_fn *c_CRYPTO_free;
+static OSSL_FUNC_CRYPTO_clear_free_fn *c_CRYPTO_clear_free;
+
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
 extern const OSSL_DISPATCH p_scossl_sha1_functions[];
@@ -257,7 +262,44 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     scossl_setup_logging();
 
+    for (; in->function_id != 0; in++)
+    {
+        switch(in->function_id)
+        {
+            case OSSL_FUNC_CRYPTO_MALLOC:
+                c_CRYPTO_malloc = OSSL_FUNC_CRYPTO_malloc(in);
+                break;
+            case OSSL_FUNC_CRYPTO_ZALLOC:
+                c_CRYPTO_zalloc = OSSL_FUNC_CRYPTO_zalloc(in);
+                break;
+            case OSSL_FUNC_CRYPTO_FREE:
+                c_CRYPTO_free = OSSL_FUNC_CRYPTO_free(in);
+                break;
+            case OSSL_FUNC_CRYPTO_CLEAR_FREE:
+                c_CRYPTO_clear_free = OSSL_FUNC_CRYPTO_clear_free(in);
+                break;
+        }
+    }
+
     return SCOSSL_SUCCESS;
+}
+
+// Functions from in dispatch table
+void *CRYPTO_malloc(size_t num, const char *file, int line)
+{
+    return c_CRYPTO_malloc(num, file, line);
+}
+void *CRYPTO_zalloc(size_t num, const char *file, int line)
+{
+    return c_CRYPTO_zalloc(num, file, line);
+}
+void CRYPTO_free(void *ptr, const char *file, int line)
+{
+    return c_CRYPTO_free(ptr, file, line);
+}
+void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line)
+{
+    return c_CRYPTO_clear_free(ptr, num, file, line);
 }
 
 #ifdef __cplusplus
