@@ -46,17 +46,19 @@ typedef struct
 {
     INT32 operationInProgress;
     BYTE iv[SCOSSL_GCM_IV_LENGTH];
-    SIZE_T ivlen;
     SYMCRYPT_GCM_STATE state;
     SYMCRYPT_GCM_EXPANDED_KEY key;
-    SIZE_T keylen;
     BYTE tag[EVP_GCM_TLS_TAG_LEN];
     SIZE_T taglen;
     BYTE tlsAad[EVP_AEAD_TLS1_AAD_LEN];
     INT32 tlsAadSet;
     UINT64 ivInvocation;
     INT32 useInvocation;
-    BOOL encrypt;
+
+    // Provider-only fields. Tracked by EVP_CIPHER_CTX in engine
+    SIZE_T ivlen;
+    SIZE_T keylen;
+    INT32 encrypt;
 } SCOSSL_CIPHER_GCM_CTX;
 
 #define SCOSSL_CCM_MIN_IV_LENGTH (7)
@@ -83,60 +85,59 @@ typedef enum
 
 typedef struct
 {
-    INT32 enc; /* COP_ENCRYPT or COP_DECRYPT */
     SCOSSL_CCM_STAGE ccmStage;
     BYTE iv[SCOSSL_CCM_MAX_IV_LENGTH];
-    SIZE_T ivlen;
     SYMCRYPT_CCM_STATE state;
     SYMCRYPT_AES_EXPANDED_KEY key;
-    SIZE_T keylen;
     BYTE tag[EVP_CCM_TLS_TAG_LEN];
     SIZE_T taglen;
     UINT64 cbData;
     BYTE tlsAad[EVP_AEAD_TLS1_AAD_LEN];
     INT32 tlsAadSet;
-    BOOL encrypt;
+
+    // Provider-only fields. Tracked by EVP_CIPHER_CTX in engine
+    SIZE_T ivlen;
+    SIZE_T keylen;
+    INT32 encrypt;
 } SCOSSL_CIPHER_CCM_CTX;
 
 void scossl_aes_gcm_init_ctx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
-                             size_t keylen,
                              _In_opt_ const unsigned char *iv);
 SCOSSL_STATUS scossl_aes_gcm_init_key(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
                                       _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                       _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen);
-SCOSSL_STATUS scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_cipher(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                     _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
                                     _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen);
-SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           _In_reads_bytes_(taglen) unsigned char *tag, size_t taglen);
-SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           _In_ unsigned char *iv, size_t ivlen);
 SCOSSL_STATUS scossl_aes_gcm_iv_gen(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
                                     _Out_writes_bytes_(outsize) unsigned char *out, size_t outsize);
-SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                         _In_ unsigned char *iv, size_t ivlen);
-UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+UINT16 scossl_aes_gcm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                    _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen);
 
 void scossl_aes_ccm_init_ctx(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
-                             size_t keylen,
                              _In_opt_ const unsigned char *iv);
 SCOSSL_STATUS scossl_aes_ccm_init_key(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
                                       _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                       _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen);
-SCOSSL_STATUS scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_cipher(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                     _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
                                     _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           _Out_writes_bytes_(taglen) unsigned char *tag, size_t taglen);
-SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           _In_reads_bytes_(taglen) unsigned char *tag, size_t taglen);
 SCOSSL_STATUS scossl_aes_ccm_set_iv_len(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen);
-SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           _In_ unsigned char *iv, size_t ivlen);
-UINT16 scossl_aes_ccm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+UINT16 scossl_aes_ccm_set_tls1_aad(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                    _In_reads_bytes_(aadlen) unsigned char *aad, size_t aadlen);
                                    
 #ifdef __cplusplus

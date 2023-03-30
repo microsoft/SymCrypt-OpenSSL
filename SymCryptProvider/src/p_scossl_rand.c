@@ -8,8 +8,8 @@
 
 #include "scossl_helpers.h"
 
-#define SYMCRYPT_DRGB_STRENGTH 256
-#define SYMCRYPT_DRGB_MAX_REQUEST_SIZE (1 << 16)
+#define SCOSSL_DRGB_STRENGTH 256
+#define SCOSSL_DRGB_MAX_REQUEST_SIZE (1 << 16)
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,11 +37,16 @@ static void p_scossl_rand_freectx(ossl_unused void *ctx){}
 // RNG state is internally managed by SymCrypt. This function is
 // required, but does not actually instantiate SymCrypt's RNG state
 static SCOSSL_STATUS p_scossl_rand_instantiate(ossl_unused void *ctx,
-                                               ossl_unused unsigned int strength,
-                                               ossl_unused int prediction_resistance,
+                                               unsigned int strength,
+                                               int prediction_resistance,
                                                _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len,
                                                ossl_unused const OSSL_PARAM params[])
 {
+    if (strength <= SCOSSL_DRGB_STRENGTH && prediction_resistance == 0)
+    {
+        return SCOSSL_FAILURE;
+    }
+
     if (addin_len > 0)
     {
         SymCryptProvideEntropy(addin, addin_len);
@@ -106,13 +111,13 @@ static SCOSSL_STATUS p_scossl_rand_get_ctx_params(ossl_unused void *ctx, _Inout_
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STRENGTH);
-    if (p != NULL && !OSSL_PARAM_set_uint(p, SYMCRYPT_DRGB_STRENGTH))
+    if (p != NULL && !OSSL_PARAM_set_uint(p, SCOSSL_DRGB_STRENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_MAX_REQUEST);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SYMCRYPT_DRGB_MAX_REQUEST_SIZE))
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_DRGB_MAX_REQUEST_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13.0)
 
+find_package(OpenSSL REQUIRED)
+
 project(SymCrypt-OpenSSL
     VERSION 1.0.0
     DESCRIPTION "The SymCrypt engine for OpenSSL (SCOSSL)"
@@ -29,5 +31,8 @@ endif()
 add_subdirectory (ScosslCommon)
 add_subdirectory (SymCryptEngine/static)
 add_subdirectory (SymCryptEngine/dynamic)
-add_subdirectory (SymCryptProvider)
 add_subdirectory (SslPlay)
+
+if(${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
+    add_subdirectory (SymCryptProvider)
+endif()

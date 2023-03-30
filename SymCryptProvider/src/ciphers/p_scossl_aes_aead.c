@@ -17,6 +17,7 @@ static const OSSL_PARAM p_scossl_aes_gcm_gettable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_IVLEN, NULL),
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TAGLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, NULL),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
@@ -34,6 +35,7 @@ static const OSSL_PARAM p_scossl_aes_ccm_gettable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_KEYLEN, NULL),
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_IVLEN, NULL),
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TAGLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, NULL),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_IV, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_UPDATED_IV, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
@@ -73,11 +75,16 @@ static void p_scossl_aes_gcm_freectx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx)
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_GCM_CTX));
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                                     _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
+    if (key && keylen != ctx->keylen)
+    {
+        return SCOSSL_FAILURE;
+    }
+
     ctx->encrypt = encrypt;
 
     return scossl_aes_gcm_init_key(ctx, key, keylen, iv, ivlen) &&
@@ -147,6 +154,12 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? EVP_GCM_TLS_TAG_LEN : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -286,10 +299,12 @@ static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX
     if (copy_ctx != NULL)
     {
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_CIPHER_CCM_CTX));
-
+        // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
+        // to itself, so a plain memcpy will maintain pointers to the source context
+        // make sure the copy_ctx uses its copy of the expanded key TODO: implement SymCryptCcmStateCopy
         SymCryptAesKeyCopy(&ctx->key, &copy_ctx->key);
         copy_ctx->state = ctx->state;
-        copy_ctx->state.pExpandedKey = &ctx->key;
+        copy_ctx->state.pExpandedKey = &copy_ctx->key;
     }
     return copy_ctx;
 }
@@ -299,19 +314,20 @@ static void p_scossl_aes_ccm_freectx(_Inout_  SCOSSL_CIPHER_CCM_CTX *ctx)
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_CCM_CTX));
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                                     _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
-    ctx->encrypt = encrypt;
-
-    if (!scossl_aes_ccm_init_key(ctx, key, keylen, iv, ivlen))
+    if (key && keylen != ctx->keylen)
     {
         return SCOSSL_FAILURE;
     }
 
-    return p_scossl_aes_ccm_set_ctx_params(ctx, params);
+    ctx->encrypt = encrypt;
+
+    return scossl_aes_ccm_init_key(ctx, key, keylen, iv, ivlen) &&
+           p_scossl_aes_ccm_set_ctx_params(ctx, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_ccm_encrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
@@ -377,6 +393,12 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? ctx->taglen : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -505,7 +527,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
         SCOSSL_CIPHER_##UCMODE##_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_##UCMODE##_CTX));            \
         if (ctx != NULL)                                                                                     \
         {                                                                                                    \
-            scossl_aes_##lcmode##_init_ctx(ctx, kbits >> 3, NULL);                                           \
+            ctx->keylen = kbits >> 3;                                                                        \
+            scossl_aes_##lcmode##_init_ctx(ctx, NULL);                                                       \
         }                                                                                                    \
                                                                                                              \
         return ctx;                                                                                          \

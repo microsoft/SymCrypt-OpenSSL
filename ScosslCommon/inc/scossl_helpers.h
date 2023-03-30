@@ -36,10 +36,6 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 #define SCOSSL_LOG_LEVEL_INFO       (2) // DEFAULT for stderr / logging to logfile
 #define SCOSSL_LOG_LEVEL_DEBUG      (3)
 
-// Many parameters required by the engine and provider APIs are unused
-#
-#define _scossl_unused_
-
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
 void SCOSSL_set_trace_log_filename(const char *filename);
 

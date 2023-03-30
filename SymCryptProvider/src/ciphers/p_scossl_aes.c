@@ -40,8 +40,8 @@ typedef struct
 
     BYTE iv[SYMCRYPT_AES_BLOCK_SIZE];
     BYTE pbChainingValue[SYMCRYPT_AES_BLOCK_SIZE];
-    BOOL encrypt;
-    BOOL pad;
+    INT32 encrypt;
+    INT32 pad;
 
     // Provider is responsible for buffering
     // incomplete blocks in update calls
@@ -53,38 +53,6 @@ typedef struct
 
 static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-// Populates remaining space in the buffer
-static size_t p_scossl_aes_generic_fill_buffer(_Inout_updates_bytes_(*cbBuf) unsigned char *buf, _Inout_ size_t *cbBuf,
-                                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
-{
-    size_t cbBufRemaining = SYMCRYPT_AES_BLOCK_SIZE - *cbBuf;
-    if (inl < cbBufRemaining)
-    {
-        cbBufRemaining = inl;
-    }
-    memcpy(buf + *cbBuf, in, cbBufRemaining);
-
-    // Advance in
-    *cbBuf += cbBufRemaining;
-    in += cbBufRemaining;
-    return cbBufRemaining;
-}
-
-static SCOSSL_STATUS p_scossl_aes_generic_buffer_trailing_data(_Inout_updates_bytes_(inl) unsigned char *buf, _Inout_ size_t *cbBuf,
-                                                               _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
-{
-    if (inl > SYMCRYPT_AES_BLOCK_SIZE)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-        return SCOSSL_FAILURE;
-    }
-
-    memcpy(buf, in, inl);
-    *cbBuf += inl;
-
-    return SCOSSL_SUCCESS;
-}
-
 static void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
 {
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_AES_CTX));
@@ -94,14 +62,14 @@ static SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
 {
     SCOSSL_AES_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_AES_CTX));
     if (copy_ctx != NULL)
-    {
+    { 
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_AES_CTX));
         SymCryptAesKeyCopy(&ctx->key, &copy_ctx->key);
     }
     return copy_ctx;
 }
 
-static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *ctx, INT32 encrypt,
                                                         _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
@@ -159,17 +127,30 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
                                                  _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     size_t outl_int = 0;
-    size_t cBlocksRemaining = 0;
+    size_t cbBytesInFullBlocks = 0;
 
     // Data from previous update in buffer. Try to fill buffer and
     // encrypt/decrypt before moving to remaining data.
     if (ctx->cbBuf > 0)
     {
-        inl -= p_scossl_aes_generic_fill_buffer(ctx->buf, &ctx->cbBuf, in, inl);
+        size_t cbBufRemaining = SYMCRYPT_AES_BLOCK_SIZE - ctx->cbBuf;
+        if (inl < cbBufRemaining)
+        {
+            cbBufRemaining = inl;
+        }
+        memcpy(ctx->buf + ctx->cbBuf, in, cbBufRemaining);
+
+        // Advance in
+        ctx->cbBuf += cbBufRemaining;
+        in += cbBufRemaining;
+        inl -= cbBufRemaining;
     }
 
-    // First encrypt the buffer if it is filled
-    if (ctx->cbBuf == SYMCRYPT_AES_BLOCK_SIZE)
+    // First encrypt the buffer if it is filled. If we're decrypting
+    // with padding, then keep the last block in the buffer for the
+    // call to cipher_final
+    if (ctx->cbBuf == SYMCRYPT_AES_BLOCK_SIZE &&
+        (ctx->encrypt || !ctx->pad || inl > 0))
     {
         if (!ctx->cipher(ctx, out, NULL, outsize, ctx->buf, ctx->cbBuf))
         {
@@ -182,12 +163,20 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
         ctx->cbBuf = 0;
     }
 
-    cBlocksRemaining = inl / SYMCRYPT_AES_BLOCK_SIZE;
+    // Get the remaining number of whole blocks in inl
+    cbBytesInFullBlocks = inl & ~(SYMCRYPT_AES_BLOCK_SIZE-1);
+
+    // Decrypt with padding. Ensure the last block is buffered
+    // for the call to cipher_final so padding is removed
+    if (!ctx->encrypt && ctx->pad && cbBytesInFullBlocks * SYMCRYPT_AES_BLOCK_SIZE == inl)
+    {
+        cbBytesInFullBlocks--;
+    }   
 
     // in still contains whole blocks, encrypt available blocks
-    if (cBlocksRemaining > 0)
+    if (cbBytesInFullBlocks > 0)
     {
-        outl_int += cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE;
+        outl_int += cbBytesInFullBlocks;
         // Need to verify outsize here is not smaller than the 
         // result of the entire update operation
         if (outsize < outl_int)
@@ -196,25 +185,38 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
             return SCOSSL_FAILURE;
         }
 
-        if (!ctx->cipher(ctx, out, NULL, outsize, in, cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE))
+        if (!ctx->cipher(ctx, out, NULL, outsize, in, cbBytesInFullBlocks))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
             return SCOSSL_FAILURE;
         }
 
-        ctx->cbBuf = 0;
-
-        in += cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE;
-        inl -= cBlocksRemaining * SYMCRYPT_AES_BLOCK_SIZE;
+        in += cbBytesInFullBlocks;
+        inl -= cbBytesInFullBlocks;
     }
 
     // Buffer any remaining data
-    if (inl > 0 &&
-        !p_scossl_aes_generic_buffer_trailing_data(ctx->buf, &ctx->cbBuf, in, inl))
+    if (inl > 0)
     {
+        // Ensure trailing remaining data is 
+        // - less than one block for encryption or unpadded decryption
+        // - less than or equal to one block for padded decryption
+        if (inl > SYMCRYPT_AES_BLOCK_SIZE ||
+            (inl == SYMCRYPT_AES_BLOCK_SIZE && (ctx->encrypt || !ctx->pad)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+            return SCOSSL_FAILURE;
+        }
+        memcpy(ctx->buf, in, inl);
+        ctx->cbBuf += inl;
+    }
+    
+    // Buffer must have some data in it for padded decryption
+    if (!ctx->encrypt && ctx->pad && ctx->cbBuf == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
         return SCOSSL_FAILURE;
     }
-
     *outl = outl_int;
 
     return SCOSSL_SUCCESS;
@@ -223,10 +225,21 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
 static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
 {
+    unsigned char out_int[SYMCRYPT_AES_BLOCK_SIZE];
+    size_t outl_int;
+
+    // The return value of SymCryptPaddingPkcs7Remove must be mapped in a
+    // side-channel safe way with SymCryptMapUint32. For all other failure
+    // cases scError is just set to 1 so it maps to SCOSSL_FAILURE
+    SYMCRYPT_ERROR scError = 1;
+    SYMCRYPT_UINT32_MAP scErrorMap[1] = {
+        {SYMCRYPT_NO_ERROR, SCOSSL_SUCCESS}};
+
+    // Encrypt final
     if (ctx->encrypt)
     {
         // Pad
-        if (ctx->pad)
+        if (ctx->pad && ctx->cbBuf < SYMCRYPT_AES_BLOCK_SIZE)
         {
             size_t pcbResult;
             SymCryptPaddingPkcs7Add(
@@ -240,56 +253,53 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
             if (pcbResult != SYMCRYPT_AES_BLOCK_SIZE)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
         }
         else if (ctx->cbBuf == 0)
         {
             *outl = 0;
-            return SCOSSL_SUCCESS;
+            scError = SYMCRYPT_NO_ERROR;
+            goto cleanup;
         }
-        else if (ctx->cbBuf != SYMCRYPT_AES_BLOCK_SIZE)
+        else
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_WRONG_FINAL_BLOCK_LENGTH);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
-        // Encrypt
         if (!ctx->cipher(ctx, out, outl, outsize, ctx->buf, ctx->cbBuf))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
-        ctx->cbBuf = 0;
 
-        return SCOSSL_SUCCESS;
+        scError = SYMCRYPT_NO_ERROR;
+        goto cleanup;
     }
 
-    if (ctx->cbBuf == 0 && !ctx->pad)
+    // Decrypt final
+    if (!ctx->pad && ctx->cbBuf == 0)
     {
         *outl = 0;
-        return SCOSSL_SUCCESS;
+        scError = SYMCRYPT_NO_ERROR;
+        goto cleanup;
     }
     else if (ctx->cbBuf != SYMCRYPT_AES_BLOCK_SIZE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_WRONG_FINAL_BLOCK_LENGTH);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    unsigned char out_int[SYMCRYPT_AES_BLOCK_SIZE];
-    size_t outl_int;
-
-    // Decrypt
     if (!ctx->cipher(ctx, out_int, &outl_int, SYMCRYPT_AES_BLOCK_SIZE, ctx->buf, ctx->cbBuf))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
-    ctx->cbBuf = 0;
 
     if (ctx->pad)
     {
-        SymCryptPaddingPkcs7Remove(
+        scError = SymCryptPaddingPkcs7Remove(
             SYMCRYPT_AES_BLOCK_SIZE,
             out_int,
             outl_int,
@@ -301,13 +311,20 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
     if (outsize < outl_int)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     memcpy(out, out_int, outl_int);
     *outl = outl_int;
 
-    return SCOSSL_SUCCESS;
+cleanup:
+    ctx->cbBuf = 0;
+
+    SymCryptWipeKnownSize(out_int, SYMCRYPT_AES_BLOCK_SIZE);
+    SymCryptWipeKnownSize(ctx->buf, SYMCRYPT_AES_BLOCK_SIZE);
+
+    // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
+    return SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1) ;
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
@@ -367,13 +384,13 @@ SCOSSL_STATUS p_scossl_aes_generic_get_params(_Inout_ OSSL_PARAM params[],
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD);
-    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_AEAD))
+    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_AEAD ? 1 : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_CUSTOM_IV);
-    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_CUSTOM_IV))
+    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_CUSTOM_IV ? 1 : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;

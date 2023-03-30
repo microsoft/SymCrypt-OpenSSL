@@ -26,7 +26,7 @@ static SCOSSL_STATUS e_scossl_rand_bytes(_Out_writes_bytes_(num) unsigned char *
 
 // RAND_add() returns SCOSSL_SUCCESS on success, SCOSSL_FAILURE otherwise.
 // Since an error internally is fatal, we always return SCOSSL_SUCCESS here.
-static SCOSSL_STATUS e_scossl_rand_add(_In_reads_bytes_(num) const void *buf, _In_ int num, _In_ double randomness)
+static SCOSSL_STATUS e_scossl_rand_add(_In_reads_bytes_(num) const void *buf, _In_ int num, _In_ ossl_unused double randomness)
 {
     SymCryptProvideEntropy(buf, num);
     return SCOSSL_SUCCESS;

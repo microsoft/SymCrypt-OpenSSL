@@ -9,11 +9,6 @@
 extern "C" {
 #endif
 
-typedef int SCOSSL_ENCRYPTION_MODE;
-#define SCOSSL_ENCRYPTION_MODE_ENCRYPT (1)
-#define SCOSSL_ENCRYPTION_MODE_DECRYPT (0)
-#define SCOSSL_ENCRYPTION_MODE_NOCHANGE (-1)
-
 struct cipher_cbc_ctx {
     SYMCRYPT_AES_EXPANDED_KEY key;
 };
@@ -59,10 +54,10 @@ static int scossl_cipher_nids[] = {
 #define AES_256_KEY_SIZE 32
 
 SCOSSL_STATUS e_scossl_aes_cbc_init_key(
-    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ ossl_unused const unsigned char *iv, ossl_unused int enc);
 SCOSSL_STATUS e_scossl_aes_cbc_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg, _Inout_ void *ptr);
 #define AES_CBC_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_CBC_MODE|EVP_CIPH_CUSTOM_COPY \
                          |EVP_CIPH_ALWAYS_CALL_INIT|EVP_CIPH_FLAG_FIPS)
 
@@ -121,10 +116,10 @@ static const EVP_CIPHER *e_scossl_aes_256_cbc(void)
 }
 
 SCOSSL_STATUS e_scossl_aes_ecb_init_key(
-    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ ossl_unused const unsigned char *iv, ossl_unused int enc);
 SCOSSL_STATUS e_scossl_aes_ecb_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg, _Inout_ void *ptr);
 #define AES_ECB_FLAGS    (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_ECB_MODE|EVP_CIPH_CUSTOM_COPY \
                          |EVP_CIPH_FLAG_FIPS)
 
@@ -182,10 +177,10 @@ static const EVP_CIPHER *e_scossl_aes_256_ecb(void)
 // Disabling XTS for now - remove with if region to avoid unused function warning
 #if 0
 SCOSSL_STATUS e_scossl_aes_xts_init_key(
-    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ ossl_unused const unsigned char *key, _In_ const unsigned char *iv, ossl_unused int enc);
 SCOSSL_STATUS e_scossl_aes_xts_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
-static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
+static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg, _Inout_ void *ptr);
 #define AES_XTS_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_XTS_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_FLAG_CUSTOM_CIPHER)
 
@@ -228,7 +223,7 @@ static const EVP_CIPHER *e_scossl_aes_256_xts(void)
 
 
 SCOSSL_STATUS e_scossl_aes_gcm_init_key(
-    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, ossl_unused int enc);
 SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
 static _Success_(return > 0) int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
@@ -289,7 +284,7 @@ static const EVP_CIPHER *e_scossl_aes_256_gcm(void)
 }
 
 SCOSSL_STATUS e_scossl_aes_ccm_init_key(
-    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc);
+    _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, ossl_unused int enc);
 SCOSSL_RETURNLENGTH e_scossl_aes_ccm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
 static _Success_(return > 0) int e_scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
@@ -473,10 +468,10 @@ int e_scossl_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
  * AES-CBC Implementation
  */
 
-// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// Initializes ctx with the provided key.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_aes_cbc_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
+                             _In_ ossl_unused const unsigned char *iv, ossl_unused int enc)
 {
     struct cipher_cbc_ctx *cipherCtx = (struct cipher_cbc_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -512,7 +507,7 @@ SCOSSL_STATUS e_scossl_aes_cbc_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigne
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_cbc_ctx *srcCtx;
@@ -538,10 +533,10 @@ static SCOSSL_STATUS e_scossl_aes_cbc_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, i
  * AES-ECB Implementation
  */
 
-// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// Initializes ctx with the provided key.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_aes_ecb_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
+                             _In_ ossl_unused const unsigned char *iv, ossl_unused int enc)
 {
     struct cipher_ecb_ctx *cipherCtx = (struct cipher_ecb_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -576,7 +571,7 @@ SCOSSL_STATUS e_scossl_aes_ecb_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigne
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg,
                                     _Inout_ void *ptr)
 {
     struct cipher_ecb_ctx *srcCtx;
@@ -604,10 +599,10 @@ static SCOSSL_STATUS e_scossl_aes_ecb_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, i
  * AES-XTS Implementation
  */
 
-// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// Initializes ctx with the provided key and iv.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_aes_xts_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
+                             _In_ const unsigned char *iv, ossl_unused int enc)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     struct cipher_xts_ctx *cipherCtx = (struct cipher_xts_ctx *)EVP_CIPHER_CTX_get_cipher_data(ctx);
@@ -680,7 +675,7 @@ SCOSSL_RETURNLENGTH e_scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ u
 
 // Allows various cipher specific parameters to be determined and set.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, int arg,
+static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, ossl_unused int arg,
                                     _Inout_ void *ptr)
 {
     switch( type )
@@ -709,10 +704,10 @@ static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, i
  * AES-GCM Implementation
  */
 
-// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// Initializes ctx with the provided key and iv.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
+                             _In_ const unsigned char *iv, ossl_unused int enc)
 {
     SCOSSL_CIPHER_GCM_CTX *cipherCtx = (SCOSSL_CIPHER_GCM_CTX *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     return scossl_aes_gcm_init_key(cipherCtx, key, EVP_CIPHER_CTX_key_length(ctx), iv, EVP_CIPHER_CTX_iv_length(ctx));
@@ -748,7 +743,7 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     switch( type )
     {
     case EVP_CTRL_INIT:
-        scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_key_length(ctx), EVP_CIPHER_CTX_iv(ctx));
+        scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
         break;
     case EVP_CTRL_GET_IVLEN:
         *(int *)ptr = SCOSSL_GCM_IV_LENGTH;
@@ -795,10 +790,10 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
  * AES-CCM Implementation
  */
 
-// Initializes ctx with the provided key and iv, along with enc/dec mode.
+// Initializes ctx with the provided key and iv.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_aes_ccm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key,
-                             _In_ const unsigned char *iv, SCOSSL_ENCRYPTION_MODE enc)
+                             _In_ const unsigned char *iv, ossl_unused int enc)
 {
     SCOSSL_CIPHER_CCM_CTX *cipherCtx = (SCOSSL_CIPHER_CCM_CTX *)EVP_CIPHER_CTX_get_cipher_data(ctx);
     return scossl_aes_ccm_init_key(cipherCtx, key, EVP_CIPHER_CTX_key_length(ctx), iv, cipherCtx->ivlen);
@@ -833,7 +828,7 @@ static int e_scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     switch( type )
     {
     case EVP_CTRL_INIT:
-        scossl_aes_ccm_init_ctx(cipherCtx, EVP_CIPHER_CTX_key_length(ctx), EVP_CIPHER_CTX_iv(ctx));
+        scossl_aes_ccm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
         break;
     case EVP_CTRL_GET_IVLEN:
         *(int *)ptr = cipherCtx->ivlen;

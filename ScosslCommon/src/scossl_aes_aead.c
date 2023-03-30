@@ -12,9 +12,8 @@ extern "C" {
  * AES-GCM Common Functions
  */
 _Use_decl_annotations_
-void scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, size_t keylen, const unsigned char *iv)
+void scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, const unsigned char *iv)
 {
-    ctx->keylen = keylen;
     ctx->ivlen = SCOSSL_GCM_IV_LENGTH;
     if (iv)
     {
@@ -53,12 +52,11 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
         {
             return SCOSSL_FAILURE;
         }
-        ctx->keylen = keylen;
     }
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS scossl_aes_gcm_tls(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS scossl_aes_gcm_tls(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                         _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
                                         _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
@@ -148,7 +146,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                     unsigned char *out, size_t *outl,
                                     const unsigned char *in, size_t inl)
 {
@@ -212,11 +210,11 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
-        taglen > ctx->taglen || encrypt)
+        taglen > ctx->taglen || !encrypt)
     {
         return SCOSSL_FAILURE;
     }
@@ -225,7 +223,7 @@ SCOSSL_STATUS scossl_aes_gcm_get_aead_tag(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encry
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_aead_tag(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *tag, size_t taglen)
 {
     if (taglen < SCOSSL_GCM_MIN_TAG_LENGTH || taglen > SCOSSL_GCM_MAX_TAG_LENGTH ||
@@ -249,7 +247,7 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(SCOSSL_CIPHER_GCM_CTX *ctx,
     }
     // Place invocation field into IV
     SYMCRYPT_STORE_MSBFIRST64(ctx->iv + ctx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, ctx->ivInvocation);
-    if (outsize <= 0 || outsize > ctx->ivlen)
+    if (outsize == 0 || outsize > ctx->ivlen)
     {
         outsize = ctx->ivlen;
     }
@@ -262,7 +260,7 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(SCOSSL_CIPHER_GCM_CTX *ctx,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *iv, size_t ivlen)
 {
     if (ctx->ivlen != EVP_GCM_TLS_IV_LEN)
@@ -302,11 +300,12 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encry
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                         unsigned char *iv, size_t ivlen)
 {
     if (ctx->useInvocation == 0 ||
         encrypt ||
+        ivlen == 0 ||
         ivlen > (size_t)ctx->ivlen)
     {
         return SCOSSL_FAILURE;
@@ -319,8 +318,9 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt
     return SCOSSL_SUCCESS;
 }
 
+// Returns the tag length on success, and 0 (SCOSSL_FAILURE) on failure
 _Use_decl_annotations_
-UINT16 scossl_aes_gcm_set_tls1_aad(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
+UINT16 scossl_aes_gcm_set_tls1_aad(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                    unsigned char *aad, size_t aadlen)
 {
     UINT16 tls_buffer_len = 0;
@@ -364,10 +364,8 @@ UINT16 scossl_aes_gcm_set_tls1_aad(SCOSSL_CIPHER_GCM_CTX *ctx, BOOL encrypt,
  */
 _Use_decl_annotations_
 void scossl_aes_ccm_init_ctx(SCOSSL_CIPHER_CCM_CTX *ctx,
-                             size_t keylen,
                              const unsigned char *iv)
 {
-    ctx->keylen = keylen;
     ctx->ivlen = SCOSSL_CCM_MIN_IV_LENGTH;
     if (iv)
     {
@@ -398,21 +396,16 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(SCOSSL_CIPHER_CCM_CTX *ctx,
     }
     if (key)
     {
-        if (keylen != ctx->keylen)
-        {
-            return SCOSSL_FAILURE;
-        }
         scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             return SCOSSL_FAILURE;
         }
-        ctx->keylen = keylen;
     }
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS scossl_aes_ccm_tls(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS scossl_aes_ccm_tls(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                         _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl,
                                         _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
@@ -505,7 +498,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                     unsigned char *out, size_t *outl,
                                     const unsigned char *in, size_t inl)
 {
@@ -626,7 +619,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *tag, size_t taglen)
 {
     if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
@@ -639,7 +632,7 @@ SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encry
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *tag, size_t taglen)
 {
     if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
@@ -672,7 +665,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_len(SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *iv, size_t ivlen)
 {
     if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
@@ -704,8 +697,9 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encry
     return SCOSSL_SUCCESS;
 }
 
+// Returns the tag length on success, and 0 (SCOSSL_FAILURE) on failure
 _Use_decl_annotations_
-UINT16 scossl_aes_ccm_set_tls1_aad(SCOSSL_CIPHER_CCM_CTX *ctx, BOOL encrypt,
+UINT16 scossl_aes_ccm_set_tls1_aad(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                                    unsigned char *aad, size_t aadlen)
 {
     UINT16 tls_buffer_len = 0;

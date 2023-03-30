@@ -11,7 +11,7 @@
 #include <openssl/ecdsa.h>
 #include <openssl/obj_mac.h>
 #include <openssl/kdf.h>
-#include "scossl.h"
+#include "e_scossl.h"
 
 BIO *bio_err = NULL;
 

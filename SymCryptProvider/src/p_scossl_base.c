@@ -55,7 +55,7 @@ extern const OSSL_DISPATCH p_scossl_aes256ccm_functions[];
 // Disabling XTS for now, also disabled in engine pending
 // the same dependencies.
 // Need to push the FIPS mode XTS flag into the SymCrypt API,
-// and expose an XTS key copy method. Addi
+// and expose an XTS key copy method.
 // extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
 // extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
 

@@ -21,7 +21,7 @@ typedef struct
 
     BYTE iv[SYMCRYPT_AES_BLOCK_SIZE];
 
-    BOOL encrypt;
+    INT32 encrypt;
 } SCOSSL_AES_XTS_CTX;
 
 static const OSSL_PARAM p_scossl_aes_xts_gettable_ctx_param_types[] = {
@@ -61,7 +61,7 @@ static void p_scossl_aes_xts_freectx(SCOSSL_AES_XTS_CTX *ctx)
     OPENSSL_clear_free(ctx, sizeof(SCOSSL_AES_XTS_CTX));
 }
 
-static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *ctx, BOOL encrypt,
+static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *ctx, INT32 encrypt,
                                                     _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
