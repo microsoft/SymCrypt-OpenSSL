@@ -42,7 +42,7 @@ static SCOSSL_STATUS p_scossl_rand_instantiate(ossl_unused void *ctx,
                                                _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len,
                                                ossl_unused const OSSL_PARAM params[])
 {
-    if (strength <= SCOSSL_DRGB_STRENGTH && prediction_resistance == 0)
+    if (strength > SCOSSL_DRGB_STRENGTH || prediction_resistance)
     {
         return SCOSSL_FAILURE;
     }
