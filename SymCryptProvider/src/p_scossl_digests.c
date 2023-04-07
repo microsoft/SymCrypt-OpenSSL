@@ -54,7 +54,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
             OPENSSL_malloc(sizeof(SYMCRYPT_##UCALG##_STATE));                         \
                                                                                       \
         if (copy_ctx != NULL)                                                         \
-            SymCrypt##CcAlg##StateCopy(copy_ctx, dctx);                               \
+            SymCrypt##CcAlg##StateCopy(dctx, copy_ctx);                               \
                                                                                       \
         return copy_ctx;                                                              \
     }                                                                                 \

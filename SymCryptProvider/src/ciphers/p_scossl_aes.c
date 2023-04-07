@@ -240,7 +240,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
     if (outsize < SYMCRYPT_AES_BLOCK_SIZE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        goto cleanup;
+        return SCOSSL_FAILURE;
     }
 
     // The return value of SymCryptPaddingPkcs7Remove must be mapped in a
@@ -250,7 +250,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
     SYMCRYPT_UINT32_MAP scErrorMap[1] = {
         {SYMCRYPT_NO_ERROR, SCOSSL_SUCCESS}};
 
-    // Encrypt final
+    // Add padding for encrypt
     if (ctx->encrypt)
     {
         if (ctx->cbBuf >= SYMCRYPT_AES_BLOCK_SIZE)
@@ -259,46 +259,31 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
             goto cleanup;
         }
 
-        // Pad
-        size_t pcbResult;
         SymCryptPaddingPkcs7Add(
             SYMCRYPT_AES_BLOCK_SIZE,
             ctx->buf,
             ctx->cbBuf,
             ctx->buf,
             SYMCRYPT_AES_BLOCK_SIZE,
-            &pcbResult);
-
-        if (pcbResult != SYMCRYPT_AES_BLOCK_SIZE)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-            goto cleanup;
-        }
-
-        if (!ctx->cipher(ctx, out, outl, outsize, ctx->buf, SYMCRYPT_AES_BLOCK_SIZE))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-            goto cleanup;
-        }
-
-        scError = SYMCRYPT_NO_ERROR;
-        goto cleanup;
+            &ctx->cbBuf);
     }
 
-    // Decrypt final
     if (ctx->cbBuf != SYMCRYPT_AES_BLOCK_SIZE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_WRONG_FINAL_BLOCK_LENGTH);
         goto cleanup;
     }
 
-    if (!ctx->cipher(ctx, out, outl, SYMCRYPT_AES_BLOCK_SIZE, ctx->buf, ctx->cbBuf))
+    if (!ctx->cipher(ctx, out, outl, SYMCRYPT_AES_BLOCK_SIZE, ctx->buf, SYMCRYPT_AES_BLOCK_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
         goto cleanup;
     }
 
-    if (ctx->pad)
+    // Remove padding for decrypt. The results of this operation should
+    // not be checked, rather mapped to error/success in a side-channel
+    // safe way.
+    if (!ctx->encrypt)
     {
         scError = SymCryptPaddingPkcs7Remove(
             SYMCRYPT_AES_BLOCK_SIZE,
@@ -308,20 +293,30 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
             SYMCRYPT_AES_BLOCK_SIZE,
             outl);
     }
+    else
+    {
+        scError = SYMCRYPT_NO_ERROR;
+    }
 
 cleanup:
     ctx->cbBuf = 0;
     SymCryptWipeKnownSize(ctx->buf, SYMCRYPT_AES_BLOCK_SIZE);
 
     // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
-    return SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1) ;
+    return SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1);
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
                                                  _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                                  _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    return ctx->cipher(ctx, out, outl, outsize, in, inl);
+    if (!ctx->cipher(ctx, out, outl, outsize, in, inl))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 const OSSL_PARAM *p_scossl_aes_generic_gettable_params(ossl_unused void *provctx)
@@ -497,7 +492,48 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-#define IMPLEMENT_SCOSSL_AES_CIPHER(kbits, ivlen, lcmode, UCMODE, flags)                                  \
+static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ctx, SIZE_T cbShift,
+                                                      _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                                      _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
+{
+    if (outsize < inl)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
+    if (outl != NULL)
+    {
+        *outl = inl;
+    }
+
+    if (ctx->encrypt)
+    {
+        SymCryptCfbEncrypt(SymCryptAesBlockCipher, cbShift, &ctx->key, ctx->pbChainingValue, in, out, inl);
+    }
+    else
+    {
+        SymCryptCfbDecrypt(SymCryptAesBlockCipher, cbShift, &ctx->key, ctx->pbChainingValue, in, out, inl);
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                           _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
+{
+    return p_scossl_aes_cfb_cipher_internal(ctx, SYMCRYPT_AES_BLOCK_SIZE, out, outl, outsize, in, inl);                                        
+}
+
+static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
+                                            _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
+{
+    return p_scossl_aes_cfb_cipher_internal(ctx, 1, out, outl, outsize, in, inl);                                        
+}
+
+#define IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(kbits, ivlen, lcmode, UCMODE)                                   \
     SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                            \
     {                                                                                                     \
         SCOSSL_AES_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_AES_CTX));                                     \
@@ -505,7 +541,7 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {                                                                                                 \
             ctx->keylen = kbits >> 3;                                                                     \
             ctx->pad = 1;                                                                                 \
-            ctx->cipher = (OSSL_FUNC_cipher_cipher_fn*)&scossl_aes_##lcmode##_cipher;                     \
+            ctx->cipher = (OSSL_FUNC_cipher_cipher_fn *)&scossl_aes_##lcmode##_cipher;                    \
         }                                                                                                 \
                                                                                                           \
         return ctx;                                                                                       \
@@ -513,7 +549,7 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     SCOSSL_STATUS p_scossl_aes_##kbits##_##lcmode##_get_params(_Inout_ OSSL_PARAM params[])               \
     {                                                                                                     \
         return p_scossl_aes_generic_get_params(params, EVP_CIPH_##UCMODE##_MODE, kbits >> 3,              \
-                                               ivlen, SYMCRYPT_AES_BLOCK_SIZE, flags);                    \
+                                               ivlen, SYMCRYPT_AES_BLOCK_SIZE, 0);                        \
     }                                                                                                     \
                                                                                                           \
     const OSSL_DISPATCH p_scossl_aes##kbits##lcmode##_functions[] = {                                     \
@@ -533,13 +569,21 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_settable_ctx_params}, \
         {0, NULL}};
 
-IMPLEMENT_SCOSSL_AES_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
-IMPLEMENT_SCOSSL_AES_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
-IMPLEMENT_SCOSSL_AES_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, 0)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC)
 
-IMPLEMENT_SCOSSL_AES_CIPHER(128, 0, ecb, ECB, 0)
-IMPLEMENT_SCOSSL_AES_CIPHER(192, 0, ecb, ECB, 0)
-IMPLEMENT_SCOSSL_AES_CIPHER(256, 0, ecb, ECB, 0)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(128, 0, ecb, ECB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(192, 0, ecb, ECB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(256, 0, ecb, ECB)
+
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB)
+
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB)
+IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB)
 
 #ifdef __cplusplus
 }

@@ -45,6 +45,12 @@ extern const OSSL_DISPATCH p_scossl_aes256cbc_functions[];
 extern const OSSL_DISPATCH p_scossl_aes128ecb_functions[];
 extern const OSSL_DISPATCH p_scossl_aes192ecb_functions[];
 extern const OSSL_DISPATCH p_scossl_aes256ecb_functions[];
+extern const OSSL_DISPATCH p_scossl_aes128cfb_functions[];
+extern const OSSL_DISPATCH p_scossl_aes192cfb_functions[];
+extern const OSSL_DISPATCH p_scossl_aes256cfb_functions[];
+extern const OSSL_DISPATCH p_scossl_aes128cfb8_functions[];
+extern const OSSL_DISPATCH p_scossl_aes192cfb8_functions[];
+extern const OSSL_DISPATCH p_scossl_aes256cfb8_functions[];
 extern const OSSL_DISPATCH p_scossl_aes128gcm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes192gcm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes256gcm_functions[];
@@ -66,6 +72,12 @@ static const OSSL_ALGORITHM p_scossl_cipher[] = {
     ALG("AES-128-ECB:2.16.840.1.101.3.4.1.1", p_scossl_aes128ecb_functions),
     ALG("AES-192-ECB:2.16.840.1.101.3.4.1.21", p_scossl_aes192ecb_functions),
     ALG("AES-256-ECB:2.16.840.1.101.3.4.1.41", p_scossl_aes256ecb_functions),
+    ALG("AES-128-CFB:2.16.840.1.101.3.4.1.4", p_scossl_aes128cfb_functions),
+    ALG("AES-192-CFB:2.16.840.1.101.3.4.1.24", p_scossl_aes192cfb_functions),
+    ALG("AES-256-CFB:2.16.840.1.101.3.4.1.44", p_scossl_aes256cfb_functions),
+    ALG("AES-128-CFB8", p_scossl_aes128cfb8_functions),
+    ALG("AES-192-CFB8", p_scossl_aes192cfb8_functions),
+    ALG("AES-256-CFB8", p_scossl_aes256cfb8_functions),
     ALG("AES-128-GCM:id-aes128-GCM:2.16.840.1.101.3.4.1.6", p_scossl_aes128gcm_functions),
     ALG("AES-192-GCM:id-aes192-GCM:2.16.840.1.101.3.4.1.26", p_scossl_aes192gcm_functions),
     ALG("AES-256-GCM:id-aes256-GCM:2.16.840.1.101.3.4.1.46", p_scossl_aes256gcm_functions),
