@@ -17,21 +17,21 @@ typedef struct
 
 static const OSSL_PARAM p_scossl_rsa_keygen_settable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_PKEY_PARAM_RSA_BITS, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_rsa_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_D, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR1, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT1, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL, 0),
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL, 0),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_N, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_D, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_FACTOR1, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_EXPONENT1, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL),
     OSSL_PARAM_END};
 
 // This function is actually unnecessary for the SymCrypt provider,
@@ -61,11 +61,7 @@ SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genc
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
     if (p != NULL)
     {
-        BIGNUM *rsa_e = BN_new();
-        if (rsa_e == NULL ||
-            !OSSL_PARAM_get_BN(p, &rsa_e) ||
-            BN_bn2binpad(rsa_e, (PBYTE)&genctx->pubExp64, sizeof(genctx->pubExp64)) != sizeof(genctx->pubExp64) ||
-            SymCryptLoadMsbFirstUint64((PBYTE)&genctx->pubExp64, sizeof(genctx->pubExp64), &genctx->pubExp64) != SYMCRYPT_NO_ERROR)
+        if (!OSSL_PARAM_get_uint64(p, &genctx->pubExp64))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return 0;
@@ -159,15 +155,15 @@ static const unsigned int log_e = 0x05c551;
 static const unsigned int c1_923 = 0x07b126;
 static const unsigned int c4_690 = 0x12c28f;
 
-static ossl_inline uint64_t mul2(uint64_t a, uint64_t b)
+static ossl_inline UINT64 mul2(UINT64 a, UINT64 b)
 {
     return a * b / scale;
 }
 
-static uint64_t icbrt64(uint64_t x)
+static UINT64 icbrt64(UINT64 x)
 {
-    uint64_t r = 0;
-    uint64_t b;
+    UINT64 r = 0;
+    UINT64 b;
     int s;
 
     for (s = 63; s >= 0; s -= 3)
@@ -183,9 +179,9 @@ static uint64_t icbrt64(uint64_t x)
     return r * cbrt_scale;
 }
 
-static uint32_t ilog_e(uint64_t v)
+static UINT32 ilog_e(UINT64 v)
 {
-    uint32_t i, r = 0;
+    UINT32 i, r = 0;
 
     while (v >= 2 * scale)
     {
@@ -201,15 +197,15 @@ static uint32_t ilog_e(uint64_t v)
             r += i;
         }
     }
-    r = (r * (uint64_t)scale) / log_e;
+    r = (r * (UINT64)scale) / log_e;
     return r;
 }
 
-static size_t p_scossl_rsa_compute_security_bits(UINT32 n)
+static UINT16 p_scossl_rsa_compute_security_bits(UINT32 n)
 {
-    uint64_t x;
-    uint32_t lx;
-    size_t y, cap;
+    UINT64 x;
+    UINT32 lx;
+    UINT16 y, cap;
 
     if (n <= 7680)
         cap = 192;
@@ -218,9 +214,9 @@ static size_t p_scossl_rsa_compute_security_bits(UINT32 n)
     else
         cap = 1200;
 
-    x = n * (uint64_t)log_2;
+    x = n * (UINT64)log_2;
     lx = ilog_e(x);
-    y = (size_t)((mul2(c1_923, icbrt64(mul2(mul2(x, lx), lx))) - c4_690) / log_2);
+    y = (UINT16)((mul2(c1_923, icbrt64(mul2(mul2(x, lx), lx))) - c4_690) / log_2);
     y = (y + 4) & ~7;
     if (y > cap)
         y = cap;
@@ -228,9 +224,9 @@ static size_t p_scossl_rsa_compute_security_bits(UINT32 n)
     return y;
 }
 
-static size_t p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
+static UINT16 p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
 {
-    size_t ret = 0;
+    UINT16 ret = 0;
     UINT32 nBNitsOfModulus = SymCryptRsakeyModulusBits(keydata);
 
     // Common key sizes are hardcoded
@@ -266,6 +262,8 @@ static size_t p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
 
 SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
     OSSL_PARAM *p;
     OSSL_PARAM *p_d;
     OSSL_PARAM *p_crt_exp1;
@@ -275,9 +273,9 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
     OSSL_PARAM *p_e;
     OSSL_PARAM *p_prime1;
     OSSL_PARAM *p_prime2;
+    UINT64 p_data_uint64;
 
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SIZE_T cbModulus = SymCryptRsakeySizeofModulus(keydata);
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keydata);
     PBYTE pbModulus = NULL;
     PBYTE pbPrivateExponent = NULL;
     PBYTE pbCrtCoefficient = NULL;
@@ -288,22 +286,20 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
         SymCryptRsakeySizeofPrime(keydata, 0),
         SymCryptRsakeySizeofPrime(keydata, 1)};
 
-    BIGNUM *bn_buf;
-
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SymCryptRsakeyModulusBits(keydata)))
+    if (p != NULL && !OSSL_PARAM_set_int(p, SymCryptRsakeyModulusBits(keydata)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, p_scossl_rsa_get_security_bits(keydata)))
+    if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_rsa_get_security_bits(keydata)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, cbModulus))
+    if (p != NULL && !OSSL_PARAM_set_int(p, cbModulus))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
@@ -319,10 +315,10 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
         p_crt_exp2 != NULL ||
         p_coefficient != NULL)
     {
-        if (((pbPrivateExponent = OPENSSL_secure_malloc(cbModulus)) == NULL) ||
-            ((pbCrtCoefficient = OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
-            ((ppbCrtExponents[0] == OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
-            ((ppbCrtExponents[1] == OPENSSL_secure_malloc(pcbPrimes[1])) == NULL))
+        if (((pbPrivateExponent  = OPENSSL_secure_malloc(cbModulus))    == NULL) ||
+            ((pbCrtCoefficient   = OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
+            ((ppbCrtExponents[0] = OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
+            ((ppbCrtExponents[1] = OPENSSL_secure_malloc(pcbPrimes[1])) == NULL))
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
@@ -345,29 +341,29 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
         }
 
         if (p_d != NULL &&
-            (BN_bin2bn(pbPrivateExponent, cbModulus, bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_d, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)pbPrivateExponent, cbModulus, &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_d, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_crt_exp1 != NULL &&
-            (BN_bin2bn(ppbCrtExponents[0], pcbPrimes[0], bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_crt_exp1, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)ppbCrtExponents[0], pcbPrimes[0], &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_crt_exp1, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_crt_exp2 != NULL &&
-            (BN_bin2bn(ppbCrtExponents[1], pcbPrimes[1], bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_crt_exp2, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)ppbCrtExponents[1], pcbPrimes[1], &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_crt_exp2, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_coefficient != NULL &&
-            (BN_bin2bn(pbCrtCoefficient, pcbPrimes[0], bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_coefficient, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)pbCrtCoefficient, pcbPrimes[0], &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_coefficient, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -385,9 +381,9 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
     {
         UINT64 pubExp64;
 
-        if (((pbModulus == OPENSSL_malloc(cbModulus)) == NULL) ||
-            ((ppbPrimes[0] == OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
-            ((ppbPrimes[1] == OPENSSL_secure_malloc(pcbPrimes[1])) == NULL))
+        if (((pbModulus    = OPENSSL_malloc(cbModulus))           == NULL) ||
+            ((ppbPrimes[0] = OPENSSL_secure_malloc(pcbPrimes[0])) == NULL) ||
+            ((ppbPrimes[1] = OPENSSL_secure_malloc(pcbPrimes[1])) == NULL))
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
@@ -410,39 +406,36 @@ SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_
         }
 
         if (p_n != NULL &&
-            (BN_bin2bn(pbModulus, cbModulus, bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_n, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)pbModulus, cbModulus, &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_n, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_e != NULL &&
-            (SymCryptStoreMsbFirstUint64(pubExp64, (PBYTE)&pubExp64, sizeof(pubExp64)) != SYMCRYPT_NO_ERROR ||
-             BN_bin2bn((PBYTE)&pubExp64, sizeof(pubExp64), bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_e, bn_buf)))
+            !OSSL_PARAM_set_uint64(p_e, pubExp64))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_prime1 != NULL &&
-            (BN_bin2bn(ppbPrimes[0], pcbPrimes[0], bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_prime1, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)ppbPrimes[0], pcbPrimes[0], &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_prime1, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
         if (p_prime2 != NULL &&
-            (BN_bin2bn(ppbPrimes[1], pcbPrimes[1], bn_buf) == NULL ||
-             !OSSL_PARAM_set_BN(p_prime2, bn_buf)))
+            (SymCryptLoadMsbFirstUint64((PCBYTE)ppbPrimes[1], pcbPrimes[1], &p_data_uint64) != SYMCRYPT_NO_ERROR ||
+             !OSSL_PARAM_set_uint64(p_prime2, p_data_uint64)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
 cleanup:
-    BN_clear_free(bn_buf);
     OPENSSL_free(pbModulus);
     OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
     OPENSSL_secure_clear_free(pbCrtCoefficient, pcbPrimes[0]);
@@ -451,7 +444,7 @@ cleanup:
     OPENSSL_secure_clear_free(ppbPrimes[0], pcbPrimes[0]);
     OPENSSL_secure_clear_free(ppbPrimes[1], pcbPrimes[1]);
 
-    return SCOSSL_FAILURE;
+    return ret;
 }
 
 const OSSL_PARAM *p_scossl_keymgmt_gettable_params(ossl_unused void *provctx)

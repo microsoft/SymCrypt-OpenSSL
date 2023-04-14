@@ -20,6 +20,7 @@ set(SCOSSL_SOURCES
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     # ./src/ciphers/p_scossl_aes_xts.c
+    ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_base.c
