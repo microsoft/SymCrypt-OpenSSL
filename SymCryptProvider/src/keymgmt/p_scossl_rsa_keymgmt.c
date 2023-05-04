@@ -2,6 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include <openssl/param_build.h>
 #include <openssl/proverr.h>
 
 #include "p_scossl_base.h"
@@ -49,15 +50,14 @@ static const OSSL_PARAM p_scossl_rsa_keymgmt_impexp_param_types[] = {
 // the size of the SYMPCRYPT_RSAKEY depends on the parameters that aren't
 // known until import, we cannot directly use the SYMPCRYPT_RSAKEY, but instead
 // must wrap it with the SYMPCRYPT_RSAKEY_CTX.
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new(ossl_unused void *provctx)
+SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
-    SCOSSL_RSA_KEY_CTX *kctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
-    if (kctx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-    }
+    return scossl_rsa_new_key_ctx();
+}
 
-    return kctx;
+SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx, ossl_unused int selection)
+{
+    return scossl_rsa_dup_key_ctx(keyCtx);
 }
 
 // Key Generation
@@ -123,16 +123,15 @@ SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int s
     return genctx;
 }
 
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genctx, _In_opt_ OSSL_CALLBACK *cb, _In_opt_ void *cbarg)
+SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genctx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
     SCOSSL_RSA_KEY_CTX *kctx;
     SYMCRYPT_ERROR scError;
 
-    kctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    kctx = scossl_rsa_new_key_ctx();
     if (kctx == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
@@ -574,7 +573,7 @@ BOOL p_scossl_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKE
                 NULL,
                 0,
                 NULL,
-                NULL,
+                0,
                 pbPrivateExponent1,
                 cbModulus,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -585,7 +584,7 @@ BOOL p_scossl_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKE
                 NULL,
                 0,
                 NULL,
-                NULL,
+                0,
                 pbPrivateExponent2,
                 cbModulus,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -618,7 +617,7 @@ const OSSL_PARAM *p_scossl_keymgmt_impexp_types(int selection)
 
 SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *kctx, int selection, _In_ const OSSL_PARAM params[])
 {
-    BOOL include_private = selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0;
+    BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
 
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -631,7 +630,7 @@ SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *kctx, int sele
     SIZE_T nPrimes = 0;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
 
-    UINT64 p_data_uint64;
+    BIGNUM *bn = BN_new();
 
     if (kctx == NULL ||
         !(selection & OSSL_KEYMGMT_SELECT_KEYPAIR))
@@ -642,19 +641,27 @@ SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *kctx, int sele
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N);
     if (p != NULL)
     {
-        if (!p_scossl_param_get_BN(p, &pbModulus))
+        cbModulus = p->data_size;
+
+        pbModulus = OPENSSL_zalloc(cbModulus);
+        if(pbModulus == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+        if (!OSSL_PARAM_get_BN(p, &bn) ||
+            !BN_bn2bin(bn, pbModulus))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
-        cbModulus = p->data_size;
     }
 
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
     if (p == NULL || !OSSL_PARAM_get_uint64(p, &pubExp64))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if (include_private)
@@ -662,24 +669,40 @@ SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *kctx, int sele
         p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1);
         if (p != NULL)
         {
-            if (!p_scossl_param_get_BN(p, &ppbPrimes[0]))
+            pcbPrimes[0] = p->data_size;
+
+            ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
+            if(pbModulus == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+            if (!OSSL_PARAM_get_BN(p, &bn) ||
+                !BN_bn2bin(bn, ppbPrimes[0]))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
-            pcbPrimes[0] = p->data_size;
             nPrimes++;
         }
 
         p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2);
         if (p != NULL)
         {
-            if (!p_scossl_param_get_BN(p, &ppbPrimes[1]))
+            pcbPrimes[1] = p->data_size;
+
+            ppbPrimes[1] = OPENSSL_zalloc(pcbPrimes[1]);
+            if(pbModulus == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+            if (!OSSL_PARAM_get_BN(p, &bn) ||
+                !BN_bn2bin(bn, ppbPrimes[1]))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
-            pcbPrimes[1] = p->data_size;
             nPrimes++;
         }
     }
@@ -737,7 +760,7 @@ cleanup:
 SCOSSL_STATUS p_scossl_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *kctx, int selection,
                                       _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    BOOL    include_private = selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY != 0;
+    BOOL    include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     UINT64  pubExp64;
     PBYTE   pbModulus = NULL;
     SIZE_T  cbModulus = 0;
@@ -759,7 +782,6 @@ SCOSSL_STATUS p_scossl_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *kctx, int selecti
     SYMCRYPT_ERROR  scError = SYMCRYPT_NO_ERROR;
 
     BIGNUM *rsa_n = NULL;
-    BIGNUM *rsa_e = NULL;
     BIGNUM *rsa_p = NULL;
     BIGNUM *rsa_q = NULL;
     BIGNUM *rsa_d = NULL;
@@ -835,7 +857,7 @@ SCOSSL_STATUS p_scossl_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *kctx, int selecti
         kctx->key,
         pbModulus,
         cbModulus,
-        NULL,
+        &pubExp64,
         0,
         ppbPrimes,
         pcbPrimes,
@@ -913,7 +935,7 @@ SCOSSL_STATUS p_scossl_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *kctx, int selecti
     }
 
     if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, rsa_n) ||
-        !OSSL_PARAM_BLD_push_uint64(bld, OSSL_PKEY_PARAM_RSA_E, rsa_e) ||
+        !OSSL_PARAM_BLD_push_uint64(bld, OSSL_PKEY_PARAM_RSA_E, pubExp64) ||
         (include_private &&
          (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1, rsa_p) ||
           !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2, rsa_q) ||
@@ -935,7 +957,6 @@ cleanup:
     }
 
     BN_free(rsa_n);
-    BN_free(rsa_e);
     BN_clear_free(rsa_p);
     BN_clear_free(rsa_q);
     BN_clear_free(rsa_dmp1);
@@ -947,8 +968,9 @@ cleanup:
 }
 
 const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[] = {
-    {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_rsa_keymgmt_new},
-    {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))scossl_rsa_free_key_context},
+    {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_rsa_keymgmt_new_ctx},
+    {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_rsa_keymgmt_dup_ctx},
+    {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))scossl_rsa_free_key_ctx},
     {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_rsa_keygen_set_params},
     {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keygen_settable_params},
     {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_rsa_keygen_cleanup},
