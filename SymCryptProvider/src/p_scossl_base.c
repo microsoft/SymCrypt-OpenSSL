@@ -5,7 +5,6 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/proverr.h>
 
-#include "scossl_helpers.h"
 #include "p_scossl_base.h"
 
 #ifdef __cplusplus
@@ -125,7 +124,7 @@ extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_keymgmt_functions),
-    // ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
     // ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsa_keymgmt_functions),
     // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
     ALG_TABLE_END};
@@ -150,7 +149,7 @@ extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
-    // ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsa_signature_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_signature_functions),
     // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecdsa_signature_functions),
     ALG_TABLE_END};
 
@@ -249,7 +248,18 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    SCOSSL_PROVCTX *p_ctx;
+    SCOSSL_PROVCTX *p_ctx = NULL;
+    OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
+
+    *out = p_scossl_base_dispatch;
+
+    if (!scossl_prov_initialized)
+    {
+        SYMCRYPT_MODULE_INIT();
+        scossl_prov_initialized = 1;
+    }
+
+    scossl_setup_logging();
 
     for (; in->function_id != 0; in++)
     {
@@ -266,6 +276,9 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                 break;
             case OSSL_FUNC_CRYPTO_CLEAR_FREE:
                 c_CRYPTO_clear_free = OSSL_FUNC_CRYPTO_clear_free(in);
+                break;
+            case OSSL_FUNC_CORE_GET_LIBCTX:
+                core_get_libctx = OSSL_FUNC_core_get_libctx(in);
                 break;
         }
     }
@@ -286,6 +299,22 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     }
 
     scossl_setup_logging();
+
+    if (core_get_libctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    p_ctx->handle = handle;
+    p_ctx->libctx = (OSSL_LIB_CTX *)core_get_libctx(handle);
+    *provctx = p_ctx;
 
     return SCOSSL_SUCCESS;
 }
