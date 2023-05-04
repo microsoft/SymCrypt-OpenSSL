@@ -23,6 +23,7 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
+    ./src/p_scossl_rsa.c
     ./src/p_scossl_base.c
 )
 
