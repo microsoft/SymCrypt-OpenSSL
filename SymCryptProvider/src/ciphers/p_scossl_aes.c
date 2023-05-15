@@ -129,6 +129,11 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
     size_t cbBytesInFullBlocks = 0;
     *outl = 0;
 
+    if (inl == 0)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     // Data from previous update in buffer. Try to fill buffer and
     // encrypt/decrypt before moving to remaining data.
     if (ctx->cbBuf > 0)

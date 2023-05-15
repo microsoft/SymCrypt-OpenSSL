@@ -8,8 +8,8 @@
 
 #include "scossl_helpers.h"
 
-#define SCOSSL_DRGB_STRENGTH 256
-#define SCOSSL_DRGB_MAX_REQUEST_SIZE (1 << 16)
+#define SCOSSL_DRBG_STRENGTH 256
+#define SCOSSL_DRBG_MAX_REQUEST_SIZE (1 << 16)
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +42,7 @@ static SCOSSL_STATUS p_scossl_rand_instantiate(ossl_unused void *ctx,
                                                _In_reads_bytes_opt_(addin_len) const unsigned char *addin, size_t addin_len,
                                                ossl_unused const OSSL_PARAM params[])
 {
-    if (strength > SCOSSL_DRGB_STRENGTH || prediction_resistance)
+    if (strength > SCOSSL_DRBG_STRENGTH || prediction_resistance)
     {
         return SCOSSL_FAILURE;
     }
@@ -111,13 +111,13 @@ static SCOSSL_STATUS p_scossl_rand_get_ctx_params(ossl_unused void *ctx, _Inout_
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STRENGTH);
-    if (p != NULL && !OSSL_PARAM_set_uint(p, SCOSSL_DRGB_STRENGTH))
+    if (p != NULL && !OSSL_PARAM_set_uint(p, SCOSSL_DRBG_STRENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
     p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_MAX_REQUEST);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_DRGB_MAX_REQUEST_SIZE))
+    if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_DRBG_MAX_REQUEST_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
