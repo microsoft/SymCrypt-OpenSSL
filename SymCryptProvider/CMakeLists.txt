@@ -4,8 +4,8 @@ project(scossl_provider)
 
 set(DEFAULT_BUILD_TYPE "Release")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-unused-parameter")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unknown-pragmas")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra")
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
@@ -17,8 +17,12 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
-    ./src/p_scossl_base.c
+    ./src/ciphers/p_scossl_aes.c
+    ./src/ciphers/p_scossl_aes_aead.c
+    # ./src/ciphers/p_scossl_aes_xts.c
     ./src/p_scossl_digests.c
+    ./src/p_scossl_rand.c
+    ./src/p_scossl_base.c
 )
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
@@ -37,10 +41,12 @@ set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
 target_link_libraries(scossl_provider PRIVATE scossl_common)
 target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
 
+set(OPENSSL_PROVIDERS CACHE PATH "Path to OpenSSL providers" "${CMAKE_INSTALL_LIBDIR}/ossl-modules")
+
 # Install the engine to the OpenSSL modules directory
 # NB: this won't work if the distro has a custom modules directory that doesn't match
 # the OpenSSL default.
 install(
     TARGETS scossl_provider
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/ossl-modules"
+    LIBRARY DESTINATION "${OPENSSL_PROVIDERS}"
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
