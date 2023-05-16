@@ -539,7 +539,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
                                                ivlen, 1, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV);          \
     }                                                                                                        \
                                                                                                              \
-    const OSSL_DISPATCH p_scossl_aes##kbits####lcmode##_functions[] = {                                      \
+    const OSSL_DISPATCH p_scossl_aes##kbits##lcmode##_functions[] = {                                        \
         {OSSL_FUNC_CIPHER_NEWCTX, (void (*)(void))p_scossl_aes_##kbits##_##lcmode##_newctx},                 \
         {OSSL_FUNC_CIPHER_DUPCTX, (void (*)(void))p_scossl_aes_##lcmode##_dupctx},                           \
         {OSSL_FUNC_CIPHER_FREECTX, (void (*)(void))p_scossl_aes_##lcmode##_freectx},                         \
