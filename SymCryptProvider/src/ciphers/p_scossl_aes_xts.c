@@ -36,7 +36,7 @@ static const OSSL_PARAM p_scossl_aes_xts_settable_ctx_param_types[] = {
 
 static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static SCOSSL_AES_XTS_CTX *p_scossl_aes_xtx_newctx_internal(size_t keylen)
+static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_newctx_internal(size_t keylen)
 {
     SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
     if (ctx != NULL)    
@@ -218,7 +218,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
 #define IMPLEMENT_SCOSSL_AES_XTS_CIPHER(kbits)                                                        \
     SCOSSL_AES_XTS_CTX *p_scossl_aes_##kbits##_xts_newctx()                                           \
     {                                                                                                 \
-        return p_scossl_aes_xtx_newctx_internal(kbits >> 3);                                          \
+        return p_scossl_aes_xts_newctx_internal(kbits >> 3);                                          \
     }                                                                                                 \
     SCOSSL_STATUS p_scossl_aes_##kbits##_xts_get_params(_Inout_ OSSL_PARAM params[])                  \
     {                                                                                                 \

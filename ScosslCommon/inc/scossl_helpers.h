@@ -51,20 +51,26 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 #define SCOSSL_ALIGNED_SIZEOF(typename)         (sizeof(typename) + SYMCRYPT_ALIGN_VALUE)
 #define SCOSSL_ALIGN_UP(ptr)                    (SYMCRYPT_ALIGN_UP(ptr))
 
-#define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename)   \
-    PBYTE alloc = allocator(SCOSSL_ALIGNED_SIZEOF(typename));   \
-    PBYTE aligned_alloc = NULL;                                 \
-    if (alloc)                                                  \
-    {                                                           \
-        aligned_alloc = SCOSSL_ALIGN_UP(alloc+1);               \
-        *(aligned_alloc - 1) = aligned_alloc - alloc;           \
-    }                                                           \
-    typename *ptr = (typename *) aligned_alloc;
+#define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename)               \
+    typename *ptr;                                                          \
+    {                                                                       \
+        PBYTE scossl_alloc = allocator(SCOSSL_ALIGNED_SIZEOF(typename));    \
+        PBYTE scossl_aligned = NULL;                                        \
+        if (scossl_alloc)                                                   \
+        {                                                                   \
+            scossl_aligned = SCOSSL_ALIGN_UP(scossl_alloc+1);               \
+            *(scossl_aligned - 1) = scossl_aligned - scossl_alloc;          \
+        }                                                                   \
+        ptr = (typename *) scossl_aligned;                                  \
+    }
 
-#define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)  \
-    PBYTE aligned_alloc = (PBYTE) ptr;                          \
-    PBYTE alloc = aligned_alloc - *(aligned_alloc-1);           \
-    deallocator(alloc, SCOSSL_ALIGNED_SIZEOF(typename));
+#define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)      \
+    {                                                               \
+        PBYTE scossl_aligned = (PBYTE) ptr;                         \
+        PBYTE scossl_alloc = scossl_aligned - *(scossl_aligned-1);  \
+        deallocator(scossl_alloc, SCOSSL_ALIGNED_SIZEOF(typename)); \
+        ptr = NULL;                                                 \
+    }
 
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
 void SCOSSL_set_trace_log_filename(const char *filename);

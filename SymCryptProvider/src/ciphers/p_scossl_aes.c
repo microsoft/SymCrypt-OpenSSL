@@ -75,6 +75,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *
                                                         _In_ const OSSL_PARAM params[])
 {
     ctx->encrypt = encrypt;
+    ctx->cbBuf = 0;
 
     if (key != NULL)
     {
