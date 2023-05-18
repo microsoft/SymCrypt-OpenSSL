@@ -38,8 +38,8 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
 
 static SCOSSL_AES_XTS_CTX *p_scossl_aes_xtx_newctx_internal(size_t keylen)
 {
-    SCOSSL_AES_XTS_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_AES_XTS_CTX));
-    if (ctx != NULL)
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
+    if (ctx != NULL)    
     {
         ctx->keylen = keylen;
     }
@@ -48,7 +48,7 @@ static SCOSSL_AES_XTS_CTX *p_scossl_aes_xtx_newctx_internal(size_t keylen)
 
 static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_dupctx(SCOSSL_AES_XTS_CTX *ctx)
 {
-    SCOSSL_AES_XTS_CTX *copy_ctx = OPENSSL_zalloc(sizeof(SCOSSL_AES_XTS_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
     if (copy_ctx != NULL)
     {
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_AES_XTS_CTX));
@@ -58,7 +58,7 @@ static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_dupctx(SCOSSL_AES_XTS_CTX *ctx)
 
 static void p_scossl_aes_xts_freectx(SCOSSL_AES_XTS_CTX *ctx)
 {
-    OPENSSL_clear_free(ctx, sizeof(SCOSSL_AES_XTS_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_AES_XTS_CTX);
 }
 
 static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *ctx, INT32 encrypt,

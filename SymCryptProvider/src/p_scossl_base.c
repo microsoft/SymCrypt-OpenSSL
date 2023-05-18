@@ -249,22 +249,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    SCOSSL_PROVCTX *p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
-    if (p_ctx != NULL)
-    {
-        p_ctx->handle = handle;
-        *provctx = p_ctx;
-    }
-
-    *out = p_scossl_base_dispatch;
-
-    if (!scossl_prov_initialized)
-    {
-        SYMCRYPT_MODULE_INIT();
-        scossl_prov_initialized = 1;
-    }
-
-    scossl_setup_logging();
+    SCOSSL_PROVCTX *p_ctx;
 
     for (; in->function_id != 0; in++)
     {
@@ -284,6 +269,23 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                 break;
         }
     }
+    
+    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx != NULL)
+    {
+        p_ctx->handle = handle;
+        *provctx = p_ctx;
+    }
+
+    *out = p_scossl_base_dispatch;
+
+    if (!scossl_prov_initialized)
+    {
+        SYMCRYPT_MODULE_INIT();
+        scossl_prov_initialized = 1;
+    }
+
+    scossl_setup_logging();
 
     return SCOSSL_SUCCESS;
 }

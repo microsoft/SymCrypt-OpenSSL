@@ -27,7 +27,7 @@ static const EVP_MD *e_scossl_digest_md5(void)
     if ((_hidden_md5_md = EVP_MD_meth_new(NID_md5, NID_md5WithRSAEncryption)) == NULL
         || !EVP_MD_meth_set_result_size(_hidden_md5_md, MD5_DIGEST_LENGTH)
         || !EVP_MD_meth_set_input_blocksize(_hidden_md5_md, MD5_CBLOCK)
-        || !EVP_MD_meth_set_app_datasize(_hidden_md5_md, sizeof(SYMCRYPT_MD5_STATE))
+        || !EVP_MD_meth_set_app_datasize(_hidden_md5_md, SCOSSL_ALIGNED_SIZEOF(SYMCRYPT_MD5_STATE))
         || !EVP_MD_meth_set_flags(_hidden_md5_md, 0)
         || !EVP_MD_meth_set_init(_hidden_md5_md, e_scossl_digest_md5_init)
         || !EVP_MD_meth_set_update(_hidden_md5_md, e_scossl_digest_md5_update)
@@ -52,7 +52,7 @@ static const EVP_MD *e_scossl_digest_sha1(void)
     if( (_hidden_sha1_md = EVP_MD_meth_new(NID_sha1, NID_sha1WithRSAEncryption)) == NULL
         || !EVP_MD_meth_set_result_size(_hidden_sha1_md, SHA_DIGEST_LENGTH)
         || !EVP_MD_meth_set_input_blocksize(_hidden_sha1_md, SHA_CBLOCK)
-        || !EVP_MD_meth_set_app_datasize(_hidden_sha1_md, sizeof(SYMCRYPT_SHA1_STATE))
+        || !EVP_MD_meth_set_app_datasize(_hidden_sha1_md, SCOSSL_ALIGNED_SIZEOF(SYMCRYPT_SHA1_STATE))
         || !EVP_MD_meth_set_flags(_hidden_sha1_md, EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS)
         || !EVP_MD_meth_set_init(_hidden_sha1_md, e_scossl_digest_sha1_init)
         || !EVP_MD_meth_set_update(_hidden_sha1_md, e_scossl_digest_sha1_update)
@@ -77,7 +77,7 @@ static const EVP_MD *e_scossl_digest_sha256(void)
     if( (_hidden_sha256_md = EVP_MD_meth_new(NID_sha256, NID_sha256WithRSAEncryption)) == NULL
         || !EVP_MD_meth_set_result_size(_hidden_sha256_md, SHA256_DIGEST_LENGTH)
         || !EVP_MD_meth_set_input_blocksize(_hidden_sha256_md, SHA256_CBLOCK)
-        || !EVP_MD_meth_set_app_datasize(_hidden_sha256_md, sizeof(SYMCRYPT_SHA256_STATE))
+        || !EVP_MD_meth_set_app_datasize(_hidden_sha256_md, SCOSSL_ALIGNED_SIZEOF(SYMCRYPT_SHA256_STATE))
         || !EVP_MD_meth_set_flags(_hidden_sha256_md, EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS)
         || !EVP_MD_meth_set_init(_hidden_sha256_md, e_scossl_digest_sha256_init)
         || !EVP_MD_meth_set_update(_hidden_sha256_md, e_scossl_digest_sha256_update)
@@ -102,7 +102,7 @@ static const EVP_MD *e_scossl_digest_sha384(void)
     if( (_hidden_sha384_md = EVP_MD_meth_new(NID_sha384, NID_sha384WithRSAEncryption)) == NULL
         || !EVP_MD_meth_set_result_size(_hidden_sha384_md, SHA384_DIGEST_LENGTH)
         || !EVP_MD_meth_set_input_blocksize(_hidden_sha384_md, SHA512_CBLOCK)
-        || !EVP_MD_meth_set_app_datasize(_hidden_sha384_md, sizeof(SYMCRYPT_SHA384_STATE))
+        || !EVP_MD_meth_set_app_datasize(_hidden_sha384_md, SCOSSL_ALIGNED_SIZEOF(SYMCRYPT_SHA384_STATE))
         || !EVP_MD_meth_set_flags(_hidden_sha384_md, EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS)
         || !EVP_MD_meth_set_init(_hidden_sha384_md, e_scossl_digest_sha384_init)
         || !EVP_MD_meth_set_update(_hidden_sha384_md, e_scossl_digest_sha384_update)
@@ -127,7 +127,7 @@ static const EVP_MD *e_scossl_digest_sha512(void)
     if( (_hidden_sha512_md = EVP_MD_meth_new(NID_sha512, NID_sha512WithRSAEncryption)) == NULL
         || !EVP_MD_meth_set_result_size(_hidden_sha512_md, SHA512_DIGEST_LENGTH)
         || !EVP_MD_meth_set_input_blocksize(_hidden_sha512_md, SHA512_CBLOCK)
-        || !EVP_MD_meth_set_app_datasize(_hidden_sha512_md, sizeof(SYMCRYPT_SHA512_STATE))
+        || !EVP_MD_meth_set_app_datasize(_hidden_sha512_md, SCOSSL_ALIGNED_SIZEOF(SYMCRYPT_SHA512_STATE))
         || !EVP_MD_meth_set_flags(_hidden_sha512_md, EVP_MD_FLAG_DIGALGID_ABSENT | EVP_MD_FLAG_FIPS)
         || !EVP_MD_meth_set_init(_hidden_sha512_md, e_scossl_digest_sha512_init)
         || !EVP_MD_meth_set_update(_hidden_sha512_md, e_scossl_digest_sha512_update)
@@ -212,7 +212,7 @@ int e_scossl_digests(_Inout_ ENGINE *e, _Out_opt_ const EVP_MD **digest,
  */
 static SCOSSL_STATUS e_scossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
 {
-    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -226,7 +226,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS e_scossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                              size_t count)
 {
-    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -239,7 +239,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_rea
 
 static SCOSSL_STATUS e_scossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_MD5_RESULT_SIZE) unsigned char *md)
 {
-    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -252,8 +252,8 @@ static SCOSSL_STATUS e_scossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_wri
 
 static SCOSSL_STATUS e_scossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    PSYMCRYPT_MD5_STATE state_to = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(to);
-    PSYMCRYPT_MD5_STATE state_from = (PSYMCRYPT_MD5_STATE)EVP_MD_CTX_md_data(from);
+    PSYMCRYPT_MD5_STATE state_to = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(to));
+    PSYMCRYPT_MD5_STATE state_from = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(from));
     if( state_to == NULL || state_from == NULL )
     {
         return SCOSSL_SUCCESS;
@@ -268,7 +268,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_copy(_Out_ EVP_MD_CTX *to, _In_ const E
  */
 static SCOSSL_STATUS e_scossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
 {
-    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -282,7 +282,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS e_scossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                               size_t count)
 {
-    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -295,7 +295,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_re
 
 static SCOSSL_STATUS e_scossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA1_RESULT_SIZE) unsigned char *md)
 {
-    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -308,8 +308,8 @@ static SCOSSL_STATUS e_scossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_wr
 
 static SCOSSL_STATUS e_scossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    PSYMCRYPT_SHA1_STATE state_to = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(to);
-    PSYMCRYPT_SHA1_STATE state_from = (PSYMCRYPT_SHA1_STATE)EVP_MD_CTX_md_data(from);
+    PSYMCRYPT_SHA1_STATE state_to = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(to));
+    PSYMCRYPT_SHA1_STATE state_from = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(from));
     if( state_to == NULL || state_from == NULL )
     {
         return SCOSSL_SUCCESS;
@@ -325,7 +325,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_copy(_Out_ EVP_MD_CTX *to, _In_ const 
  */
 static SCOSSL_STATUS e_scossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
 {
-    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -339,7 +339,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS e_scossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -352,7 +352,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_
 
 static SCOSSL_STATUS e_scossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA256_RESULT_SIZE) unsigned char *md)
 {
-    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -365,8 +365,8 @@ static SCOSSL_STATUS e_scossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_
 
 static SCOSSL_STATUS e_scossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    PSYMCRYPT_SHA256_STATE state_to = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(to);
-    PSYMCRYPT_SHA256_STATE state_from = (PSYMCRYPT_SHA256_STATE)EVP_MD_CTX_md_data(from);
+    PSYMCRYPT_SHA256_STATE state_to = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(to));
+    PSYMCRYPT_SHA256_STATE state_from = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(from));
     if( state_to == NULL || state_from == NULL )
     {
         return SCOSSL_SUCCESS;
@@ -381,7 +381,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_copy(_Out_ EVP_MD_CTX *to, _In_ cons
  */
 static SCOSSL_STATUS e_scossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
 {
-    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -395,7 +395,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS e_scossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -408,7 +408,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_
 
 static SCOSSL_STATUS e_scossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA384_RESULT_SIZE) unsigned char *md)
 {
-    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -421,8 +421,8 @@ static SCOSSL_STATUS e_scossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_
 
 static SCOSSL_STATUS e_scossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    PSYMCRYPT_SHA384_STATE state_to = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(to);
-    PSYMCRYPT_SHA384_STATE state_from = (PSYMCRYPT_SHA384_STATE)EVP_MD_CTX_md_data(from);
+    PSYMCRYPT_SHA384_STATE state_to = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(to));
+    PSYMCRYPT_SHA384_STATE state_from = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(from));
     if( state_to == NULL || state_from == NULL )
     {
         return SCOSSL_SUCCESS;
@@ -437,7 +437,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_copy(_Out_ EVP_MD_CTX *to, _In_ cons
  */
 static SCOSSL_STATUS e_scossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
 {
-    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -451,7 +451,7 @@ static SCOSSL_STATUS e_scossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
 static SCOSSL_STATUS e_scossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_reads_bytes_(count) const void *data,
                                 size_t count)
 {
-    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -464,7 +464,7 @@ static SCOSSL_STATUS e_scossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_
 
 static SCOSSL_STATUS e_scossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_writes_(SYMCRYPT_SHA512_RESULT_SIZE) unsigned char *md)
 {
-    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(ctx);
+    PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
@@ -477,8 +477,8 @@ static SCOSSL_STATUS e_scossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_
 
 static SCOSSL_STATUS e_scossl_digest_sha512_copy(_Out_ EVP_MD_CTX *to, _In_ const EVP_MD_CTX *from)
 {
-    PSYMCRYPT_SHA512_STATE state_to = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(to);
-    PSYMCRYPT_SHA512_STATE state_from = (PSYMCRYPT_SHA512_STATE)EVP_MD_CTX_md_data(from);
+    PSYMCRYPT_SHA512_STATE state_to = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(to));
+    PSYMCRYPT_SHA512_STATE state_from = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(from));
     if( state_to == NULL || state_from == NULL )
     {
         return SCOSSL_SUCCESS;

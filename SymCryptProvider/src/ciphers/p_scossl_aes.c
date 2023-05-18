@@ -55,12 +55,12 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
 
 static void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
 {
-    OPENSSL_clear_free(ctx, sizeof(SCOSSL_AES_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_AES_CTX);
 }
 
 static SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
 {
-    SCOSSL_AES_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_AES_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_AES_CTX);
     if (copy_ctx != NULL)
     { 
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_AES_CTX));
@@ -541,7 +541,7 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
 #define IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(kbits, ivlen, lcmode, UCMODE)                                   \
     SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                            \
     {                                                                                                     \
-        SCOSSL_AES_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_AES_CTX));                                     \
+        SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_CTX);                                 \
         if (ctx != NULL)                                                                                  \
         {                                                                                                 \
             ctx->keylen = kbits >> 3;                                                                     \

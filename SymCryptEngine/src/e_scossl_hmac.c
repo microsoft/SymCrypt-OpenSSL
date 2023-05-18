@@ -40,15 +40,15 @@ static PCSYMCRYPT_MAC e_scossl_get_symcrypt_hmac_algorithm( _In_ const EVP_MD *e
 
 SCOSSL_STATUS e_scossl_hmac_init(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context;
+    PBYTE e_scossl_hmac_context_alloc;
     
-    if ((e_scossl_hmac_context = OPENSSL_zalloc(sizeof(*e_scossl_hmac_context))) == NULL) {
+    if ((e_scossl_hmac_context_alloc = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_PKEY_CTX))) == NULL) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL");
         return SCOSSL_FAILURE;
     }
     
-    EVP_PKEY_CTX_set_data(ctx, e_scossl_hmac_context);
+    EVP_PKEY_CTX_set_data(ctx, e_scossl_hmac_context_alloc);
 
     return SCOSSL_SUCCESS;
 }
@@ -56,14 +56,15 @@ SCOSSL_STATUS e_scossl_hmac_init(_Inout_ EVP_PKEY_CTX *ctx)
 
 void e_scossl_hmac_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 {
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    PBYTE e_scossl_hmac_context_alloc = EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(e_scossl_hmac_context_alloc);
     
     if (!e_scossl_hmac_context) {
         return;
     }
 
     OPENSSL_clear_free(e_scossl_hmac_context->key.data, e_scossl_hmac_context->key.length);
-    OPENSSL_clear_free(e_scossl_hmac_context, sizeof(*e_scossl_hmac_context));
+    OPENSSL_clear_free(e_scossl_hmac_context_alloc, SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_PKEY_CTX));
 
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
@@ -81,9 +82,9 @@ SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src
         goto end;
     }
 
-    src_ctx = EVP_PKEY_CTX_get_data(src);
+    src_ctx = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(src));
 
-    dst_ctx = EVP_PKEY_CTX_get_data(dst);
+    dst_ctx = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(dst));
 
     if(!src_ctx || !dst_ctx) {
 
@@ -163,7 +164,7 @@ end:
 SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(ctx));
     EVP_PKEY *pkey;
     ASN1_OCTET_STRING *key;
 
@@ -235,7 +236,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 SCOSSL_STATUS e_scossl_hmac_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(ctx));
     ASN1_OCTET_STRING *key;
 
     if(!e_scossl_hmac_context->key.data) {
@@ -259,7 +260,7 @@ end:
 
 SCOSSL_STATUS e_scossl_hmac_update(EVP_MD_CTX *ctx, const void *data, size_t count)
 {
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *)EVP_PKEY_CTX_get_data(EVP_MD_CTX_pkey_ctx(ctx));
+    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(EVP_MD_CTX_pkey_ctx(ctx)));
 
     e_scossl_hmac_context->mac->appendFunc(&e_scossl_hmac_context->macState, data, count);
 
@@ -280,7 +281,7 @@ SCOSSL_STATUS e_scossl_hmac_signctx_init(EVP_PKEY_CTX *ctx, EVP_MD_CTX *mdctx)
 SCOSSL_STATUS e_scossl_hmac_signctx(_Inout_ EVP_PKEY_CTX *ctx, _Out_ unsigned char *sig, _Out_ size_t *siglen, _In_ EVP_MD_CTX *mdctx)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_HMAC_PKEY_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_PKEY_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(ctx));
 
     if(!sig) {
 

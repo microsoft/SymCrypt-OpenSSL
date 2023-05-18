@@ -56,7 +56,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
  */
 static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
-    SCOSSL_CIPHER_GCM_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_GCM_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_GCM_CTX);
     if (copy_ctx != NULL)
     {
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_CIPHER_GCM_CTX));
@@ -72,7 +72,7 @@ static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX
 
 static void p_scossl_aes_gcm_freectx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
-    OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_GCM_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_CIPHER_GCM_CTX);
 }
 
 static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
@@ -295,7 +295,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
  */
 static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX *ctx)
 {
-    SCOSSL_CIPHER_CCM_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_CCM_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_CCM_CTX);
     if (copy_ctx != NULL)
     {
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_CIPHER_CCM_CTX));
@@ -311,7 +311,7 @@ static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX
 
 static void p_scossl_aes_ccm_freectx(_Inout_  SCOSSL_CIPHER_CCM_CTX *ctx)
 {
-    OPENSSL_clear_free(ctx, sizeof(SCOSSL_CIPHER_CCM_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_CIPHER_CCM_CTX);
 }
 
 static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
@@ -524,7 +524,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
 #define IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(kbits, ivlen, lcmode, UCMODE)                                       \
     SCOSSL_CIPHER_##UCMODE##_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                 \
     {                                                                                                        \
-        SCOSSL_CIPHER_##UCMODE##_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_CIPHER_##UCMODE##_CTX));            \
+        SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_CIPHER_##UCMODE##_CTX);                      \
         if (ctx != NULL)                                                                                     \
         {                                                                                                    \
             ctx->keylen = kbits >> 3;                                                                        \

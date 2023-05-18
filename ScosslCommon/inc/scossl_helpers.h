@@ -36,6 +36,36 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 #define SCOSSL_LOG_LEVEL_INFO       (2) // DEFAULT for stderr / logging to logfile
 #define SCOSSL_LOG_LEVEL_DEBUG      (3)
 
+// As a SymCrypt caller, when allocating SymCrypt objects we need to ensure these objects are aligned to SYMCRYPT_ALIGN_VALUE
+//
+// In the SCOSSL engine, we only have control over the size of an allocation, with OpenSSL doing the allocation / free for us.
+// Here we just need to allocate (SYMCRYPT_ALIGN_VALUE-1) extra bytes, and round up the provided pointer to the nearest aligned
+// pointer before using it with SymCrypt.
+//
+// In the SCOSSL provider, it is our responsibility to perform the allocation and free ourselves.
+// Here we allocate SYMCRYPT_ALIGN_VALUE extra bytes, and store the offset into our allocation in the byte before the aligned 
+// pointer we use in SymCrypt. On free, we look at the byte before the aligned pointer we have been using, to determine the start
+// of the allocation and free it correctly.
+//
+// For simplicity, we just allocate 1 extra byte in the SCOSSL engine so we just need the following 2 macros.
+#define SCOSSL_ALIGNED_SIZEOF(typename)         (sizeof(typename) + SYMCRYPT_ALIGN_VALUE)
+#define SCOSSL_ALIGN_UP(ptr)                    (SYMCRYPT_ALIGN_UP(ptr))
+
+#define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename)   \
+    PBYTE alloc = allocator(SCOSSL_ALIGNED_SIZEOF(typename));   \
+    PBYTE aligned_alloc = NULL;                                 \
+    if (alloc)                                                  \
+    {                                                           \
+        aligned_alloc = SCOSSL_ALIGN_UP(alloc+1);               \
+        *(aligned_alloc - 1) = aligned_alloc - alloc;           \
+    }                                                           \
+    typename *ptr = (typename *) aligned_alloc;
+
+#define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)  \
+    PBYTE aligned_alloc = (PBYTE) ptr;                          \
+    PBYTE alloc = aligned_alloc - *(aligned_alloc-1);           \
+    deallocator(alloc, SCOSSL_ALIGNED_SIZEOF(typename));
+
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
 void SCOSSL_set_trace_log_filename(const char *filename);
 
