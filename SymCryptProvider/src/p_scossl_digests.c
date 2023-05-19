@@ -46,12 +46,12 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
 #define IMPLEMENT_SCOSSL_DIGEST(lcalg, CcAlg, UCALG)                                  \
     static void *p_scossl_##lcalg##_newctx(ossl_unused void *prov_ctx)                \
     {                                                                                 \
-        return OPENSSL_malloc(sizeof(SYMCRYPT_##UCALG##_STATE));                      \
+        SCOSSL_COMMON_ALIGNED_ALLOC(dctx, OPENSSL_malloc, SYMCRYPT_##UCALG##_STATE);  \
+        return (PBYTE)dctx;                                                           \
     }                                                                                 \
     static void *p_scossl_##lcalg##_dupctx(_In_ SYMCRYPT_##UCALG##_STATE *dctx)       \
     {                                                                                 \
-        SYMCRYPT_##UCALG##_STATE *copy_ctx =                                          \
-            OPENSSL_malloc(sizeof(SYMCRYPT_##UCALG##_STATE));                         \
+        SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SYMCRYPT_##UCALG##_STATE);\
                                                                                       \
         if (copy_ctx != NULL)                                                         \
             SymCrypt##CcAlg##StateCopy(dctx, copy_ctx);                               \
@@ -60,7 +60,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t blo
     }                                                                                 \
     static void p_scossl_##lcalg##_freectx(_Inout_ SYMCRYPT_##UCALG##_STATE *dctx)    \
     {                                                                                 \
-        OPENSSL_clear_free(dctx, sizeof(SYMCRYPT_##UCALG##_STATE));                   \
+        SCOSSL_COMMON_ALIGNED_FREE(dctx, OPENSSL_clear_free, SYMCRYPT_##UCALG##_STATE);\
     }                                                                                 \
     static SCOSSL_STATUS p_scossl_##lcalg##_init(                                     \
         _Inout_ SYMCRYPT_##UCALG##_STATE *dctx,                                       \
