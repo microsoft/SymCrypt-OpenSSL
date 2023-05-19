@@ -51,6 +51,9 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 #define SCOSSL_ALIGNED_SIZEOF(typename)         (sizeof(typename) + SYMCRYPT_ALIGN_VALUE)
 #define SCOSSL_ALIGN_UP(ptr)                    (SYMCRYPT_ALIGN_UP(ptr))
 
+// We need to be able to represent the offset into our allocation in a single byte
+C_ASSERT( SYMCRYPT_ALIGN_VALUE < 256 );
+
 #define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename)               \
     typename *ptr;                                                          \
     {                                                                       \
