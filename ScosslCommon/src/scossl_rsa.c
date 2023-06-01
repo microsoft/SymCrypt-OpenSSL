@@ -1,4 +1,46 @@
 #include "scossl_rsa.h"
+#include <openssl/core_names.h>
+#include <openssl/proverr.h>
+
+static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
+{
+    if (type == NID_md5)
+        return SymCryptMd5Algorithm;
+    if (type == NID_sha1)
+        return SymCryptSha1Algorithm;
+    if (type == NID_sha256)
+        return SymCryptSha256Algorithm;
+    if (type == NID_sha384)
+        return SymCryptSha384Algorithm;
+    if (type == NID_sha512)
+        return SymCryptSha512Algorithm;
+    if (type == NID_sha3_256)
+        return SymCryptSha3_256Algorithm;
+    if (type == NID_sha3_384)
+        return SymCryptSha3_384Algorithm;
+    if (type == NID_sha3_512)
+        return SymCryptSha3_512Algorithm;
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                     "SymCrypt engine does not support Mac algorithm %d", type);
+    return NULL;
+}
+
+static size_t scossl_get_expected_tbs_length(int type)
+{
+    if (type == NID_md5)
+        return 16;
+    if (type == NID_sha1)
+        return 20;
+    if (type == NID_sha256)
+        return 32;
+    if (type == NID_sha384)
+        return 48;
+    if (type == NID_sha512)
+        return 64;
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt engine does not support Mac algorithm %d", type);
+    return -1;
+}
 
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 {
@@ -11,8 +53,9 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
     return kctx;
 }
 
-_Use_decl_annotations_ 
-SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
+_Use_decl_annotations_
+    SCOSSL_RSA_KEY_CTX *
+    scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
 {
     SCOSSL_RSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
     if (copyCtx == NULL)
@@ -35,20 +78,19 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
         if (copyCtx->key == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                            "SymCryptRsakeyAllocate failed");
+                             "SymCryptRsakeyAllocate failed");
             scossl_rsa_free_key_ctx(copyCtx);
             return NULL;
         }
 
-        SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY) keyCtx->key, copyCtx->key);
+        SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copyCtx->key);
         copyCtx->initialized = 1;
     }
 
     return copyCtx;
 }
 
-_Use_decl_annotations_ 
-void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
+_Use_decl_annotations_ void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
@@ -62,9 +104,10 @@ void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
-                              PCBYTE pbHashValue, SIZE_T cbHashValue,
-                              PBYTE pbSignature, SIZE_T *pcbSignature)
+    SCOSSL_STATUS
+    scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+                          PCBYTE pbHashValue, SIZE_T cbHashValue,
+                          PBYTE pbSignature, SIZE_T *pcbSignature)
 {
     UINT32 cbModulus = 0;
     SIZE_T cbResult = 0;
@@ -77,7 +120,7 @@ SCOSSL_STATUS scossl_rsa_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
         goto cleanup;
     }
 
-    switch (type)
+    switch (mdnid)
     {
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
@@ -249,7 +292,7 @@ SCOSSL_STATUS scossl_rsa_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(type), cbHashValue);
+                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 
@@ -268,14 +311,15 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
-                                PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                PCBYTE pbSignature, SIZE_T pcbSignature)
+    SCOSSL_STATUS
+    scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+                            PCBYTE pbHashValue, SIZE_T cbHashValue,
+                            PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
-    switch (type)
+    switch (mdnid)
     {
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
@@ -438,7 +482,7 @@ SCOSSL_STATUS scossl_rsa_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", type, cbHashValue);
+                         "Unknown type: %s. Size: %d.", mdnid, cbHashValue);
         goto cleanup;
     }
 
@@ -451,6 +495,206 @@ SCOSSL_STATUS scossl_rsa_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int type,
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                                   "SymCryptRsaPkcs1verify returned unexpected error", scError);
     }
+
+cleanup:
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS
+scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+                   PCBYTE pbHashValue, SIZE_T cbHashValue,
+                   PBYTE pbSignature, SIZE_T *pcbSignature)
+{
+    size_t cbResult = 0;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    int ret = SCOSSL_FAILURE;
+    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    size_t expectedTbsLength = -1;
+    int cbDigest, cbSaltMax;
+    int mdnid;
+
+    cbDigest = EVP_MD_size(md);
+    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+
+    switch (cbSalt)
+    {
+    case RSA_PSS_SALTLEN_DIGEST:
+        cbSalt = cbDigest;
+        break;
+    case RSA_PSS_SALTLEN_MAX_SIGN:
+    case RSA_PSS_SALTLEN_MAX:
+        cbSalt = cbSaltMax;
+        break;
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
+    // Added in 3.1, should only be used in provider. min(cbSaltMax, cbDigest)
+    case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
+        cbSalt = cbSaltMax < cbDigest ? cbSaltMax : cbDigest;
+#endif
+    }
+
+    if (cbSalt < 0 || cbSalt > cbSaltMax)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "Invalid cbSalt");
+        return SCOSSL_UNSUPPORTED;
+    }
+
+    cbResult = SymCryptRsakeySizeofModulus(keyCtx->key);
+    if (pcbSignature != NULL)
+    {
+        *pcbSignature = cbResult;
+    }
+    if (pbSignature == NULL)
+    {
+        ret = SCOSSL_SUCCESS;
+        goto cleanup; // Not error - this can be called with NULL parameter for siglen
+    }
+
+    mdnid = EVP_MD_type(md);
+    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    expectedTbsLength = scossl_get_expected_tbs_length(mdnid);
+    if (!scossl_mac_algo || expectedTbsLength == (SIZE_T)-1)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+        goto cleanup;
+    }
+
+    // Log warnings for algorithms that aren't FIPS compliant
+    if (mdnid == NID_md5)
+    {
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+                        "Using Mac algorithm MD5 which is not FIPS compliant");
+    }
+    else if (mdnid == NID_sha1)
+    {
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+    }
+
+    if (cbHashValue != expectedTbsLength)
+    {
+        goto cleanup;
+    }
+
+    scError = SymCryptRsaPssSign(
+        keyCtx->key,
+        pbHashValue,
+        cbHashValue,
+        scossl_mac_algo,
+        cbSalt,
+        0,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        pbSignature,
+        pcbSignature != NULL ? (*pcbSignature) : 0,
+        &cbResult);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                  "SymCryptRsaPssSign failed", scError);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+                                   PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                   PCBYTE pbSignature, SIZE_T pcbSignature)
+{
+    int ret = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    size_t expectedTbsLength = -1;
+    int mdnid = 0;
+    int cbDigest, cbSaltMax;
+
+    mdnid = EVP_MD_type(md);
+
+    cbDigest = EVP_MD_size(md);
+    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+
+    switch (cbSalt)
+    {
+    case RSA_PSS_SALTLEN_DIGEST:
+        cbSalt = cbDigest;
+    case RSA_PSS_SALTLEN_MAX:
+        cbSalt = cbSaltMax;
+    case RSA_PSS_SALTLEN_AUTO:
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
+    // Added in 3.1, should only be used in provider. Auto salt len for verify
+    case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
+#endif
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
+        return SCOSSL_UNSUPPORTED;
+    }
+
+    if (cbSalt < 0 || cbSalt > cbSaltMax)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "Invalid cbSalt");
+        return SCOSSL_UNSUPPORTED;
+    }
+
+    if (pbSignature == NULL)
+    {
+        goto cleanup;
+    }
+
+    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    expectedTbsLength = scossl_get_expected_tbs_length(mdnid);
+    if (!scossl_mac_algo || expectedTbsLength == (SIZE_T)-1)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+        goto cleanup;
+    }
+
+    // Log warnings for algorithms that aren't FIPS compliant
+    if (mdnid == NID_md5)
+    {
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+                        "Using Mac algorithm MD5 which is not FIPS compliant");
+    }
+    else if (mdnid == NID_sha1)
+    {
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+    }
+
+    if (cbHashValue != expectedTbsLength)
+    {
+        goto cleanup;
+    }
+
+    scError = SymCryptRsaPssVerify(
+        keyCtx->key,
+        pbHashValue,
+        cbHashValue,
+        pbSignature,
+        pcbSignature,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        scossl_mac_algo,
+        cbSalt,
+        0);
+
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                      "SymCryptRsaPssVerify returned unexpected error", scError);
+        }
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     return ret;

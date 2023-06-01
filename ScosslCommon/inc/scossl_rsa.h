@@ -4,10 +4,37 @@
 
 #include "scossl_helpers.h"
 
-typedef struct _SCOSSL_RSA_KEY_CTX {
+#define OSSL_MAX_NAME_SIZE 50
+
+typedef struct 
+{
+    void *vLibCtx;
+
     int initialized;
     PSYMCRYPT_RSAKEY key;
 } SCOSSL_RSA_KEY_CTX;
+
+typedef struct
+{
+    SCOSSL_RSA_KEY_CTX *kctx;
+    UINT padding;
+    UINT operation;
+
+    // Needed for fetching 
+    OSSL_LIB_CTX *libctx;
+    char* propq;
+
+    EVP_MD_CTX *mdctx;
+    EVP_MD *md;
+    char mdname[OSSL_MAX_NAME_SIZE];
+    int mdnid;
+    BOOL allowMdUpdates;
+
+    // PSS params
+    char mgf1mdname[OSSL_MAX_NAME_SIZE];
+    int mgf1mdnid;
+    int cbSalt;
+} SCOSSL_RSA_SIGN_CTX;
 
 // The minimum PKCS1 padding is 11 bytes
 #define SCOSSL_MIN_PKCS1_PADDING (11)
@@ -22,13 +49,27 @@ typedef struct _SCOSSL_RSA_KEY_CTX {
 #define SCOSSL_SHA384_DIGEST_LENGTH (48)
 #define SCOSSL_SHA512_DIGEST_LENGTH (64)
 
+// Option added in 3.1, but unused in the engine. Redefined here
+// so it can be used in common code.
+#ifndef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
+#define RSA_PSS_SALTLEN_AUTO_DIGEST_MAX -4
+#endif
+
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx();
 SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx);
 void scossl_rsa_free_key_ctx(_In_ SCOSSL_RSA_KEY_CTX *keyCtx);
 
-SCOSSL_STATUS scossl_rsa_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int type, 
-                              _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
-                              _Out_writes_bytes_(*pcbSignature) PBYTE pbSignature, _Out_ SIZE_T* pcbSignature);
-SCOSSL_STATUS scossl_rsa_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int type, 
-                                _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+SCOSSL_STATUS scossl_rsa_pkcs1_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, 
+                                    _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                    _Out_writes_bytes_(*pcbSignature) PBYTE pbSignature, _Out_ SIZE_T* pcbSignature);
+SCOSSL_STATUS scossl_rsa_pkcs1_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, 
+                                      _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                      _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+SCOSSL_STATUS scossl_rsapss_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ EVP_MD *md, int cbSalt, 
+                                 _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                 _Out_writes_bytes_(*pcbSignature) PBYTE pbSignature, _Out_ SIZE_T* pcbSignature);
+SCOSSL_STATUS scossl_rsapss_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ EVP_MD *md, int cbSalt, 
+                                   _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                   _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+
+                                

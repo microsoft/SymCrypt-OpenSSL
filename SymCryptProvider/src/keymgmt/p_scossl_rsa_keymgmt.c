@@ -70,7 +70,7 @@ static const OSSL_PARAM p_scossl_rsapss_keymgmt_impexp_param_types[] = {
 // must wrap it with the SYMPCRYPT_RSAKEY_CTX.
 SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
-    return scossl_rsa_new_key_ctx_ex(RSA_PKCS1_PADDING);
+    return scossl_rsa_new_key_ctx();
 }
 
 // SCOSSL_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
@@ -178,7 +178,7 @@ SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genctx, ossl
     SCOSSL_RSA_KEY_CTX *keyCtx;
     SYMCRYPT_ERROR scError;
 
-    keyCtx = scossl_rsa_new_key_ctx_ex(genctx->padding);
+    keyCtx = scossl_rsa_new_key_ctx();
     if (keyCtx == NULL)
     {
         goto cleanup;
