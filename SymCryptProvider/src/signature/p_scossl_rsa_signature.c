@@ -10,6 +10,26 @@
 #include "scossl_rsa.h"
 #include "p_scossl_base.h"
 
+typedef struct
+{
+    SCOSSL_RSA_KEY_CTX *kctx;
+    UINT padding;
+    UINT operation;
+
+    // Needed for fetching 
+    OSSL_LIB_CTX *libctx;
+    char* propq;
+
+    EVP_MD_CTX *mdctx;
+    EVP_MD *md;
+    OSSL_ITEM mdInfo; // Informational, must match md if set
+    BOOL allowMdUpdates;
+
+    // PSS params
+    OSSL_ITEM mgf1MdInfo; // Informational, must match md if set
+    int cbSalt;
+} SCOSSL_RSA_SIGN_CTX;
+
 #define OSSL_MAX_PROPQUERY_SIZE 256
 
 #define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                             \
@@ -49,14 +69,14 @@ static const OSSL_PARAM p_scossl_rsa_sig_ctx_settable_param_types_no_digest[] = 
     SCOSSL_RSA_PSS_SIGNATURE_SETTABLE_PARAMS
     OSSL_PARAM_END};
 
-static OSSL_ITEM supported_padding_modes[] = {
+static OSSL_ITEM p_scossl_rsa_sign_padding_modes[] = {
     {RSA_NO_PADDING, OSSL_PKEY_RSA_PAD_MODE_NONE},
     {RSA_PKCS1_PADDING, OSSL_PKEY_RSA_PAD_MODE_PKCSV15},
     {RSA_PKCS1_PSS_PADDING, OSSL_PKEY_RSA_PAD_MODE_PSS},
     {0, NULL}};
 
 static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
-    {NID_sha1, OSSL_DIGEST_NAME_SHA1},
+    {NID_sha1, OSSL_DIGEST_NAME_SHA1}, // Default
     {NID_sha256, OSSL_DIGEST_NAME_SHA2_256},
     {NID_sha384, OSSL_DIGEST_NAME_SHA2_384},
     {NID_sha512, OSSL_DIGEST_NAME_SHA2_512},
@@ -64,84 +84,34 @@ static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
     {NID_sha3_384, OSSL_DIGEST_NAME_SHA3_384},
     {NID_sha3_512, OSSL_DIGEST_NAME_SHA3_512}};
 
-_Use_decl_annotations_
-static int p_scossl_rsa_supported_md_to_nid(const EVP_MD *md)
+static OSSL_ITEM p_scossl_rsa_signature_get_supported_md(_In_ OSSL_LIB_CTX *libctx,
+                                                         _In_ const char *mdname, _In_ const char *propq,
+                                                         _Out_opt_ EVP_MD **md)
 {
-    for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds)/sizeof(OSSL_ITEM); i++)
+    EVP_MD *mdInt = NULL;
+    OSSL_ITEM mdInfo = {NID_undef, NULL};
+
+    if ((mdInt = EVP_MD_fetch(libctx, mdname, propq)) != NULL)
     {
-        if (EVP_MD_is_a(md, p_scossl_rsa_supported_mds[i].ptr))
+        for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds)/sizeof(OSSL_ITEM); i++)
         {
-            return p_scossl_rsa_supported_mds[i].id;
+            if (EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
+            {
+                mdInfo = p_scossl_rsa_supported_mds[i];
+            }
         }
     }
 
-    return NID_undef;
-}
-
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_rsa_set_md(SCOSSL_RSA_SIGN_CTX *ctx, const char *mdname, const char *propq)
-{
-    if (mdname == NULL)
+    if (md != NULL)
     {
-        return SCOSSL_SUCCESS;
+        *md = mdInt;
+    }
+    else
+    {
+        EVP_MD_free(mdInt);
     }
 
-    if (propq == NULL)
-    {
-        propq = ctx->propq;
-    }
-
-    if (!ctx->allowMdUpdates)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED);
-        return SCOSSL_FAILURE;
-    }
-
-    if ((ctx->md = EVP_MD_fetch(ctx->libctx, mdname, propq)) == NULL ||
-        (ctx->mdnid = p_scossl_rsa_supported_md_to_nid(ctx->md)) == NID_undef)
-    {
-        EVP_MD_free(ctx->md);
-        ctx->md = NULL;
-
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-        return SCOSSL_FAILURE;
-    }
-    OPENSSL_strlcpy(ctx->mdname, mdname, sizeof(ctx->mdname));
-    
-    EVP_MD_CTX_free(ctx->mdctx);
-    ctx->mdctx = NULL;
-
-    return SCOSSL_SUCCESS;
-}
-
-_Use_decl_annotations_
-// Only the NID really matters here. ScOSSL does not support distinct MD and MGF1 MD
-SCOSSL_STATUS p_scossl_rsa_set_mgf1md(SCOSSL_RSA_SIGN_CTX *ctx, const char *mgf1mdname, const char *propq)
-{
-    EVP_MD *mgf1md;
-
-    if (mgf1mdname == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
-    if (propq == NULL)
-    {
-        propq = ctx->propq;
-    }
-
-    if ((mgf1md = EVP_MD_fetch(ctx->libctx, mgf1mdname, propq)) == NULL ||
-        (ctx->mgf1mdnid = p_scossl_rsa_supported_md_to_nid(mgf1md)) == NID_undef ||
-        ((ctx->mgf1mdnid | ctx->mdnid) != ctx->mgf1mdnid))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-        ctx->mgf1mdnid = NID_undef;
-    }
-    OPENSSL_strlcpy(ctx->mgf1mdname, mgf1mdname, sizeof(ctx->mgf1mdname));
-    
-    EVP_MD_free(mgf1md);
-
-    return ctx->mgf1mdnid != NID_undef;
+    return mdInfo;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[]);
@@ -149,16 +119,20 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In_ const char *propq)
 {
     SCOSSL_RSA_SIGN_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
-    if (ctx == NULL ||
-        (propq != NULL && ((ctx->propq = OPENSSL_strdup(propq)) == NULL)))
+    if (ctx != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return SCOSSL_FAILURE;
+        if (propq != NULL && ((ctx->propq = OPENSSL_strdup(propq)) == NULL))
+        {
+            OPENSSL_free(ctx);
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return NULL;
+        }
+
+        ctx->libctx = provctx->libctx;
+        ctx->allowMdUpdates = TRUE;
+        ctx->padding = RSA_PKCS1_PADDING;
     }
 
-    ctx->libctx = provctx->libctx;
-    ctx->allowMdUpdates = TRUE;
-    ctx->padding = RSA_PKCS1_PADDING;
     return ctx;
 }
 
@@ -181,14 +155,16 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
             (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
         {
             p_scossl_rsa_freectx(copy_ctx);
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             copy_ctx = NULL;
         }
 
         copy_ctx->libctx = ctx->libctx;
         copy_ctx->padding = ctx->padding;
         copy_ctx->kctx = ctx->kctx;
-        copy_ctx->mdnid = ctx->mdnid;
         copy_ctx->md = ctx->md;
+        copy_ctx->mdInfo = ctx->mdInfo; 
+        copy_ctx->mgf1MdInfo = ctx->mgf1MdInfo;
     }
 
     return copy_ctx;
@@ -204,6 +180,8 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
     }
+
+    ctx->cbSalt = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
 
     ctx->operation = operation;
 
@@ -248,7 +226,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_sign(ctx->kctx, ctx->mdnid, tbs, tbslen, sig, siglen);
+        return scossl_rsa_pkcs1_sign(ctx->kctx, ctx->mdInfo.id, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
         return scossl_rsapss_sign(ctx->kctx, ctx->md, ctx->cbSalt, tbs, tbslen, sig, siglen);
     case RSA_NO_PADDING:
@@ -266,7 +244,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_verify(ctx->kctx, ctx->mdnid, tbs, tbslen, sig, siglen);
+        return scossl_rsa_pkcs1_verify(ctx->kctx, ctx->mdInfo.id, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
         return scossl_rsapss_verify(ctx->kctx, ctx->md, ctx->cbSalt, tbs, tbslen, sig, siglen);
     case RSA_NO_PADDING:
@@ -286,10 +264,22 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
     }
 
     if (mdname != NULL &&
-        (mdname[0] == '\0' || !EVP_MD_is_a(ctx->md, mdname)) &&
-        !p_scossl_rsa_set_md(ctx, mdname, NULL))
+        (mdname[0] == '\0' || !EVP_MD_is_a(ctx->md, mdname)))
     {
-        return SCOSSL_FAILURE;
+        // Different digest specified than what was previously set by paramters.
+        EVP_MD *md;
+        OSSL_ITEM mdInfo = p_scossl_rsa_signature_get_supported_md(ctx->libctx, mdname, NULL, &md);
+    
+        if (mdInfo.id == NID_undef ||
+            (mdInfo.id | ctx->mgf1MdInfo.id) != mdInfo.id)
+        {
+            EVP_MD_free(md);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->md = md;
+        ctx->mdInfo = mdInfo;
     }
 
     if (ctx->mdctx == NULL &&
@@ -380,12 +370,14 @@ static const OSSL_PARAM *p_scossl_rsa_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_C
 static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
-
+    const OSSL_PARAM *param_propq;
+    const char *mdName, *mdProps;
+    
     p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST);
     if (p != NULL)
     {
-        const char *mdName;
-        const char *mdPropq = NULL;
+        EVP_MD *md;
+        OSSL_ITEM mdInfo;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
         {
@@ -393,18 +385,27 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             return SCOSSL_FAILURE;
         }
 
-        const OSSL_PARAM *param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
+        mdProps = NULL;
+        param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
         if (param_propq != NULL &&
-            !OSSL_PARAM_get_utf8_string_ptr(p, &mdPropq))
+            !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
-        }    
+        }
 
-        if (!p_scossl_rsa_set_md(ctx, mdName, mdPropq))
+        // ScOSSL does not support distinct MD and MGF1 MD
+        mdInfo = p_scossl_rsa_signature_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        if (mdInfo.id == NID_undef ||
+            (mdInfo.id | ctx->mgf1MdInfo.id) != mdInfo.id)
         {
+            EVP_MD_free(md);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
         }
+
+        ctx->md = md;
+        ctx->mdInfo = mdInfo;
     }
 
     p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PAD_MODE);
@@ -424,15 +425,15 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
                 return SCOSSL_FAILURE;
             }
 
-            while (supported_padding_modes[i].id != 0 &&
-                   padding != supported_padding_modes[i].id)
+            while (p_scossl_rsa_sign_padding_modes[i].id != 0 &&
+                   padding != p_scossl_rsa_sign_padding_modes[i].id)
             {
                 i++;
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
-            while (supported_padding_modes[i].id != 0 &&
-                   OPENSSL_strcasecmp(p->data, supported_padding_modes[i].ptr) != 0)
+            while (p_scossl_rsa_sign_padding_modes[i].id != 0 &&
+                   OPENSSL_strcasecmp(p->data, p_scossl_rsa_sign_padding_modes[i].ptr) != 0)
             {
                 i++;
             }
@@ -442,7 +443,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             return SCOSSL_FAILURE;
         }
 
-        padding = supported_padding_modes[i].id;
+        padding = p_scossl_rsa_sign_padding_modes[i].id;
 
         if (padding == 0)
         {
@@ -523,27 +524,37 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
     p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST);
     if (p != NULL)
     {
-        const char *mgf1mdName;
-        const char *mgf1mdPropq = NULL;
+        EVP_MD *md;
+        OSSL_ITEM mgf1MdInfo;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mgf1mdName))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        const OSSL_PARAM *param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
+        mdProps = NULL;
+        param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
         if (param_propq != NULL &&
-            !OSSL_PARAM_get_utf8_string_ptr(p, &mgf1mdPropq))
+            !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
-        }    
+        }
 
-        if (!p_scossl_rsa_set_mgf1md(ctx, mgf1mdName, mgf1mdPropq))
+        // ScOSSL does not support distinct MD and MGF1 MD
+        mgf1MdInfo = p_scossl_rsa_signature_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        if (mgf1MdInfo.id == NID_undef ||
+            (mgf1MdInfo.id | ctx->mdInfo.id) != mgf1MdInfo.id)
         {
+            EVP_MD_free(md);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
         }
+
+        EVP_MD_free(ctx->md);
+        ctx->md = md;
+        ctx->mgf1MdInfo = mgf1MdInfo;
     }
 
     return SCOSSL_SUCCESS;
@@ -565,7 +576,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     OSSL_PARAM *p;
     p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
     if (p != NULL && 
-        !OSSL_PARAM_set_utf8_string(p, ctx->mdname))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mdInfo.ptr == NULL ? "" : ctx->mdInfo.ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -586,13 +597,13 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             break;
         case OSSL_PARAM_UTF8_STRING:
             int i = 0;
-            while (supported_padding_modes[i].id != 0 &&
-                   ctx->padding != supported_padding_modes[i].id)
+            while (p_scossl_rsa_sign_padding_modes[i].id != 0 &&
+                   ctx->padding != p_scossl_rsa_sign_padding_modes[i].id)
             {
                 i++;
             }
 
-            if (!OSSL_PARAM_set_utf8_string(p, supported_padding_modes[i].ptr))
+            if (!OSSL_PARAM_set_utf8_string(p, p_scossl_rsa_sign_padding_modes[i].ptr))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 return SCOSSL_FAILURE;
@@ -659,7 +670,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
 
     p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST);
     if (p != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->mgf1mdname))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo.ptr == NULL ? "" : ctx->mgf1MdInfo.ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;     

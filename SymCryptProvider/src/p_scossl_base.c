@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME, funcs, NULL}
-#define ALG_TABLE_END { NULL, NULL, NULL, NULL}
+#define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 static int scossl_prov_initialized = 0;
 
@@ -154,10 +154,10 @@ static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG_TABLE_END};
 
 // Asymmetric Cipher
-extern const OSSL_DISPATCH p_scossl_rsa_asym_cipher_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_cipher_functions[];
 
 static const OSSL_ALGORITHM p_scossl_asym_cipher[] = {
-    // ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsa_asym_cipher_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_cipher_functions),
     ALG_TABLE_END};
 
 static int p_scossl_get_status()

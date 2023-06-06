@@ -22,7 +22,7 @@ set(SCOSSL_SOURCES
     # ./src/ciphers/p_scossl_aes_xts.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/signature/p_scossl_rsa_signature.c
-    #./src/p_scossl_rsa_encryption.c
+    ./src/asymcipher/p_scossl_rsa_cipher.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_base.c
