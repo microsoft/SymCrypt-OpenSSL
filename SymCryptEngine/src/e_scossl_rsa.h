@@ -4,6 +4,7 @@
 
 #include "e_scossl.h"
 #include <openssl/rsa.h>
+#include "scossl_rsa.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,17 +89,12 @@ SCOSSL_STATUS e_scossl_rsa_init(_Inout_ RSA *rsa);
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
 SCOSSL_STATUS e_scossl_rsa_finish(_Inout_ RSA *rsa);
 
-typedef struct _SCOSSL_RSA_KEY_CONTEXT {
-    int initialized;
-    PSYMCRYPT_RSAKEY key;
-} SCOSSL_RSA_KEY_CONTEXT;
-
 // Initializes keyCtx from key rsa.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error
-SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONTEXT *keyCtx);
+SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CTX *keyCtx);
 
 // Frees data and key of keyCtx
-void e_scossl_rsa_free_key_context(_In_ SCOSSL_RSA_KEY_CONTEXT *keyCtx);
+void e_scossl_rsa_free_key_context(_In_ SCOSSL_RSA_KEY_CTX *keyCtx);
 
 #ifdef __cplusplus
 }

@@ -13,7 +13,7 @@ typedef struct
     SCOSSL_RSA_KEY_CTX *kctx;
     UINT padding;
 
-    // Needed for fetching 
+    // Needed for fetching
     OSSL_LIB_CTX *libctx;
 
     OSSL_ITEM oaepMdInfo;
@@ -30,7 +30,7 @@ static const OSSL_PARAM p_scossl_rsa_cipher_gettable_ctx_param_types[] = {
     OSSL_PARAM_octet_ptr(OSSL_ASYM_CIPHER_PARAM_OAEP_LABEL, NULL, 0),
     OSSL_PARAM_END};
 
-static const OSSL_PARAM  p_scossl_rsa_cipher_settable_ctx_param_types[] = {
+static const OSSL_PARAM p_scossl_rsa_cipher_settable_ctx_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST_PROPS, NULL, 0),
@@ -64,7 +64,7 @@ static OSSL_ITEM p_scossl_rsa_cipher_get_supported_md(_In_ OSSL_LIB_CTX *libctx,
 
     if ((md = EVP_MD_fetch(libctx, mdname, propq)) != NULL)
     {
-        for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds)/sizeof(OSSL_ITEM); i++)
+        for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
         {
             if (EVP_MD_is_a(md, p_scossl_rsa_supported_mds[i].ptr))
             {
@@ -123,32 +123,45 @@ SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
                                           _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
                                           _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
-    // Default to SHA1 for OAEP
+    INT32 cbResult;
+    SCOSSL_STATUS ret;
+
+    // Default to SHA1 for OAEP. Update md in context so this is
+    // reflected in getparam
     if (ctx->oaepMdInfo.id == NID_undef)
     {
         ctx->oaepMdInfo = p_scossl_rsa_supported_mds[0];
     }
 
-    return scossl_rsa_encrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
-                              ctx->pbLabel, ctx->cbLabel,
-                              in, inlen,
-                              out, outlen, outsize);
+    ret = scossl_rsa_encrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
+                             ctx->pbLabel, ctx->cbLabel,
+                             in, inlen,
+                             out, &cbResult, outsize);
+    *outlen = ret ? (SIZE_T)cbResult : 0;
+
+    return ret;
 }
 
 SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
                                           _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
                                           _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
+    INT32 cbResult;
+    SCOSSL_STATUS ret;
+
     // Default to SHA1 for OAEP
     if (ctx->oaepMdInfo.id == NID_undef)
     {
         ctx->oaepMdInfo = p_scossl_rsa_supported_mds[0];
     }
 
-    return scossl_rsa_decrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
-                              ctx->pbLabel, ctx->cbLabel,
-                              in, inlen,
-                              out, outlen, outsize);
+    ret = scossl_rsa_decrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
+                             ctx->pbLabel, ctx->cbLabel,
+                             in, inlen,
+                             out, &cbResult, outsize);
+    *outlen = ret ? (SIZE_T)cbResult : 0;
+
+    return ret;
 }
 
 /* Asymmetric Cipher parameters */
@@ -318,7 +331,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
- 
+
         // ScOSSL does not support distinct MD and MGF1 MD
         mgf1MdInfo = p_scossl_rsa_cipher_get_supported_md(ctx->libctx, mdName, mdProps);
         if (mgf1MdInfo.id == NID_undef ||

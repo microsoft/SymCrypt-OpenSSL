@@ -2,6 +2,19 @@
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+// The minimum PKCS1 padding is 11 bytes
+#define SCOSSL_MIN_PKCS1_PADDING (11)
+// The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
+#define SCOSSL_MIN_OAEP_PADDING (42)
+
+// Hash digest lengths
+#define SCOSSL_MD5_DIGEST_LENGTH (16)
+#define SCOSSL_SHA1_DIGEST_LENGTH (20)
+#define SCOSSL_MD5_SHA1_DIGEST_LENGTH (SCOSSL_MD5_DIGEST_LENGTH + SCOSSL_SHA1_DIGEST_LENGTH) // 36
+#define SCOSSL_SHA256_DIGEST_LENGTH (32)
+#define SCOSSL_SHA384_DIGEST_LENGTH (48)
+#define SCOSSL_SHA512_DIGEST_LENGTH (64)
+
 static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
 {
     if (type == NID_md5)
@@ -38,7 +51,7 @@ static size_t scossl_get_expected_tbs_length(int type)
     if (type == NID_sha512)
         return 64;
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt engine does not support Mac algorithm %d", type);
+                     "SymCrypt engine does not support Mac algorithm %d", type);
     return -1;
 }
 
@@ -502,10 +515,10 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS
-scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
-                   PCBYTE pbHashValue, SIZE_T cbHashValue,
-                   PBYTE pbSignature, SIZE_T *pcbSignature)
+    SCOSSL_STATUS
+    scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+                       PCBYTE pbHashValue, SIZE_T cbHashValue,
+                       PBYTE pbSignature, SIZE_T *pcbSignature)
 {
     size_t cbResult = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -604,9 +617,10 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
-                                   PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                   PCBYTE pbSignature, SIZE_T pcbSignature)
+    SCOSSL_STATUS
+    scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+                         PCBYTE pbHashValue, SIZE_T cbHashValue,
+                         PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -614,7 +628,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int c
     size_t expectedTbsLength = -1;
     int mdnid = 0;
     int cbDigest, cbSaltMax;
-    
+
     mdnid = EVP_MD_type(md);
 
     cbDigest = EVP_MD_size(md);
@@ -704,21 +718,28 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
-                                 PCBYTE pbLabel, SIZE_T cbLabel,
-                                 PCBYTE pbSrc, SIZE_T cbSrc,
-                                 PBYTE pbDst, SIZE_T *pcbDst, SIZE_T cbDst)
+    SCOSSL_STATUS
+    scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
+                       PCBYTE pbLabel, SIZE_T cbLabel,
+                       PCBYTE pbSrc, SIZE_T cbSrc,
+                       PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    SIZE_T cbResult = -1;
 
     if (pbDst == NULL)
     {
-        *pcbDst = cbModulus;
+        *pcbDst = (INT32)cbModulus;
         goto cleanup;
     }
 
-    if (pbSrc == NULL)
+    if (cbDst > INT_MAX)
+    {
+        // cbDst is not caller supplied for engine
+        cbDst = cbModulus;
+    }
+    else if (cbDst < cbModulus)
     {
         goto cleanup;
     }
@@ -733,18 +754,18 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int m
             goto cleanup;
         }
         scError = SymCryptRsaPkcs1Encrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       pbDst,
-                       cbDst,
-                       pcbDst);
-        if( scError != SYMCRYPT_NO_ERROR )
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            0,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            pbDst,
+            cbDst,
+            &cbResult);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptRsaPkcs1Encrypt failed", scError);
+                                      "SymCryptRsaPkcs1Encrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -757,26 +778,26 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int m
         if (!scossl_mac_algo)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                            "Unknown type: %d.", mdnid);
-            goto cleanup;              
+                             "Unknown type: %d.", mdnid);
+            goto cleanup;
         }
 
         scError = SymCryptRsaOaepEncrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       SymCryptSha1Algorithm,
-                       pbLabel,
-                       cbLabel,
-                       0,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       pbDst,
-                       cbDst,
-                       pcbDst);
-        if( scError != SYMCRYPT_NO_ERROR )
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            scossl_mac_algo,
+            pbLabel,
+            cbLabel,
+            0,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            pbDst,
+            cbDst,
+            &cbResult);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptRsaOaepEncrypt failed", scError);
+                                      "SymCryptRsaOaepEncrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -786,36 +807,39 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int m
             goto cleanup;
         }
         scError = SymCryptRsaRawEncrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       0,
-                       pbDst,
-                       cbDst);
-        *pcbDst = cbDst;
-        if( scError != SYMCRYPT_NO_ERROR )
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0,
+            pbDst,
+            cbDst);
+        cbResult = cbDst;
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptRsaRawEncrypt failed", scError);
+                                      "SymCryptRsaRawEncrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-            "Unsupported Padding: %d.", padding);
+                        "Unsupported Padding: %d.", padding);
         break;
     }
 
+    *pcbDst = (cbResult <= INT_MAX) ? (INT32)cbResult : -1;
+
 cleanup:
-    return *pcbDst <= INT_MAX;
+    return *pcbDst >= 0;
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
-                                 PCBYTE pbLabel, SIZE_T cbLabel,
-                                 PCBYTE pbSrc, SIZE_T cbSrc,
-                                 PBYTE pbDst, SIZE_T *pcbDst, SIZE_T cbDst)
+    SCOSSL_STATUS
+    scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
+                       PCBYTE pbLabel, SIZE_T cbLabel,
+                       PCBYTE pbSrc, SIZE_T cbSrc,
+                       PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     UINT32 cbModulus;
@@ -826,30 +850,34 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int m
 
     if (pbDst == NULL)
     {
-        *pcbDst = cbModulus;
+        *pcbDst = (INT32)cbModulus;
         goto cleanup;
     }
 
-    if (pbSrc == NULL ||
-        cbDst > cbModulus)
+    if (cbDst > INT_MAX)
+    {
+        // cbDst is not caller supplied for engine
+        cbDst = cbModulus;
+    }
+    else if (cbSrc > cbModulus)
     {
         goto cleanup;
     }
 
     *pcbDst = -1;
 
-    switch( padding )
+    switch (padding)
     {
     case RSA_PKCS1_PADDING:
         scError = SymCryptRsaPkcs1Decrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       0,
-                       pbDst,
-                       cbModulus - SCOSSL_MIN_PKCS1_PADDING,
-                       &cbResult);
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0,
+            pbDst,
+            cbModulus - SCOSSL_MIN_PKCS1_PADDING,
+            &cbResult);
 
         // Constant-time error processing to avoid Bleichenbacher attack
 
@@ -870,54 +898,54 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int m
         if (!scossl_mac_algo)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                            "Unknown type: %d.", mdnid);
-            goto cleanup;           
+                             "Unknown type: %d.", mdnid);
+            goto cleanup;
         }
 
         scError = SymCryptRsaOaepDecrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       SymCryptSha1Algorithm,
-                       pbLabel,
-                       cbLabel,
-                       0,
-                       pbDst,
-                       cbModulus - SCOSSL_MIN_OAEP_PADDING,
-                       &cbResult);
-        if( scError != SYMCRYPT_NO_ERROR )
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            SymCryptSha1Algorithm,
+            pbLabel,
+            cbLabel,
+            0,
+            pbDst,
+            cbModulus - SCOSSL_MIN_OAEP_PADDING,
+            &cbResult);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptRsaOaepDecrypt failed", scError);
+                                      "SymCryptRsaOaepDecrypt failed", scError);
             goto cleanup;
         }
         break;
     case RSA_NO_PADDING:
         scError = SymCryptRsaRawDecrypt(
-                       keyCtx->key,
-                       pbSrc,
-                       cbSrc,
-                       SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                       0,
-                       pbDst,
-                       cbModulus);
+            keyCtx->key,
+            pbSrc,
+            cbSrc,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0,
+            pbDst,
+            cbModulus);
         cbResult = cbModulus;
-        if( scError != SYMCRYPT_NO_ERROR )
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptRsaRawDecrypt failed", scError);
+                                      "SymCryptRsaRawDecrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-            "Unsupported Padding: %d.", padding);
+                        "Unsupported Padding: %d.", padding);
         break;
     }
 
-    *pcbDst = (cbResult <= INT_MAX) ? (int) cbResult : -1;
+    *pcbDst = (cbResult <= INT_MAX) ? (INT32)cbResult : -1;
 
 cleanup:
-    return *pcbDst <= INT_MAX;
+    return *pcbDst >= 0;
 }
