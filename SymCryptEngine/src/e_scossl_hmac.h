@@ -16,7 +16,7 @@ SCOSSL_STATUS e_scossl_hmac_init(_Inout_ EVP_PKEY_CTX *ctx);
 void e_scossl_hmac_cleanup(_Inout_ EVP_PKEY_CTX *ctx);
 
 // Makes a copy of internal context src
-SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src);
+SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ const EVP_PKEY_CTX *src);
 
 // Sends a control operation to context ctx. type indicates which operation, and
 // p1 and p2 are optional parameters depending on which type is used.

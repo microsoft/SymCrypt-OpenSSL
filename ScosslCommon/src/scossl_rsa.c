@@ -15,43 +15,98 @@
 #define SCOSSL_SHA384_DIGEST_LENGTH (48)
 #define SCOSSL_SHA512_DIGEST_LENGTH (64)
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
+typedef struct
 {
-    if (type == NID_md5)
-        return SymCryptMd5Algorithm;
-    if (type == NID_sha1)
-        return SymCryptSha1Algorithm;
-    if (type == NID_sha256)
-        return SymCryptSha256Algorithm;
-    if (type == NID_sha384)
-        return SymCryptSha384Algorithm;
-    if (type == NID_sha512)
-        return SymCryptSha512Algorithm;
-    if (type == NID_sha3_256)
-        return SymCryptSha3_256Algorithm;
-    if (type == NID_sha3_384)
-        return SymCryptSha3_384Algorithm;
-    if (type == NID_sha3_512)
-        return SymCryptSha3_512Algorithm;
-    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                     "SymCrypt engine does not support Mac algorithm %d", type);
+    PCSYMCRYPT_OID pHashOIDs;
+    SIZE_T nOIDCount;
+    UINT32 flags;
+} SCOSSL_RSA_PKCS1_PARAMS;
+
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1md5_params = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha384_params = {SymCryptSha384OidList, SYMCRYPT_SHA384_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_params = {SymCryptSha512OidList, SYMCRYPT_SHA512_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_256_params = {SymCryptSha3_256OidList, SYMCRYPT_SHA3_256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_384_params = {SymCryptSha3_384OidList, SYMCRYPT_SHA3_384_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_512_params = {SymCryptSha3_512OidList, SYMCRYPT_SHA3_512_OID_COUNT, 0};
+
+static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
+{
+    switch (mdnid)
+    {
+    case NID_md5_sha1:
+        return &scossl_rsa_pkcs1_sha1md5_params;
+    case NID_md5:
+        return &scossl_rsa_pkcs1_md5_params;
+    case NID_sha1:
+        return &scossl_rsa_pkcs1_sha1_params;
+    case NID_sha256:
+        return &scossl_rsa_pkcs1_sha256_params;
+    case NID_sha384:
+        return &scossl_rsa_pkcs1_sha384_params;
+    case NID_sha512:
+        return &scossl_rsa_pkcs1_sha512_params;
+    case NID_sha3_256:
+        return &scossl_rsa_pkcs1_sha3_256_params;
+    case NID_sha3_384:
+        return &scossl_rsa_pkcs1_sha3_384_params;
+    case NID_sha3_512:
+        return &scossl_rsa_pkcs1_sha3_512_params;
+    }
+
     return NULL;
 }
 
-static size_t scossl_get_expected_hash_length(int type)
+static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
 {
-    if (type == NID_md5)
-        return 16;
-    if (type == NID_sha1)
-        return 20;
-    if (type == NID_sha256)
-        return 32;
-    if (type == NID_sha384)
-        return 48;
-    if (type == NID_sha512)
-        return 64;
-    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                     "SymCrypt engine does not support Mac algorithm %d", type);
+    switch (mdnid)
+    {
+    case NID_md5:
+        return SymCryptMd5Algorithm;
+    case NID_sha1:
+        return SymCryptSha1Algorithm;
+    case NID_sha256:
+        return SymCryptSha256Algorithm;
+    case NID_sha384:
+        return SymCryptSha384Algorithm;
+    case NID_sha512:
+        return SymCryptSha512Algorithm;
+    case NID_sha3_256:
+        return SymCryptSha3_256Algorithm;
+    case NID_sha3_384:
+        return SymCryptSha3_384Algorithm;
+    case NID_sha3_512:
+        return SymCryptSha3_512Algorithm;
+    default:
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "SymCrypt engine does not support Mac algorithm %d", mdnid);
+    }
+    return NULL;
+}
+
+static SIZE_T scossl_get_expected_hash_length(int mdnid)
+{
+    switch (mdnid)
+    {
+    case NID_md5:
+        return SCOSSL_MD5_DIGEST_LENGTH;
+    case NID_sha1:
+        return SCOSSL_SHA1_DIGEST_LENGTH;
+    case NID_sha256:
+    case NID_sha3_256:
+        return SCOSSL_SHA256_DIGEST_LENGTH;
+    case NID_sha384:
+    case NID_sha3_384:
+        return SCOSSL_SHA384_DIGEST_LENGTH;
+    case NID_sha512:
+    case NID_sha3_512:
+        return SCOSSL_SHA512_DIGEST_LENGTH;
+    default:
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "SymCrypt engine does not support Mac algorithm %d", mdnid);
+    }
     return -1;
 }
 
@@ -127,10 +182,19 @@ _Use_decl_annotations_
     SIZE_T cbResult = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    const SCOSSL_RSA_PKCS1_PARAMS *params;
 
     cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     if (pbSignature == NULL || pcbSignature == NULL)
     {
+        goto cleanup;
+    }
+
+    params = scossl_get_rsa_pkcs1_params(mdnid);
+    if (params == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 
@@ -139,176 +203,33 @@ _Use_decl_annotations_
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_MD5_SHA1_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            NULL,
-            0,
-            SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
         break;
     case NID_md5:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm MD5 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_MD5_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptMd5OidList,
-            SYMCRYPT_MD5_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
         break;
     case NID_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_SHA1_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha1OidList,
-            SYMCRYPT_SHA1_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
         break;
-    case NID_sha256:
-        if (cbHashValue != SCOSSL_SHA256_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
+    }
 
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha256OidList,
-            SYMCRYPT_SHA256_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    case NID_sha384:
-        if (cbHashValue != SCOSSL_SHA384_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha384OidList,
-            SYMCRYPT_SHA384_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    case NID_sha512:
-        if (cbHashValue != SCOSSL_SHA512_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha512OidList,
-            SYMCRYPT_SHA512_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    case NID_sha3_256:
-        if (cbHashValue != SCOSSL_SHA256_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha3_256OidList,
-            SYMCRYPT_SHA3_256_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    case NID_sha3_384:
-        if (cbHashValue != SCOSSL_SHA384_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha3_384OidList,
-            SYMCRYPT_SHA3_384_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    case NID_sha3_512:
-        if (cbHashValue != SCOSSL_SHA512_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Sign(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            SymCryptSha3_512OidList,
-            SYMCRYPT_SHA3_512_OID_COUNT,
-            0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            pbSignature,
-            cbModulus,
-            &cbResult);
-        break;
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
+    if (cbHashValue != scossl_get_expected_hash_length(mdnid))
+    {
         goto cleanup;
     }
+
+    scError = SymCryptRsaPkcs1Sign(
+        keyCtx->key,
+        pbHashValue,
+        cbHashValue,
+        params->pHashOIDs,
+        params->nOIDCount,
+        params->flags,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        pbSignature,
+        cbModulus,
+        &cbResult);
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -332,173 +253,47 @@ _Use_decl_annotations_
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    const SCOSSL_RSA_PKCS1_PARAMS *params;
+
+    params = scossl_get_rsa_pkcs1_params(mdnid);
+    if (params == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
+        goto cleanup;
+    }
 
     switch (mdnid)
     {
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_MD5_SHA1_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            NULL,
-            0,
-            0);
         break;
     case NID_md5:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm MD5 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_MD5_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptMd5OidList,
-            SYMCRYPT_MD5_OID_COUNT,
-            0);
         break;
     case NID_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
-        if (cbHashValue != SCOSSL_SHA1_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha1OidList,
-            SYMCRYPT_SHA1_OID_COUNT,
-            0);
         break;
-    case NID_sha256:
-        if (cbHashValue != SCOSSL_SHA256_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
+    }
 
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha256OidList,
-            SYMCRYPT_SHA256_OID_COUNT,
-            0);
-        break;
-    case NID_sha384:
-        if (cbHashValue != SCOSSL_SHA384_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha384OidList,
-            SYMCRYPT_SHA384_OID_COUNT,
-            0);
-        break;
-    case NID_sha512:
-        if (cbHashValue != SCOSSL_SHA512_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha512OidList,
-            SYMCRYPT_SHA512_OID_COUNT,
-            0);
-        break;
-    case NID_sha3_256:
-        if (cbHashValue != SCOSSL_SHA256_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha3_256OidList,
-            SYMCRYPT_SHA3_256_OID_COUNT,
-            0);
-        break;
-    case NID_sha3_384:
-        if (cbHashValue != SCOSSL_SHA384_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha3_384OidList,
-            SYMCRYPT_SHA3_384_OID_COUNT,
-            0);
-        break;
-    case NID_sha3_512:
-        if (cbHashValue != SCOSSL_SHA512_DIGEST_LENGTH)
-        {
-            goto cleanup;
-        }
-
-        scError = SymCryptRsaPkcs1Verify(
-            keyCtx->key,
-            pbHashValue,
-            cbHashValue,
-            pbSignature,
-            pcbSignature,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha3_512OidList,
-            SYMCRYPT_SHA3_512_OID_COUNT,
-            0);
-        break;
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", mdnid, cbHashValue);
+    if (cbHashValue != scossl_get_expected_hash_length(mdnid))
+    {
         goto cleanup;
     }
+
+    scError = SymCryptRsaPkcs1Verify(
+        keyCtx->key,
+        pbHashValue,
+        cbHashValue,
+        pbSignature,
+        pcbSignature,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        params->pHashOIDs,
+        params->nOIDCount,
+        0);
 
     if (scError == SYMCRYPT_NO_ERROR)
     {
@@ -520,11 +315,11 @@ _Use_decl_annotations_
                        PCBYTE pbHashValue, SIZE_T cbHashValue,
                        PBYTE pbSignature, SIZE_T *pcbSignature)
 {
-    size_t cbResult = 0;
+    SIZE_T cbResult = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int ret = SCOSSL_FAILURE;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
-    size_t expectedHashLength = -1;
+    SIZE_T expectedHashLength = -1;
     int cbDigest, cbSaltMax;
     int mdnid;
 
