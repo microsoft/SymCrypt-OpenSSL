@@ -38,7 +38,7 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int type)
     return NULL;
 }
 
-static size_t scossl_get_expected_tbs_length(int type)
+static size_t scossl_get_expected_hash_length(int type)
 {
     if (type == NID_md5)
         return 16;
@@ -516,7 +516,7 @@ cleanup:
 
 _Use_decl_annotations_
     SCOSSL_STATUS
-    scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+    scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
                        PCBYTE pbHashValue, SIZE_T cbHashValue,
                        PBYTE pbSignature, SIZE_T *pcbSignature)
 {
@@ -524,7 +524,7 @@ _Use_decl_annotations_
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int ret = SCOSSL_FAILURE;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
-    size_t expectedTbsLength = -1;
+    size_t expectedHashLength = -1;
     int cbDigest, cbSaltMax;
     int mdnid;
 
@@ -567,8 +567,8 @@ _Use_decl_annotations_
 
     mdnid = EVP_MD_type(md);
     scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
-    expectedTbsLength = scossl_get_expected_tbs_length(mdnid);
-    if (!scossl_mac_algo || expectedTbsLength == (SIZE_T)-1)
+    expectedHashLength = scossl_get_expected_hash_length(mdnid);
+    if (!scossl_mac_algo || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
@@ -587,7 +587,7 @@ _Use_decl_annotations_
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
-    if (cbHashValue != expectedTbsLength)
+    if (cbHashValue != expectedHashLength)
     {
         goto cleanup;
     }
@@ -618,14 +618,14 @@ cleanup:
 
 _Use_decl_annotations_
     SCOSSL_STATUS
-    scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, EVP_MD *md, int cbSalt,
+    scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
                          PCBYTE pbHashValue, SIZE_T cbHashValue,
                          PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
-    size_t expectedTbsLength = -1;
+    size_t expectedHashLength = -1;
     int mdnid = 0;
     int cbDigest, cbSaltMax;
 
@@ -665,8 +665,8 @@ _Use_decl_annotations_
     }
 
     scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
-    expectedTbsLength = scossl_get_expected_tbs_length(mdnid);
-    if (!scossl_mac_algo || expectedTbsLength == (SIZE_T)-1)
+    expectedHashLength = scossl_get_expected_hash_length(mdnid);
+    if (!scossl_mac_algo || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
@@ -685,7 +685,7 @@ _Use_decl_annotations_
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
-    if (cbHashValue != expectedTbsLength)
+    if (cbHashValue != expectedHashLength)
     {
         goto cleanup;
     }

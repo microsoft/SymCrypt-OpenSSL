@@ -41,7 +41,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const 
     }
     if( keyCtx->initialized == 0 )
     {
-        if( e_scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -91,7 +91,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const
     }
     if( keyCtx->initialized == 0 )
     {
-        if( e_scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             goto cleanup;
         }
@@ -172,7 +172,7 @@ SCOSSL_STATUS e_scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsig
     }
     if( keyCtx->initialized == 0 )
     {
-        if( e_scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             return SCOSSL_FAILURE;
         }
@@ -196,7 +196,7 @@ SCOSSL_STATUS e_scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const un
     }
     if( keyCtx->initialized == 0 )
     {
-        if( e_scossl_initialize_rsa_key((RSA *)rsa, keyCtx) == 0 )
+        if( e_scossl_initialize_rsa_key(rsa, keyCtx) == 0 )
         {
             return SCOSSL_FAILURE;
         }
@@ -427,7 +427,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CTX *keyCtx)
+SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_KEY_CTX *keyCtx)
 {
     int ret = SCOSSL_FAILURE;
     UINT64  pubExp64;
@@ -456,7 +456,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ RSA* rsa, _Out_ SCOSSL_RSA_KEY_CT
         cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
         cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
 
-    if( RSA_get_version(rsa) != RSA_ASN1_VERSION_DEFAULT )
+    if( RSA_get_version((RSA*) rsa) != RSA_ASN1_VERSION_DEFAULT )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,

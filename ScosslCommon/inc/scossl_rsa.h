@@ -23,10 +23,10 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid
                                       _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                       _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
-SCOSSL_STATUS scossl_rsapss_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ EVP_MD *md, int cbSalt, 
+SCOSSL_STATUS scossl_rsapss_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const EVP_MD *md, int cbSalt, 
                                  _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                  _Out_writes_bytes_(*pcbSignature) PBYTE pbSignature, _Out_ SIZE_T* pcbSignature);
-SCOSSL_STATUS scossl_rsapss_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ EVP_MD *md, int cbSalt, 
+SCOSSL_STATUS scossl_rsapss_verify(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const EVP_MD *md, int cbSalt, 
                                    _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                    _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
