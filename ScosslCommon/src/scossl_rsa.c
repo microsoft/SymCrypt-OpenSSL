@@ -1,33 +1,42 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include "scossl_rsa.h"
+
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // The minimum PKCS1 padding is 11 bytes
 #define SCOSSL_MIN_PKCS1_PADDING (11)
 // The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
-#define SCOSSL_MIN_OAEP_PADDING (42)
+#define SCOSSL_MIN_OAEP_PADDING  (42)
 
 // Hash digest lengths
-#define SCOSSL_MD5_DIGEST_LENGTH (16)
-#define SCOSSL_SHA1_DIGEST_LENGTH (20)
+#define SCOSSL_MD5_DIGEST_LENGTH      (16)
+#define SCOSSL_SHA1_DIGEST_LENGTH     (20)
 #define SCOSSL_MD5_SHA1_DIGEST_LENGTH (SCOSSL_MD5_DIGEST_LENGTH + SCOSSL_SHA1_DIGEST_LENGTH) // 36
-#define SCOSSL_SHA256_DIGEST_LENGTH (32)
-#define SCOSSL_SHA384_DIGEST_LENGTH (48)
-#define SCOSSL_SHA512_DIGEST_LENGTH (64)
+#define SCOSSL_SHA256_DIGEST_LENGTH   (32)
+#define SCOSSL_SHA384_DIGEST_LENGTH   (48)
+#define SCOSSL_SHA512_DIGEST_LENGTH   (64)
 
 typedef struct
 {
     PCSYMCRYPT_OID pHashOIDs;
-    SIZE_T nOIDCount;
-    UINT32 flags;
+    SIZE_T         nOIDCount;
+    UINT32         flags;
 } SCOSSL_RSA_PKCS1_PARAMS;
 
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1md5_params = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha384_params = {SymCryptSha384OidList, SYMCRYPT_SHA384_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_params = {SymCryptSha512OidList, SYMCRYPT_SHA512_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1md5_params  = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params      = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params     = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params   = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha384_params   = {SymCryptSha384OidList, SYMCRYPT_SHA384_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_params   = {SymCryptSha512OidList, SYMCRYPT_SHA512_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_256_params = {SymCryptSha3_256OidList, SYMCRYPT_SHA3_256_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_384_params = {SymCryptSha3_384OidList, SYMCRYPT_SHA3_384_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_512_params = {SymCryptSha3_512OidList, SYMCRYPT_SHA3_512_OID_COUNT, 0};
@@ -79,9 +88,6 @@ static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
         return SymCryptSha3_384Algorithm;
     case NID_sha3_512:
         return SymCryptSha3_512Algorithm;
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt engine does not support Mac algorithm %d", mdnid);
     }
     return NULL;
 }
@@ -103,30 +109,26 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
     case NID_sha512:
     case NID_sha3_512:
         return SCOSSL_SHA512_DIGEST_LENGTH;
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt engine does not support Mac algorithm %d", mdnid);
     }
     return -1;
 }
 
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 {
-    SCOSSL_RSA_KEY_CTX *kctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
-    if (kctx == NULL)
+    SCOSSL_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
     }
 
-    return kctx;
+    return keyCtx;
 }
 
 _Use_decl_annotations_
-    SCOSSL_RSA_KEY_CTX *
-    scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
+SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
 {
-    SCOSSL_RSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
-    if (copyCtx == NULL)
+    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    if (copy_ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return NULL;
@@ -142,27 +144,27 @@ _Use_decl_annotations_
         SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
         SymcryptRsaParam.nPrimes = nPrimes;
         SymcryptRsaParam.nPubExp = 1;
-        copyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-        if (copyCtx->key == NULL)
+        copy_ctx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+        if (copy_ctx->key == NULL)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                             "SymCryptRsakeyAllocate failed");
-            scossl_rsa_free_key_ctx(copyCtx);
+            scossl_rsa_free_key_ctx(copy_ctx);
             return NULL;
         }
 
-        SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copyCtx->key);
-        copyCtx->initialized = 1;
+        // TODO: Enable in SymCrypt
+        SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copy_ctx->key);
+        copy_ctx->initialized = 1;
     }
 
-    return copyCtx;
+    return copy_ctx;
 }
 
-_Use_decl_annotations_ void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
+_Use_decl_annotations_ 
+void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
-    if (keyCtx->key)
+    if (keyCtx->key != NULL)
     {
         SymCryptRsakeyFree(keyCtx->key);
         keyCtx->key = NULL;
@@ -173,31 +175,30 @@ _Use_decl_annotations_ void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
-                          PCBYTE pbHashValue, SIZE_T cbHashValue,
-                          PBYTE pbSignature, SIZE_T *pcbSignature)
+SCOSSL_STATUS scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+                                    PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                    PBYTE pbSignature, SIZE_T *pcbSignature)
 {
     UINT32 cbModulus = 0;
-    SIZE_T cbResult = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    const SCOSSL_RSA_PKCS1_PARAMS *params;
+    const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params;
 
     cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
-    if (pbSignature == NULL || pcbSignature == NULL)
+    if (pcbSignature == NULL)
     {
         goto cleanup;
     }
 
-    params = scossl_get_rsa_pkcs1_params(mdnid);
-    if (params == NULL)
+    pkcs1Params = scossl_get_rsa_pkcs1_params(mdnid);
+    if (pkcs1Params == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 
+    // Log warnings for algorithms that aren't FIPS compliant
     switch (mdnid)
     {
     case NID_md5_sha1:
@@ -214,7 +215,7 @@ _Use_decl_annotations_
         break;
     }
 
-    if (cbHashValue != scossl_get_expected_hash_length(mdnid))
+    if (pbSignature != NULL && cbHashValue != scossl_get_expected_hash_length(mdnid))
     {
         goto cleanup;
     }
@@ -223,13 +224,13 @@ _Use_decl_annotations_
         keyCtx->key,
         pbHashValue,
         cbHashValue,
-        params->pHashOIDs,
-        params->nOIDCount,
-        params->flags,
+        pkcs1Params->pHashOIDs,
+        pkcs1Params->nOIDCount,
+        pkcs1Params->flags,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         pbSignature,
         cbModulus,
-        &cbResult);
+        pcbSignature);
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -238,7 +239,6 @@ _Use_decl_annotations_
         goto cleanup;
     }
 
-    *pcbSignature = cbResult;
     ret = SCOSSL_SUCCESS;
 
 cleanup:
@@ -246,17 +246,16 @@ cleanup:
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
-                            PCBYTE pbHashValue, SIZE_T cbHashValue,
-                            PCBYTE pbSignature, SIZE_T pcbSignature)
+SCOSSL_STATUS scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+                                      PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                      PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    const SCOSSL_RSA_PKCS1_PARAMS *params;
+    const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params;
 
-    params = scossl_get_rsa_pkcs1_params(mdnid);
-    if (params == NULL)
+    pkcs1Params = scossl_get_rsa_pkcs1_params(mdnid);
+    if (pkcs1Params == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
@@ -291,8 +290,8 @@ _Use_decl_annotations_
         pbSignature,
         pcbSignature,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        params->pHashOIDs,
-        params->nOIDCount,
+        pkcs1Params->pHashOIDs,
+        pkcs1Params->nOIDCount,
         0);
 
     if (scError == SYMCRYPT_NO_ERROR)
@@ -310,10 +309,9 @@ cleanup:
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
-                       PCBYTE pbHashValue, SIZE_T cbHashValue,
-                       PBYTE pbSignature, SIZE_T *pcbSignature)
+SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
+                                 PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                 PBYTE pbSignature, SIZE_T *pcbSignature)
 {
     SIZE_T cbResult = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -412,15 +410,14 @@ cleanup:
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
-                         PCBYTE pbHashValue, SIZE_T cbHashValue,
-                         PCBYTE pbSignature, SIZE_T pcbSignature)
+SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
+                                   PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                   PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
-    size_t expectedHashLength = -1;
+    SIZE_T expectedHashLength = -1;
     int mdnid = 0;
     int cbDigest, cbSaltMax;
 
@@ -513,11 +510,10 @@ cleanup:
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
-                       PCBYTE pbLabel, SIZE_T cbLabel,
-                       PCBYTE pbSrc, SIZE_T cbSrc,
-                       PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
+SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, 
+                                 int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
+                                 PCBYTE pbSrc, SIZE_T cbSrc,
+                                 PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
@@ -529,7 +525,7 @@ _Use_decl_annotations_
         goto cleanup;
     }
 
-    if (cbDst > INT_MAX)
+    if (cbDst == (SIZE_T)-1)
     {
         // cbDst is not caller supplied for engine
         cbDst = cbModulus;
@@ -630,11 +626,10 @@ cleanup:
 }
 
 _Use_decl_annotations_
-    SCOSSL_STATUS
-    scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, int mdnid,
-                       PCBYTE pbLabel, SIZE_T cbLabel,
-                       PCBYTE pbSrc, SIZE_T cbSrc,
-                       PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
+SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
+                                 int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
+                                 PCBYTE pbSrc, SIZE_T cbSrc,
+                                 PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     UINT32 cbModulus;
@@ -676,7 +671,7 @@ _Use_decl_annotations_
 
         // Constant-time error processing to avoid Bleichenbacher attack
 
-        // Set ret based on scError and cbResult
+        // Set pcbDst based on scError and cbResult
         // cbResult > INT_MAX               => err > 0
         err = (UINT64)cbResult >> 31;
         // scError != SYMCRYPT_NO_ERROR    => err > 0
@@ -685,7 +680,7 @@ _Use_decl_annotations_
         // else          { ret = 0; }
         *pcbDst = (0ll - err) >> 32;
 
-        // Set ret to cbResult if ret still 0
+        // Set pcbDst to cbResult if pcbDst still 0
         *pcbDst |= (UINT32)cbResult;
         goto cleanup;
     case RSA_PKCS1_OAEP_PADDING:
@@ -744,3 +739,7 @@ _Use_decl_annotations_
 cleanup:
     return *pcbDst >= 0;
 }
+
+#ifdef __cplusplus
+}
+#endif

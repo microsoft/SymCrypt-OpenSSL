@@ -25,6 +25,7 @@ set(SCOSSL_SOURCES
     ./src/asymcipher/p_scossl_rsa_cipher.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
+    ./src/p_scossl_rsa.c
     ./src/p_scossl_base.c
 )
 

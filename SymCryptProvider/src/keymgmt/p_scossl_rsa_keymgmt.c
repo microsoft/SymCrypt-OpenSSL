@@ -21,6 +21,8 @@ typedef struct
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0), \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_D, NULL, 0),
 
+// OpenSSL supports up to 10 primes via parameters,
+// but SymCrypt only accepts 2
 #define SCOSSL_MP_RSA_KEYMGMT_PARAMS                       \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR1, NULL, 0),   \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL, 0),   \
@@ -28,18 +30,9 @@ typedef struct
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL, 0), \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL, 0),
 
-#define SCOSSL_RSA_KEYGEN_PARAMS                       \
-    OSSL_PARAM_uint32(OSSL_PKEY_PARAM_RSA_BITS, NULL), \
-    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),    \
-
-#define SCOSSL_RSA_PSS_KEYGEN_PARAMS
-
 static const OSSL_PARAM p_scossl_rsa_keygen_settable_param_types[] = {
-    SCOSSL_RSA_KEYGEN_PARAMS
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_rsapss_keygen_settable_param_types[] = {
-    SCOSSL_RSA_KEYGEN_PARAMS
+    OSSL_PARAM_uint32(OSSL_PKEY_PARAM_RSA_BITS, NULL),
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),   
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_rsa_keymgmt_gettable_param_types[] = {
@@ -65,23 +58,12 @@ static const OSSL_PARAM p_scossl_rsapss_keymgmt_impexp_param_types[] = {
 //
 // Key import uses keymgmt_new to allocate an empty key object
 // first, then passes that reference to keymgmt_import. Since
-// the size of the SYMPCRYPT_RSAKEY depends on the parameters that aren't
-// known until import, we cannot directly use the SYMPCRYPT_RSAKEY, but instead
-// must wrap it with the SYMPCRYPT_RSAKEY_CTX.
+// the size of the SYMPCRYPT_RSAKEY depends on parameters that aren't
+// known until import, no key is actually allocated here.
 SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
     return scossl_rsa_new_key_ctx();
 }
-
-// SCOSSL_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
-// {
-//     SCOSSL_RSA_KEY_CTX *keyCtx = scossl_rsa_new_key_ctx_ex(RSA_PKCS1_PSS_PADDING);
-//     if (keyCtx != NULL)
-//     {
-//         keyCtx->libctx = provctx->libctx;
-//     }
-//     return keyCtx;
-// }
 
 SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx, ossl_unused int selection)
 {
@@ -91,11 +73,11 @@ SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KEY_CTX *
 //
 // Key Generation
 //
-SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genctx, _In_ const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_BITS);
-    if (p != NULL && !OSSL_PARAM_get_uint32(p, &genctx->nBitsOfModulus))
+    if (p != NULL && !OSSL_PARAM_get_uint32(p, &genCtx->nBitsOfModulus))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -103,32 +85,26 @@ SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genc
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
     if (p != NULL)
     {
-        if (!OSSL_PARAM_get_uint64(p, &genctx->pubExp64))
+        if (!OSSL_PARAM_get_uint64(p, &genCtx->pubExp64))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-        genctx->nPubExp = 1;
+        genCtx->nPubExp = 1;
     }
 
     return SCOSSL_SUCCESS;
 }
 
-const OSSL_PARAM *p_scossl_rsa_keygen_settable_params(ossl_unused void *genctx,
+const OSSL_PARAM *p_scossl_rsa_keygen_settable_params(ossl_unused void *genCtx,
                                                       ossl_unused void *provctx)
 {
     return p_scossl_rsa_keygen_settable_param_types;
 }
 
-const OSSL_PARAM *p_scossl_rsapss_keygen_settable_params(ossl_unused void *genctx,
-                                                         ossl_unused void *provctx)
+void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 {
-    return p_scossl_rsapss_keygen_settable_param_types;
-}
-
-void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genctx)
-{
-    OPENSSL_clear_free(genctx, sizeof(SCOSSL_RSA_KEYGEN_CTX));
+    OPENSSL_clear_free(genCtx, sizeof(SCOSSL_RSA_KEYGEN_CTX));
 }
 
 SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(ossl_unused void *provctx, int selection, int padding,
@@ -140,24 +116,24 @@ SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(ossl_unused void *provctx
         return NULL;
     }
 
-    SCOSSL_RSA_KEYGEN_CTX *genctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEYGEN_CTX));
-    if (genctx == NULL)
+    SCOSSL_RSA_KEYGEN_CTX *genCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEYGEN_CTX));
+    if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
 
-    genctx->nBitsOfModulus = 2048;
-    genctx->nPubExp = 0;
-    genctx->padding = padding;
+    genCtx->nBitsOfModulus = 2048;
+    genCtx->nPubExp = 0;
+    genCtx->padding = padding;
 
-    if (!p_scossl_rsa_keygen_set_params(genctx, params))
+    if (!p_scossl_rsa_keygen_set_params(genCtx, params))
     {
-        p_scossl_rsa_keygen_cleanup(genctx);
-        genctx = NULL;
+        p_scossl_rsa_keygen_cleanup(genCtx);
+        genCtx = NULL;
     }
 
-    return genctx;
+    return genCtx;
 }
 
 SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int selection,
@@ -166,15 +142,9 @@ SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int s
     return p_scossl_rsa_keygen_init_common(provctx, selection, RSA_PKCS1_PADDING, params);
 }
 
-SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsapss_keygen_init(ossl_unused void *provctx, int selection,
-                                                   _In_ const OSSL_PARAM params[])
+SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    return p_scossl_rsa_keygen_init_common(provctx, selection, RSA_PKCS1_PSS_PADDING, params);
-}
-
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genctx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
-{
-    SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
+    SYMCRYPT_RSA_PARAMS symcryptRsaParam;
     SCOSSL_RSA_KEY_CTX *keyCtx;
     SYMCRYPT_ERROR scError;
 
@@ -184,19 +154,19 @@ SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genctx, ossl
         goto cleanup;
     }
 
-    SymcryptRsaParam.version = 1;
-    SymcryptRsaParam.nBitsOfModulus = genctx->nBitsOfModulus;
-    SymcryptRsaParam.nPrimes = 2;
-    SymcryptRsaParam.nPubExp = genctx->nPubExp;
+    symcryptRsaParam.version = 1;
+    symcryptRsaParam.nBitsOfModulus = genCtx->nBitsOfModulus;
+    symcryptRsaParam.nPrimes = 2;
+    symcryptRsaParam.nPubExp = genCtx->nPubExp;
 
-    keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+    keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
     if (keyCtx->key == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
     }
 
-    scError = SymCryptRsakeyGenerate(keyCtx->key, &genctx->pubExp64, genctx->nPubExp, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
+    scError = SymCryptRsakeyGenerate(keyCtx->key, &genCtx->pubExp64, genCtx->nPubExp, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GENERATE_KEY);
@@ -692,7 +662,7 @@ SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int se
     PBYTE ppbPrimes[2] = {0};
     SIZE_T pcbPrimes[2] = {0};
     SIZE_T nPrimes = 0;
-    SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
+    SYMCRYPT_RSA_PARAMS symcryptRsaParam;
 
     BIGNUM *bn = BN_new();
 
@@ -790,11 +760,11 @@ SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int se
             goto cleanup;
         }
 
-        SymcryptRsaParam.version = 1;
-        SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-        SymcryptRsaParam.nPrimes = nPrimes;
-        SymcryptRsaParam.nPubExp = 1;
-        keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+        symcryptRsaParam.version = 1;
+        symcryptRsaParam.nBitsOfModulus = cbModulus * 8;
+        symcryptRsaParam.nPrimes = nPrimes;
+        symcryptRsaParam.nPubExp = 1;
+        keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
         if (keyCtx->key == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,

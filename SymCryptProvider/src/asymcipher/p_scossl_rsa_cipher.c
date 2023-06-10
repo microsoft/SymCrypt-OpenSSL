@@ -2,23 +2,29 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_rsa.h"
+#include "p_scossl_base.h"
+#include "p_scossl_rsa.h"
+
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
-#include "scossl_rsa.h"
-#include "p_scossl_base.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define SCOSSL_DEFAULT_OAEP_DIGEST OSSL_DIGEST_NAME_SHA1
 
 typedef struct
 {
-    SCOSSL_RSA_KEY_CTX *kctx;
-    UINT padding;
-
-    // Needed for fetching
     OSSL_LIB_CTX *libctx;
 
-    OSSL_ITEM oaepMdInfo;
-    OSSL_ITEM mgf1MdInfo; // Informational, must match oaepMdInfo if set
+    SCOSSL_RSA_KEY_CTX *keyCtx;
+    UINT padding;
 
+    // OAEP Parameters
+    const OSSL_ITEM *oaepMdInfo;
+    const OSSL_ITEM *mgf1MdInfo; // Informational, must match oaepMdInfo if set
     PBYTE pbLabel;
     SIZE_T cbLabel;
 } SCOSSL_RSA_CIPHER_CTX;
@@ -45,38 +51,7 @@ static OSSL_ITEM p_scossl_rsa_cipher_padding_modes[] = {
     {RSA_PKCS1_OAEP_PADDING, OSSL_PKEY_RSA_PAD_MODE_OAEP},
     {0, NULL}};
 
-static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
-    {NID_sha1, OSSL_DIGEST_NAME_SHA1}, // Default
-    {NID_sha256, OSSL_DIGEST_NAME_SHA2_256},
-    {NID_sha384, OSSL_DIGEST_NAME_SHA2_384},
-    {NID_sha512, OSSL_DIGEST_NAME_SHA2_512},
-    {NID_sha3_256, OSSL_DIGEST_NAME_SHA3_256},
-    {NID_sha3_384, OSSL_DIGEST_NAME_SHA3_384},
-    {NID_sha3_512, OSSL_DIGEST_NAME_SHA3_512}};
-
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[]);
-
-static OSSL_ITEM p_scossl_rsa_cipher_get_supported_md(_In_ OSSL_LIB_CTX *libctx,
-                                                      _In_ const char *mdname, _In_ const char *propq)
-{
-    EVP_MD *md;
-    OSSL_ITEM mdItem = {NID_undef, NULL};
-
-    if ((md = EVP_MD_fetch(libctx, mdname, propq)) != NULL)
-    {
-        for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
-        {
-            if (EVP_MD_is_a(md, p_scossl_rsa_supported_mds[i].ptr))
-            {
-                mdItem = p_scossl_rsa_supported_mds[i];
-            }
-        }
-
-        EVP_MD_free(md);
-    }
-
-    return mdItem;
-}
+SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
 /* Context management */
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
@@ -111,9 +86,9 @@ SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX 
 }
 
 SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                       _In_ const OSSL_PARAM params[])
+                                       const _In_ OSSL_PARAM params[])
 {
-    ctx->kctx = keyCtx;
+    ctx->keyCtx = keyCtx;
     ctx->padding = RSA_PKCS1_PADDING;
 
     return p_scossl_rsa_cipher_set_ctx_params(ctx, params);
@@ -128,12 +103,18 @@ SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
 
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
-    if (ctx->oaepMdInfo.id == NID_undef)
+    if (ctx->oaepMdInfo == NULL)
     {
-        ctx->oaepMdInfo = p_scossl_rsa_supported_mds[0];
+        ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+
+        if (ctx->oaepMdInfo == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
     }
 
-    ret = scossl_rsa_encrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
+    ret = scossl_rsa_encrypt(ctx->keyCtx, ctx->padding, ctx->oaepMdInfo->id,
                              ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
@@ -149,13 +130,19 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
     INT32 cbResult;
     SCOSSL_STATUS ret;
 
-    // Default to SHA1 for OAEP
-    if (ctx->oaepMdInfo.id == NID_undef)
+    // Default to SHA1 for OAEP. Update md in context so this is
+    // reflected in getparam
+    if (ctx->oaepMdInfo == NULL)
     {
-        ctx->oaepMdInfo = p_scossl_rsa_supported_mds[0];
+        ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+        if (ctx->oaepMdInfo == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
     }
 
-    ret = scossl_rsa_decrypt(ctx->kctx, ctx->padding, ctx->oaepMdInfo.id,
+    ret = scossl_rsa_decrypt(ctx->keyCtx, ctx->padding, ctx->oaepMdInfo->id,
                              ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
@@ -203,7 +190,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 
     p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
     if (p != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->oaepMdInfo.ptr == NULL ? "" : ctx->oaepMdInfo.ptr))
+        !OSSL_PARAM_set_utf8_string(p, ctx->oaepMdInfo == NULL ? "" : ctx->oaepMdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -211,7 +198,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 
     p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
     if (p != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo.ptr == NULL ? "" : ctx->mgf1MdInfo.ptr))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo == NULL ? "" : ctx->mgf1MdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -225,7 +212,7 @@ const OSSL_PARAM *p_scossl_rsa_cipher_gettable_ctx_params(ossl_unused void *prov
     return p_scossl_rsa_cipher_gettable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
@@ -283,7 +270,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
     p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
     if (p != NULL)
     {
-        OSSL_ITEM oaepMdInfo;
+        const OSSL_ITEM *oaepMdInfo;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
         {
@@ -301,9 +288,9 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        oaepMdInfo = p_scossl_rsa_cipher_get_supported_md(ctx->libctx, mdName, mdProps);
-        if (oaepMdInfo.id == NID_undef ||
-            (oaepMdInfo.id | ctx->mgf1MdInfo.id) != oaepMdInfo.id)
+        oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, NULL);
+        if (oaepMdInfo == NULL ||
+            (ctx->mgf1MdInfo != NULL && oaepMdInfo->id != ctx->mgf1MdInfo->id))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
@@ -315,7 +302,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
     p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
     if (p != NULL)
     {
-        OSSL_ITEM mgf1MdInfo;
+        const OSSL_ITEM *mgf1MdInfo;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
         {
@@ -333,9 +320,9 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mgf1MdInfo = p_scossl_rsa_cipher_get_supported_md(ctx->libctx, mdName, mdProps);
-        if (mgf1MdInfo.id == NID_undef ||
-            (mgf1MdInfo.id | ctx->oaepMdInfo.id) != mgf1MdInfo.id)
+        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, NULL);
+        if (mgf1MdInfo == NULL ||
+            (ctx->oaepMdInfo != NULL && mgf1MdInfo->id != ctx->oaepMdInfo->id))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
@@ -381,3 +368,7 @@ const OSSL_DISPATCH p_scossl_rsa_cipher_functions[] = {
     {OSSL_FUNC_ASYM_CIPHER_SET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_cipher_set_ctx_params},
     {OSSL_FUNC_ASYM_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_cipher_settable_ctx_params},
     {0, NULL}};
+
+#ifdef __cplusplus
+}
+#endif
