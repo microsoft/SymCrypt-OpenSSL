@@ -4,9 +4,6 @@
 
 #include "scossl_rsa.h"
 
-#include <openssl/core_names.h>
-#include <openssl/proverr.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -116,11 +113,6 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 {
     SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_zalloc, SCOSSL_RSA_KEY_CTX);
-    if (keyCtx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-    }
-
     return keyCtx;
 }
 
@@ -130,7 +122,6 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_RSA_KEY_CTX);
     if (copy_ctx == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
 
@@ -164,7 +155,7 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
     return copy_ctx;
 }
 
-_Use_decl_annotations_ 
+_Use_decl_annotations_
 void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
@@ -513,7 +504,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding, 
+SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                  int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
@@ -568,6 +559,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         {
             goto cleanup;
         }
+
         PCSYMCRYPT_HASH scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
         if (!scossl_mac_algo)
         {
@@ -635,6 +627,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
     UINT32 cbModulus;
     UINT64 err = 0;
     SIZE_T cbResult = -1;
@@ -687,7 +680,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         *pcbDst |= (UINT32)cbResult;
         goto cleanup;
     case RSA_PKCS1_OAEP_PADDING:
-        PCSYMCRYPT_HASH scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
+        scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
         if (!scossl_mac_algo)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
