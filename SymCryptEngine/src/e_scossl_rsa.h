@@ -3,8 +3,8 @@
 //
 
 #include "e_scossl.h"
-#include <openssl/rsa.h>
 #include "scossl_rsa.h"
+#include <openssl/rsa.h>
 
 #ifdef __cplusplus
 extern "C" {

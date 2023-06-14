@@ -61,7 +61,6 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
     case NID_sha3_512:
         return &scossl_rsa_pkcs1_sha3_512_params;
     }
-
     return NULL;
 }
 

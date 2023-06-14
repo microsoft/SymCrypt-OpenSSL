@@ -18,7 +18,7 @@ extern "C" {
 #define SCOSSL_LOG_LEVEL_PREFIX_DEBUG       "DEBUG"
 
 // Level of tracing that is output to stderr / log file
-static int _traceLogLevel = SCOSSL_LOG_LEVEL_OFF;
+static int _traceLogLevel = SCOSSL_LOG_LEVEL_INFO;
 static char *_traceLogFilename = NULL;
 static FILE *_traceLogFile = NULL;
 
