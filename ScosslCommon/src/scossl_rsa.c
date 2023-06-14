@@ -115,7 +115,7 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
 
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 {
-    SCOSSL_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_zalloc, SCOSSL_RSA_KEY_CTX);
     if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -127,7 +127,7 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 _Use_decl_annotations_
 SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
 {
-    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_RSA_KEY_CTX);
     if (copy_ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -155,6 +155,11 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
         SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copy_ctx->key);
         copy_ctx->initialized = 1;
     }
+    else
+    {
+        copy_ctx->initialized = 0;
+        copy_ctx->key = NULL;
+    }
 
     return copy_ctx;
 }
@@ -167,9 +172,7 @@ void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
     if (keyCtx->key != NULL)
     {
         SymCryptRsakeyFree(keyCtx->key);
-        keyCtx->key = NULL;
     }
-    keyCtx->initialized = 0;
 
     OPENSSL_free(keyCtx);
 }

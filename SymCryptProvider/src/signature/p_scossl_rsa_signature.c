@@ -11,13 +11,17 @@
 #include "p_scossl_rsa.h"
 #include "p_scossl_base.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct
 {
     SCOSSL_RSA_KEY_CTX *keyCtx;
     UINT padding;
     UINT operation;
 
-    // Needed for fetching 
+    // Needed for fetching md
     OSSL_LIB_CTX *libctx;
     char* propq;
 
@@ -30,8 +34,6 @@ typedef struct
     const OSSL_ITEM *mgf1MdInfo; // Informational, must match md if set
     int cbSalt;
 } SCOSSL_RSA_SIGN_CTX;
-
-#define OSSL_MAX_PROPQUERY_SIZE 256
 
 #define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                             \
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),      \
@@ -79,7 +81,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In_ const char *propq)
 {
-    SCOSSL_RSA_SIGN_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_RSA_SIGN_CTX);
     if (ctx != NULL)
     {
         if (propq != NULL && ((ctx->propq = OPENSSL_strdup(propq)) == NULL))
@@ -102,15 +104,14 @@ static void p_scossl_rsa_freectx(SCOSSL_RSA_SIGN_CTX *ctx)
     EVP_MD_CTX_free(ctx->mdctx);
     EVP_MD_free(ctx->md);
     OPENSSL_free(ctx->propq);
-    OPENSSL_clear_free(ctx, sizeof(SCOSSL_RSA_SIGN_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_RSA_SIGN_CTX);
 }
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 {
-    SCOSSL_RSA_SIGN_CTX *copy_ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_zalloc, SCOSSL_RSA_SIGN_CTX);
     if (copy_ctx != NULL)
     {
-
         if ((ctx->propq != NULL && ((copy_ctx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
             (ctx->mdctx != NULL && ((copy_ctx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
             (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
@@ -143,9 +144,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
     }
 
     ctx->cbSalt = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
-
     ctx->operation = operation;
-
     if (keyCtx != NULL)
     {
         ctx->keyCtx = keyCtx;
@@ -280,7 +279,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *c
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_update(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                            _In_reads_bytes_(datalen) const unsigned char *data, size_t datalen)
 {
-    if (ctx == NULL || ctx->mdctx == NULL)
+    if (ctx->mdctx == NULL)
     {
         return SCOSSL_FAILURE;
     }
@@ -295,8 +294,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     BYTE digest[EVP_MAX_MD_SIZE];
     UINT cbDigest = 0;
 
-    if (ctx == NULL ||
-        ctx->mdctx == NULL)
+    if (ctx->mdctx == NULL)
     {
         return ret;
     }
@@ -317,8 +315,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *
     BYTE digest[EVP_MAX_MD_SIZE];
     UINT cbDigest = 0;
 
-    if (ctx == NULL ||
-        ctx->mdctx == NULL)
+    if (ctx->mdctx == NULL)
     {
         return SCOSSL_FAILURE;
     }
@@ -711,6 +708,6 @@ const OSSL_DISPATCH p_scossl_rsa_signature_functions[] = {
     {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_settable_ctx_md_params},
     {0, NULL}};
 
-//
-// Helper functions
-//
+#ifdef __cplusplus
+}
+#endif
