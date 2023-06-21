@@ -905,7 +905,8 @@ SCOSSL_STATUS scossl_rsa_export_key(PSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PARA
     if (BN_bin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
         BN_bin2bn(pbModulus, pubExp64, rsaParams->e) == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
+            "BN_bin2bn failed.");
         goto cleanup;
     }
 
@@ -936,7 +937,8 @@ SCOSSL_STATUS scossl_rsa_export_key(PSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PARA
             (BN_bin2bn(pbCrtCoefficient, cbPrime1, rsaParams->privateParams->iqmp)   == NULL) ||
             (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, rsaParams->privateParams->d) == NULL))
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
+                "BN_bin2bn failed.");
             goto cleanup;
         }
     }
