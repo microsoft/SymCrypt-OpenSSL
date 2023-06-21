@@ -550,6 +550,8 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_PAD_MODE);
     if (p != NULL)
     {
+        int i = 0;
+
         // Padding mode may be retrieved as legacy NID or string
         switch (p->data_type)
         {
@@ -561,7 +563,6 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
-            int i = 0;
             while (p_scossl_rsa_sign_padding_modes[i].id != 0 &&
                    ctx->padding != p_scossl_rsa_sign_padding_modes[i].id)
             {
@@ -586,6 +587,9 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN);
     if (p != NULL)
     {
+        const char* saltLenText;
+        int len;
+
         // Padding mode may be accepted as legacy NID or string
         switch (p->data_type)
         {
@@ -597,7 +601,6 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
-            const char* saltLenText;
             switch (ctx->cbSalt)
             {
                 case RSA_PSS_SALTLEN_DIGEST:
@@ -613,7 +616,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                     saltLenText = OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX;
                     break;
                 default:
-                    int len = BIO_snprintf(p->data, p->data_size, "%d",
+                    len = BIO_snprintf(p->data, p->data_size, "%d",
                                            ctx->cbSalt);
                     if (len <= 0)
                         return 0;

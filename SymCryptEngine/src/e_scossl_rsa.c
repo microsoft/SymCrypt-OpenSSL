@@ -209,34 +209,11 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     _In_opt_ BN_GENCB* cb)
 {
     UINT64  pubExp64;
-    PBYTE   pbModulus = NULL;
-    SIZE_T  cbModulus = 0;
-    PBYTE   ppbPrimes[2] = { 0 };
-    SIZE_T  pcbPrimes[2] = { 0 };
-    SIZE_T  cbPrime1 = 0;
-    SIZE_T  cbPrime2 = 0;
-    PBYTE   ppbCrtExponents[2] = { 0 };
-    SIZE_T  pcbCrtExponents[2] = { 0 };
-    PBYTE   pbCrtCoefficient = NULL;
-    SIZE_T  cbCrtCoefficient = 0;
-    PBYTE   pbPrivateExponent = NULL;
-    SIZE_T  cbPrivateExponent = 0;
-    SIZE_T  nPrimes = 2; // Constant for SymCrypt
-    PBYTE   pbCurrent = NULL;
-    PBYTE   pbData = NULL;
-    SIZE_T  cbData = 0;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int     ret = SCOSSL_FAILURE;
+    int ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CTX *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
-    BIGNUM *rsa_n = NULL;
-    BIGNUM *rsa_e = NULL;
-    BIGNUM *rsa_p = NULL;
-    BIGNUM *rsa_q = NULL;
-    BIGNUM *rsa_d = NULL;
-    BIGNUM *rsa_dmp1 = NULL;
-    BIGNUM *rsa_dmq1 = NULL;
-    BIGNUM *rsa_iqmp = NULL;
+    SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
 
     if( keyCtx == NULL )
     {
@@ -280,127 +257,16 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
         goto cleanup;
     }
 
-    //
-    // Fill rsa structures so that OpenSSL helper functions can import/export the
-    // structure to its format.
-    // CNG format for reference:
-    // https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
-    //
-    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
-    cbPrime1 = SymCryptRsakeySizeofPrime(keyCtx->key, 0);
-    cbPrime2 = SymCryptRsakeySizeofPrime(keyCtx->key, 1);
-
-    cbData =
-        cbModulus +     // Modulus[cbModulus] // Big-endian.
-        cbPrime1 +      // Prime1[cbPrime1] // Big-endian.
-        cbPrime2 +      // Prime2[cbPrime2] // Big-endian.
-        cbPrime1 +      // Exponent1[cbPrime1] // Big-endian.
-        cbPrime2 +      // Exponent2[cbPrime2] // Big-endian.
-        cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
-        cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
-
-    pbData = OPENSSL_zalloc(cbData);
-    if( pbData == NULL )
+    rsaParams = scossl_rsa_new_export_params(TRUE);
+    if (rsaParams == NULL ||
+        !scossl_rsa_export_key(keyCtx->key, rsaParams))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
-            "OPENSSL_zalloc failed");
-        goto cleanup;
-    }
-    pbCurrent = pbData;
-
-    pbModulus = pbCurrent;
-    pbCurrent += cbModulus;
-
-    ppbPrimes[0] = pbCurrent;
-    pcbPrimes[0] = cbPrime1;
-    pbCurrent += cbPrime1;
-
-    ppbPrimes[1] = pbCurrent;
-    pcbPrimes[1] = cbPrime2;
-    pbCurrent += cbPrime2;
-
-    ppbCrtExponents[0] = pbCurrent;
-    pcbCrtExponents[0] = cbPrime1;
-    pbCurrent += cbPrime1;
-
-    ppbCrtExponents[1] = pbCurrent;
-    pcbCrtExponents[1] = cbPrime2;
-    pbCurrent += cbPrime2;
-
-    pbCrtCoefficient = pbCurrent;
-    cbCrtCoefficient = cbPrime1;
-    pbCurrent += cbPrime1;
-
-    pbPrivateExponent = pbCurrent;
-    cbPrivateExponent = cbModulus;
-
-    scError = SymCryptRsakeyGetValue(
-                   keyCtx->key,
-                   pbModulus,
-                   cbModulus,
-                   NULL,
-                   0,
-                   ppbPrimes,
-                   pcbPrimes,
-                   nPrimes,
-                   SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                   0);
-    if( scError != SYMCRYPT_NO_ERROR )
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
-    scError = SymCryptRsakeyGetCrtValue(
-                    keyCtx->key,
-                    ppbCrtExponents,
-                    pcbCrtExponents,
-                    nPrimes,
-                    pbCrtCoefficient,
-                    cbCrtCoefficient,
-                    pbPrivateExponent,
-                    cbPrivateExponent,
-                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                    0);
-    if( scError != SYMCRYPT_NO_ERROR )
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptRsakeyGetCrtValue failed", scError);
-        goto cleanup;
-    }
-
-    // Set these values
-    if( ((rsa_n = BN_new()) == NULL ) ||
-        ((rsa_e = BN_dup(e)) == NULL) ||
-        ((rsa_p = BN_secure_new()) == NULL) ||
-        ((rsa_q = BN_secure_new()) == NULL) ||
-        ((rsa_dmp1 = BN_secure_new()) == NULL) ||
-        ((rsa_dmq1 = BN_secure_new()) == NULL) ||
-        ((rsa_iqmp = BN_secure_new()) == NULL) ||
-        ((rsa_d = BN_secure_new()) == NULL))
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
-            "BN_new returned NULL.");
-        goto cleanup;
-    }
-
-    if( (BN_bin2bn(pbModulus, cbModulus, rsa_n) == NULL) ||
-        (BN_bin2bn(ppbPrimes[0], cbPrime1, rsa_p) == NULL) ||
-        (BN_bin2bn(ppbPrimes[1], cbPrime2, rsa_q) == NULL) ||
-        (BN_bin2bn(ppbCrtExponents[0], cbPrime1, rsa_dmp1) == NULL) ||
-        (BN_bin2bn(ppbCrtExponents[1], cbPrime2, rsa_dmq1) == NULL) ||
-        (BN_bin2bn(pbCrtCoefficient, cbPrime1, rsa_iqmp) == NULL) ||
-        (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, rsa_d) == NULL) )
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
-            "BN_bin2bn failed.");
-        goto cleanup;
-    }
-
-    RSA_set0_key(rsa, rsa_n, rsa_e, rsa_d);
-    RSA_set0_factors(rsa, rsa_p, rsa_q);
-    RSA_set0_crt_params(rsa, rsa_dmp1, rsa_dmq1, rsa_iqmp);
+    RSA_set0_key(rsa, rsaParams->n, rsaParams->e, rsaParams->privateParams->d);
+    RSA_set0_factors(rsa, rsaParams->privateParams->p, rsaParams->privateParams->q);
+    RSA_set0_crt_params(rsa, rsaParams->privateParams->dmp1, rsaParams->privateParams->dmq1, rsaParams->privateParams->iqmp);
 
     keyCtx->initialized = 1;
     ret = SCOSSL_SUCCESS;
@@ -409,20 +275,11 @@ cleanup:
     if( ret != SCOSSL_SUCCESS )
     {
         e_scossl_rsa_free_key_context(keyCtx);
-        BN_free(rsa_n);
-        BN_free(rsa_e);
-        BN_clear_free(rsa_p);
-        BN_clear_free(rsa_q);
-        BN_clear_free(rsa_dmp1);
-        BN_clear_free(rsa_dmq1);
-        BN_clear_free(rsa_iqmp);
-        BN_clear_free(rsa_d);
     }
 
-    if( pbData )
-    {
-        OPENSSL_clear_free( pbData, cbData );
-    }
+    // Only free the set params in failure case,
+    // since OpenSSL directly copies the pointers
+    scossl_rsa_free_export_params(rsaParams, !ret);
 
     return ret;
 }

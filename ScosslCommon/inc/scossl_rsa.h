@@ -14,6 +14,22 @@ typedef struct
     PSYMCRYPT_RSAKEY key;
 } SCOSSL_RSA_KEY_CTX;
 
+typedef struct {
+    BIGNUM *p;
+    BIGNUM *q;
+    BIGNUM *d;
+    BIGNUM *dmp1;
+    BIGNUM *dmq1;
+    BIGNUM *iqmp;
+} SCOSSL_RSA_PRIVATE_EXPORT_PARAMS;
+
+typedef struct
+{
+    BIGNUM *n;
+    BIGNUM *e;
+    SCOSSL_RSA_PRIVATE_EXPORT_PARAMS *privateParams;
+} SCOSSL_RSA_EXPORT_PARAMS;
+
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx();
 SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx);
 void scossl_rsa_free_key_ctx(_In_ SCOSSL_RSA_KEY_CTX *keyCtx);
@@ -41,6 +57,10 @@ SCOSSL_STATUS scossl_rsa_decrypt(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                   int mdnid, _In_reads_bytes_opt_(cbLabel) PCBYTE pbLabel, SIZE_T cbLabel,
                                  _In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc,
                                  _Out_writes_bytes_(*pcbDst) PBYTE pbDst, _Out_ INT32 *pcbDst, SIZE_T cbDst);
+
+SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate);
+void scossl_rsa_free_export_params(_In_ SCOSSL_RSA_EXPORT_PARAMS *rsaParam, BOOL freeParams);
+SCOSSL_STATUS scossl_rsa_export_key(_In_ PSYMCRYPT_RSAKEY key, _Out_ SCOSSL_RSA_EXPORT_PARAMS *rsaParams);
 
 #ifdef __cplusplus
 }

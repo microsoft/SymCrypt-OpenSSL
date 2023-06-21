@@ -53,7 +53,6 @@ static OSSL_ITEM p_scossl_rsa_cipher_padding_modes[] = {
 
 SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
-/* Context management */
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_RSA_CIPHER_CTX);;
@@ -151,13 +150,14 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
     return ret;
 }
 
-/* Asymmetric Cipher parameters */
 SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
     p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE);
     if (p != NULL)
     {
+        int i = 0;
+
         // Padding mode may be retrieved as legacy NID or string
         switch (p->data_type)
         {
@@ -169,7 +169,6 @@ SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
-            int i = 0;
             while (p_scossl_rsa_cipher_padding_modes[i].id != 0 &&
                    ctx->padding != p_scossl_rsa_cipher_padding_modes[i].id)
             {

@@ -70,7 +70,7 @@ void e_scossl_hmac_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
 }
 
 
-SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ const EVP_PKEY_CTX *src)
+SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
     SCOSSL_HMAC_PKEY_CTX *src_ctx, *dst_ctx;

@@ -2,6 +2,8 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+// Common functions for rsa sign and rsa asym cipher interfaces
+
 #include "p_scossl_rsa.h"
 
 #include <openssl/core_names.h>

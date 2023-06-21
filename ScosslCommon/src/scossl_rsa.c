@@ -92,6 +92,8 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
 {
     switch (mdnid)
     {
+    case NID_md5_sha1:
+        return SCOSSL_MD5_SHA1_DIGEST_LENGTH;
     case NID_md5:
         return SCOSSL_MD5_DIGEST_LENGTH;
     case NID_sha1:
@@ -172,12 +174,11 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
                                     PCBYTE pbHashValue, SIZE_T cbHashValue,
                                     PBYTE pbSignature, SIZE_T *pcbSignature)
 {
-    UINT32 cbModulus = 0;
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params;
 
-    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     if (pcbSignature == NULL)
     {
         goto cleanup;
@@ -245,9 +246,8 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params;
+    const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params = scossl_get_rsa_pkcs1_params(mdnid);
 
-    pkcs1Params = scossl_get_rsa_pkcs1_params(mdnid);
     if (pkcs1Params == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
@@ -311,11 +311,9 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     int ret = SCOSSL_FAILURE;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
     SIZE_T expectedHashLength = -1;
-    int cbDigest, cbSaltMax;
+    int cbDigest = EVP_MD_size(md);
+    int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     int mdnid;
-
-    cbDigest = EVP_MD_size(md);
-    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
 
     switch (cbSalt)
     {
@@ -326,8 +324,8 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     case RSA_PSS_SALTLEN_MAX:
         cbSalt = cbSaltMax;
         break;
+// Added in 3.1
 #ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
-    // Added in 3.1, should only be used in provider. min(cbSaltMax, cbDigest)
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
         cbSalt = cbSaltMax < cbDigest ? cbSaltMax : cbDigest;
 #endif
@@ -345,6 +343,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     {
         *pcbSignature = cbResult;
     }
+
     if (pbSignature == NULL)
     {
         ret = SCOSSL_SUCCESS;
@@ -354,7 +353,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     mdnid = EVP_MD_type(md);
     scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
     expectedHashLength = scossl_get_expected_hash_length(mdnid);
-    if (!scossl_mac_algo || expectedHashLength == (SIZE_T)-1)
+    if (scossl_mac_algo == NULL || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
@@ -411,13 +410,9 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PCSYMCRYPT_HASH scossl_mac_algo = NULL;
     SIZE_T expectedHashLength = -1;
-    int mdnid = 0;
-    int cbDigest, cbSaltMax;
-
-    mdnid = EVP_MD_type(md);
-
-    cbDigest = EVP_MD_size(md);
-    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+    int mdnid;
+    int cbDigest = EVP_MD_size(md);
+    int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
 
     switch (cbSalt)
     {
@@ -449,6 +444,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
         goto cleanup;
     }
 
+    mdnid = EVP_MD_type(md);
     scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
     expectedHashLength = scossl_get_expected_hash_length(mdnid);
     if (!scossl_mac_algo || expectedHashLength == (SIZE_T)-1)
@@ -733,6 +729,227 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
 
 cleanup:
     return *pcbDst >= 0;
+}
+
+SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
+{
+    SCOSSL_RSA_EXPORT_PARAMS *rsaParams = OPENSSL_malloc(sizeof(SCOSSL_RSA_EXPORT_PARAMS));
+
+    if(rsaParams == NULL ||
+       ((rsaParams->n = BN_new()) == NULL) ||
+       ((rsaParams->e = BN_new()) == NULL))
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+            "BN_new returned NULL.");
+        scossl_rsa_free_export_params(rsaParams, TRUE);
+        rsaParams = NULL;
+    }
+    else if (includePrivate)
+    {
+        rsaParams->privateParams = OPENSSL_malloc(sizeof(SCOSSL_RSA_PRIVATE_EXPORT_PARAMS));
+        if (rsaParams->privateParams == NULL ||            
+            ((rsaParams->privateParams->p    = BN_secure_new()) == NULL) ||
+            ((rsaParams->privateParams->q    = BN_secure_new()) == NULL) ||
+            ((rsaParams->privateParams->dmp1 = BN_secure_new()) == NULL) ||
+            ((rsaParams->privateParams->dmq1 = BN_secure_new()) == NULL) ||
+            ((rsaParams->privateParams->iqmp = BN_secure_new()) == NULL) ||
+            ((rsaParams->privateParams->d    = BN_secure_new()) == NULL))
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+                "BN_new returned NULL.");
+            scossl_rsa_free_export_params(rsaParams, TRUE);
+            rsaParams = NULL;
+        }
+    }
+    else
+    {
+        rsaParams->privateParams = NULL;
+    }
+
+    return rsaParams;
+}
+
+// Contained BNs are not freed in the engine case, 
+// since OpenSSL just copies the pointer 
+_Use_decl_annotations_
+void scossl_rsa_free_export_params(SCOSSL_RSA_EXPORT_PARAMS *rsaParams, BOOL freeParams)
+{
+    if (rsaParams != NULL)
+    {
+        if (freeParams)
+        {
+            BN_free(rsaParams->n);
+            BN_free(rsaParams->e);
+        }
+        if (rsaParams->privateParams != NULL)
+        {
+            if (freeParams)
+            {
+                BN_clear_free(rsaParams->privateParams->p);
+                BN_clear_free(rsaParams->privateParams->q);
+                BN_clear_free(rsaParams->privateParams->dmp1);
+                BN_clear_free(rsaParams->privateParams->dmq1);
+                BN_clear_free(rsaParams->privateParams->iqmp);
+                BN_clear_free(rsaParams->privateParams->d);
+            }
+            OPENSSL_free(rsaParams->privateParams);
+        }
+        OPENSSL_free(rsaParams);
+    }
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_rsa_export_key(PSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PARAMS *rsaParams)
+{
+    BOOL    includePrivate = rsaParams->privateParams != NULL;
+    UINT64  pubExp64;
+    PBYTE   pbModulus = NULL;
+    SIZE_T  cbModulus = 0;
+    PBYTE   ppbPrimes[2] = {0};
+    SIZE_T  pcbPrimes[2] = {0};
+    SIZE_T  cbPrime1 = 0;
+    SIZE_T  cbPrime2 = 0;
+    PBYTE   ppbCrtExponents[2] = { 0 };
+    SIZE_T  pcbCrtExponents[2] = { 0 };
+    PBYTE   pbCrtCoefficient = NULL;
+    SIZE_T  cbCrtCoefficient = 0;
+    PBYTE   pbPrivateExponent = NULL;
+    SIZE_T  cbPrivateExponent = 0;
+    SIZE_T  nPrimes = includePrivate ? 2 : 0;
+    PBYTE   pbCurrent = NULL;
+    PBYTE   pbData = NULL;
+    SIZE_T  cbData = 0;
+    SCOSSL_STATUS  ret = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    //
+    // Fill rsa structures so that OpenSSL helper functions can import/export the
+    // structure to its format.
+    // CNG format for reference:
+    // https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
+    //
+    cbModulus = SymCryptRsakeySizeofModulus(key);
+    cbPrime1 = SymCryptRsakeySizeofPrime(key, 0);
+    cbPrime2 = SymCryptRsakeySizeofPrime(key, 1);
+
+    cbData = cbModulus; // Modulus[cbModulus] // Big-endian.
+
+    if (includePrivate)
+    {
+        cbData =
+            cbModulus +     // Modulus[cbModulus] // Big-endian.
+            cbPrime1 +      // Prime1[cbPrime1] // Big-endian.
+            cbPrime2 +      // Prime2[cbPrime2] // Big-endian.
+            cbPrime1 +      // Exponent1[cbPrime1] // Big-endian.
+            cbPrime2 +      // Exponent2[cbPrime2] // Big-endian.
+            cbPrime1 +      // Coefficient[cbPrime1] // Big-endian.
+            cbModulus;      // PrivateExponent[cbModulus] // Big-endian.
+    }
+
+    pbData = OPENSSL_zalloc(cbData);
+    if (pbData == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+            "OPENSSL_zalloc failed");
+        goto cleanup;
+    }
+    pbCurrent = pbData;
+
+    pbModulus = pbCurrent;
+    pbCurrent += cbModulus;
+
+    if (includePrivate)
+    {
+        ppbPrimes[0] = pbCurrent;
+        pcbPrimes[0] = cbPrime1;
+        pbCurrent += cbPrime1;
+
+        ppbPrimes[1] = pbCurrent;
+        pcbPrimes[1] = cbPrime2;
+        pbCurrent += cbPrime2;
+
+        ppbCrtExponents[0] = pbCurrent;
+        pcbCrtExponents[0] = cbPrime1;
+        pbCurrent += cbPrime1;
+
+        ppbCrtExponents[1] = pbCurrent;
+        pcbCrtExponents[1] = cbPrime2;
+        pbCurrent += cbPrime2;
+
+        pbCrtCoefficient = pbCurrent;
+        cbCrtCoefficient = cbPrime1;
+        pbCurrent += cbPrime1;
+
+        pbPrivateExponent = pbCurrent;
+        cbPrivateExponent = cbModulus;
+    }
+
+    scError = SymCryptRsakeyGetValue(
+                   key,
+                   pbModulus,
+                   cbModulus,
+                   &pubExp64,
+                   0,
+                   ppbPrimes,
+                   pcbPrimes,
+                   nPrimes,
+                   SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                   0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptRsakeyGetValue failed", scError);
+        goto cleanup;
+    }
+
+    if (BN_bin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
+        BN_bin2bn(pbModulus, pubExp64, rsaParams->e) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        goto cleanup;
+    }
+
+    if (includePrivate)
+    {
+        scError = SymCryptRsakeyGetCrtValue(
+                        key,
+                        ppbCrtExponents,
+                        pcbCrtExponents,
+                        nPrimes,
+                        pbCrtCoefficient,
+                        cbCrtCoefficient,
+                        pbPrivateExponent,
+                        cbPrivateExponent,
+                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                        0);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptRsakeyGetCrtValue failed", scError);
+            goto cleanup;
+        }
+
+        if ((BN_bin2bn(ppbPrimes[0], cbPrime1, rsaParams->privateParams->p) == NULL) ||
+            (BN_bin2bn(ppbPrimes[1], cbPrime2, rsaParams->privateParams->q) == NULL) ||
+            (BN_bin2bn(ppbCrtExponents[0], cbPrime1, rsaParams->privateParams->dmp1) == NULL) ||
+            (BN_bin2bn(ppbCrtExponents[1], cbPrime2, rsaParams->privateParams->dmq1) == NULL) ||
+            (BN_bin2bn(pbCrtCoefficient, cbPrime1, rsaParams->privateParams->iqmp)   == NULL) ||
+            (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, rsaParams->privateParams->d) == NULL))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+            goto cleanup;
+        }
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if(pbData)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    return ret;
 }
 
 #ifdef __cplusplus
