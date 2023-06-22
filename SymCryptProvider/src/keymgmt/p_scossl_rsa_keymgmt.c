@@ -304,7 +304,7 @@ static UINT16 p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -491,12 +491,12 @@ cleanup:
     return ret;
 }
 
-const OSSL_PARAM *p_scossl_keymgmt_gettable_params(ossl_unused void *provctx)
+const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *provctx)
 {
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-BOOL p_scossl_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
+BOOL p_scossl_rsa_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
 {
     BOOL ret = TRUE;
     if (keydata == NULL)
@@ -510,8 +510,8 @@ BOOL p_scossl_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
     return ret;
 }
 
-BOOL p_scossl_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKEY keydata2,
-                            int selection)
+BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKEY keydata2,
+                                int selection)
 {
     BOOL ret = FALSE;
     UINT64 pubExp1 = 0;
@@ -629,13 +629,13 @@ cleanup:
 //
 // Key import/export
 //
-const OSSL_PARAM *p_scossl_keymgmt_impexp_types(int selection){
+const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
     return (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 ? 
         p_scossl_rsa_keymgmt_impexp_param_types : 
         NULL;
 }
 
-SCOSSL_STATUS p_scossl_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -784,8 +784,8 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection,
-                                      _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
+SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection,
+                                          _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -844,14 +844,14 @@ const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_rsa_keygen_cleanup},
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_rsa_keygen_init},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_rsa_keygen},
-    {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_keymgmt_get_params},
-    {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_keymgmt_gettable_params},
-    {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_keymgmt_has},
-    {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_keymgmt_match},
-    {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_keymgmt_impexp_types},
-    {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_keymgmt_impexp_types},
-    {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_keymgmt_import},
-    {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))p_scossl_keymgmt_export},
+    {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_get_params},
+    {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_gettable_params},
+    {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_rsa_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_rsa_keymgmt_match},
+    {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
+    {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
+    {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_rsa_keymgmt_import},
+    {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))p_scossl_rsa_keymgmt_export},
     {0, NULL}};
 
 #ifdef __cplusplus
