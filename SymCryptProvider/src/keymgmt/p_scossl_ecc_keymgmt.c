@@ -3,6 +3,10 @@
 //
 
 #include "scossl_ecc.h"
+#include "p_scossl_base.h"
+
+#include <openssl/core_names.h>
+#include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,10 +14,13 @@ extern "C" {
 
 typedef struct
 {
- 
+    OSSL_LIB_CTX *libctx;
+    EC_GROUP *ecGroup;
 } SCOSSL_ECC_KEYGEN_CTX;
 
+// ScOSSL only supports named curves
 static const OSSL_PARAM p_scossl_ecc_keygen_settable_param_types[] = {
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
@@ -41,8 +48,22 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(SCOSSL_ECC_KEY_CTX *keyC
 //
 // Key Generation
 //
-SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
+    const OSSL_PARAM *p;
+
+    p = OSSL_PARAM_locate_const(p, OSSL_PKEY_PARAM_GROUP_NAME);
+    if (p != NULL)
+    {
+        genCtx->ecGroup = EC_GROUP_new_from_params(params, genCtx->libctx, NULL);
+        if (genCtx->ecGroup == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
+            return SCOSSL_FAILURE;
+        }      
+    }
+
+cleanup:
     return SCOSSL_SUCCESS;
 }
 
@@ -54,20 +75,77 @@ const OSSL_PARAM *p_scossl_ecc_keygen_settable_params(ossl_unused void *genCtx,
 
 void p_scossl_ecc_keygen_cleanup(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx)
 {
-
+    if (genCtx != NULL) 
+    {
+        EC_GROUP_free(genCtx->ecGroup);
+    }
+    OPENSSL_free(genCtx);
 }
 
-SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(ossl_unused void *provctx, int selection,
+SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                 const _In_ OSSL_PARAM params[])
 {
-    SCOSSL_ECC_KEYGEN_CTX *genCtx = NULL;
+    SCOSSL_COMMON_ALIGNED_ALLOC(genCtx, OPENSSL_malloc, SCOSSL_ECC_KEYGEN_CTX);
+    if (genCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
+
+    genCtx->libctx = provctx->libctx;
+
+    if (!p_scossl_ecc_keygen_set_params(genCtx, params))
+    {
+        p_scossl_ecc_keygen_cleanup(genCtx);
+        genCtx = NULL;
+    }
 
     return genCtx;
 }
 
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    SCOSSL_ECC_KEY_CTX *keyCtx = NULL;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_ECURVE pCurve = NULL;
+
+    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_malloc, SCOSSL_ECC_KEY_CTX);
+    if (keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
+
+    keyCtx->ecGroup = genCtx->ecGroup;
+    genCtx->ecGroup = NULL;
+
+    pCurve = scossl_ecc_group_to_symcrypt_curve(keyCtx->ecGroup);
+    if (pCurve == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
+        goto cleanup; 
+    }
+
+    keyCtx->key = SymCryptEckeyAllocate(pCurve);
+    if (keyCtx->key == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    // We don't know whether this key will be used for ECDSA or ECDH
+    scError = SymCryptEckeySetRandom(SYMCRYPT_FLAG_ECKEY_ECDSA | SYMCRYPT_FLAG_ECKEY_ECDH, keyCtx->key);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+cleanup:
+    if (!keyCtx->initialized)
+    {
+        scossl_ecc_free_key_ctx(keyCtx);
+        keyCtx = NULL;
+    }
 
     return keyCtx;
 }

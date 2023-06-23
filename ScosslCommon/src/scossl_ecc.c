@@ -17,8 +17,28 @@ static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P384 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 
-static PSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)
+SCOSSL_STATUS scossl_ecc_init_static()
 {
+    if( ((_hidden_curve_P192 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP192, 0)) == NULL) ||
+        ((_hidden_curve_P224 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP224, 0)) == NULL) ||
+        ((_hidden_curve_P256 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP256, 0)) == NULL) ||
+        ((_hidden_curve_P384 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP384, 0)) == NULL) ||
+        ((_hidden_curve_P521 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP521, 0)) == NULL) )
+    {
+        return SCOSSL_FAILURE;
+    }
+    return SCOSSL_SUCCESS;
+}
+
+PSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(EC_GROUP *group)
+{
+    if (group == NULL)
+    {
+        return NULL;
+    }
+
+    int groupNid = EC_GROUP_get_curve_name(group);
+
     // Only reroute NIST Prime curves to SymCrypt for now
     switch (groupNid)
     {
@@ -84,6 +104,7 @@ void scossl_ecc_free_key_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
         SymCryptEckeyFree(keyCtx->key);
     }
 
+    EC_GROUP_free(keyCtx->ecGroup);    
     OPENSSL_free(keyCtx);
 }
 

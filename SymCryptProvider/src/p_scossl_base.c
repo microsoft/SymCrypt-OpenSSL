@@ -255,6 +255,11 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
+        if(!scossl_ecc_init_static())
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+            return SCOSSL_FAILURE;
+        }
         scossl_prov_initialized = 1;
     }
 
@@ -281,7 +286,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                 break;
         }
     }
-    
+
     p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
     if (p_ctx != NULL)
     {
