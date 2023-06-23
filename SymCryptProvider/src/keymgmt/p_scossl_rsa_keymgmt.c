@@ -60,12 +60,12 @@ static const OSSL_PARAM p_scossl_rsa_keymgmt_impexp_param_types[] = {
 // first, then passes that reference to keymgmt_import. Since
 // the size of the SYMPCRYPT_RSAKEY depends on parameters that aren't
 // known until import, no key is actually allocated here.
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
+static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
     return scossl_rsa_new_key_ctx();
 }
 
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(const _In_ SCOSSL_RSA_KEY_CTX *keyCtx, ossl_unused int selection)
+static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(const _In_ SCOSSL_RSA_KEY_CTX *keyCtx, ossl_unused int selection)
 {
     return scossl_rsa_dup_key_ctx(keyCtx);
 }
@@ -73,7 +73,7 @@ SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(const _In_ SCOSSL_RSA_KEY_CTX *
 //
 // Key Generation
 //
-SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_BITS);
@@ -96,18 +96,18 @@ SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genC
     return SCOSSL_SUCCESS;
 }
 
-const OSSL_PARAM *p_scossl_rsa_keygen_settable_params(ossl_unused void *genCtx,
-                                                      ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_rsa_keygen_settable_params(ossl_unused void *genCtx,
+                                                             ossl_unused void *provctx)
 {
     return p_scossl_rsa_keygen_settable_param_types;
 }
 
-void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
+static void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 {
     OPENSSL_clear_free(genCtx, sizeof(SCOSSL_RSA_KEYGEN_CTX));
 }
 
-SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int selection,
+static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int selection,
                                                 const _In_ OSSL_PARAM params[])
 {
     // Sanity check
@@ -135,7 +135,7 @@ SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int s
     return genCtx;
 }
 
-SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
+static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SYMCRYPT_RSA_PARAMS symcryptRsaParam;
     SCOSSL_RSA_KEY_CTX *keyCtx;
@@ -304,7 +304,7 @@ static UINT16 p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -491,12 +491,12 @@ cleanup:
     return ret;
 }
 
-const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *provctx)
 {
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-BOOL p_scossl_rsa_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
+static BOOL p_scossl_rsa_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
 {
     BOOL ret = TRUE;
     if (keydata == NULL)
@@ -510,8 +510,8 @@ BOOL p_scossl_rsa_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
     return ret;
 }
 
-BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKEY keydata2,
-                                int selection)
+static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKEY keydata2,
+                                       int selection)
 {
     BOOL ret = FALSE;
     UINT64 pubExp1 = 0;
@@ -629,13 +629,13 @@ cleanup:
 //
 // Key import/export
 //
-const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
+static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
     return (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 ? 
         p_scossl_rsa_keymgmt_impexp_param_types : 
         NULL;
 }
 
-SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -784,8 +784,8 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection,
-                                          _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection,
+                                                 _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
