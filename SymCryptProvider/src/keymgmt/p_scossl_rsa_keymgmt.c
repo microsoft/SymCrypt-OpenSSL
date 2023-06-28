@@ -304,7 +304,7 @@ static UINT16 p_scossl_rsa_get_security_bits(_In_ PSYMCRYPT_RSAKEY keydata)
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keydata, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -319,7 +319,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keyda
     OSSL_PARAM *p_prime2;
     UINT64 p_data_uint64;
 
-    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keydata);
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     PBYTE pbModulus = NULL;
     PBYTE pbPrivateExponent = NULL;
     PBYTE pbCrtCoefficient = NULL;
@@ -327,17 +327,17 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keyda
     PBYTE ppbCrtExponents[2] = {0};
 
     SIZE_T pcbPrimes[2] = {
-        SymCryptRsakeySizeofPrime(keydata, 0),
-        SymCryptRsakeySizeofPrime(keydata, 1)};
+        SymCryptRsakeySizeofPrime(keyCtx->key, 0),
+        SymCryptRsakeySizeofPrime(keyCtx->key, 1)};
 
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
-    if (p != NULL && !OSSL_PARAM_set_uint32(p, SymCryptRsakeyModulusBits(keydata)))
+    if (p != NULL && !OSSL_PARAM_set_uint32(p, SymCryptRsakeyModulusBits(keyCtx->key)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
     p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
-    if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_rsa_get_security_bits(keydata)))
+    if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_rsa_get_security_bits(keyCtx->key)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
@@ -369,7 +369,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keyda
         }
 
         if (SymCryptRsakeyGetCrtValue(
-                keydata,
+                keyCtx->key,
                 ppbCrtExponents,
                 pcbPrimes,
                 2,
@@ -434,7 +434,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ PSYMCRYPT_RSAKEY keyda
         }
 
         if (SymCryptRsakeyGetValue(
-                keydata,
+                keyCtx->key,
                 pbModulus,
                 cbModulus,
                 &pubExp64,
@@ -496,21 +496,21 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-static BOOL p_scossl_rsa_keymgmt_has(_In_ PSYMCRYPT_RSAKEY keydata, int selection)
+static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection)
 {
     BOOL ret = TRUE;
-    if (keydata == NULL)
+    if (keyCtx->key == NULL)
     {
         return FALSE;
     }
     if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY)
     {
-        ret = ret && SymCryptRsakeyHasPrivateKey(keydata);
+        ret = ret && SymCryptRsakeyHasPrivateKey(keyCtx->key);
     }
     return ret;
 }
 
-static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYMCRYPT_RSAKEY keydata2,
+static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
     BOOL ret = FALSE;
@@ -521,9 +521,9 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYM
     PBYTE pbPrivateExponent1 = NULL;
     PBYTE pbPrivateExponent2 = NULL;
 
-    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keydata1);
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx1->key);
 
-    if (cbModulus != SymCryptRsakeySizeofModulus(keydata2))
+    if (cbModulus != SymCryptRsakeySizeofModulus(keyCtx2->key))
     {
         goto cleanup;
     }
@@ -536,7 +536,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYM
     }
 
     if (SymCryptRsakeyGetValue(
-            keydata1,
+            keyCtx1->key,
             pbModulus1,
             cbModulus,
             &pubExp1,
@@ -547,7 +547,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYM
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0) != SYMCRYPT_NO_ERROR ||
         SymCryptRsakeyGetValue(
-            keydata2,
+            keyCtx2->key,
             pbModulus2,
             cbModulus,
             &pubExp2,
@@ -584,7 +584,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYM
         }
 
         if (SymCryptRsakeyGetCrtValue(
-                keydata1,
+                keyCtx1->key,
                 NULL,
                 NULL,
                 0,
@@ -595,7 +595,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ PSYMCRYPT_RSAKEY keydata1, _In_ PSYM
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0) != SYMCRYPT_NO_ERROR ||
             SymCryptRsakeyGetCrtValue(
-                keydata2,
+                keyCtx2->key,
                 NULL,
                 NULL,
                 0,
