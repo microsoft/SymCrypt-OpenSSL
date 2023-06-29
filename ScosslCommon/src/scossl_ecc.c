@@ -60,54 +60,6 @@ PSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(EC_GROUP *group)
     return NULL;
 }
 
-SCOSSL_ECC_KEY_CTX *scossl_ecc_new_key_ctx()
-{
-    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_zalloc, SCOSSL_ECC_KEY_CTX);
-    return keyCtx;
-}
-
-SCOSSL_ECC_KEY_CTX *scossl_ecc_dup_key_ctx(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx)
-{
-    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_ECC_KEY_CTX);
-    if (copy_ctx == NULL)
-    {
-        return NULL;
-    }
-
-    if (keyCtx->initialized)
-    {
-        if (keyCtx->ecGroup == NULL)
-        {
-            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
-                "ECC key inititalized but group not set"); 
-        }
-        copy_ctx->ecGroup = keyCtx->ecGroup;
-        copy_ctx->key = SymCryptEckeyAllocate(scossl_ecc_nid_to_symcrypt_curve(copy_ctx->ecGroup));
-        SymCryptEckeyCopy(keyCtx->key, copy_ctx->key);
-    }
-    else
-    {
-        copy_ctx->initialized = 0;
-        copy_ctx->key = NULL;
-        copy_ctx->ecGroup = NULL;
-    }
-
-    return copy_ctx;
-}
-
-void scossl_ecc_free_key_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
-{
-    if (keyCtx == NULL)
-        return;
-    if (keyCtx->key != NULL)
-    {
-        SymCryptEckeyFree(keyCtx->key);
-    }
-
-    EC_GROUP_free(keyCtx->ecGroup);    
-    OPENSSL_free(keyCtx);
-}
-
 #ifdef __cplusplus
 }
 #endif
