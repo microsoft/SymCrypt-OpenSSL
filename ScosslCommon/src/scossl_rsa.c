@@ -28,7 +28,7 @@ typedef struct
     UINT32         flags;
 } SCOSSL_RSA_PKCS1_PARAMS;
 
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1md5_params  = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5sha1_params  = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params      = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params     = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params   = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
@@ -43,7 +43,7 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
     switch (mdnid)
     {
     case NID_md5_sha1:
-        return &scossl_rsa_pkcs1_sha1md5_params;
+        return &scossl_rsa_pkcs1_md5sha1_params;
     case NID_md5:
         return &scossl_rsa_pkcs1_md5_params;
     case NID_sha1:
@@ -113,14 +113,13 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
 
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_zalloc, SCOSSL_RSA_KEY_CTX);
-    return keyCtx;
+    return OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
 }
 
 _Use_decl_annotations_
 SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_RSA_KEY_CTX);
+    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
     if (copy_ctx == NULL)
     {
         return NULL;
@@ -309,7 +308,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     SIZE_T cbResult = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int ret = SCOSSL_FAILURE;
-    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    PCSYMCRYPT_HASH scosslHashAlgo = NULL;
     SIZE_T expectedHashLength = -1;
     int cbDigest = EVP_MD_size(md);
     int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
@@ -324,8 +323,8 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     case RSA_PSS_SALTLEN_MAX:
         cbSalt = cbSaltMax;
         break;
-// Added in 3.1
 #ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
+    // Added in 3.1, smaller of digest length or maximized salt length
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
         cbSalt = cbSaltMax < cbDigest ? cbSaltMax : cbDigest;
 #endif
@@ -339,10 +338,14 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     }
 
     cbResult = SymCryptRsakeySizeofModulus(keyCtx->key);
-    if (pcbSignature != NULL)
+    if (pcbSignature == NULL)
     {
-        *pcbSignature = cbResult;
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_NULL_PARAMETER,
+                         "pcbSignature is NULL");
+        goto cleanup;
     }
+    
+    *pcbSignature = cbResult;
 
     if (pbSignature == NULL)
     {
@@ -351,9 +354,9 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
     }
 
     mdnid = EVP_MD_type(md);
-    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
     expectedHashLength = scossl_get_expected_hash_length(mdnid);
-    if (scossl_mac_algo == NULL || expectedHashLength == (SIZE_T)-1)
+    if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
@@ -381,12 +384,12 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
         keyCtx->key,
         pbHashValue,
         cbHashValue,
-        scossl_mac_algo,
+        scosslHashAlgo,
         cbSalt,
         0,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         pbSignature,
-        pcbSignature != NULL ? (*pcbSignature) : 0,
+        *pcbSignature,
         &cbResult);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -408,7 +411,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    PCSYMCRYPT_HASH scosslHashAlgo = NULL;
     SIZE_T expectedHashLength = -1;
     int mdnid;
     int cbDigest = EVP_MD_size(md);
@@ -424,11 +427,11 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
         break;
     case RSA_PSS_SALTLEN_AUTO:
 #ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
-    // Added in 3.1, should only be used in provider. Unsupported auto salt len for verify
+    // Added in 3.1, unsupported auto salt len for verify
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
 #endif
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt Engine does not support RSA_PSS_SALTLEN_AUTO saltlen");
+                         "SymCrypt for OpenSSL does not support RSA_PSS_SALTLEN_AUTO saltlen");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -445,9 +448,9 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
     }
 
     mdnid = EVP_MD_type(md);
-    scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
     expectedHashLength = scossl_get_expected_hash_length(mdnid);
-    if (!scossl_mac_algo || expectedHashLength == (SIZE_T)-1)
+    if (!scosslHashAlgo || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
@@ -478,21 +481,19 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
         pbSignature,
         pcbSignature,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        scossl_mac_algo,
+        scosslHashAlgo,
         cbSalt,
         0);
 
-    if (scError != SYMCRYPT_NO_ERROR)
+    if (scError == SYMCRYPT_NO_ERROR)
     {
-        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
-        {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaPssVerify returned unexpected error", scError);
-        }
-        goto cleanup;
+        ret = SCOSSL_SUCCESS;
     }
-
-    ret = SCOSSL_SUCCESS;
+    else if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                  "SymCryptRsaPssVerify returned unexpected error", scError);
+    }
 
 cleanup:
     return ret;
@@ -504,12 +505,14 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
     SIZE_T cbResult = -1;
 
     if (pbDst == NULL)
     {
+        ret = SCOSSL_SUCCESS;
         *pcbDst = (INT32)cbModulus;
         goto cleanup;
     }
@@ -523,8 +526,6 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
     {
         goto cleanup;
     }
-
-    *pcbDst = -1;
 
     switch (padding)
     {
@@ -555,8 +556,8 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             goto cleanup;
         }
 
-        PCSYMCRYPT_HASH scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
-        if (!scossl_mac_algo)
+        PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
+        if (!scosslHashAlgo)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                              "Unknown type: %d.", mdnid);
@@ -567,7 +568,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             keyCtx->key,
             pbSrc,
             cbSrc,
-            scossl_mac_algo,
+            scosslHashAlgo,
             pbLabel,
             cbLabel,
             0,
@@ -609,10 +610,11 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         break;
     }
 
-    *pcbDst = (cbResult <= INT_MAX) ? (INT32)cbResult : -1;
+    ret = cbResult <= INT_MAX;
+    *pcbDst = ret ? (INT32)cbResult : -1;
 
 cleanup:
-    return *pcbDst >= 0;
+    return ret;
 }
 
 _Use_decl_annotations_
@@ -622,7 +624,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PCSYMCRYPT_HASH scossl_mac_algo = NULL;
+    PCSYMCRYPT_HASH scosslHashAlgo = NULL;
     UINT32 cbModulus;
     UINT64 err = 0;
     SIZE_T cbResult = -1;
@@ -675,8 +677,8 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         *pcbDst |= (UINT32)cbResult;
         goto cleanup;
     case RSA_PKCS1_OAEP_PADDING:
-        scossl_mac_algo = scossl_get_symcrypt_hash_algorithm(mdnid);
-        if (!scossl_mac_algo)
+        scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
+        if (!scosslHashAlgo)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                              "Unknown type: %d.", mdnid);
@@ -688,7 +690,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             pbSrc,
             cbSrc,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SymCryptSha1Algorithm,
+            scosslHashAlgo,
             pbLabel,
             cbLabel,
             0,
@@ -799,7 +801,7 @@ void scossl_rsa_free_export_params(SCOSSL_RSA_EXPORT_PARAMS *rsaParams, BOOL fre
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_export_key(PSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PARAMS *rsaParams)
+SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PARAMS *rsaParams)
 {
     BOOL    includePrivate = rsaParams->privateParams != NULL;
     UINT64  pubExp64;

@@ -116,7 +116,7 @@ static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx
         return NULL;
     }
 
-    SCOSSL_COMMON_ALIGNED_ALLOC(genCtx, OPENSSL_malloc, SCOSSL_RSA_KEYGEN_CTX);
+    SCOSSL_RSA_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEYGEN_CTX));
     if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -801,7 +801,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx
 
     rsaParams = scossl_rsa_new_export_params(includePrivate);
     if (rsaParams == NULL ||
-        !scossl_rsa_export_key(keyCtx->key, rsaParams))
+        !scossl_rsa_export_key((PCSYMCRYPT_RSAKEY)keyCtx->key, rsaParams))
     {
         goto cleanup;
     }

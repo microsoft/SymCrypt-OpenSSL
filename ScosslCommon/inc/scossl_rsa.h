@@ -60,7 +60,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
 
 SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate);
 void scossl_rsa_free_export_params(_In_ SCOSSL_RSA_EXPORT_PARAMS *rsaParam, BOOL freeParams);
-SCOSSL_STATUS scossl_rsa_export_key(_In_ PSYMCRYPT_RSAKEY key, _Out_ SCOSSL_RSA_EXPORT_PARAMS *rsaParams);
+SCOSSL_STATUS scossl_rsa_export_key(_In_ PCSYMCRYPT_RSAKEY key, _Out_ SCOSSL_RSA_EXPORT_PARAMS *rsaParams);
 
 #ifdef __cplusplus
 }

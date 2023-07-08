@@ -259,7 +259,7 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
 
     rsaParams = scossl_rsa_new_export_params(TRUE);
     if (rsaParams == NULL ||
-        !scossl_rsa_export_key(keyCtx->key, rsaParams))
+        !scossl_rsa_export_key((PCSYMCRYPT_RSAKEY)keyCtx->key, rsaParams))
     {
         goto cleanup;
     }
@@ -279,7 +279,7 @@ cleanup:
 
     // Only free the set params in failure case,
     // since OpenSSL directly copies the pointers
-    scossl_rsa_free_export_params(rsaParams, !ret);
+    scossl_rsa_free_export_params(rsaParams, ret != SCOSSL_SUCCESS);
 
     return ret;
 }

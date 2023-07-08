@@ -55,7 +55,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
 
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_RSA_CIPHER_CTX);;
+    SCOSSL_RSA_CIPHER_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
     if (ctx != NULL)
     {
         ctx->libctx = provctx->libctx;
@@ -75,7 +75,7 @@ void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_RSA_CIPHER_CTX);
+    SCOSSL_RSA_CIPHER_CTX* copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
     if (copy_ctx != NULL)
     {
         memcpy(copy_ctx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
