@@ -3,7 +3,7 @@
 
 typedef struct {
     OSSL_LIB_CTX *libctx; 
-    int initialized;
+    BOOL initialized;
     int includePublic;
     PSYMCRYPT_ECKEY key;
     EC_GROUP* ecGroup;

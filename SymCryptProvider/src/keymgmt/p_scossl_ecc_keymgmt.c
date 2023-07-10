@@ -45,7 +45,7 @@ static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_zalloc, SCOSSL_ECC_KEY_CTX);
+    SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -59,7 +59,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_malloc, SCOSSL_ECC_KEY_CTX);
+    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (copyCtx == NULL)
     {
         return NULL;
@@ -72,8 +72,13 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
             SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
                 "ECC key inititalized but group not set"); 
         }
-        copyCtx->ecGroup = keyCtx->ecGroup;
-        copyCtx->key = SymCryptEckeyAllocate(scossl_ecc_group_to_symcrypt_curve(copyCtx->ecGroup));
+        
+        if (((copyCtx->ecGroup = EC_GROUP_dup(keyCtx->ecGroup)) == NULL) ||
+            ((copyCtx->key = SymCryptEckeyAllocate(scossl_ecc_group_to_symcrypt_curve(copyCtx->ecGroup))) == NULL))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return NULL;
+        }
         SymCryptEckeyCopy(keyCtx->key, copyCtx->key);
     }
     else
@@ -96,8 +101,11 @@ static void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
     {
         SymCryptEckeyFree(keyCtx->key);
     }
+    if (keyCtx->ecGroup != NULL)
+    {
+        EC_GROUP_free(keyCtx->ecGroup);    
+    }
 
-    EC_GROUP_free(keyCtx->ecGroup);    
     OPENSSL_free(keyCtx);
 }
 
@@ -139,7 +147,7 @@ static void p_scossl_ecc_keygen_cleanup(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx)
 static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
                                                        const _In_ OSSL_PARAM params[])
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(genCtx, OPENSSL_malloc, SCOSSL_ECC_KEYGEN_CTX);
+    SCOSSL_ECC_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEYGEN_CTX));
     if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -162,7 +170,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PCSYMCRYPT_ECURVE pCurve = NULL;
 
-    SCOSSL_COMMON_ALIGNED_ALLOC(keyCtx, OPENSSL_malloc, SCOSSL_ECC_KEY_CTX);
+    SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -194,6 +202,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
     }
+    
+    keyCtx->initialized = TRUE;
 
 cleanup:
     if (!keyCtx->initialized)
@@ -435,13 +445,14 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
+    BN_CTX *bnCtx = NULL;
+    EC_POINT *ecPoint = NULL;
     const OSSL_PARAM *p;
 
-    fprintf(stdout, "import!");
     // Domain parameters (curve) are required for import
     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0)
     {
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME);
@@ -451,7 +462,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         if (keyCtx->ecGroup == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }      
     }
 
@@ -462,17 +473,54 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         goto cleanup; 
     }
 
+    // Other parameters
+    if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)
+    {
+        p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC);
+        if (p != NULL &&
+            !OSSL_PARAM_get_int(p, &keyCtx->includePublic))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    // Keypair
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
+        if ((keyCtx->key = SymCryptEckeyAllocate(pCurve))== NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
+
         p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY);
         if (p != NULL)
         {
-            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
-            if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPublicKey, 0, &cbPublicKey))
+            PCBYTE encodedPoint;
+            SIZE_T encodedLen;
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&encodedPoint, &encodedLen))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
+
+            if (((ecPoint = EC_POINT_new(keyCtx->ecGroup))    == NULL) ||
+                ((bnCtx = BN_CTX_new_ex(keyCtx->libctx))      == NULL) ||
+                ((pbPublicKey = OPENSSL_malloc(cbPublicKey))  == NULL))                
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (!EC_POINT_oct2point(keyCtx->ecGroup, ecPoint, encodedPoint, encodedLen, bnCtx) ||
+                !scossl_ec_point_to_pubkey(ecPoint, keyCtx->ecGroup, bnCtx, pbPublicKey, cbPublicKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }            
         }
 
         p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
@@ -488,7 +536,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             if (!OSSL_PARAM_get_BN(p, &bnPrivateKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
 
             cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
@@ -505,47 +553,32 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             }
         }
 
-        keyCtx->key = SymCryptEckeyAllocate(pCurve);
-        if (keyCtx->key == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
         scError = SymCryptEckeySetValue(
             pbPrivateKey, cbPrivateKey,
             pbPublicKey, cbPublicKey,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             SYMCRYPT_ECPOINT_FORMAT_XY,
-            0,
+            SYMCRYPT_FLAG_ECKEY_ECDSA | SYMCRYPT_FLAG_ECKEY_ECDH,
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
             goto cleanup;
         }
-    }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)
-    {
-        p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC);
-        if (p != NULL &&
-            !OSSL_PARAM_get_int(p, keyCtx->includePublic))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
+        keyCtx->initialized = TRUE;
     }
 
     ret = SCOSSL_SUCCESS;
 cleanup:
-    if (!ret)
+    if (pbPrivateKey != NULL)
     {
-        p_scossl_ecc_keymgmt_free_ctx(keyCtx);
+        OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
     }
     BN_clear_free(bnPrivateKey);
-    OPENSSL_secure_clear_free(pbPrivateKey, cbPublicKey);
     OPENSSL_free(pbPublicKey);
+    EC_POINT_free(ecPoint);
+    BN_CTX_free(bnCtx);
 
     return ret;
 }
@@ -673,6 +706,18 @@ cleanup:
     return ret;
 }
 
+static const char *p_scossl_ecc_keymgmt_query_operation_name(int operation_id)
+{
+    switch (operation_id) 
+    {
+    case OSSL_OP_KEYEXCH:
+        return "ECDH";
+    case OSSL_OP_SIGNATURE:
+        return "ECDSA";
+    }
+    return NULL;
+}
+
 const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_ecc_keymgmt_new_ctx},
     {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_ecc_keymgmt_dup_ctx},
@@ -690,6 +735,7 @@ const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_ecc_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_ecc_keymgmt_import},
     {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))p_scossl_ecc_keymgmt_export},
+    {OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME, (void (*)(void))p_scossl_ecc_keymgmt_query_operation_name},
     {0, NULL}};
 
 #ifdef __cplusplus

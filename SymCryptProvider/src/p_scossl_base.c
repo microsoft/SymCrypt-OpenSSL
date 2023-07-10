@@ -5,13 +5,14 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/proverr.h>
 
+#include "scossl_ecc.h"
 #include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME, funcs, NULL}
+#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 static int scossl_prov_initialized = 0;
@@ -149,7 +150,7 @@ extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_signature_functions),
-    // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecdsa_signature_functions),
+    ALG("ECDSA", p_scossl_ecdsa_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher

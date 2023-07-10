@@ -23,6 +23,7 @@ set(SCOSSL_SOURCES
     # ./src/ciphers/p_scossl_aes_xts.c
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
+    ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
