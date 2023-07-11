@@ -12,7 +12,8 @@
 extern "C" {
 #endif
 
-typedef struct {
+typedef struct
+{
     SCOSSL_ECC_KEY_CTX *keyCtx;
 
     int operation;
