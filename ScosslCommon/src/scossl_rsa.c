@@ -116,44 +116,44 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
     return OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
 }
 
-_Use_decl_annotations_
-SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
-{
-    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
-    if (copy_ctx == NULL)
-    {
-        return NULL;
-    }
+// _Use_decl_annotations_
+// SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
+// {
+//     SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
+//     if (copy_ctx == NULL)
+//     {
+//         return NULL;
+//     }
 
-    if (keyCtx->initialized)
-    {
-        SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
-        UINT32 cbModulus = SymCryptRsakeyModulusBits(keyCtx->key);
-        UINT32 nPrimes = SymCryptRsakeyGetNumberOfPrimes(keyCtx->key);
+//     if (keyCtx->initialized)
+//     {
+//         SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
+//         UINT32 cbModulus = SymCryptRsakeyModulusBits(keyCtx->key);
+//         UINT32 nPrimes = SymCryptRsakeyGetNumberOfPrimes(keyCtx->key);
 
-        SymcryptRsaParam.version = 1;
-        SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-        SymcryptRsaParam.nPrimes = nPrimes;
-        SymcryptRsaParam.nPubExp = 1;
-        copy_ctx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-        if (copy_ctx->key == NULL)
-        {
-            scossl_rsa_free_key_ctx(copy_ctx);
-            return NULL;
-        }
+//         SymcryptRsaParam.version = 1;
+//         SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
+//         SymcryptRsaParam.nPrimes = nPrimes;
+//         SymcryptRsaParam.nPubExp = 1;
+//         copy_ctx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+//         if (copy_ctx->key == NULL)
+//         {
+//             scossl_rsa_free_key_ctx(copy_ctx);
+//             return NULL;
+//         }
 
-        // TODO: Enable in SymCrypt
-        SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copy_ctx->key);
-        copy_ctx->initialized = 1;
-    }
-    else
-    {
-        copy_ctx->initialized = 0;
-        copy_ctx->key = NULL;
-    }
+//         // TODO: Enable in SymCrypt
+//         SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copy_ctx->key);
+//         copy_ctx->initialized = 1;
+//     }
+//     else
+//     {
+//         copy_ctx->initialized = 0;
+//         copy_ctx->key = NULL;
+//     }
 
-    return copy_ctx;
-}
+//     return copy_ctx;
+// }
 
 _Use_decl_annotations_
 void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
@@ -301,23 +301,34 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
+SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSalt,
                                  PCBYTE pbHashValue, SIZE_T cbHashValue,
                                  PBYTE pbSignature, SIZE_T *pcbSignature)
 {
-    SIZE_T cbResult = 0;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int ret = SCOSSL_FAILURE;
-    PCSYMCRYPT_HASH scosslHashAlgo = NULL;
-    SIZE_T expectedHashLength = -1;
-    int cbDigest = EVP_MD_size(md);
-    int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
-    int mdnid;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    int cbSaltMax;
+    SIZE_T cbResult = 0;
+    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);;
+    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);;
 
+    if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+        goto cleanup;
+    }
+
+    if (cbHashValue != expectedHashLength)
+    {
+        goto cleanup;
+    }
+
+    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
-        cbSalt = cbDigest;
+        cbSalt = expectedHashLength;
         break;
     case RSA_PSS_SALTLEN_MAX_SIGN:
     case RSA_PSS_SALTLEN_MAX:
@@ -326,7 +337,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
 #ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
     // Added in 3.1, smaller of digest length or maximized salt length
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
-        cbSalt = cbSaltMax < cbDigest ? cbSaltMax : cbDigest;
+        cbSalt = cbSaltMax < (int)cbHashValue ? cbSaltMax : (int)cbHashValue;
 #endif
     }
 
@@ -353,16 +364,6 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
         goto cleanup; // Not error - this can be called with NULL parameter for siglen
     }
 
-    mdnid = EVP_MD_type(md);
-    scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
-    expectedHashLength = scossl_get_expected_hash_length(mdnid);
-    if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
-        goto cleanup;
-    }
-
     // Log warnings for algorithms that aren't FIPS compliant
     if (mdnid == NID_md5)
     {
@@ -375,10 +376,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, i
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
-    if (cbHashValue != expectedHashLength)
-    {
-        goto cleanup;
-    }
+
 
     scError = SymCryptRsaPssSign(
         keyCtx->key,
@@ -405,22 +403,33 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md, int cbSalt,
+SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSalt,
                                    PCBYTE pbHashValue, SIZE_T cbHashValue,
                                    PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PCSYMCRYPT_HASH scosslHashAlgo = NULL;
-    SIZE_T expectedHashLength = -1;
-    int mdnid;
-    int cbDigest = EVP_MD_size(md);
-    int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbDigest - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+    int cbSaltMax;
+    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);;
+    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);;
 
+    if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+        goto cleanup;
+    }
+
+    if (cbHashValue != expectedHashLength)
+    {
+        goto cleanup;
+    }
+
+    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
-        cbSalt = cbDigest;
+        cbSalt = cbHashValue;
         break;
     case RSA_PSS_SALTLEN_MAX:
         cbSalt = cbSaltMax;
@@ -447,16 +456,6 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
         goto cleanup;
     }
 
-    mdnid = EVP_MD_type(md);
-    scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
-    expectedHashLength = scossl_get_expected_hash_length(mdnid);
-    if (!scosslHashAlgo || expectedHashLength == (SIZE_T)-1)
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
-        goto cleanup;
-    }
-
     // Log warnings for algorithms that aren't FIPS compliant
     if (mdnid == NID_md5)
     {
@@ -467,11 +466,6 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, const EVP_MD *md,
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
-    }
-
-    if (cbHashValue != expectedHashLength)
-    {
-        goto cleanup;
     }
 
     scError = SymCryptRsaPssVerify(
@@ -888,13 +882,10 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
 
     scError = SymCryptRsakeyGetValue(
                    key,
-                   pbModulus,
-                   cbModulus,
+                   pbModulus, cbModulus,
                    &pubExp64,
                    0,
-                   ppbPrimes,
-                   pcbPrimes,
-                   nPrimes,
+                   ppbPrimes, pcbPrimes, nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0);
     if (scError != SYMCRYPT_NO_ERROR)
@@ -916,13 +907,9 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
     {
         scError = SymCryptRsakeyGetCrtValue(
                         key,
-                        ppbCrtExponents,
-                        pcbCrtExponents,
-                        nPrimes,
-                        pbCrtCoefficient,
-                        cbCrtCoefficient,
-                        pbPrivateExponent,
-                        cbPrivateExponent,
+                        ppbCrtExponents, pcbCrtExponents, nPrimes,
+                        pbCrtCoefficient, cbCrtCoefficient,
+                        pbPrivateExponent, cbPrivateExponent,
                         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                         0);
         if (scError != SYMCRYPT_NO_ERROR)

@@ -65,9 +65,137 @@ static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provct
     return scossl_rsa_new_key_ctx();
 }
 
-static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(const _In_ SCOSSL_RSA_KEY_CTX *keyCtx, ossl_unused int selection)
+// Temporary solution until SymCryptRsakeyCopy is enabled. For now we need to export, then import the key to copy.
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fromKey, _Out_ PSYMCRYPT_RSAKEY *toKey, BOOL includePrivate)
 {
-    return scossl_rsa_dup_key_ctx(keyCtx);
+    UINT64  pubExp64;
+    PBYTE   pbModulus = NULL;
+    SIZE_T  cbModulus = 0;
+    PBYTE   ppbPrimes[2] = {0};
+    SIZE_T  pcbPrimes[2] = {0};
+    SIZE_T  cbPrime1 = 0;
+    SIZE_T  cbPrime2 = 0;
+    SIZE_T  nPrimes = includePrivate ? 2 : 0;
+    PBYTE   pbCurrent = NULL;
+    PBYTE   pbData = NULL;
+    SIZE_T  cbData = 0;
+    SCOSSL_STATUS  ret = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    cbModulus = SymCryptRsakeySizeofModulus(fromKey);
+    cbPrime1 = SymCryptRsakeySizeofPrime(fromKey, 0);
+    cbPrime2 = SymCryptRsakeySizeofPrime(fromKey, 1);
+
+    cbData = cbModulus; // Modulus[cbModulus] // Big-endian.
+
+    if (includePrivate)
+    {
+        cbData =
+            cbModulus +     // Modulus[cbModulus] // Big-endian.
+            cbPrime1 +      // Prime1[cbPrime1] // Big-endian.
+            cbPrime2;       // Prime2[cbPrime2] // Big-endian.
+    }
+
+    pbData = OPENSSL_zalloc(cbData);
+    if (pbData == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+    pbCurrent = pbData;
+
+    pbModulus = pbCurrent;
+    pbCurrent += cbModulus;
+
+    if (includePrivate)
+    {
+        ppbPrimes[0] = pbCurrent;
+        pcbPrimes[0] = cbPrime1;
+        pbCurrent += cbPrime1;
+
+        ppbPrimes[1] = pbCurrent;
+        pcbPrimes[1] = cbPrime2;
+        pbCurrent += cbPrime2;
+    }
+
+    scError = SymCryptRsakeyGetValue(
+                fromKey,
+                pbModulus, cbModulus,
+                &pubExp64,
+                0,
+                ppbPrimes, pcbPrimes, nPrimes,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
+    SymcryptRsaParam.version = 1;
+    SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
+    SymcryptRsaParam.nPrimes = nPrimes;
+    SymcryptRsaParam.nPubExp = 1;
+    *toKey = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+
+    if (*toKey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    scError = SymCryptRsakeySetValue(
+        pbModulus, cbModulus,
+        &pubExp64,
+        1,
+        (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
+        *toKey);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if(pbData)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    if (!ret && toKey != NULL)
+    {
+        SymCryptRsakeyFree(*toKey);
+    }
+
+    return ret;
+}
+
+static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx, int selection)
+{
+    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    if (copy_ctx == NULL)
+    {
+        return NULL;
+    }
+
+    copy_ctx->initialized = keyCtx->initialized;
+
+    if (keyCtx->initialized && (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    {
+        if (!p_scossl_rsa_keymgmt_dup_keydata((PCSYMCRYPT_RSAKEY) keyCtx->key, &copy_ctx->key, 
+                                              (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0))
+        {
+            scossl_rsa_free_key_ctx(copy_ctx);
+            copy_ctx = NULL;
+        }
+    }
+
+    return copy_ctx;
 }
 
 //
@@ -754,13 +882,10 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
         }
 
         scError = SymCryptRsakeySetValue(
-            pbModulus,
-            cbModulus,
+            pbModulus, cbModulus,
             &pubExp64,
             1,
-            (PCBYTE *)ppbPrimes,
-            (SIZE_T *)pcbPrimes,
-            nPrimes,
+            (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
             keyCtx->key);

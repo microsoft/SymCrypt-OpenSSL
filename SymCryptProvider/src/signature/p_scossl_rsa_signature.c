@@ -185,7 +185,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         }
         return scossl_rsa_pkcs1_sign(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_sign(ctx->keyCtx, ctx->md, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        return scossl_rsapss_sign(ctx->keyCtx, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
     case RSA_NO_PADDING:
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
@@ -208,7 +208,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         }
         return scossl_rsa_pkcs1_verify(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_verify(ctx->keyCtx, ctx->md, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        return scossl_rsapss_verify(ctx->keyCtx, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
     case RSA_NO_PADDING:
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
