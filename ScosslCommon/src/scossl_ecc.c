@@ -8,8 +8,7 @@
 extern "C" {
 #endif
 
-#define NID_secp192r1 (NID_X9_62_prime192v1)
-#define NID_secp256r1 (NID_X9_62_prime256v1)
+
 
 // If r and s are both 0, the DER encoding would be 8 bytes
 // (0x30 0x06 0x02 0x01 0x00 0x02 0x01 0x00)
@@ -18,10 +17,6 @@ extern "C" {
 // Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
 #define SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN (139)
 
-// Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
-#define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
-// Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
-#define SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN (132)
 
 static PSYMCRYPT_ECURVE _hidden_curve_P192 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
@@ -50,7 +45,36 @@ SCOSSL_STATUS scossl_ecc_init_static()
     return SCOSSL_SUCCESS;
 }
 
-PSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(EC_GROUP *group)
+void scossl_ecc_destroy_ecc_curves()
+{
+    if( _hidden_curve_P192 )
+    {
+        SymCryptEcurveFree(_hidden_curve_P192);
+        _hidden_curve_P192 = NULL;
+    }
+    if( _hidden_curve_P224 )
+    {
+        SymCryptEcurveFree(_hidden_curve_P224);
+        _hidden_curve_P224 = NULL;
+    }
+    if( _hidden_curve_P256 )
+    {
+        SymCryptEcurveFree(_hidden_curve_P256);
+        _hidden_curve_P256 = NULL;
+    }
+    if( _hidden_curve_P384 )
+    {
+        SymCryptEcurveFree(_hidden_curve_P384);
+        _hidden_curve_P384 = NULL;
+    }
+    if( _hidden_curve_P521 )
+    {
+        SymCryptEcurveFree(_hidden_curve_P521);
+        _hidden_curve_P521 = NULL;
+    }
+}
+
+PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
 {
     if (group == NULL)
     {
