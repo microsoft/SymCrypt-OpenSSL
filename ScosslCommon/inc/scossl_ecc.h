@@ -19,6 +19,7 @@ SCOSSL_STATUS scossl_ecdsa_sign(_In_ PSYMCRYPT_ECKEY key,
 SCOSSL_STATUS scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key,
                                   _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                   _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+
 #ifdef __cplusplus
 }
 #endif
