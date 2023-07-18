@@ -125,6 +125,7 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
         copy_ctx->padding = ctx->padding;
         copy_ctx->keyCtx = ctx->keyCtx;
         copy_ctx->md = ctx->md;
+        copy_ctx->cbSalt = ctx->cbSalt;
         copy_ctx->mdInfo = ctx->mdInfo; 
         copy_ctx->mgf1MdInfo = ctx->mgf1MdInfo;
     }

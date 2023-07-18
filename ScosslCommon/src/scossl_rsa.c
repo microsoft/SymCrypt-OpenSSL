@@ -319,11 +319,6 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
         goto cleanup;
     }
 
-    if (cbHashValue != expectedHashLength)
-    {
-        goto cleanup;
-    }
-
     cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
@@ -376,7 +371,10 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
                         "Using Mac algorithm SHA1 which is not FIPS compliant");
     }
 
-
+    if (cbHashValue != expectedHashLength)
+    {
+        goto cleanup;
+    }
 
     scError = SymCryptRsaPssSign(
         keyCtx->key,
