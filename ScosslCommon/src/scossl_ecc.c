@@ -8,8 +8,6 @@
 extern "C" {
 #endif
 
-
-
 // If r and s are both 0, the DER encoding would be 8 bytes
 // (0x30 0x06 0x02 0x01 0x00 0x02 0x01 0x00)
 // integers must contain at least 1 octet of content in DER
