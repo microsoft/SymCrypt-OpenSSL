@@ -30,6 +30,8 @@ static SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
     if (ctx != NULL)
     {
         ctx->libctx = provctx->libctx;
+        ctx->keyCtx = NULL;
+        ctx->peerKeyCtx = NULL;
     }
 
     return ctx;
@@ -62,7 +64,9 @@ static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_E
     }
     ctx->keyCtx = keyCtx;
 
-    return p_scossl_ecdh_set_ctx_params(ctx, params);
+    // No parameters are currently accepted for this interface.
+    // Return the result of p_scossl_ecdh_set_ctx_params if this changes.
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *peerKeyCtx)
@@ -72,11 +76,11 @@ static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ S
 
     if (ctx == NULL || peerKeyCtx == NULL)
     {
-        return SCOSSL_FAILURE;
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        goto cleanup;
     }
 
-    bnCtx = BN_CTX_new_ex(ctx->libctx);
-    if (bnCtx == NULL)
+    if ((bnCtx = BN_CTX_new_ex(ctx->libctx)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -97,10 +101,17 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx, _Out_writes_bytes_opt_(*secretlen) unsigned char *secret,
-                                          _Out_ size_t *secretlen, size_t outlen)
+static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx, 
+                                          _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen, 
+                                          size_t outlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    if (ctx == NULL || secretlen == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
@@ -120,15 +131,16 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx, _Out_writes
         0,
         secret,
         outlen);
-
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        return SCOSSL_FAILURE;
     }
 
-    return scError == SYMCRYPT_NO_ERROR;
+    return SCOSSL_SUCCESS;
 }
 
+// This implementation currently does not accept any parameters
 static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(ossl_unused SCOSSL_ECDH_CTX *ctx, ossl_unused const OSSL_PARAM params[])
 {
     return SCOSSL_SUCCESS;
@@ -136,7 +148,7 @@ static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(ossl_unused SCOSSL_ECDH_CTX *c
 
 static SCOSSL_STATUS p_scossl_ecdh_get_ctx_params(ossl_unused SCOSSL_ECDH_CTX *ctx, ossl_unused OSSL_PARAM params[])
 {
-    return SCOSSL_FAILURE;
+    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_PARAM *p_scossl_ecdh_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)

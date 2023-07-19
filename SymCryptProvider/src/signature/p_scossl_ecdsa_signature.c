@@ -16,8 +16,6 @@ typedef struct
 {
     SCOSSL_ECC_KEY_CTX *keyCtx;
 
-    int operation;
-
     // Needed for fetching md
     OSSL_LIB_CTX *libctx;
     char* propq;
@@ -97,7 +95,7 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                    _In_ const OSSL_PARAM params[], int operation)
+                                                    _In_ const OSSL_PARAM params[])
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
@@ -107,7 +105,6 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
         return SCOSSL_FAILURE;
     }
 
-    ctx->operation = operation;
     if (keyCtx != NULL)
     {
         ctx->keyCtx = keyCtx;
@@ -119,27 +116,35 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 static SCOSSL_STATUS p_scossl_ecdsa_sign_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                               _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                                 _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
                                          _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    *siglen = 2*SymCryptEcurveSizeofFieldElement(ctx->keyCtx->key->pCurve);
+    SIZE_T cbResult;
 
+    if (siglen == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    cbResult = 2*SymCryptEcurveSizeofFieldElement(ctx->keyCtx->key->pCurve);
     if (sig == NULL)
     {
+        *siglen = cbResult;
         return SCOSSL_SUCCESS;
     }
     
-    if (sigsize < *siglen)
+    if (sigsize < cbResult)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
@@ -162,9 +167,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const char *mdname,
-                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
+                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], ossl_unused int operation)
 {
-    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, operation))
+    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params))
     {
         return SCOSSL_FAILURE;
     }

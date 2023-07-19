@@ -6,6 +6,10 @@
 //   OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 //   OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 //   OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
+// Rather than constructing the parameter array each time
+// a caller queries supported parameters, these values
+// are hardcoded here. This follows the same pattern as
+// the default provider.
 
 #define SCOSSL_ECC_IMPEXP_PRIV_KEY_PARAMS \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),

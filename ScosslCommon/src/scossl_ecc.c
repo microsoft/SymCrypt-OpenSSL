@@ -8,27 +8,25 @@
 extern "C" {
 #endif
 
+#define NID_secp192r1 (NID_X9_62_prime192v1)
+#define NID_secp256r1 (NID_X9_62_prime256v1)
+
 // If r and s are both 0, the DER encoding would be 8 bytes
 // (0x30 0x06 0x02 0x01 0x00 0x02 0x01 0x00)
 // integers must contain at least 1 octet of content in DER
 #define SCOSSL_ECDSA_MIN_DER_SIGNATURE_LEN (8)
 // Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
 #define SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN (139)
-
+// Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
+#define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
+// Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
+#define SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN (132)
 
 static PSYMCRYPT_ECURVE _hidden_curve_P192 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P384 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
-
-static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_reads_bytes_(cbDerField) PCBYTE pbDerField, SIZE_T cbDerField,
-                                                                         BYTE expectedTag, 
-                                                                         _Out_writes_bytes_(pcbContent) PCBYTE *ppbContent, SIZE_T *pcbContent);
-static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PCBYTE pbDerSignature, SIZE_T cbDerSignature,
-                                             _Out_writes_bytes_(cbSymCryptSignature) PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature);
-static SCOSSL_STATUS scossl_ecdsa_apply_der(_In_reads_bytes_(cbSymCryptSignature) PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
-                                            _Out_writes_bytes_(cbDerSignature) PBYTE pbDerSignature, unsigned int* cbDerSignature);
 
 SCOSSL_STATUS scossl_ecc_init_static()
 {
@@ -118,7 +116,7 @@ SCOSSL_STATUS scossl_ec_point_to_pubkey(const EC_POINT* ecPoint, const EC_GROUP 
         goto cleanup;
     }
 
-    if (EC_POINT_get_affine_coordinates(ecGroup, ecPoint, ecPubX, ecPubY, bnCtx) == 0)
+    if (!EC_POINT_get_affine_coordinates(ecGroup, ecPoint, ecPubX, ecPubY, bnCtx))
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_POINT_get_affine_coordinates failed.");
@@ -142,89 +140,9 @@ cleanup:
     return ret;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key,
-                                PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                PBYTE pbSignature, unsigned int* pcbSignature)
-{
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
-    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
-
-    scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptEckeyExtendKeyUsage failed", scError);
-        return SCOSSL_FAILURE;
-    }
-
-    scError = SymCryptEcDsaSign(
-        key,
-        pbHashValue,
-        cbHashValue,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        0,
-        buf,
-        cbSymCryptSig);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptEcDsaSign failed", scError);
-        return SCOSSL_FAILURE;
-    }
-
-    if (!scossl_ecdsa_apply_der(buf, cbSymCryptSig, pbSignature, pcbSignature))
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
-            "e_scossl_ecdsa_apply_der failed");
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-_Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, 
-                                  PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                  PCBYTE pbSignature, SIZE_T pcbSignature)
-{
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
-    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
-
-    if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
-            "scossl_ecdsa_remove_der failed");
-        return SCOSSL_FAILURE;
-    }
-
-    scError = SymCryptEcDsaVerify(
-        key,
-        pbHashValue,
-        cbHashValue,
-        buf,
-        cbSymCryptSig,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        0);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
-        {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptEcDsaVerify returned unexpected error", scError);
-        }
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-_Use_decl_annotations_
-static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(PCBYTE pbDerField, SIZE_T cbDerField,
+static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_reads_bytes_(cbDerField) PCBYTE pbDerField, SIZE_T cbDerField,
                                                                          BYTE expectedTag, 
-                                                                         PCBYTE *ppbContent, SIZE_T *pcbContent)
+                                                                         _Out_writes_bytes_(pcbContent) PCBYTE *ppbContent, SIZE_T *pcbContent)
 {
     PCBYTE pbContent = NULL;
     SIZE_T cbContent = 0;
@@ -286,9 +204,8 @@ cleanup:
 // Quick hack function to parse precisely the DER encodings which we expect for ECDSA signatures for the NIST prime curves
 // Extracts the encoded R and S and places them in a buffer with 2 same-sized big-endian encodings (BER encoding expected by SymCrypt)
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on failure.
-_Use_decl_annotations_
-static SCOSSL_STATUS scossl_ecdsa_remove_der(PCBYTE pbDerSignature, SIZE_T cbDerSignature,
-                                             PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature)
+static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PCBYTE pbDerSignature, SIZE_T cbDerSignature,
+                                             _Out_writes_bytes_(cbSymCryptSignature) PBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature)
 {
     PCBYTE pbSeq = NULL;
     SIZE_T cbSeq = 0;
@@ -402,9 +319,8 @@ cleanup:
 // Quick hack function to generate precisely the DER encodings which we want for ECDSA signatures for the NIST prime curves
 // Takes 2 same-size big-endian integers output from SymCrypt and encodes them in the minimally sized (strict) equivalent DER encoding
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on failure.
-_Use_decl_annotations_
-static SCOSSL_STATUS scossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
-                                            PBYTE pbDerSignature, unsigned int* cbDerSignature)
+static SCOSSL_STATUS scossl_ecdsa_apply_der(_In_reads_bytes_(cbSymCryptSignature) PCBYTE pbSymCryptSignature, SIZE_T cbSymCryptSignature,
+                                            _Out_writes_bytes_(cbDerSignature) PBYTE pbDerSignature, _Out_ unsigned int* cbDerSignature)
 {
     PBYTE  pbWrite = pbDerSignature;
     SIZE_T cbSeq = 0;
@@ -500,6 +416,85 @@ static SCOSSL_STATUS scossl_ecdsa_apply_der(PCBYTE pbSymCryptSignature, SIZE_T c
 
 cleanup:
     return res;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key,
+                                PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                PBYTE pbSignature, unsigned int* pcbSignature)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
+    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
+
+    scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyExtendKeyUsage failed", scError);
+        return SCOSSL_FAILURE;
+    }
+
+    scError = SymCryptEcDsaSign(
+        key,
+        pbHashValue,
+        cbHashValue,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        0,
+        buf,
+        cbSymCryptSig);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEcDsaSign failed", scError);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!scossl_ecdsa_apply_der(buf, cbSymCryptSig, pbSignature, pcbSignature))
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
+            "scossl_ecdsa_apply_der failed");
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, 
+                                  PCBYTE pbHashValue, SIZE_T cbHashValue,
+                                  PCBYTE pbSignature, SIZE_T pcbSignature)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
+    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
+
+    if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
+            "scossl_ecdsa_remove_der failed");
+        return SCOSSL_FAILURE;
+    }
+
+    scError = SymCryptEcDsaVerify(
+        key,
+        pbHashValue,
+        cbHashValue,
+        buf,
+        cbSymCryptSig,
+        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEcDsaVerify returned unexpected error", scError);
+        }
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus
