@@ -107,7 +107,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     // ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
-    // ALG("HKDF", p_scossl_hkdf_kdf_functions),
+    ALG("HKDF", p_scossl_hkdf_kdf_functions),
     // ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
@@ -304,7 +304,21 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         scossl_prov_initialized = 1;
     }
 
-    scossl_setup_logging();
+        if (core_get_libctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    p_ctx->handle = handle;
+    p_ctx->libctx = (OSSL_LIB_CTX *)core_get_libctx(handle);
+    *provctx = p_ctx;
 
     if (core_get_libctx == NULL)
     {
