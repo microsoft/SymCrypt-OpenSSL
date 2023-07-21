@@ -394,6 +394,78 @@ void _scossl_log_SYMCRYPT_ERROR(
     _scossl_log(trace_level, func_code, reason_code, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
 }
 
+_Use_decl_annotations_
+BOOL scossl_is_md_supported(EVP_MD *md)
+{
+    switch (EVP_MD_type(md))
+    {
+    case NID_sha1:
+    case NID_sha256:
+    case NID_sha384:
+    case NID_sha512:
+    case NID_sha3_256:
+    case NID_sha3_384:
+    case NID_sha3_512:
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+_Use_decl_annotations_
+PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *md)
+{
+    int type = EVP_MD_type(md);
+
+    switch(type)
+    {
+    case NID_sha1:
+        return SymCryptHmacSha1Algorithm;
+    case NID_sha256:
+        return SymCryptHmacSha256Algorithm;
+    case NID_sha384:
+        return SymCryptHmacSha384Algorithm;
+    case NID_sha512:
+        return SymCryptHmacSha512Algorithm;
+    case NID_sha3_256:
+        return SymCryptHmacSha3_256Algorithm;
+    case NID_sha3_384:
+        return SymCryptHmacSha3_384Algorithm;
+    case NID_sha3_512:
+        return SymCryptHmacSha3_512Algorithm;
+    }
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt-OpenSSL does not support Mac algorithm %d", type);
+    return NULL;
+}
+
+_Use_decl_annotations_
+PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
+{
+    int type = EVP_MD_type(md);
+
+    switch (type)
+    {
+    case NID_sha1:
+        return SymCryptSha1Algorithm;
+    case NID_sha256:
+        return SymCryptSha256Algorithm;
+    case NID_sha384:
+        return SymCryptSha384Algorithm;
+    case NID_sha512:
+        return SymCryptSha512Algorithm;
+    case NID_sha3_256:
+        return SymCryptSha3_256Algorithm;
+    case NID_sha3_384:
+        return SymCryptSha3_384Algorithm;
+    case NID_sha3_512:
+        return SymCryptSha3_512Algorithm;
+    }
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        "SymCrypt-OpenSSL does not support hash algorithm %d", type);
+    return NULL;
+}
+
 #ifdef __cplusplus
 }
 #endif

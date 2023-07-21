@@ -201,7 +201,7 @@ SCOSSL_STATUS e_scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
         return SCOSSL_FAILURE;
     }
 
-    if (scossl_hkdf_is_md_supported(e_scossl_hkdf_context->md))
+    if (scossl_is_md_supported(e_scossl_hkdf_context->md))
     {
         if (e_scossl_hkdf_context->mode == EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY && key == NULL) 
         {

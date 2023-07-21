@@ -10,7 +10,7 @@ extern "C" {
 
 #define HKDF_MAXBUF 1024
 
-typedef struct 
+typedef struct
 {
     int mode;
     EVP_MD *md;
@@ -22,8 +22,6 @@ typedef struct
     SIZE_T cbInfo;
 } SCOSSL_HKDF_CTX;
 
-BOOL scossl_hkdf_is_md_supported(_In_ EVP_MD *md);
-
 SCOSSL_HKDF_CTX *scossl_hkdf_newctx();
 SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(_In_ SCOSSL_HKDF_CTX *ctx);
 void scossl_hkdf_freectx(_Inout_ SCOSSL_HKDF_CTX *ctx);
@@ -31,7 +29,7 @@ SCOSSL_STATUS scossl_hkdf_reset(_Inout_ SCOSSL_HKDF_CTX *ctx);
 
 SCOSSL_STATUS scossl_hkdf_append_info(_Inout_ SCOSSL_HKDF_CTX *ctx, _In_reads_bytes_(cbInfo) PCBYTE info, SIZE_T cbInfo);
 
-SCOSSL_STATUS scossl_hkdf_derive(_In_ SCOSSL_HKDF_CTX *ctx, 
+SCOSSL_STATUS scossl_hkdf_derive(_In_ SCOSSL_HKDF_CTX *ctx,
                                  _Out_writes_opt_(*keylen) PBYTE key, SIZE_T keylen);
 
 #ifdef __cplusplus
