@@ -39,7 +39,7 @@ endif()
 add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES})
 add_dependencies(scossl_dynamic scossl_common)
 
-set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
+set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/e_scossl.h)
 # target_link_libraries(scossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})
 target_include_directories(scossl_dynamic PUBLIC ../inc)
 target_include_directories(scossl_dynamic PRIVATE ../src)
