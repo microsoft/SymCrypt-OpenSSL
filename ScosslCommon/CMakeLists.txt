@@ -15,6 +15,7 @@ set(SCOSSL_SOURCES
     ./src/scossl_hkdf.c
     ./src/scossl_rsa.c
     ./src/scossl_sshkdf.c
+    ./src/scossl_tls1prf.c
 )
 
 add_library(scossl_common STATIC ${SCOSSL_SOURCES})

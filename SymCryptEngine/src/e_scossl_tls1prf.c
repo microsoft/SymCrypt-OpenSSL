@@ -2,6 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_tls1prf.h"
 #include "e_scossl_tls1prf.h"
 #include <openssl/kdf.h>
 
@@ -9,24 +10,11 @@
 extern "C" {
 #endif
 
-#define TLS1_PRF_MAXBUF 1024
-
-/* TLS KDF pkey context structure */
-typedef struct {
-    /* Digest to use for PRF */
-    const EVP_MD *md;
-    /* Secret value to use for PRF */
-    unsigned char *secret;
-    size_t secret_length;
-    /* Buffer of concatenated seed data */
-    unsigned char seed[TLS1_PRF_MAXBUF];
-    size_t seed_length;
-} SCOSSL_TLS1_PRF_PKEY_CTX;
-
-SCOSSL_STATUS e_scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_tls1prf_init(EVP_PKEY_CTX *ctx)
 {
-    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = NULL;
-    if ((key_context = OPENSSL_zalloc(sizeof(*key_context))) == NULL) {
+    SCOSSL_TLS1_PRF_CTX *key_context = NULL;
+    if ((key_context = scossl_tls1prf_newctx()) == NULL) {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_INIT, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc return NULL");
         return SCOSSL_FAILURE;
@@ -35,47 +23,55 @@ SCOSSL_STATUS e_scossl_tls1prf_init(_Inout_ EVP_PKEY_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-void e_scossl_tls1prf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+void e_scossl_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
 {
-    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
     if (key_context == NULL) {
         return;
     }
-    OPENSSL_clear_free(key_context->secret, key_context->secret_length);
-    OPENSSL_cleanse(key_context->seed, key_context->seed_length);
-    OPENSSL_free(key_context);
+    scossl_tls1prf_freectx(key_context);
+
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
-SCOSSL_STATUS e_scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
-    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
     switch (type) {
     case EVP_PKEY_CTRL_TLS_MD:
-        key_context->md = p2;
-        return SCOSSL_SUCCESS;
+        PCSYMCRYPT_MAC symcryptMacAlg = NULL;
+        BOOL isTlsPrf1_1 = TRUE;
 
+        // Special case to always allow md5_sha1 for tls1.1 PRF compat
+        if (EVP_MD_type(p2) != NID_md5_sha1)
+        {
+            if ((symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(p2)) == NULL)
+                return SCOSSL_FAILURE;
+            isTlsPrf1_1 = FALSE;
+        }
+
+        key_context->pMac = symcryptMacAlg;
+        key_context->isTlsPrf1_1 = isTlsPrf1_1;
+        return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_TLS_SECRET:
         if (p1 < 0)
             return SCOSSL_FAILURE;
-        if (key_context->secret != NULL)
-            OPENSSL_clear_free(key_context->secret, key_context->secret_length);
-        OPENSSL_cleanse(key_context->seed, key_context->seed_length);
-        key_context->seed_length = 0;
-        key_context->secret = OPENSSL_memdup(p2, p1);
-        if (key_context->secret == NULL)
+        if (key_context->pbSecret != NULL)
+            OPENSSL_clear_free(key_context->pbSecret, key_context->cbSecret);
+        OPENSSL_cleanse(key_context->seed, key_context->cbSeed);
+        key_context->cbSeed = 0;
+        key_context->pbSecret = OPENSSL_memdup(p2, p1);
+        if (key_context->pbSecret == NULL)
             return SCOSSL_FAILURE;
-        key_context->secret_length  = p1;
+        key_context->cbSecret  = p1;
         return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_TLS_SEED:
         if (p1 == 0 || p2 == NULL)
             return SCOSSL_SUCCESS;
-        if (p1 < 0 || p1 > (int)(TLS1_PRF_MAXBUF - key_context->seed_length))
-            return SCOSSL_FAILURE;
-        memcpy(key_context->seed + key_context->seed_length, p2, p1);
-        key_context->seed_length += p1;
-        return SCOSSL_SUCCESS;
+        return scossl_tls1prf_append_seed(key_context, p2, p1);
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "SymCrypt Engine does not support ctrl type (%d)", type);
@@ -83,87 +79,19 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1,
     }
 }
 
-SCOSSL_STATUS e_scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_tls1prf_derive_init(EVP_PKEY_CTX *ctx)
 {
-    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    OPENSSL_clear_free(key_context->secret, key_context->secret_length);
-    OPENSSL_cleanse(key_context->seed, key_context->seed_length);
-    memset(key_context, 0, sizeof(*key_context));
-    return SCOSSL_SUCCESS;
+    SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    return scossl_tls1prf_reset(key_context);
 }
 
-static PCSYMCRYPT_MAC e_scossl_get_symcrypt_mac_algorithm(const EVP_MD *evp_md)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_tls1prf_derive(EVP_PKEY_CTX *ctx,
+                                      unsigned char *key, size_t *keylen)
 {
-    int type = EVP_MD_type(evp_md);
-
-    if (type == NID_sha1)
-        return SymCryptHmacSha1Algorithm;
-    if (type == NID_sha256)
-        return SymCryptHmacSha256Algorithm;
-    if (type == NID_sha384)
-        return SymCryptHmacSha384Algorithm;
-    if (type == NID_sha512)
-        return SymCryptHmacSha512Algorithm;
-    // if (type == NID_AES_CMC)
-    //     return SymCryptAesCmacAlgorithm;
-    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt engine does not support Mac algorithm %d", type);
-    return NULL;
-}
-
-SCOSSL_STATUS e_scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                        _Inout_ size_t *keylen)
-{
-    SCOSSL_TLS1_PRF_PKEY_CTX *key_context = (SCOSSL_TLS1_PRF_PKEY_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_MAC e_scossl_mac_algo = NULL;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-
-    if (key_context->md == NULL) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Digest");
-        return SCOSSL_FAILURE;
-    }
-
-    if (key_context->secret == NULL) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Secret");
-        return SCOSSL_FAILURE;
-    }
-
-    if( EVP_MD_type(key_context->md) == NID_md5_sha1 )
-    {
-        // Special case to use TlsPrf1_1 to handle md5_sha1
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-            "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
-        scError = SymCryptTlsPrf1_1(
-            key_context->secret, key_context->secret_length,
-            NULL, 0,
-            key_context->seed, key_context->seed_length,
-            key, *keylen);
-    }
-    else
-    {
-        e_scossl_mac_algo = e_scossl_get_symcrypt_mac_algorithm(key_context->md);
-        if( e_scossl_mac_algo == NULL )
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        scError = SymCryptTlsPrf1_2(
-            e_scossl_mac_algo,
-            key_context->secret, key_context->secret_length,
-            NULL, 0,
-            key_context->seed, key_context->seed_length,
-            key, *keylen);
-    }
-
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptTlsPrf1_x failed", scError);
-        return SCOSSL_FAILURE;
-    }
-    return SCOSSL_SUCCESS;
+    SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    return scossl_tls1prf_derive(key_context, key, *keylen);
 }
 
 #ifdef __cplusplus

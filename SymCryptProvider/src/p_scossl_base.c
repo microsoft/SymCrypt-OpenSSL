@@ -108,7 +108,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
     ALG("HKDF", p_scossl_hkdf_kdf_functions),
-    // ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
+    ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
 // Rand
