@@ -17,7 +17,7 @@ typedef struct {
     OSSL_LIB_CTX *libctx;
 
     // Purely informational
-    EVP_MD *md;
+    const char* mdName;
 
     SCOSSL_SSHKDF_CTX *sshkdfCtx;
 } SCOSSL_PROV_SSHKDF_CTX;
@@ -47,8 +47,14 @@ SCOSSL_PROV_SSHKDF_CTX *p_scossl_sshkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
     SCOSSL_PROV_SSHKDF_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SSHKDF_CTX));
     if (ctx != NULL)
     {
+        if ((ctx->sshkdfCtx = scossl_sshkdf_newctx()) == NULL)
+        {
+            OPENSSL_free(ctx);
+            return NULL;
+        }
+
+        ctx->mdName = "";
         ctx->libctx = provctx->libctx;
-        ctx->sshkdfCtx = scossl_sshkdf_newctx();
     }
 
     return ctx;
@@ -59,7 +65,6 @@ void p_scossl_sshkdf_freectx(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx)
     if (ctx != NULL)
     {
         scossl_sshkdf_freectx(ctx->sshkdfCtx);
-        EVP_MD_free(ctx->md);
     }
 
     OPENSSL_free(ctx);
@@ -70,14 +75,14 @@ SCOSSL_PROV_SSHKDF_CTX *p_scossl_sshkdf_dupctx(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx)
     SCOSSL_PROV_SSHKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SSHKDF_CTX));
     if (copyCtx != NULL)
     {
-        if ((ctx->md != NULL && !EVP_MD_up_ref(ctx->md)) ||
-            (copyCtx->sshkdfCtx = scossl_sshkdf_dupctx(ctx->sshkdfCtx)) == NULL)
+        if ((copyCtx->sshkdfCtx = scossl_sshkdf_dupctx(ctx->sshkdfCtx)) == NULL)
         {
             OPENSSL_free(copyCtx);
             return NULL;
         }
+
         copyCtx->libctx = ctx->libctx;
-        copyCtx->md = ctx->md;
+        copyCtx->mdName = ctx->mdName;
     }
 
     return copyCtx;
@@ -85,21 +90,16 @@ SCOSSL_PROV_SSHKDF_CTX *p_scossl_sshkdf_dupctx(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx)
 
 SCOSSL_STATUS p_scossl_sshkdf_reset(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx)
 {
-    EVP_MD_free(ctx->md);
-    ctx->md = NULL;
+    ctx->mdName = "";
     return scossl_sshkdf_reset(ctx->sshkdfCtx);
 }
 
 SCOSSL_STATUS p_scossl_sshkdf_derive(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx,
-                                     _In_reads_bytes_(keylen) unsigned char *key, size_t keylen,
+                                     _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
                                      _In_ const OSSL_PARAM params[])
 {
-    if (!p_scossl_sshkdf_set_ctx_params(ctx, params))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return scossl_sshkdf_derive(ctx->sshkdfCtx, key, keylen);
+    return p_scossl_sshkdf_set_ctx_params(ctx, params) &&
+           scossl_sshkdf_derive(ctx->sshkdfCtx, key, keylen);
 }
 
 const OSSL_PARAM *p_scossl_sshkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -124,7 +124,7 @@ SCOSSL_STATUS p_scossl_sshkdf_get_ctx_params(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx, _
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_DIGEST)) != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->md == NULL ? "" : EVP_MD_get0_name(ctx->md)))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mdName))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -138,14 +138,14 @@ SCOSSL_STATUS p_scossl_sshkdf_get_ctx_params(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx, _
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SSHKDF_XCGHASH)) != NULL &&
-        !OSSL_PARAM_set_octet_string(p, ctx->sshkdfCtx->pbHashValue, ctx->sshkdfCtx->cbHashValue))
+        !OSSL_PARAM_set_octet_string(p, ctx->sshkdfCtx->hashValue, ctx->sshkdfCtx->cbHashValue))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SSHKDF_SESSION_ID)) != NULL &&
-        !OSSL_PARAM_set_octet_string(p, ctx->sshkdfCtx->pbSessionId, ctx->sshkdfCtx->cbSessionId))
+        !OSSL_PARAM_set_octet_string(p, ctx->sshkdfCtx->sessionId, ctx->sshkdfCtx->cbSessionId))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -175,6 +175,7 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
+        PCSYMCRYPT_HASH symcryptHashAlg = NULL;
         const OSSL_PARAM *param_propq;
         const char *mdName, *mdProps;
         EVP_MD *md;
@@ -194,14 +195,23 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
             return SCOSSL_FAILURE;
         }
 
-        if ((md = EVP_MD_fetch(ctx->libctx, mdName, mdProps)) == NULL ||
-            (ctx->sshkdfCtx->pHash = scossl_get_symcrypt_hash_algorithm(md)) == NULL)
+        if ((md = EVP_MD_fetch(ctx->libctx, mdName, mdProps)) == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
         }
 
-        ctx->md = md;
+        mdName = EVP_MD_get0_name(md);
+        symcryptHashAlg = scossl_get_symcrypt_hash_algorithm(md);
+        EVP_MD_free(md);
+
+        if (symcryptHashAlg == NULL)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->sshkdfCtx->pHash = symcryptHashAlg;
+        ctx->mdName = mdName;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
@@ -237,7 +247,7 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
             return SCOSSL_FAILURE;
         }
 
-        memcpy(ctx->sshkdfCtx->pbHashValue, pbHashValue, cbHashValue);
+        memcpy(ctx->sshkdfCtx->hashValue, pbHashValue, cbHashValue);
         ctx->sshkdfCtx->cbHashValue = cbHashValue;
     }
 
@@ -257,7 +267,7 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
             return SCOSSL_FAILURE;
         }
 
-        memcpy(ctx->sshkdfCtx->pbSessionId, pbSessionId, cbSessionId);
+        memcpy(ctx->sshkdfCtx->sessionId, pbSessionId, cbSessionId);
         ctx->sshkdfCtx->cbSessionId = cbSessionId;
     }
 

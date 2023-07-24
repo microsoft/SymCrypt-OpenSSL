@@ -51,8 +51,13 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
     SCOSSL_PROV_HKDF_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
     if (ctx != NULL)
     {
+        if ((ctx->hkdfCtx = scossl_hkdf_newctx()) == NULL)
+        {
+            OPENSSL_free(ctx);
+            return NULL;
+        }
+
         ctx->libctx = provctx->libctx;
-        ctx->hkdfCtx = scossl_hkdf_newctx();
     }
 
     return ctx;
@@ -78,6 +83,7 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx
             OPENSSL_free(copyCtx);
             return NULL;
         }
+
         copyCtx->libctx = ctx->libctx;
     }
 
@@ -90,15 +96,11 @@ static SCOSSL_STATUS p_scossl_hkdf_reset(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
-                                          _In_reads_bytes_(keylen) unsigned char *key, size_t keylen,
-                                          const _In_ OSSL_PARAM params[])
+                                          _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
+                                          _In_ const OSSL_PARAM params[])
 {
-    if (!p_scossl_hkdf_set_ctx_params(ctx, params))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return scossl_hkdf_derive(ctx->hkdfCtx, key, keylen);
+    return p_scossl_hkdf_set_ctx_params(ctx, params) &&
+           scossl_hkdf_derive(ctx->hkdfCtx, key, keylen);
 }
 
 static const OSSL_PARAM *p_scossl_hkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -205,7 +207,7 @@ static SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx
 
 static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
-    PCBYTE info;
+    PCBYTE pbInfo;
     SIZE_T cbInfo;
     const OSSL_PARAM *p;
 
@@ -227,14 +229,15 @@ static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *
                 mode = EVP_KDF_HKDF_MODE_EXPAND_ONLY;
             }
         }
-        else
+        else if (!OSSL_PARAM_get_int(p, &mode))
         {
-            OSSL_PARAM_get_int(p, &mode);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
         }
 
         if (mode < EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND || mode > EVP_KDF_HKDF_MODE_EXPAND_ONLY)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             return SCOSSL_FAILURE;
         }
 
@@ -271,6 +274,7 @@ static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *
             return SCOSSL_FAILURE;
         }
 
+        EVP_MD_free(ctx->hkdfCtx->md);
         ctx->hkdfCtx->md = md;
     }
 
@@ -313,13 +317,13 @@ static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *
          p != NULL;
          p = OSSL_PARAM_locate_const(p + 1, OSSL_KDF_PARAM_INFO))
     {
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&info, &cbInfo))
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbInfo, &cbInfo))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if (!scossl_hkdf_append_info(ctx->hkdfCtx, info, cbInfo))
+        if (!scossl_hkdf_append_info(ctx->hkdfCtx, pbInfo, cbInfo))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
             return SCOSSL_FAILURE;

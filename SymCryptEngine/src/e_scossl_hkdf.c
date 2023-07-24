@@ -4,6 +4,7 @@
 
 #include "scossl_hkdf.h"
 #include "e_scossl_hkdf.h"
+
 #include <openssl/hmac.h>
 #include <openssl/kdf.h>
 
@@ -11,7 +12,8 @@
 extern "C" {
 #endif
 
-SCOSSL_STATUS e_scossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_hkdf_init(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context;
     if ((e_scossl_hkdf_context = scossl_hkdf_newctx()) == NULL) {
@@ -23,7 +25,8 @@ SCOSSL_STATUS e_scossl_hkdf_init(_Inout_ EVP_PKEY_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-void e_scossl_hkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+void e_scossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = NULL;
 
@@ -35,6 +38,7 @@ void e_scossl_hkdf_cleanup(_Inout_ EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
+_Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = (SCOSSL_HKDF_CTX *)EVP_PKEY_CTX_get_data(ctx);
@@ -81,12 +85,16 @@ SCOSSL_STATUS e_scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     }
 }
 
-SCOSSL_STATUS e_scossl_hkdf_derive_init(_Inout_ EVP_PKEY_CTX *ctx)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_hkdf_derive_init(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = (SCOSSL_HKDF_CTX *)EVP_PKEY_CTX_get_data(ctx);
     return scossl_hkdf_reset(e_scossl_hkdf_context);
 }
 
+//
+// Default OpenSSL fallback functions
+//
 static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
                                    const unsigned char *pbSalt, size_t cbSalt,
                                    const unsigned char *key, size_t key_len,
@@ -184,26 +192,29 @@ static unsigned char *HKDF(const EVP_MD *evp_md,
     return ret;
 }
 
-SCOSSL_STATUS e_scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                   _Inout_ size_t *keylen)
+_Use_decl_annotations_
+SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
+                                   unsigned char *key, size_t *keylen)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = (SCOSSL_HKDF_CTX *)EVP_PKEY_CTX_get_data(ctx);
 
-    if (e_scossl_hkdf_context->md == NULL) {
+    if (e_scossl_hkdf_context->md == NULL)
+    {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Digest");
+                         "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
-    if (e_scossl_hkdf_context->pbKey == NULL) {
+    if (e_scossl_hkdf_context->pbKey == NULL)
+    {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Key");
+                         "Missing Key");
         return SCOSSL_FAILURE;
     }
 
     if (scossl_is_md_supported(e_scossl_hkdf_context->md))
     {
-        if (e_scossl_hkdf_context->mode == EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY && key == NULL) 
+        if (e_scossl_hkdf_context->mode == EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY && key == NULL)
         {
             *keylen = EVP_MD_size(e_scossl_hkdf_context->md);
             return SCOSSL_SUCCESS;
@@ -213,9 +224,10 @@ SCOSSL_STATUS e_scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
     }
 
     SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-        "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
+                    "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
 
-    switch (e_scossl_hkdf_context->mode) {
+    switch (e_scossl_hkdf_context->mode)
+    {
     case EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND:
         return HKDF(
             e_scossl_hkdf_context->md,
@@ -225,16 +237,16 @@ SCOSSL_STATUS e_scossl_hkdf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
             key, *keylen) != NULL;
     case EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY:
         return HKDF_Extract(
-                e_scossl_hkdf_context->md,
-                e_scossl_hkdf_context->pbSalt, e_scossl_hkdf_context->cbSalt,
-                e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
-                key, keylen) != NULL;
+            e_scossl_hkdf_context->md,
+            e_scossl_hkdf_context->pbSalt, e_scossl_hkdf_context->cbSalt,
+            e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
+            key, keylen) != NULL;
     case EVP_PKEY_HKDEF_MODE_EXPAND_ONLY:
         return HKDF_Expand(
-                e_scossl_hkdf_context->md,
-                e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
-                e_scossl_hkdf_context->info, e_scossl_hkdf_context->cbInfo,
-                key, *keylen) != NULL;
+            e_scossl_hkdf_context->md,
+            e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
+            e_scossl_hkdf_context->info, e_scossl_hkdf_context->cbInfo,
+            key, *keylen) != NULL;
     }
 
     return SCOSSL_FAILURE;

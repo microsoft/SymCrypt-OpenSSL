@@ -10,17 +10,13 @@ extern "C" {
 
 #define TLS1_PRF_MAXBUF 1024
 
-typedef struct {
+typedef struct
+{
     BOOL isTlsPrf1_1;
-    /* Digest to use for PRF */
     PCSYMCRYPT_MAC pMac;
-
-    /* Secret value to use for PRF */
-    PBYTE  pbSecret;
+    PBYTE pbSecret;
     SIZE_T cbSecret;
-
-    /* Buffer of concatenated seed data */
-    BYTE   seed[TLS1_PRF_MAXBUF];
+    BYTE seed[TLS1_PRF_MAXBUF];
     SIZE_T cbSeed;
 } SCOSSL_TLS1_PRF_CTX;
 

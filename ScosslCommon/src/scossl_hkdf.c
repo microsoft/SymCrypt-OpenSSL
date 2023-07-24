@@ -18,35 +18,39 @@ SCOSSL_HKDF_CTX *scossl_hkdf_newctx()
 _Use_decl_annotations_
 SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
 {
-    SCOSSL_HKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_HKDF_CTX));
+    SCOSSL_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_HKDF_CTX));
     if (copyCtx != NULL)
     {
         if (ctx->md != NULL && !EVP_MD_up_ref(ctx->md))
         {
-            // Dont call scossl_hkdf_freectx here since we don't want
-            // to free ctx->md if it's reference count wasn't increased
-            OPENSSL_free(copyCtx);
+            scossl_hkdf_freectx(copyCtx);
             return NULL;
         }
         copyCtx->md = ctx->md;
 
-        copyCtx->cbSalt = ctx->cbSalt;
-        if (ctx->pbSalt != NULL &&
-            (copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
+        if (ctx->pbSalt == NULL)
+        {
+            copyCtx->pbSalt = NULL;
+        }
+        else if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
         {
             scossl_hkdf_freectx(copyCtx);
             return NULL;
         }
 
-        copyCtx->cbKey = ctx->cbKey;
-        if (ctx->pbKey != NULL &&
-            (copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
+        if (ctx->pbKey == NULL)
+        {
+            copyCtx->pbKey = NULL;
+        }
+        else if ((copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
         {
             scossl_hkdf_freectx(copyCtx);
             return NULL;
         }
 
         copyCtx->mode = ctx->mode;
+        copyCtx->cbSalt = ctx->cbSalt;
+        copyCtx->cbKey = ctx->cbKey;
         copyCtx->cbInfo = ctx->cbInfo;
         memcpy(copyCtx->info, ctx->info, ctx->cbInfo);
     }
@@ -71,21 +75,22 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_hkdf_reset(SCOSSL_HKDF_CTX *ctx)
 {
     EVP_MD_free(ctx->md);
-    OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
+    OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_cleanse(ctx, sizeof(*ctx));
     return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hkdf_append_info(SCOSSL_HKDF_CTX *ctx, PCBYTE info, SIZE_T cbInfo)
+SCOSSL_STATUS scossl_hkdf_append_info(SCOSSL_HKDF_CTX *ctx,
+                                      PCBYTE pbInfo, SIZE_T cbInfo)
 {
     if (cbInfo + ctx->cbInfo > HKDF_MAXBUF)
     {
         return SCOSSL_FAILURE;
     }
 
-    memcpy(ctx->info + ctx->cbInfo, info, cbInfo);
+    memcpy(ctx->info + ctx->cbInfo, pbInfo, cbInfo);
     ctx->cbInfo += cbInfo;
 
     return SCOSSL_SUCCESS;
@@ -99,15 +104,17 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
     PCSYMCRYPT_MAC symcryptMacAlg = NULL;
     SYMCRYPT_HKDF_EXPANDED_KEY scExpandedKey;
 
-    if (ctx->md == NULL) {
+    if (ctx->md == NULL)
+    {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Digest");
+                         "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->pbKey == NULL) {
+    if (ctx->pbKey == NULL)
+    {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Missing Key");
+                         "Missing Key");
         return SCOSSL_FAILURE;
     }
 
@@ -117,7 +124,8 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    switch (ctx->mode) {
+    switch (ctx->mode)
+    {
     case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
         scError = SymCryptHkdf(
             symcryptMacAlg,
@@ -162,7 +170,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Invalid Mode: %d", ctx->mode);
+                         "Invalid Mode: %d", ctx->mode);
         return SCOSSL_FAILURE;
     }
 
