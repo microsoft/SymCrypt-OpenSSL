@@ -31,6 +31,7 @@ typedef struct
 
 static const OSSL_PARAM p_scossl_rsa_cipher_gettable_ctx_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, NULL, 0),
+    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, NULL),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST, NULL, 0),
     OSSL_PARAM_octet_ptr(OSSL_ASYM_CIPHER_PARAM_OAEP_LABEL, NULL, 0),
@@ -38,6 +39,7 @@ static const OSSL_PARAM p_scossl_rsa_cipher_gettable_ctx_param_types[] = {
 
 static const OSSL_PARAM p_scossl_rsa_cipher_settable_ctx_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, NULL, 0),
+    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, NULL),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST_PROPS, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST, NULL, 0),
@@ -75,13 +77,13 @@ void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    SCOSSL_RSA_CIPHER_CTX* copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
-    if (copy_ctx != NULL)
+    SCOSSL_RSA_CIPHER_CTX* copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
+    if (copyCtx != NULL)
     {
-        memcpy(copy_ctx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+        memcpy(copyCtx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
     }
 
-    return copy_ctx;
+    return copyCtx;
 }
 
 SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
@@ -153,8 +155,8 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
 SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
-    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE)) != NULL)
     {
         int i = 0;
 
@@ -187,16 +189,14 @@ SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
         }
     }
 
-    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
-    if (p != NULL &&
+    if ((p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->oaepMdInfo == NULL ? "" : ctx->oaepMdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
-    if (p != NULL &&
+    if ((p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo == NULL ? "" : ctx->mgf1MdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -217,8 +217,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
     const OSSL_PARAM *param_propq;
     const char *mdName, *mdProps;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE)) != NULL)
     {
         // Padding mode may be passed as legacy NID or string, and is
         // checked against the padding modes the ScOSSL provider supports
@@ -266,8 +265,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
     //
     // OAEP parameters
     //
-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST)) != NULL)
     {
         const OSSL_ITEM *oaepMdInfo;
 
@@ -278,8 +276,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST_PROPS);
-        if (param_propq != NULL &&
+        if ((param_propq = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_DIGEST_PROPS)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -298,8 +295,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         ctx->oaepMdInfo = oaepMdInfo;
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST)) != NULL)
     {
         const OSSL_ITEM *mgf1MdInfo;
 
@@ -310,8 +306,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST_PROPS);
-        if (param_propq != NULL &&
+        if ((param_propq = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_MGF1_DIGEST_PROPS)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -330,8 +325,8 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         ctx->mgf1MdInfo = mgf1MdInfo;
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_LABEL);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_OAEP_LABEL)) != NULL)
     {
         void *pbLabel = NULL;
         size_t cbLabel;

@@ -35,17 +35,18 @@ typedef struct
     int cbSalt;
 } SCOSSL_RSA_SIGN_CTX;
 
-#define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                             \
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),      \
+#define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                        \
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0), \
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
 
-#define SCOSSL_RSA_PSS_SIGNATURE_GETTABLE_PARAMS                           \
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),     \
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),   
+#define SCOSSL_RSA_PSS_SIGNATURE_GETTABLE_PARAMS                       \
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0), \
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0), \
+    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL),
 
-#define SCOSSL_RSA_PSS_SIGNATURE_SETTABLE_PARAMS                           \
-    SCOSSL_RSA_PSS_SIGNATURE_GETTABLE_PARAMS                               \
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),  
+#define SCOSSL_RSA_PSS_SIGNATURE_SETTABLE_PARAMS \
+    SCOSSL_RSA_PSS_SIGNATURE_GETTABLE_PARAMS     \
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES, NULL, 0),
 
 static const OSSL_PARAM p_scossl_rsa_sig_ctx_gettable_param_types[] = {
     SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS
@@ -57,7 +58,7 @@ static const OSSL_PARAM p_scossl_rsa_pss_sig_ctx_gettable_param_types[] = {
     OSSL_PARAM_END};
 
 // Padding may not be set at the time of querying settable params, so PSS params
-// are always accepted. The provider will check the padding before attempting 
+// are always accepted. The provider will check the padding before attempting
 // to set the PSS parameters
 static const OSSL_PARAM p_scossl_rsa_sig_ctx_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
@@ -77,7 +78,7 @@ static OSSL_ITEM p_scossl_rsa_sign_padding_modes[] = {
     {RSA_PKCS1_PSS_PADDING, OSSL_PKEY_RSA_PAD_MODE_PSS},
     {0, NULL}};
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In_ const char *propq)
 {
@@ -109,32 +110,32 @@ static void p_scossl_rsa_freectx(SCOSSL_RSA_SIGN_CTX *ctx)
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 {
-    SCOSSL_RSA_SIGN_CTX *copy_ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
-    if (copy_ctx != NULL)
+    SCOSSL_RSA_SIGN_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
+    if (copyCtx != NULL)
     {
-        if ((ctx->propq != NULL && ((copy_ctx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
-            (ctx->mdctx != NULL && ((copy_ctx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
+        if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
+            (ctx->mdctx != NULL && ((copyCtx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
             (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
         {
-            p_scossl_rsa_freectx(copy_ctx);
+            p_scossl_rsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            copy_ctx = NULL;
+            copyCtx = NULL;
         }
 
-        copy_ctx->libctx = ctx->libctx;
-        copy_ctx->padding = ctx->padding;
-        copy_ctx->keyCtx = ctx->keyCtx;
-        copy_ctx->md = ctx->md;
-        copy_ctx->cbSalt = ctx->cbSalt;
-        copy_ctx->mdInfo = ctx->mdInfo; 
-        copy_ctx->mgf1MdInfo = ctx->mgf1MdInfo;
+        copyCtx->libctx = ctx->libctx;
+        copyCtx->padding = ctx->padding;
+        copyCtx->keyCtx = ctx->keyCtx;
+        copyCtx->md = ctx->md;
+        copyCtx->cbSalt = ctx->cbSalt;
+        copyCtx->mdInfo = ctx->mdInfo;
+        copyCtx->mgf1MdInfo = ctx->mgf1MdInfo;
     }
 
-    return copy_ctx;
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                                  _In_ const OSSL_PARAM params[], int operation)
+                                                  const _In_ OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
@@ -155,13 +156,13 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sign_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                            _In_ const OSSL_PARAM params[])
+                                            const _In_ OSSL_PARAM params[])
 {
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                              _In_ const OSSL_PARAM params[])
+                                              const _In_ OSSL_PARAM params[])
 {
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
@@ -219,7 +220,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                         _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
+                                                         _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[], int operation)
 {
     if (!p_scossl_rsa_signverify_init(ctx, keyCtx, params, operation))
     {
@@ -232,7 +233,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
         // Different digest specified than what was previously set by paramters.
         EVP_MD *md;
         const OSSL_ITEM *mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdname, NULL, &md);
-    
+
         if (mdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && mdInfo->id != ctx->mgf1MdInfo->id))
         {
@@ -266,13 +267,13 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_sign_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                   _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
+                                                   _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[])
 {
     return p_scossl_rsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                     _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
+                                                     _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[])
 {
     return p_scossl_rsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
@@ -333,14 +334,13 @@ static const OSSL_PARAM *p_scossl_rsa_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_C
     return ctx->allowMdUpdates ? p_scossl_rsa_sig_ctx_settable_param_types : p_scossl_rsa_sig_ctx_settable_param_types_no_digest;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
     const char *mdName, *mdProps;
-    
-    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
     {
         EVP_MD *md;
         const OSSL_ITEM *mdInfo;
@@ -352,8 +352,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
-        if (param_propq != NULL &&
+        if ((param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -374,8 +373,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         ctx->mdInfo = mdInfo;
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PAD_MODE);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PAD_MODE)) != NULL)
     {
         // Padding mode may be passed as legacy NID or string, and is
         // checked against the padding modes the ScOSSL provider supports
@@ -423,11 +421,10 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
     //
     // PSS paramaters
     //
-    p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN)) != NULL)
     {
         // PSS padding must be set before setting PSS parameters
-        if (ctx->padding != RSA_PKCS1_PSS_PADDING) 
+        if (ctx->padding != RSA_PKCS1_PSS_PADDING)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
             return SCOSSL_FAILURE;
@@ -476,7 +473,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         if (saltlen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX ||
-            (ctx->operation == EVP_PKEY_OP_VERIFY && 
+            (ctx->operation == EVP_PKEY_OP_VERIFY &&
               (saltlen == RSA_PSS_SALTLEN_AUTO ||
                saltlen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX)))
         {
@@ -487,8 +484,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         ctx->cbSalt = saltlen;
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST)) != NULL)
     {
         EVP_MD *md;
         const OSSL_ITEM *mgf1MdInfo;
@@ -500,8 +496,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
-        if (param_propq != NULL &&
+        if ((param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -528,7 +523,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
 static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX  *ctx,
                                                           ossl_unused void *provctx)
-{   
+{
     return ctx->padding == RSA_PKCS1_PSS_PADDING ? p_scossl_rsa_pss_sig_ctx_gettable_param_types : p_scossl_rsa_sig_ctx_gettable_param_types;
 }
 
@@ -540,16 +535,15 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     }
 
     OSSL_PARAM *p;
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
-    if (p != NULL && 
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->mdInfo == NULL ? "" : ctx->mdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_PAD_MODE);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_PAD_MODE)) != NULL)
     {
         int i = 0;
 
@@ -585,10 +579,9 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     //
     // PSS paramaters
     //
-    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN)) != NULL)
     {
-        const char* saltLenText;
+        const char* saltLenText = NULL;
         int len;
 
         // Padding mode may be accepted as legacy NID or string
@@ -624,7 +617,8 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                     p->return_size = len;
             }
 
-            if (!OSSL_PARAM_set_utf8_string(p, saltLenText))
+            if (saltLenText != NULL &&
+                !OSSL_PARAM_set_utf8_string(p, saltLenText))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 return SCOSSL_FAILURE;
@@ -637,12 +631,11 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
         }
     }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST);
-    if (p != NULL &&
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo == NULL ? "" : ctx->mgf1MdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_FAILURE;     
+        return SCOSSL_FAILURE;
     }
 
     return SCOSSL_SUCCESS;
@@ -678,7 +671,7 @@ static const OSSL_PARAM *p_scossl_rsa_settable_ctx_md_params(_In_ SCOSSL_RSA_SIG
     return EVP_MD_settable_ctx_params(ctx->md);
 }
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     if (ctx->mdctx == NULL)
     {

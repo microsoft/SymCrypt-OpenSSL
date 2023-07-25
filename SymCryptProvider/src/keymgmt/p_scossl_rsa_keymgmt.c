@@ -37,7 +37,7 @@ typedef struct
 
 static const OSSL_PARAM p_scossl_rsa_keygen_settable_param_types[] = {
     OSSL_PARAM_uint32(OSSL_PKEY_PARAM_RSA_BITS, NULL),
-    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),   
+    OSSL_PARAM_uint64(OSSL_PKEY_PARAM_RSA_E, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_rsa_keymgmt_gettable_param_types[] = {
@@ -177,25 +177,25 @@ cleanup:
 
 static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx, int selection)
 {
-    SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
-    if (copy_ctx == NULL)
+    SCOSSL_RSA_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
+    if (copyCtx == NULL)
     {
         return NULL;
     }
 
-    copy_ctx->initialized = keyCtx->initialized;
+    copyCtx->initialized = keyCtx->initialized;
 
     if (keyCtx->initialized && (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if (!p_scossl_rsa_keymgmt_dup_keydata((PCSYMCRYPT_RSAKEY) keyCtx->key, &copy_ctx->key, 
+        if (!p_scossl_rsa_keymgmt_dup_keydata((PCSYMCRYPT_RSAKEY) keyCtx->key, &copyCtx->key,
                                               (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0))
         {
-            scossl_rsa_free_key_ctx(copy_ctx);
-            copy_ctx = NULL;
+            scossl_rsa_free_key_ctx(copyCtx);
+            copyCtx = NULL;
         }
     }
 
-    return copy_ctx;
+    return copyCtx;
 }
 
 //
@@ -458,20 +458,22 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_RSA_KEY_CTX *ke
         SymCryptRsakeySizeofPrime(keyCtx->key, 0),
         SymCryptRsakeySizeofPrime(keyCtx->key, 1)};
 
-    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
-    if (p != NULL && !OSSL_PARAM_set_uint32(p, SymCryptRsakeyModulusBits(keyCtx->key)))
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
+        !OSSL_PARAM_set_uint32(p, SymCryptRsakeyModulusBits(keyCtx->key)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
-    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
-    if (p != NULL && !OSSL_PARAM_set_int(p, p_scossl_rsa_get_security_bits(keyCtx->key)))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL &&
+        !OSSL_PARAM_set_int(p, p_scossl_rsa_get_security_bits(keyCtx->key)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
-    p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
-    if (p != NULL && !OSSL_PARAM_set_uint32(p, cbModulus))
+    ;
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
+        !OSSL_PARAM_set_uint32(p, cbModulus))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
@@ -758,8 +760,8 @@ cleanup:
 // Key import/export
 //
 static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
-    return (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 ? 
-        p_scossl_rsa_keymgmt_impexp_param_types : 
+    return (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 ?
+        p_scossl_rsa_keymgmt_impexp_param_types :
         NULL;
 }
 
@@ -771,7 +773,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     UINT64 pubExp64;
     PBYTE pbModulus = NULL;
-    SIZE_T cbModulus;
+    SIZE_T cbModulus = 2048;
     PBYTE ppbPrimes[2] = {0};
     SIZE_T pcbPrimes[2] = {0};
     SIZE_T nPrimes = 0;
@@ -792,13 +794,12 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N);
-        if (p != NULL)
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N)) != NULL)
         {
             cbModulus = p->data_size;
 
             pbModulus = OPENSSL_zalloc(cbModulus);
-            if(pbModulus == NULL)
+            if (pbModulus == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
@@ -811,8 +812,8 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
             }
         }
 
-        p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
-        if (p == NULL || !OSSL_PARAM_get_uint64(p, &pubExp64))
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E)) == NULL ||
+            !OSSL_PARAM_get_uint64(p, &pubExp64))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
@@ -820,13 +821,12 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
 
         if (include_private)
         {
-            p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1);
-            if (p != NULL)
+            if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1)) != NULL)
             {
                 pcbPrimes[0] = p->data_size;
 
                 ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
-                if(pbModulus == NULL)
+                if (pbModulus == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
@@ -840,8 +840,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
                 nPrimes++;
             }
 
-            p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2);
-            if (p != NULL)
+            if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2)) != NULL)
             {
                 pcbPrimes[1] = p->data_size;
 
@@ -933,7 +932,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx
 
     bld = OSSL_PARAM_BLD_new();
     if (bld == NULL)
-    {   
+    {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
@@ -952,7 +951,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
-    
+
     ret = param_cb(params, cbarg);
 cleanup:
     OSSL_PARAM_BLD_free(bld);

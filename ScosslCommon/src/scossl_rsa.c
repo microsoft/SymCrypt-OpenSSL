@@ -119,8 +119,8 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 // _Use_decl_annotations_
 // SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
 // {
-//     SCOSSL_RSA_KEY_CTX *copy_ctx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
-//     if (copy_ctx == NULL)
+//     SCOSSL_RSA_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
+//     if (copyCtx == NULL)
 //     {
 //         return NULL;
 //     }
@@ -135,24 +135,24 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
 //         SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
 //         SymcryptRsaParam.nPrimes = nPrimes;
 //         SymcryptRsaParam.nPubExp = 1;
-//         copy_ctx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-//         if (copy_ctx->key == NULL)
+//         copyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
+//         if (copyCtx->key == NULL)
 //         {
-//             scossl_rsa_free_key_ctx(copy_ctx);
+//             scossl_rsa_free_key_ctx(copyCtx);
 //             return NULL;
 //         }
 
 //         // TODO: Enable in SymCrypt
-//         SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copy_ctx->key);
-//         copy_ctx->initialized = 1;
+//         SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copyCtx->key);
+//         copyCtx->initialized = 1;
 //     }
 //     else
 //     {
-//         copy_ctx->initialized = 0;
-//         copy_ctx->key = NULL;
+//         copyCtx->initialized = 0;
+//         copyCtx->key = NULL;
 //     }
 
-//     return copy_ctx;
+//     return copyCtx;
 // }
 
 _Use_decl_annotations_
