@@ -99,24 +99,29 @@ SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
                                           _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
                                           _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
+    int mdnid = 0;
     INT32 cbResult;
     SCOSSL_STATUS ret;
 
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
-    if (ctx->oaepMdInfo == NULL)
+    if (ctx->padding == RSA_PKCS1_OAEP_PADDING)
     {
-        ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
-
         if (ctx->oaepMdInfo == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
+            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+
+            if (ctx->oaepMdInfo == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                return SCOSSL_FAILURE;
+            }
         }
+        mdnid = ctx->oaepMdInfo->id;
     }
 
-    ret = scossl_rsa_encrypt(ctx->keyCtx, ctx->padding, ctx->oaepMdInfo->id,
-                             ctx->pbLabel, ctx->cbLabel,
+    ret = scossl_rsa_encrypt(ctx->keyCtx, ctx->padding,
+                             mdnid, ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
@@ -128,23 +133,29 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
                                           _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
                                           _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
+    int mdnid = 0;
     INT32 cbResult;
     SCOSSL_STATUS ret;
 
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
-    if (ctx->oaepMdInfo == NULL)
+    if (ctx->padding == RSA_PKCS1_OAEP_PADDING)
     {
-        ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
         if (ctx->oaepMdInfo == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
+            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+
+            if (ctx->oaepMdInfo == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                return SCOSSL_FAILURE;
+            }
         }
+        mdnid = ctx->oaepMdInfo->id;
     }
 
-    ret = scossl_rsa_decrypt(ctx->keyCtx, ctx->padding, ctx->oaepMdInfo->id,
-                             ctx->pbLabel, ctx->cbLabel,
+    ret = scossl_rsa_decrypt(ctx->keyCtx, ctx->padding,
+                             mdnid, ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;

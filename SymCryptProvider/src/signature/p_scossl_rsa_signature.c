@@ -180,20 +180,58 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
+        if (ctx->mdInfo != NULL)
+        {
+            return scossl_rsa_pkcs1_sign(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        }
+
+        if (scossl_rsa_encrypt(ctx->keyCtx, ctx->padding, 0, NULL, 0, tbs, tbslen, sig, (INT32 *)siglen, sigsize))
+        {
+            return SCOSSL_SUCCESS;
+        }
+
+        // If scossl_rsa_encrypt fails, siglen may be set to some signed negative value.
+        // cleanse before returning.
+        siglen = 0;
+        return SCOSSL_FAILURE;
+    case RSA_PKCS1_PSS_PADDING:
         if (ctx->mdInfo == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
             return SCOSSL_FAILURE;
         }
-        return scossl_rsa_pkcs1_sign(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
-    case RSA_PKCS1_PSS_PADDING:
+
         return scossl_rsapss_sign(ctx->keyCtx, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
-    case RSA_NO_PADDING:
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }
 
     return SCOSSL_FAILURE;
+}
+
+static SCOSSL_STATUS p_scossl_rsa_verify_pkcs1_no_digest(_In_ SCOSSL_RSA_KEY_CTX *keyCtx,
+                                                         _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    INT32 cbResult;
+    SIZE_T cBuf = SymCryptRsakeySizeofModulus(keyCtx->key);
+    PBYTE pBuf = OPENSSL_secure_malloc(cBuf);
+
+    if (pBuf == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    ret = scossl_rsa_decrypt(keyCtx, RSA_PKCS1_PADDING, 0, NULL, 0, sig, siglen, pBuf, &cbResult, cBuf) &&
+          (SIZE_T) cbResult == tbslen &&
+          memcmp(pBuf, tbs, cbResult) == 0;
+
+cleanup:
+    OPENSSL_secure_clear_free(pBuf, cBuf);
+
+    return ret;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
@@ -203,15 +241,19 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
+        if (ctx->mdInfo != NULL)
+        {
+            return scossl_rsa_pkcs1_verify(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        }
+
+        return p_scossl_rsa_verify_pkcs1_no_digest(ctx->keyCtx, sig, siglen, tbs, tbslen);
+    case RSA_PKCS1_PSS_PADDING:
         if (ctx->mdInfo == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
             return SCOSSL_FAILURE;
         }
-        return scossl_rsa_pkcs1_verify(ctx->keyCtx, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
-    case RSA_PKCS1_PSS_PADDING:
         return scossl_rsapss_verify(ctx->keyCtx, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
-    case RSA_NO_PADDING:
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }

@@ -350,7 +350,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
                          "pcbSignature is NULL");
         goto cleanup;
     }
-    
+
     *pcbSignature = cbResult;
 
     if (pbSignature == NULL)
@@ -533,7 +533,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             0,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             pbDst,
-            cbDst,
+            cbModulus,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -566,7 +566,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             0,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             pbDst,
-            cbDst,
+            cbModulus,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -587,7 +587,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0,
             pbDst,
-            cbDst);
+            cbModulus);
         cbResult = cbDst;
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -741,7 +741,7 @@ SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
     else if (includePrivate)
     {
         rsaParams->privateParams = OPENSSL_malloc(sizeof(SCOSSL_RSA_PRIVATE_EXPORT_PARAMS));
-        if (rsaParams->privateParams == NULL ||            
+        if (rsaParams->privateParams == NULL ||
             ((rsaParams->privateParams->p    = BN_secure_new()) == NULL) ||
             ((rsaParams->privateParams->q    = BN_secure_new()) == NULL) ||
             ((rsaParams->privateParams->dmp1 = BN_secure_new()) == NULL) ||
@@ -763,8 +763,8 @@ SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
     return rsaParams;
 }
 
-// Contained BNs are not freed in the engine case, 
-// since OpenSSL just copies the pointer 
+// Contained BNs are not freed in the engine case,
+// since OpenSSL just copies the pointer
 _Use_decl_annotations_
 void scossl_rsa_free_export_params(SCOSSL_RSA_EXPORT_PARAMS *rsaParams, BOOL freeParams)
 {
