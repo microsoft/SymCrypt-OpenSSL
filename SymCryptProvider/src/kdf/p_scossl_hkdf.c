@@ -2,11 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/kdf.h>
-#include <openssl/proverr.h>
-
 #include "scossl_hkdf.h"
 #include "p_scossl_base.h"
+
+#include <openssl/proverr.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +67,7 @@ static void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
     if (ctx != NULL)
     {
+        EVP_MD_free(ctx->hkdfCtx->md);
         scossl_hkdf_freectx(ctx->hkdfCtx);
     }
 
@@ -78,7 +79,8 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx
     SCOSSL_PROV_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
     if (copyCtx != NULL)
     {
-        if ((copyCtx->hkdfCtx = scossl_hkdf_dupctx(ctx->hkdfCtx)) == NULL)
+        if ((copyCtx->hkdfCtx = scossl_hkdf_dupctx(ctx->hkdfCtx)) == NULL ||
+            (ctx->hkdfCtx->md != NULL && !EVP_MD_up_ref(ctx->hkdfCtx->md)))
         {
             OPENSSL_free(copyCtx);
             return NULL;
@@ -92,6 +94,7 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx
 
 static SCOSSL_STATUS p_scossl_hkdf_reset(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
+    EVP_MD_free(ctx->hkdfCtx->md);
     return scossl_hkdf_reset(ctx->hkdfCtx);
 }
 
@@ -120,7 +123,7 @@ static SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
     {
         SIZE_T cbResult;
-        if (ctx->hkdfCtx->mode == EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY)
+        if (ctx->hkdfCtx->mode == EVP_KDF_HKDF_MODE_EXTRACT_ONLY)
         {
             if (ctx->hkdfCtx->md == NULL)
             {

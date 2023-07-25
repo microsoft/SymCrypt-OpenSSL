@@ -2,11 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/kdf.h>
-#include <openssl/proverr.h>
-
 #include "scossl_sshkdf.h"
 #include "p_scossl_base.h"
+
+#include <openssl/kdf.h>
+#include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {

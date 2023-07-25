@@ -6,7 +6,6 @@
 #include "e_scossl_hkdf.h"
 
 #include <openssl/hmac.h>
-#include <openssl/kdf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,9 +30,9 @@ void e_scossl_hkdf_cleanup(EVP_PKEY_CTX *ctx)
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = NULL;
 
     e_scossl_hkdf_context = (SCOSSL_HKDF_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    if (e_scossl_hkdf_context == NULL) {
+    if (e_scossl_hkdf_context == NULL)
         return;
-    }
+
     scossl_hkdf_freectx(e_scossl_hkdf_context);
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
@@ -44,8 +43,7 @@ SCOSSL_STATUS e_scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context = (SCOSSL_HKDF_CTX *)EVP_PKEY_CTX_get_data(ctx);
     switch (type) {
     case EVP_PKEY_CTRL_HKDF_MD:
-        if (p2 == NULL ||
-            !EVP_MD_up_ref(p2))
+        if (p2 == NULL)
             return SCOSSL_FAILURE;
         e_scossl_hkdf_context->md = p2;
         return SCOSSL_SUCCESS;
@@ -96,13 +94,13 @@ SCOSSL_STATUS e_scossl_hkdf_derive_init(EVP_PKEY_CTX *ctx)
 // Default OpenSSL fallback functions
 //
 static unsigned char *HKDF_Extract(const EVP_MD *evp_md,
-                                   const unsigned char *pbSalt, size_t cbSalt,
+                                   const unsigned char *salt, size_t salt_len,
                                    const unsigned char *key, size_t key_len,
                                    unsigned char *prk, size_t *prk_len)
 {
     unsigned int tmp_len;
 
-    if (!HMAC(evp_md, pbSalt, cbSalt, key, key_len, prk, &tmp_len))
+    if (!HMAC(evp_md, salt, salt_len, key, key_len, prk, &tmp_len))
         return NULL;
 
     *prk_len = tmp_len;
@@ -174,7 +172,7 @@ static unsigned char *HKDF_Expand(const EVP_MD *evp_md,
 }
 
 static unsigned char *HKDF(const EVP_MD *evp_md,
-                           const unsigned char *pbSalt, size_t cbSalt,
+                           const unsigned char *salt, size_t salt_len,
                            const unsigned char *key, size_t key_len,
                            const unsigned char *info, size_t info_len,
                            unsigned char *okm, size_t okm_len)
@@ -183,7 +181,7 @@ static unsigned char *HKDF(const EVP_MD *evp_md,
     unsigned char *ret;
     size_t prk_len;
 
-    if (!HKDF_Extract(evp_md, pbSalt, cbSalt, key, key_len, prk, &prk_len))
+    if (!HKDF_Extract(evp_md, salt, salt_len, key, key_len, prk, &prk_len))
         return NULL;
 
     ret = HKDF_Expand(evp_md, prk, prk_len, info, info_len, okm, okm_len);
@@ -214,7 +212,7 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
 
     if (scossl_is_md_supported(e_scossl_hkdf_context->md))
     {
-        if (e_scossl_hkdf_context->mode == EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY && key == NULL)
+        if (e_scossl_hkdf_context->mode == EVP_KDF_HKDF_MODE_EXTRACT_ONLY && key == NULL)
         {
             *keylen = EVP_MD_size(e_scossl_hkdf_context->md);
             return SCOSSL_SUCCESS;
@@ -228,20 +226,20 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
 
     switch (e_scossl_hkdf_context->mode)
     {
-    case EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND:
+    case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
         return HKDF(
             e_scossl_hkdf_context->md,
             e_scossl_hkdf_context->pbSalt, e_scossl_hkdf_context->cbSalt,
             e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
             e_scossl_hkdf_context->info, e_scossl_hkdf_context->cbInfo,
             key, *keylen) != NULL;
-    case EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY:
+    case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
         return HKDF_Extract(
             e_scossl_hkdf_context->md,
             e_scossl_hkdf_context->pbSalt, e_scossl_hkdf_context->cbSalt,
             e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,
             key, keylen) != NULL;
-    case EVP_PKEY_HKDEF_MODE_EXPAND_ONLY:
+    case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
         return HKDF_Expand(
             e_scossl_hkdf_context->md,
             e_scossl_hkdf_context->pbKey, e_scossl_hkdf_context->cbKey,

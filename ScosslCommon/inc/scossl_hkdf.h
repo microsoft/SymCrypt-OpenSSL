@@ -4,11 +4,28 @@
 
 #include "scossl_helpers.h"
 
+#include <openssl/kdf.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define HKDF_MAXBUF 1024
+
+// These macros were renamed in OpenSSL 3. Common implementation
+// uses the new names. This mapping from new to old names is
+// needed until OpenSSL 1.1.1 builds are no longer needed.
+#ifndef EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND
+#define EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND
+#endif
+
+#ifndef EVP_KDF_HKDF_MODE_EXTRACT_ONLY
+#define EVP_KDF_HKDF_MODE_EXTRACT_ONLY EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY
+#endif
+
+#ifndef EVP_KDF_HKDF_MODE_EXPAND_ONLY
+#define EVP_KDF_HKDF_MODE_EXPAND_ONLY EVP_PKEY_HKDEF_MODE_EXPAND_ONLY
+#endif
 
 typedef struct
 {

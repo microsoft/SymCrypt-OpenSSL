@@ -395,7 +395,7 @@ void _scossl_log_SYMCRYPT_ERROR(
 }
 
 _Use_decl_annotations_
-BOOL scossl_is_md_supported(EVP_MD *md)
+BOOL scossl_is_md_supported(const EVP_MD *md)
 {
     switch (EVP_MD_type(md))
     {

@@ -4,6 +4,7 @@
 
 #include "scossl_tls1prf.h"
 #include "e_scossl_tls1prf.h"
+
 #include <openssl/kdf.h>
 
 #ifdef __cplusplus
@@ -14,9 +15,10 @@ _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_tls1prf_init(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_CTX *key_context = NULL;
-    if ((key_context = scossl_tls1prf_newctx()) == NULL) {
+    if ((key_context = scossl_tls1prf_newctx()) == NULL)
+    {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_INIT, ERR_R_MALLOC_FAILURE,
-            "OPENSSL_zalloc return NULL");
+                         "OPENSSL_zalloc return NULL");
         return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
@@ -27,9 +29,9 @@ _Use_decl_annotations_
 void e_scossl_tls1prf_cleanup(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    if (key_context == NULL) {
+    if (key_context == NULL)
         return;
-    }
+
     scossl_tls1prf_freectx(key_context);
 
     EVP_PKEY_CTX_set_data(ctx, NULL);
@@ -39,12 +41,12 @@ _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
     SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
+    PCSYMCRYPT_MAC symcryptMacAlg = NULL;
+    BOOL isTlsPrf1_1 = TRUE;
 
-    switch (type) {
+    switch (type)
+    {
     case EVP_PKEY_CTRL_TLS_MD:
-        PCSYMCRYPT_MAC symcryptMacAlg = NULL;
-        BOOL isTlsPrf1_1 = TRUE;
-
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
         if (EVP_MD_type(p2) != NID_md5_sha1)
         {
@@ -52,7 +54,6 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p
                 return SCOSSL_FAILURE;
             isTlsPrf1_1 = FALSE;
         }
-
         key_context->pMac = symcryptMacAlg;
         key_context->isTlsPrf1_1 = isTlsPrf1_1;
         return SCOSSL_SUCCESS;
@@ -74,7 +75,7 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p
         return scossl_tls1prf_append_seed(key_context, p2, p1);
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-            "SymCrypt Engine does not support ctrl type (%d)", type);
+                         "SymCrypt Engine does not support ctrl type (%d)", type);
         return SCOSSL_UNSUPPORTED;
     }
 }

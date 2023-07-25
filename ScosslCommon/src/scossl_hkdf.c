@@ -2,8 +2,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/kdf.h>
-
 #include "scossl_hkdf.h"
 
 #ifdef __cplusplus
@@ -21,13 +19,6 @@ SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
     SCOSSL_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_HKDF_CTX));
     if (copyCtx != NULL)
     {
-        if (ctx->md != NULL && !EVP_MD_up_ref(ctx->md))
-        {
-            scossl_hkdf_freectx(copyCtx);
-            return NULL;
-        }
-        copyCtx->md = ctx->md;
-
         if (ctx->pbSalt == NULL)
         {
             copyCtx->pbSalt = NULL;
@@ -48,6 +39,7 @@ SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
             return NULL;
         }
 
+        copyCtx->md = ctx->md;
         copyCtx->mode = ctx->mode;
         copyCtx->cbSalt = ctx->cbSalt;
         copyCtx->cbKey = ctx->cbKey;
@@ -64,7 +56,6 @@ void scossl_hkdf_freectx(SCOSSL_HKDF_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    EVP_MD_free(ctx->md);
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_cleanse(ctx->info, ctx->cbInfo);
@@ -74,7 +65,6 @@ void scossl_hkdf_freectx(SCOSSL_HKDF_CTX *ctx)
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_hkdf_reset(SCOSSL_HKDF_CTX *ctx)
 {
-    EVP_MD_free(ctx->md);
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_cleanse(ctx, sizeof(*ctx));
