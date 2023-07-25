@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-typedef struct 
+typedef struct
 {
     OSSL_LIB_CTX *libctx;
     SCOSSL_ECC_KEY_CTX *keyCtx;
@@ -56,7 +56,7 @@ static SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
-                                        const _In_ OSSL_PARAM params[])
+                                        ossl_unused const OSSL_PARAM params[])
 {
     if (ctx == NULL || keyCtx == NULL)
     {
@@ -101,8 +101,8 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx, 
-                                          _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen, 
+static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
+                                          _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen,
                                           size_t outlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;

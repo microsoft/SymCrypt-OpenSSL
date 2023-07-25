@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+// Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
+#define SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN (132)
+
 SCOSSL_STATUS scossl_ecc_init_static();
 void scossl_ecc_destroy_ecc_curves();
 

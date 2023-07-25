@@ -143,7 +143,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         *siglen = cbResult;
         return SCOSSL_SUCCESS;
     }
-    
+
     if (sigsize < cbResult)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
@@ -220,7 +220,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_update(_In_ SCOSSL_ECDSA_C
     if (ctx->mdctx == NULL)
         return 0;
 
-    return EVP_DigestUpdate(ctx->mdctx, data, datalen); 
+    return EVP_DigestUpdate(ctx->mdctx, data, datalen);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx,
@@ -274,8 +274,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
     const OSSL_PARAM *param_propq;
     const char *mdname, *mdprops;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
     {
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdname))
         {
@@ -284,8 +283,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
         }
 
         mdprops = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES);
-        if (param_propq != NULL &&
+        if ((param_propq = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PROPERTIES)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdprops))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -302,8 +300,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
         ctx->mdSize = EVP_MD_get_size(ctx->md);
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
-    if (p != NULL && 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE)) != NULL &&
         !OSSL_PARAM_get_size_t(p, &ctx->mdSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -327,16 +324,15 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
     }
 
     OSSL_PARAM *p;
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
-    if (p != NULL && 
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->md == NULL ? "" : EVP_MD_get0_name(ctx->md)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
-    if (p != NULL && 
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->mdSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

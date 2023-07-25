@@ -1,4 +1,12 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/core_names.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Parameter types for import/export depend on the selection
 // passed by the caller. These can be any combination of:
@@ -150,3 +158,7 @@ static const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_param_types[] = {
     p_scossl_ecc_impexp_types_0x85,
     p_scossl_ecc_impexp_types_0x86,
     p_scossl_ecc_impexp_types_0x87};
+
+#ifdef __cplusplus
+}
+#endif

@@ -19,8 +19,6 @@ extern "C" {
 #define SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN (139)
 // Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
 #define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
-// Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
-#define SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN (132)
 
 static PSYMCRYPT_ECURVE _hidden_curve_P192 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
@@ -124,7 +122,7 @@ SCOSSL_STATUS scossl_ec_point_to_pubkey(const EC_POINT* ecPoint, const EC_GROUP 
     }
 
     if (((SIZE_T) BN_bn2binpad(ecPubX, pbPublicKey, cbPublicKey/2) != cbPublicKey/2) ||
-        ((SIZE_T) BN_bn2binpad(ecPubY, pbPublicKey + (cbPublicKey/2), cbPublicKey/2) != cbPublicKey/2)) 
+        ((SIZE_T) BN_bn2binpad(ecPubY, pbPublicKey + (cbPublicKey/2), cbPublicKey/2) != cbPublicKey/2))
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad did not write expected number of public key bytes.");
@@ -141,7 +139,7 @@ cleanup:
 }
 
 static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_reads_bytes_(cbDerField) PCBYTE pbDerField, SIZE_T cbDerField,
-                                                                         BYTE expectedTag, 
+                                                                         BYTE expectedTag,
                                                                          _Out_writes_bytes_(pcbContent) PCBYTE *ppbContent, SIZE_T *pcbContent)
 {
     PCBYTE pbContent = NULL;
@@ -461,7 +459,7 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, 
+SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key,
                                   PCBYTE pbHashValue, SIZE_T cbHashValue,
                                   PCBYTE pbSignature, SIZE_T pcbSignature)
 {
