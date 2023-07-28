@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-PBYTE scossl_hmac_newctx()
+PSCOSSL_HMAC_ALIGNED_CTX scossl_hmac_newctx()
 {
     return OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_CTX));
 }
@@ -21,11 +21,11 @@ PBYTE scossl_hmac_newctx()
                                    &copyCtx->macState.##lcAlg##State);
 
 _Use_decl_annotations_
-PBYTE scossl_hmac_dupctx(PBYTE alignedCtx)
+PSCOSSL_HMAC_ALIGNED_CTX scossl_hmac_dupctx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
 {
     SCOSSL_HMAC_CTX *ctx, *copyCtx;
     ASN1_OCTET_STRING *pkey;
-    PBYTE alignedCopy;
+    PSCOSSL_HMAC_ALIGNED_CTX alignedCopy;
 
     if ((alignedCopy = scossl_hmac_newctx()) == NULL)
     {
@@ -71,7 +71,7 @@ PBYTE scossl_hmac_dupctx(PBYTE alignedCtx)
 }
 
 _Use_decl_annotations_
-void scossl_hmac_freectx(PBYTE alignedCtx)
+void scossl_hmac_freectx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
 {
     if (alignedCtx == NULL)
         return;
@@ -83,7 +83,7 @@ void scossl_hmac_freectx(PBYTE alignedCtx)
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hmac_set_md(PBYTE alignedCtx, const EVP_MD *md)
+SCOSSL_STATUS scossl_hmac_set_md(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx, const EVP_MD *md)
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
@@ -113,7 +113,7 @@ SCOSSL_STATUS scossl_hmac_set_md(PBYTE alignedCtx, const EVP_MD *md)
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hmac_set_mac_key(PBYTE alignedCtx,
+SCOSSL_STATUS scossl_hmac_set_mac_key(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
                                       const char *macKey, SIZE_T cbMacKey)
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
@@ -132,7 +132,7 @@ SCOSSL_STATUS scossl_hmac_set_mac_key(PBYTE alignedCtx,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hmac_init(PBYTE alignedCtx,
+SCOSSL_STATUS scossl_hmac_init(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
                                PCBYTE pbKey, SIZE_T cbKey)
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
@@ -148,7 +148,7 @@ SCOSSL_STATUS scossl_hmac_init(PBYTE alignedCtx,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hmac_update(PBYTE alignedCtx,
+SCOSSL_STATUS scossl_hmac_update(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
                                  PCBYTE pbData, SIZE_T cbData)
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
@@ -159,7 +159,7 @@ SCOSSL_STATUS scossl_hmac_update(PBYTE alignedCtx,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_hmac_final(PBYTE alignedCtx,
+SCOSSL_STATUS scossl_hmac_final(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
                                 PBYTE pbResult, SIZE_T *cbResult)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
