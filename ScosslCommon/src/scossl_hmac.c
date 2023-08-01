@@ -13,18 +13,17 @@ PSCOSSL_HMAC_ALIGNED_CTX scossl_hmac_newctx()
     return OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_CTX));
 }
 
-#define SCOSSL_COPY_HMAC_KEY_AND_STATE(lcAlg, UcAlg)                   \
-    SymCryptHmac##UcAlg##KeyCopy(&ctx->expandedKey.##lcAlg##Key,       \
-                                 &copyCtx->expandedKey.##lcAlg##Key);  \
-    SymCryptHmac##UcAlg##StateCopy(&ctx->macState.##lcAlg##State,      \
-                                   &copyCtx->expandedKey.##lcAlg##Key, \
-                                   &copyCtx->macState.##lcAlg##State);
+#define SCOSSL_COPY_HMAC_KEY_AND_STATE(lcAlg, UcAlg)                 \
+    SymCryptHmac##UcAlg##KeyCopy(&ctx->expandedKey.lcAlg##Key,       \
+                                 &copyCtx->expandedKey.lcAlg##Key);  \
+    SymCryptHmac##UcAlg##StateCopy(&ctx->macState.lcAlg##State,      \
+                                   &copyCtx->expandedKey.lcAlg##Key, \
+                                   &copyCtx->macState.lcAlg##State);
 
 _Use_decl_annotations_
 PSCOSSL_HMAC_ALIGNED_CTX scossl_hmac_dupctx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
 {
     SCOSSL_HMAC_CTX *ctx, *copyCtx;
-    ASN1_OCTET_STRING *pkey;
     PSCOSSL_HMAC_ALIGNED_CTX alignedCopy;
 
     if ((alignedCopy = scossl_hmac_newctx()) == NULL)
@@ -35,19 +34,19 @@ PSCOSSL_HMAC_ALIGNED_CTX scossl_hmac_dupctx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
     ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     copyCtx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCopy);
 
-    if (ctx->key.data != NULL)
+    if (ctx->pbKey != NULL)
     {
-        if ((pkey = ASN1_OCTET_STRING_dup(&ctx->key)) == NULL)
+        if ((copyCtx->pbKey = OPENSSL_malloc(ctx->cbKey)) == NULL)
         {
             scossl_hmac_freectx(copyCtx);
             return NULL;
         }
 
-        copyCtx->key = *pkey;
+        memcpy(copyCtx->pbKey, ctx->pbKey, ctx->cbKey);
+        copyCtx->cbKey = ctx->cbKey;
     }
 
     copyCtx->pMac = ctx->pMac;
-
 
     // Copy the expanded key and mac state
     if(ctx->pMac == SymCryptHmacSha1Algorithm)
@@ -78,7 +77,7 @@ void scossl_hmac_freectx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
 
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    OPENSSL_clear_free(ctx->key.data, ctx->key.length);
+    OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_clear_free(alignedCtx, SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_CTX));
 }
 
@@ -114,21 +113,55 @@ SCOSSL_STATUS scossl_hmac_set_md(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx, const EVP_
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_hmac_set_mac_key(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
-                                      const char *macKey, SIZE_T cbMacKey)
+                                      PCBYTE pbMacKey, SIZE_T cbMacKey)
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+    PBYTE pbKey;
 
-    if (cbMacKey < -1 || macKey == NULL)
+    if (pbMacKey == NULL ||
+        (pbKey = OPENSSL_malloc(cbMacKey)) == NULL)
     {
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->key.data != NULL)
+    OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
+    ctx->pbKey = pbKey;
+    ctx->cbKey = cbMacKey;
+    memcpy(ctx->pbKey, pbMacKey, cbMacKey);
+
+    return SCOSSL_SUCCESS;
+}
+
+_Use_decl_annotations_
+SIZE_T scossl_hmac_get_result_size(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
+{
+    SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+    return ctx->pMac == NULL ? 0 : ctx->pMac->resultSize;
+}
+
+_Use_decl_annotations_
+SIZE_T scossl_hmac_get_block_size(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
+{
+    SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+
+    if(ctx->pMac == SymCryptHmacSha1Algorithm)
     {
-        OPENSSL_clear_free(ctx->key.data, ctx->key.length);
+        return SYMCRYPT_HMAC_SHA1_INPUT_BLOCK_SIZE;
+    }
+    else if(ctx->pMac == SymCryptHmacSha256Algorithm)
+    {
+        return SYMCRYPT_HMAC_SHA256_INPUT_BLOCK_SIZE;
+    }
+    else if(ctx->pMac == SymCryptHmacSha384Algorithm)
+    {
+        return SYMCRYPT_HMAC_SHA384_INPUT_BLOCK_SIZE;
+    }
+    else if(ctx->pMac == SymCryptHmacSha512Algorithm)
+    {
+        return SYMCRYPT_HMAC_SHA512_INPUT_BLOCK_SIZE;
     }
 
-    return ASN1_OCTET_STRING_set(&ctx->key, macKey, cbMacKey);
+    return 0;
 }
 
 _Use_decl_annotations_
@@ -137,14 +170,15 @@ SCOSSL_STATUS scossl_hmac_init(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    if(ctx->pMac->expandKeyFunc(&ctx->expandedKey, pbKey, cbKey) != SYMCRYPT_NO_ERROR)
+    if (pbKey != NULL &&
+        ctx->pMac->expandKeyFunc(&ctx->expandedKey, pbKey, cbKey) != SYMCRYPT_NO_ERROR)
     {
         return SCOSSL_FAILURE;
     }
 
     ctx->pMac->initFunc(&ctx->macState, &ctx->expandedKey);
 
-    return SCOSSL_FAILURE;
+    return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_
@@ -160,9 +194,8 @@ SCOSSL_STATUS scossl_hmac_update(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_hmac_final(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
-                                PBYTE pbResult, SIZE_T *cbResult)
+                                PBYTE pbResult, SIZE_T *cbResult, SIZE_T outsize)
 {
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
     if (!pbResult)
@@ -171,11 +204,9 @@ SCOSSL_STATUS scossl_hmac_final(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
         return SCOSSL_SUCCESS;
     }
 
-    if (*cbResult < ctx->pMac->resultSize)
+    if (outsize < ctx->pMac->resultSize)
     {
-
         return SCOSSL_FAILURE;
-
     }
 
     ctx->pMac->resultFunc(&ctx->macState, pbResult);

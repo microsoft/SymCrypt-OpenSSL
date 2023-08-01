@@ -97,7 +97,7 @@ static const OSSL_ALGORITHM p_scossl_cipher[] = {
 extern const OSSL_DISPATCH p_scossl_hmac_functions[];
 
 static const OSSL_ALGORITHM p_scossl_mac[] = {
-    // ALG("HMAC", p_scossl_hmac_functions),
+    ALG("HMAC", p_scossl_hmac_functions),
     ALG_TABLE_END};
 
 // KDF
