@@ -16,7 +16,7 @@ SCOSSL_STATUS e_scossl_hmac_init(_Inout_ EVP_PKEY_CTX *ctx);
 void e_scossl_hmac_cleanup(_Inout_ EVP_PKEY_CTX *ctx);
 
 // Makes a copy of internal context src
-SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src);
+SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ const EVP_PKEY_CTX *src);
 
 // Sends a control operation to context ctx. type indicates which operation, and
 // p1 and p2 are optional parameters depending on which type is used.
@@ -24,7 +24,7 @@ SCOSSL_STATUS e_scossl_hmac_copy(_Out_ EVP_PKEY_CTX *dst, _In_ EVP_PKEY_CTX *src
 SCOSSL_STATUS e_scossl_hmac_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1, _In_ void *p2);
 
 // Initializes pkey with the HMAC key from the internal context.
-SCOSSL_STATUS e_scossl_hmac_keygen(_Inout_ EVP_PKEY_CTX *ctx, EVP_PKEY *pkey);
+SCOSSL_STATUS e_scossl_hmac_keygen(_In_ EVP_PKEY_CTX *ctx, _Inout_ EVP_PKEY *pkey);
 
 // Performs initialization on the mdctx object, such as setting the message update function.
 SCOSSL_STATUS e_scossl_hmac_signctx_init(_Inout_ EVP_PKEY_CTX *ctx, _In_ EVP_MD_CTX *mdctx);
