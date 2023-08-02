@@ -38,7 +38,7 @@ SCOSSL_STATUS scossl_hmac_init(_Inout_ PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
 SCOSSL_STATUS scossl_hmac_update(_Inout_ PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
                                  _In_reads_bytes_(cbData) PCBYTE pbData, SIZE_T cbData);
 SCOSSL_STATUS scossl_hmac_final(_Inout_ PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
-                                _Out_writes_bytes_(*cbResult) PBYTE pbResult, _Out_ SIZE_T *cbResult, SIZE_T outsize);
+                                _Out_writes_bytes_opt_(*cbResult) PBYTE pbResult, _Out_ SIZE_T *cbResult, SIZE_T outsize);
 
 #ifdef __cplusplus
 }

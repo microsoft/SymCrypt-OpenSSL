@@ -11,7 +11,8 @@
 extern "C" {
 #endif
 
-typedef struct {
+typedef struct
+{
     // Needed for fetching md
     OSSL_LIB_CTX *libctx;
 
@@ -201,7 +202,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
     {
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
-        if (OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
             !scossl_hmac_init(ctx->hmacAlignedCtx, pbMacKey, cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -214,8 +215,8 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
 
 const OSSL_DISPATCH p_scossl_hmac_functions[] = {
     {OSSL_FUNC_MAC_NEWCTX, (void (*)(void))p_scossl_hmac_newctx},
-    {OSSL_FUNC_MAC_FREECTX, (void (*)(void))p_scossl_hmac_dupctx},
-    {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))p_scossl_hmac_freectx},
+    {OSSL_FUNC_MAC_FREECTX, (void (*)(void))p_scossl_hmac_freectx},
+    {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))p_scossl_hmac_dupctx},
     {OSSL_FUNC_MAC_INIT, (void (*)(void))p_scossl_hmac_init},
     {OSSL_FUNC_MAC_UPDATE, (void (*)(void))p_scossl_hmac_update},
     {OSSL_FUNC_MAC_FINAL, (void (*)(void))p_scossl_hmac_final},

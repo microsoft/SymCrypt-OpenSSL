@@ -78,7 +78,7 @@ void scossl_hmac_freectx(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx)
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
-    OPENSSL_clear_free(alignedCtx, SCOSSL_ALIGNED_SIZEOF(SCOSSL_HMAC_CTX));
+    SCOSSL_COMMON_ALIGNED_FREE(alignedCtx, OPENSSL_clear_free, SCOSSL_HMAC_CTX);
 }
 
 _Use_decl_annotations_
@@ -198,7 +198,7 @@ SCOSSL_STATUS scossl_hmac_final(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    if (!pbResult)
+    if (pbResult == NULL)
     {
         *cbResult = ctx->pMac->resultSize;
         return SCOSSL_SUCCESS;
