@@ -28,6 +28,7 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/mac/p_scossl_hmac.c
+    ./src/mac/p_scossl_kmac.c
     ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_digests.c
