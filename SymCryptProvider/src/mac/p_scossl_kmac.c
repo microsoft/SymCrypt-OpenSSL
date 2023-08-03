@@ -187,18 +187,21 @@ static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligne
 {
     SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    if (outsize < ctx->cbOutput)
+    if (out != NULL)
     {
-        return SCOSSL_FAILURE;
-    }
+        if (outsize < ctx->cbOutput)
+        {
+            return SCOSSL_FAILURE;
+        }
 
-    if (ctx->xofMode)
-    {
-        ctx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
-    }
-    else
-    {
-        ctx->resultExFunc(&ctx->macState, out, ctx->cbOutput);
+        if (ctx->xofMode)
+        {
+            ctx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
+        }
+        else
+        {
+            ctx->resultExFunc(&ctx->macState, out, ctx->cbOutput);
+        }
     }
 
     *outl = ctx->cbOutput;

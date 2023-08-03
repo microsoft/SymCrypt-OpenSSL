@@ -198,18 +198,16 @@ SCOSSL_STATUS scossl_hmac_final(PSCOSSL_HMAC_ALIGNED_CTX alignedCtx,
 {
     SCOSSL_HMAC_CTX *ctx = (SCOSSL_HMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    if (pbResult == NULL)
+    if (pbResult != NULL)
     {
-        *cbResult = ctx->pMac->resultSize;
-        return SCOSSL_SUCCESS;
+        if (outsize < ctx->pMac->resultSize)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->pMac->resultFunc(&ctx->macState, pbResult);
     }
 
-    if (outsize < ctx->pMac->resultSize)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    ctx->pMac->resultFunc(&ctx->macState, pbResult);
     *cbResult = ctx->pMac->resultSize;
 
     return SCOSSL_SUCCESS;

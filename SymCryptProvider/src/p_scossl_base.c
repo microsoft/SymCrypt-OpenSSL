@@ -94,11 +94,13 @@ static const OSSL_ALGORITHM p_scossl_cipher[] = {
     ALG_TABLE_END};
 
 // MAC
+extern const OSSL_DISPATCH p_scossl_cmac_functions[];
 extern const OSSL_DISPATCH p_scossl_hmac_functions[];
 extern const OSSL_DISPATCH p_scossl_kmac128_functions[];
 extern const OSSL_DISPATCH p_scossl_kmac256_functions[];
 
 static const OSSL_ALGORITHM p_scossl_mac[] = {
+    ALG("CMAC", p_scossl_cmac_functions),
     ALG("HMAC", p_scossl_hmac_functions),
     ALG("KMAC-128:KMAC128:2.16.840.1.101.3.4.2.19", p_scossl_kmac128_functions),
     ALG("KMAC-256:KMAC256:2.16.840.1.101.3.4.2.20", p_scossl_kmac256_functions),
