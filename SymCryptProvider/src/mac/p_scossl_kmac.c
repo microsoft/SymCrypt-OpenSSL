@@ -19,13 +19,13 @@ typedef union
 {
     SYMCRYPT_KMAC128_EXPANDED_KEY kmac128Key;
     SYMCRYPT_KMAC256_EXPANDED_KEY kmac256Key;
-} SYMCRYPT_KMAC_EXPANDED_KEY;
+} SCOSSL_KMAC_EXPANDED_KEY;
 
 typedef union
 {
     SYMCRYPT_KMAC128_STATE kmac128State;
     SYMCRYPT_KMAC256_STATE kmac256State;
-} SYMCRYPT_KMAC_STATE;
+} SCOSSL_KMAC_STATE;
 
 typedef SYMCRYPT_ERROR (SYMCRYPT_CALL * PSYMCRYPT_MAC_EXPAND_KEY_EX)
                                         (PVOID pExpandedKey, PCBYTE pbKey, SIZE_T cbKey,
@@ -35,14 +35,30 @@ typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_MAC_EXTRACT) (PVOID pState, PVOID pbOutp
 
 typedef struct
 {
-    SYMCRYPT_KMAC_EXPANDED_KEY expandedKey;
-    SYMCRYPT_KMAC_STATE macState;
-
-    PCSYMCRYPT_MAC pMac;
-
     PSYMCRYPT_MAC_EXPAND_KEY_EX expandKeyExFunc;
     PSYMCRYPT_MAC_RESULT_EX resultExFunc;
     PSYMCRYPT_MAC_EXTRACT extractFunc;
+} SCOSSL_KMAC_EXTENSIONS;
+
+const SCOSSL_KMAC_EXTENSIONS SymCryptKmac128AlgorithmEx = {
+    (PSYMCRYPT_MAC_EXPAND_KEY_EX)SymCryptKmac128ExpandKeyEx,
+    (PSYMCRYPT_MAC_RESULT_EX)    SymCryptKmac128ResultEx,
+    (PSYMCRYPT_MAC_EXTRACT)      SymCryptKmac128Extract
+};
+
+const SCOSSL_KMAC_EXTENSIONS SymCryptKmac256AlgorithmEx = {
+    (PSYMCRYPT_MAC_EXPAND_KEY_EX)SymCryptKmac256ExpandKeyEx,
+    (PSYMCRYPT_MAC_RESULT_EX)    SymCryptKmac256ResultEx,
+    (PSYMCRYPT_MAC_EXTRACT)      SymCryptKmac256Extract
+};
+
+typedef struct
+{
+    SCOSSL_KMAC_EXPANDED_KEY expandedKey;
+    SCOSSL_KMAC_STATE macState;
+
+    PCSYMCRYPT_MAC pMac;
+    const SCOSSL_KMAC_EXTENSIONS *pMacEx;
 
     int xofMode;
     SIZE_T cbOutput;
@@ -73,9 +89,7 @@ static PSCOSSL_KMAC_ALIGNED_CTX *p_scossl_kmac128_newctx(ossl_unused void *provc
     {
         SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
         ctx->pMac = SymCryptKmac128Algorithm;
-        ctx->expandKeyExFunc = (PSYMCRYPT_MAC_EXPAND_KEY_EX)&SymCryptKmac128ExpandKeyEx;
-        ctx->resultExFunc = (PSYMCRYPT_MAC_RESULT_EX)&SymCryptKmac128ResultEx;
-        ctx->extractFunc = (PSYMCRYPT_MAC_EXTRACT)&SymCryptKmac128Extract;
+        ctx->pMacEx = &SymCryptKmac128AlgorithmEx;
         ctx->cbOutput = ctx->pMac->resultSize;
     }
     return alignedCtx;
@@ -88,9 +102,7 @@ static PSCOSSL_KMAC_ALIGNED_CTX *p_scossl_kmac256_newctx(ossl_unused void *provc
     {
         SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
         ctx->pMac = SymCryptKmac256Algorithm;
-        ctx->expandKeyExFunc = (PSYMCRYPT_MAC_EXPAND_KEY_EX)&SymCryptKmac256ExpandKeyEx;
-        ctx->resultExFunc = (PSYMCRYPT_MAC_RESULT_EX)&SymCryptKmac256ResultEx;
-        ctx->extractFunc = (PSYMCRYPT_MAC_EXTRACT)&SymCryptKmac256Extract;
+        ctx->pMacEx = &SymCryptKmac256AlgorithmEx;
         ctx->cbOutput = ctx->pMac->resultSize;
     }
     return alignedCtx;
@@ -160,9 +172,10 @@ static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligned
     ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
     if (key != NULL &&
-        ctx->expandKeyExFunc(&ctx->expandedKey,
-                             key, keylen,
-                             ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
+        ctx->pMacEx->expandKeyExFunc(
+            &ctx->expandedKey,
+            key, keylen,
+            ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
     {
         return SCOSSL_FAILURE;
     }
@@ -196,11 +209,11 @@ static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligne
 
         if (ctx->xofMode)
         {
-            ctx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
+            ctx->pMacEx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
         }
         else
         {
-            ctx->resultExFunc(&ctx->macState, out, ctx->cbOutput);
+            ctx->pMacEx->resultExFunc(&ctx->macState, out, ctx->cbOutput);
         }
     }
 
@@ -289,9 +302,9 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_C
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            ctx->expandKeyExFunc(&ctx->expandedKey,
-                                 pbMacKey, cbMacKey,
-                                 ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
+            ctx->pMacEx->expandKeyExFunc(&ctx->expandedKey,
+                                         pbMacKey, cbMacKey,
+                                         ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;

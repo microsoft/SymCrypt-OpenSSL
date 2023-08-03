@@ -19,7 +19,7 @@ typedef struct
     // Purely informational
     const char* mdName;
 
-    PSCOSSL_HMAC_ALIGNED_CTX hmacAlignedCtx;
+    PSCOSSL_MAC_ALIGNED_CTX hmacAlignedCtx;
 } SCOSSL_PROV_HMAC_CTX;
 
 static const OSSL_PARAM p_scossl_hmac_ctx_gettable_param_types[] = {
@@ -41,7 +41,7 @@ static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
     SCOSSL_PROV_HMAC_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_HMAC_CTX));
     if (ctx != NULL)
     {
-        if ((ctx->hmacAlignedCtx = scossl_hmac_newctx()) == NULL)
+        if ((ctx->hmacAlignedCtx = scossl_mac_newctx()) == NULL)
         {
             OPENSSL_free(ctx);
             return NULL;
@@ -59,7 +59,7 @@ static void p_scossl_hmac_freectx(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    scossl_hmac_freectx(ctx->hmacAlignedCtx);
+    scossl_mac_freectx(ctx->hmacAlignedCtx);
     OPENSSL_free(ctx);
 }
 
@@ -69,7 +69,7 @@ static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_dupctx(_In_ SCOSSL_PROV_HMAC_CTX *ctx
 
     if (copyCtx != NULL)
     {
-        if ((copyCtx->hmacAlignedCtx = scossl_hmac_dupctx(ctx)) == NULL)
+        if ((copyCtx->hmacAlignedCtx = scossl_mac_dupctx(ctx)) == NULL)
         {
             OPENSSL_free(copyCtx);
             return NULL;
@@ -87,19 +87,19 @@ static SCOSSL_STATUS p_scossl_hmac_init(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
                                         _In_ const OSSL_PARAM params[])
 {
     return p_scossl_hmac_set_ctx_params(ctx, params) &&
-           scossl_hmac_init(ctx->hmacAlignedCtx, key, keylen);
+           scossl_mac_init(ctx->hmacAlignedCtx, key, keylen);
 }
 
 static SCOSSL_STATUS p_scossl_hmac_update(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
                                           _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    return scossl_hmac_update(ctx->hmacAlignedCtx, in, inl);
+    return scossl_mac_update(ctx->hmacAlignedCtx, in, inl);
 }
 
 static SCOSSL_STATUS p_scossl_hmac_final(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
                                          _Out_writes_bytes_(*outl) char *out, _Out_ size_t *outl, size_t outsize)
 {
-    return scossl_hmac_final(ctx->hmacAlignedCtx, (PBYTE) out, outl, outsize);
+    return scossl_mac_final(ctx->hmacAlignedCtx, (PBYTE) out, outl, outsize);
 }
 
 static const OSSL_PARAM *p_scossl_hmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -119,7 +119,7 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL)
     {
         SIZE_T cbResult;
-        if ((cbResult = scossl_hmac_get_result_size(ctx->hmacAlignedCtx)) == 0)
+        if ((cbResult = scossl_mac_get_result_size(ctx->hmacAlignedCtx)) == 0)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
             return SCOSSL_FAILURE;
@@ -135,7 +135,7 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL)
     {
         SIZE_T cbResult;
-        if ((cbResult = scossl_hmac_get_block_size(ctx->hmacAlignedCtx)) == 0)
+        if ((cbResult = scossl_mac_get_block_size(ctx->hmacAlignedCtx)) == 0)
         {
             return SCOSSL_FAILURE;
         }
@@ -188,7 +188,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
             return SCOSSL_FAILURE;
         }
 
-        if (!scossl_hmac_set_md(ctx->hmacAlignedCtx, md))
+        if (!scossl_mac_set_md(ctx->hmacAlignedCtx, md))
         {
             EVP_MD_free(md);
             return SCOSSL_FAILURE;
@@ -203,7 +203,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            !scossl_hmac_init(ctx->hmacAlignedCtx, pbMacKey, cbMacKey))
+            !scossl_mac_init(ctx->hmacAlignedCtx, pbMacKey, cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;

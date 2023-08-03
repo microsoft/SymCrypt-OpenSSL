@@ -15,9 +15,9 @@ extern "C" {
 _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hmac_init(EVP_PKEY_CTX *ctx)
 {
-    PSCOSSL_HMAC_ALIGNED_CTX e_scossl_hmac_context_alloc;
+    PSCOSSL_MAC_ALIGNED_CTX e_scossl_hmac_context_alloc;
 
-    if ((e_scossl_hmac_context_alloc = scossl_hmac_newctx()) == NULL)
+    if ((e_scossl_hmac_context_alloc = scossl_mac_newctx()) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
                          "OPENSSL_zalloc returned NULL");
@@ -32,8 +32,8 @@ SCOSSL_STATUS e_scossl_hmac_init(EVP_PKEY_CTX *ctx)
 _Use_decl_annotations_
 void e_scossl_hmac_cleanup(EVP_PKEY_CTX *ctx)
 {
-    PSCOSSL_HMAC_ALIGNED_CTX e_scossl_hmac_context_alloc = EVP_PKEY_CTX_get_data(ctx);
-    scossl_hmac_freectx(e_scossl_hmac_context_alloc);
+    PSCOSSL_MAC_ALIGNED_CTX e_scossl_hmac_context_alloc = EVP_PKEY_CTX_get_data(ctx);
+    scossl_mac_freectx(e_scossl_hmac_context_alloc);
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
@@ -47,7 +47,7 @@ SCOSSL_STATUS e_scossl_hmac_copy(EVP_PKEY_CTX *dst, const EVP_PKEY_CTX *src)
         return SCOSSL_FAILURE;
     }
 
-    if ((dst_ctx_alloc = scossl_hmac_dupctx(src_ctx_alloc)) == NULL)
+    if ((dst_ctx_alloc = scossl_mac_dupctx(src_ctx_alloc)) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
                          "scossl_hmac_dupctx returned NULL");
@@ -65,7 +65,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
     EVP_PKEY *pkey;
     ASN1_OCTET_STRING *key;
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    PSCOSSL_HMAC_ALIGNED_CTX e_scossl_hmac_context_alloc = EVP_PKEY_CTX_get_data(ctx);
+    PSCOSSL_MAC_ALIGNED_CTX e_scossl_hmac_context_alloc = EVP_PKEY_CTX_get_data(ctx);
 
     switch (type)
     {
@@ -75,12 +75,12 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             ret = SCOSSL_FAILURE;
             break;
         }
-        ret = scossl_hmac_set_md(e_scossl_hmac_context_alloc, p2);
+        ret = scossl_mac_set_md(e_scossl_hmac_context_alloc, p2);
         break;
     case EVP_PKEY_CTRL_SET_MAC_KEY:
         // p2 : pointer to the buffer containing the HMAC key, must not be NULL.
         // p1 : length of the key in bytes. p1 = -1 indicates p2 is a null-terminated string.
-        ret = scossl_hmac_set_mac_key(e_scossl_hmac_context_alloc, p2, p1);
+        ret = scossl_mac_set_mac_key(e_scossl_hmac_context_alloc, p2, p1);
         break;
     case EVP_PKEY_CTRL_DIGESTINIT:
         if ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL ||
@@ -90,7 +90,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             break;
         }
 
-        ret = scossl_hmac_init(e_scossl_hmac_context_alloc, p2, p1);
+        ret = scossl_mac_init(e_scossl_hmac_context_alloc, p2, p1);
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
@@ -105,7 +105,7 @@ _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hmac_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
-    SCOSSL_HMAC_CTX *e_scossl_hmac_context = (SCOSSL_HMAC_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(ctx));
+    SCOSSL_MAC_CTX *e_scossl_hmac_context = (SCOSSL_MAC_CTX *) SCOSSL_ALIGN_UP(EVP_PKEY_CTX_get_data(ctx));
     ASN1_OCTET_STRING *key;
 
     if (e_scossl_hmac_context->pbKey == NULL)
@@ -131,7 +131,7 @@ end:
 _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hmac_update(EVP_MD_CTX *ctx, const void *data, size_t count)
 {
-    return scossl_hmac_update(EVP_PKEY_CTX_get_data(EVP_MD_CTX_pkey_ctx(ctx)), data, count);
+    return scossl_mac_update(EVP_PKEY_CTX_get_data(EVP_MD_CTX_pkey_ctx(ctx)), data, count);
 }
 
 _Use_decl_annotations_
@@ -147,7 +147,7 @@ SCOSSL_STATUS e_scossl_hmac_signctx_init(EVP_PKEY_CTX *ctx, EVP_MD_CTX *mdctx)
 _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hmac_signctx(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen, EVP_MD_CTX *mdctx)
 {
-    return scossl_hmac_final(EVP_PKEY_CTX_get_data(ctx), sig, siglen, *siglen);
+    return scossl_mac_final(EVP_PKEY_CTX_get_data(ctx), sig, siglen, *siglen);
 }
 
 #ifdef __cplusplus
