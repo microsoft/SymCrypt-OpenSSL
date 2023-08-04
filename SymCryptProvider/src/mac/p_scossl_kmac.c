@@ -4,7 +4,6 @@
 
 #include "scossl_helpers.h"
 
-
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
@@ -27,29 +26,37 @@ typedef union
     SYMCRYPT_KMAC256_STATE kmac256State;
 } SCOSSL_KMAC_STATE;
 
-typedef SYMCRYPT_ERROR (SYMCRYPT_CALL * PSYMCRYPT_MAC_EXPAND_KEY_EX)
-                                        (PVOID pExpandedKey, PCBYTE pbKey, SIZE_T cbKey,
+typedef SYMCRYPT_ERROR (SYMCRYPT_CALL * PSYMCRYPT_KMAC_EXPAND_KEY_EX)
+                                        (SCOSSL_KMAC_EXPANDED_KEY *pExpandedKey, PCBYTE pbKey, SIZE_T cbKey,
                                          PCBYTE  pbCustomizationString, SIZE_T  cbCustomizationString);
-typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_MAC_RESULT_EX) (PVOID pState, PVOID pbResult, SIZE_T cbResult);
-typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_MAC_EXTRACT) (PVOID pState, PVOID pbOutput, SIZE_T cbOutput, BOOLEAN bWipe);
+typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_KMAC_RESULT_EX) (SCOSSL_KMAC_STATE *pState, PVOID pbResult, SIZE_T cbResult);
+typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_KMAC_EXTRACT) (SCOSSL_KMAC_STATE *pState, PVOID pbOutput, SIZE_T cbOutput, BOOLEAN bWipe);
+typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_KMAC_KEY_COPY) (SCOSSL_KMAC_EXPANDED_KEY *pSrc, SCOSSL_KMAC_EXPANDED_KEY *pDst);
+typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_KMAC_STATE_COPY) (SCOSSL_KMAC_STATE *pSrc, SCOSSL_KMAC_STATE *pDst);
 
 typedef struct
 {
-    PSYMCRYPT_MAC_EXPAND_KEY_EX expandKeyExFunc;
-    PSYMCRYPT_MAC_RESULT_EX resultExFunc;
-    PSYMCRYPT_MAC_EXTRACT extractFunc;
+    PSYMCRYPT_KMAC_EXPAND_KEY_EX expandKeyExFunc;
+    PSYMCRYPT_KMAC_RESULT_EX     resultExFunc;
+    PSYMCRYPT_KMAC_EXTRACT       extractFunc;
+    PSYMCRYPT_KMAC_KEY_COPY      keyCopyFunc;
+    PSYMCRYPT_KMAC_STATE_COPY    stateCopyFunc;
 } SCOSSL_KMAC_EXTENSIONS;
 
 const SCOSSL_KMAC_EXTENSIONS SymCryptKmac128AlgorithmEx = {
-    (PSYMCRYPT_MAC_EXPAND_KEY_EX)SymCryptKmac128ExpandKeyEx,
-    (PSYMCRYPT_MAC_RESULT_EX)    SymCryptKmac128ResultEx,
-    (PSYMCRYPT_MAC_EXTRACT)      SymCryptKmac128Extract
+    (PSYMCRYPT_KMAC_EXPAND_KEY_EX) SymCryptKmac128ExpandKeyEx,
+    (PSYMCRYPT_KMAC_RESULT_EX)     SymCryptKmac128ResultEx,
+    (PSYMCRYPT_KMAC_EXTRACT)       SymCryptKmac128Extract,
+    (PSYMCRYPT_KMAC_KEY_COPY)      SymCryptKmac128KeyCopy,
+    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac128StateCopy
 };
 
 const SCOSSL_KMAC_EXTENSIONS SymCryptKmac256AlgorithmEx = {
-    (PSYMCRYPT_MAC_EXPAND_KEY_EX)SymCryptKmac256ExpandKeyEx,
-    (PSYMCRYPT_MAC_RESULT_EX)    SymCryptKmac256ResultEx,
-    (PSYMCRYPT_MAC_EXTRACT)      SymCryptKmac256Extract
+    (PSYMCRYPT_KMAC_EXPAND_KEY_EX) SymCryptKmac256ExpandKeyEx,
+    (PSYMCRYPT_KMAC_RESULT_EX)     SymCryptKmac256ResultEx,
+    (PSYMCRYPT_KMAC_EXTRACT)       SymCryptKmac256Extract,
+    (PSYMCRYPT_KMAC_KEY_COPY)      SymCryptKmac256KeyCopy,
+    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac256StateCopy
 };
 
 typedef struct
@@ -130,21 +137,10 @@ static PSCOSSL_KMAC_ALIGNED_CTX p_scossl_kmac_dupctx(_In_ PSCOSSL_KMAC_ALIGNED_C
     copyCtx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCopy);
 
     copyCtx->pMac = ctx->pMac;
+    copyCtx->pMacEx = ctx->pMacEx;
 
-    if (ctx->pMac == SymCryptKmac128Algorithm)
-    {
-        SymCryptKmac128KeyCopy(&ctx->expandedKey.kmac128Key,
-                               &copyCtx->expandedKey.kmac128Key);
-        SymCryptKmac128StateCopy(&ctx->macState.kmac128State,
-                                 &copyCtx->macState.kmac128State);
-    }
-    else if (ctx->pMac == SymCryptKmac256Algorithm)
-    {
-        SymCryptKmac256KeyCopy(&ctx->expandedKey.kmac256Key,
-                               &copyCtx->expandedKey.kmac256Key);
-        SymCryptKmac256StateCopy(&ctx->macState.kmac256State,
-                                 &copyCtx->macState.kmac256State);
-    }
+    ctx->pMacEx->keyCopyFunc(&ctx->expandedKey, &copyCtx->expandedKey);
+    ctx->pMacEx->stateCopyFunc(&ctx->macState, &copyCtx->macState);
 
     if (ctx->cbCustomizationString > 0)
     {

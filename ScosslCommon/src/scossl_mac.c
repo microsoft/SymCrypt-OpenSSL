@@ -125,7 +125,7 @@ SCOSSL_STATUS scossl_mac_set_cipher(PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const EV
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_set_mac_key(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
-                                      PCBYTE pbMacKey, SIZE_T cbMacKey)
+                                     PCBYTE pbMacKey, SIZE_T cbMacKey)
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     PBYTE pbKey;
@@ -182,7 +182,7 @@ SIZE_T scossl_mac_get_block_size(PSCOSSL_MAC_ALIGNED_CTX alignedCtx)
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_init(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
-                               PCBYTE pbKey, SIZE_T cbKey)
+                              PCBYTE pbKey, SIZE_T cbKey)
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
@@ -199,7 +199,7 @@ SCOSSL_STATUS scossl_mac_init(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_update(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
-                                 PCBYTE pbData, SIZE_T cbData)
+                                PCBYTE pbData, SIZE_T cbData)
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
@@ -210,7 +210,7 @@ SCOSSL_STATUS scossl_mac_update(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
 
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_final(PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
-                                PBYTE pbResult, SIZE_T *cbResult, SIZE_T outsize)
+                               PBYTE pbResult, SIZE_T *cbResult, SIZE_T outsize)
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
