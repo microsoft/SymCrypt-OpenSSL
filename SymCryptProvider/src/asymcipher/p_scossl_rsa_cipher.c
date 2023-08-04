@@ -53,7 +53,7 @@ static OSSL_ITEM p_scossl_rsa_cipher_padding_modes[] = {
     {RSA_PKCS1_OAEP_PADDING, OSSL_PKEY_RSA_PAD_MODE_OAEP},
     {0, NULL}};
 
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, const _In_ OSSL_PARAM params[]);
+SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -87,7 +87,7 @@ SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX 
 }
 
 SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                       const _In_ OSSL_PARAM params[])
+                                       _In_ const OSSL_PARAM params[])
 {
     ctx->keyCtx = keyCtx;
     ctx->padding = RSA_PKCS1_PADDING;
@@ -222,7 +222,7 @@ const OSSL_PARAM *p_scossl_rsa_cipher_gettable_ctx_params(ossl_unused void *prov
     return p_scossl_rsa_cipher_gettable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, const _In_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;

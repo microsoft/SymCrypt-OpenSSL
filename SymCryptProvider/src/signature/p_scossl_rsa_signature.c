@@ -78,7 +78,7 @@ static OSSL_ITEM p_scossl_rsa_sign_padding_modes[] = {
     {RSA_PKCS1_PSS_PADDING, OSSL_PKEY_RSA_PAD_MODE_PSS},
     {0, NULL}};
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In_ const char *propq)
 {
@@ -135,7 +135,7 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                                  const _In_ OSSL_PARAM params[], int operation)
+                                                  _In_ const OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
@@ -156,13 +156,13 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sign_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                            const _In_ OSSL_PARAM params[])
+                                            _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                              const _In_ OSSL_PARAM params[])
+                                              _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
@@ -220,7 +220,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                         _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[], int operation)
+                                                         _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
 {
     if (!p_scossl_rsa_signverify_init(ctx, keyCtx, params, operation))
     {
@@ -267,13 +267,13 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_sign_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                   _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[])
+                                                   _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
-                                                     _In_ SCOSSL_RSA_KEY_CTX *keyCtx, const _In_ OSSL_PARAM params[])
+                                                     _In_ SCOSSL_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
@@ -334,7 +334,7 @@ static const OSSL_PARAM *p_scossl_rsa_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_C
     return ctx->allowMdUpdates ? p_scossl_rsa_sig_ctx_settable_param_types : p_scossl_rsa_sig_ctx_settable_param_types_no_digest;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
@@ -671,7 +671,7 @@ static const OSSL_PARAM *p_scossl_rsa_settable_ctx_md_params(_In_ SCOSSL_RSA_SIG
     return EVP_MD_settable_ctx_params(ctx->md);
 }
 
-static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     if (ctx->mdctx == NULL)
     {

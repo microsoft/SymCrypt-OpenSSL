@@ -309,8 +309,8 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int cbSaltMax;
     SIZE_T cbResult = 0;
-    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);;
-    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);;
+    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);
 
     if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
@@ -408,8 +408,8 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     int cbSaltMax;
-    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);;
-    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);;
+    PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
+    SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);
 
     if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
@@ -588,7 +588,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             0,
             pbDst,
             cbModulus);
-        cbResult = cbDst;
+        cbResult = cbModulus;
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
@@ -615,6 +615,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PCSYMCRYPT_HASH scosslHashAlgo = NULL;
     UINT32 cbModulus;
@@ -625,11 +626,12 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
 
     if (pbDst == NULL)
     {
+        ret = SCOSSL_SUCCESS;
         *pcbDst = (INT32)cbModulus;
         goto cleanup;
     }
 
-    if (cbDst > INT_MAX)
+    if (cbDst == (SIZE_T)-1)
     {
         // cbDst is not caller supplied for engine
         cbDst = cbModulus;
@@ -661,9 +663,10 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         err = (UINT64)cbResult >> 31;
         // scError != SYMCRYPT_NO_ERROR    => err > 0
         err |= (UINT32)(scError ^ SYMCRYPT_NO_ERROR);
-        // if( err > 0 ) { ret = -1; }
-        // else          { ret = 0; }
+        // if( err > 0 ) { pcbDst = -1; }
+        // else          { pcbDst = 0; }
         *pcbDst = (0ll - err) >> 32;
+        ret = err <= 0;
 
         // Set pcbDst to cbResult if pcbDst still 0
         *pcbDst |= (UINT32)cbResult;
@@ -719,10 +722,11 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         break;
     }
 
-    *pcbDst = (cbResult <= INT_MAX) ? (INT32)cbResult : -1;
+    ret = cbResult <= INT_MAX;
+    *pcbDst = ret ? (INT32)cbResult : -1;
 
 cleanup:
-    return *pcbDst >= 0;
+    return ret;
 }
 
 SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
@@ -881,8 +885,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
     scError = SymCryptRsakeyGetValue(
                    key,
                    pbModulus, cbModulus,
-                   &pubExp64,
-                   0,
+                   &pubExp64, 1,
                    ppbPrimes, pcbPrimes, nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    0);

@@ -19,7 +19,7 @@ typedef struct
     UINT32 nPubExp;
 } SCOSSL_RSA_KEYGEN_CTX;
 
-#define SCOSSL_DEFAULT_RSA_GEN_BITS 2048
+#define SCOSSL_DEFAULT_RSA_BITS 2048
 
 #define SCOSSL_RSA_KEYMGMT_PARAMS                  \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0), \
@@ -90,10 +90,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fro
 
     if (includePrivate)
     {
-        cbData =
-            cbModulus +     // Modulus[cbModulus] // Big-endian.
-            cbPrime1 +      // Prime1[cbPrime1] // Big-endian.
-            cbPrime2;       // Prime2[cbPrime2] // Big-endian.
+        cbData = cbModulus +     // Modulus[cbModulus] // Big-endian.
+                 cbPrime1 +      // Prime1[cbPrime1] // Big-endian.
+                 cbPrime2;       // Prime2[cbPrime2] // Big-endian.
     }
 
     pbData = OPENSSL_zalloc(cbData);
@@ -121,8 +120,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fro
     scError = SymCryptRsakeyGetValue(
                 fromKey,
                 pbModulus, cbModulus,
-                &pubExp64,
-                0,
+                &pubExp64, 1,
                 ppbPrimes, pcbPrimes, nPrimes,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0);
@@ -147,8 +145,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fro
 
     scError = SymCryptRsakeySetValue(
         pbModulus, cbModulus,
-        &pubExp64,
-        1,
+        &pubExp64, 1,
         (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
@@ -201,7 +198,7 @@ static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KE
 //
 // Key Generation
 //
-static SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_BITS);
@@ -236,7 +233,7 @@ static void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 }
 
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx, int selection,
-                                                const _In_ OSSL_PARAM params[])
+                                                _In_ const OSSL_PARAM params[])
 {
     // Sanity check
     if (!(selection & OSSL_KEYMGMT_SELECT_KEYPAIR))
@@ -251,7 +248,7 @@ static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(ossl_unused void *provctx
         return NULL;
     }
 
-    genCtx->nBitsOfModulus = SCOSSL_DEFAULT_RSA_GEN_BITS;
+    genCtx->nBitsOfModulus = SCOSSL_DEFAULT_RSA_BITS;
     genCtx->nPubExp = 0;
 
     if (!p_scossl_rsa_keygen_set_params(genCtx, params))
@@ -500,13 +497,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_RSA_KEY_CTX *ke
 
         if (SymCryptRsakeyGetCrtValue(
                 keyCtx->key,
-                ppbCrtExponents,
-                pcbPrimes,
-                2,
-                pbCrtCoefficient,
-                pcbPrimes[0],
-                pbPrivateExponent,
-                cbModulus,
+                ppbCrtExponents, pcbPrimes, 2,
+                pbCrtCoefficient, pcbPrimes[0],
+                pbPrivateExponent, cbModulus,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0) != SYMCRYPT_NO_ERROR)
         {
@@ -565,13 +558,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_RSA_KEY_CTX *ke
 
         if (SymCryptRsakeyGetValue(
                 keyCtx->key,
-                pbModulus,
-                cbModulus,
-                &pubExp64,
-                1,
-                ppbPrimes,
-                pcbPrimes,
-                2,
+                pbModulus, cbModulus,
+                &pubExp64, 1,
+                ppbPrimes, pcbPrimes, 2,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0) != SYMCRYPT_NO_ERROR)
         {
@@ -667,24 +656,16 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_RSA_KEY_CTX *keyCtx1, _In_ SC
 
     if (SymCryptRsakeyGetValue(
             keyCtx1->key,
-            pbModulus1,
-            cbModulus,
-            &pubExp1,
-            1,
-            NULL,
-            NULL,
-            0,
+            pbModulus1, cbModulus,
+            &pubExp1, 1,
+            NULL, NULL, 0,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0) != SYMCRYPT_NO_ERROR ||
         SymCryptRsakeyGetValue(
             keyCtx2->key,
-            pbModulus2,
-            cbModulus,
-            &pubExp2,
-            1,
-            NULL,
-            NULL,
-            0,
+            pbModulus2, cbModulus,
+            &pubExp2, 1,
+            NULL, NULL, 0,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0) != SYMCRYPT_NO_ERROR)
     {
@@ -715,24 +696,16 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_RSA_KEY_CTX *keyCtx1, _In_ SC
 
         if (SymCryptRsakeyGetCrtValue(
                 keyCtx1->key,
-                NULL,
-                NULL,
-                0,
-                NULL,
-                0,
-                pbPrivateExponent1,
-                cbModulus,
+                NULL, NULL, 0,
+                NULL, 0,
+                pbPrivateExponent1, cbModulus,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0) != SYMCRYPT_NO_ERROR ||
             SymCryptRsakeyGetCrtValue(
                 keyCtx2->key,
-                NULL,
-                NULL,
-                0,
-                NULL,
-                0,
-                pbPrivateExponent2,
-                cbModulus,
+                NULL, NULL, 0,
+                NULL, 0,
+                pbPrivateExponent2, cbModulus,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0) != SYMCRYPT_NO_ERROR)
         {
@@ -765,7 +738,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
         NULL;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -773,7 +746,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     UINT64 pubExp64;
     PBYTE pbModulus = NULL;
-    SIZE_T cbModulus = 2048;
+    SIZE_T cbModulus = SCOSSL_DEFAULT_RSA_BITS / 8;
     PBYTE ppbPrimes[2] = {0};
     SIZE_T pcbPrimes[2] = {0};
     SIZE_T nPrimes = 0;
@@ -864,7 +837,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
         {
             // Only supporting 2 primes
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                            "Unsupported RSA version");
+                             "Unsupported RSA version");
             goto cleanup;
         }
 
@@ -876,14 +849,13 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
         if (keyCtx->key == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                            "SymCryptRsakeyAllocate failed");
+                             "SymCryptRsakeyAllocate failed");
             goto cleanup;
         }
 
         scError = SymCryptRsakeySetValue(
             pbModulus, cbModulus,
-            &pubExp64,
-            1,
+            &pubExp64, 1,
             (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
@@ -891,7 +863,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_RSA_KEY_CTX *key
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                    "SymCryptRsakeySetValue failed", scError);
+                                      "SymCryptRsakeySetValue failed", scError);
             goto cleanup;
         }
     }
@@ -953,6 +925,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx
     }
 
     ret = param_cb(params, cbarg);
+
 cleanup:
     OSSL_PARAM_BLD_free(bld);
     scossl_rsa_free_export_params(rsaParams, TRUE);
