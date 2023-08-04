@@ -181,7 +181,7 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
             }
 
             mdName = EVP_MD_get0_name(md);
-            symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(md);
+            symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(md));
             EVP_MD_free(md);
 
             if (symcryptMacAlg == NULL)

@@ -108,7 +108,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(ctx->md);
+    symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(ctx->md));
     if (symcryptMacAlg == NULL)
     {
         return SCOSSL_FAILURE;

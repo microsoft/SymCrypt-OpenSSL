@@ -271,7 +271,7 @@ static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *
         md = EVP_MD_fetch(ctx->libctx, mdName, mdProps);
 
         if (md == NULL ||
-            !scossl_is_md_supported(md))
+            !scossl_is_md_supported(EVP_MD_type(md)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;

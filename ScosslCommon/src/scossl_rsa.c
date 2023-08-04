@@ -64,30 +64,6 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
     return NULL;
 }
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
-{
-    switch (mdnid)
-    {
-    case NID_md5:
-        return SymCryptMd5Algorithm;
-    case NID_sha1:
-        return SymCryptSha1Algorithm;
-    case NID_sha256:
-        return SymCryptSha256Algorithm;
-    case NID_sha384:
-        return SymCryptSha384Algorithm;
-    case NID_sha512:
-        return SymCryptSha512Algorithm;
-    case NID_sha3_256:
-        return SymCryptSha3_256Algorithm;
-    case NID_sha3_384:
-        return SymCryptSha3_384Algorithm;
-    case NID_sha3_512:
-        return SymCryptSha3_512Algorithm;
-    }
-    return NULL;
-}
-
 static SIZE_T scossl_get_expected_hash_length(int mdnid)
 {
     switch (mdnid)

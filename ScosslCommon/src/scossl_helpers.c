@@ -395,9 +395,9 @@ void _scossl_log_SYMCRYPT_ERROR(
 }
 
 _Use_decl_annotations_
-BOOL scossl_is_md_supported(const EVP_MD *md)
+BOOL scossl_is_md_supported(int mdnid)
 {
-    switch (EVP_MD_type(md))
+    switch (mdnid)
     {
     case NID_sha1:
     case NID_sha256:
@@ -413,11 +413,9 @@ BOOL scossl_is_md_supported(const EVP_MD *md)
 }
 
 _Use_decl_annotations_
-PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *md)
+PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(int mdnid)
 {
-    int type = EVP_MD_type(md);
-
-    switch(type)
+    switch(mdnid)
     {
     case NID_sha1:
         return SymCryptHmacSha1Algorithm;
@@ -435,16 +433,14 @@ PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(const EVP_MD *md)
         return SymCryptHmacSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support Mac algorithm %d", type);
+        "SymCrypt-OpenSSL does not support Mac algorithm %d", mdnid);
     return NULL;
 }
 
 _Use_decl_annotations_
-PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
+PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
 {
-    int type = EVP_MD_type(md);
-
-    switch (type)
+    switch (mdnid)
     {
     case NID_sha1:
         return SymCryptSha1Algorithm;
@@ -462,7 +458,7 @@ PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
         return SymCryptSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support hash algorithm %d", type);
+        "SymCrypt-OpenSSL does not support hash algorithm %d", mdnid);
     return NULL;
 }
 

@@ -202,7 +202,7 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
         }
 
         mdName = EVP_MD_get0_name(md);
-        symcryptHashAlg = scossl_get_symcrypt_hash_algorithm(md);
+        symcryptHashAlg = scossl_get_symcrypt_hash_algorithm(EVP_MD_type(md));
         EVP_MD_free(md);
 
         if (symcryptHashAlg == NULL)

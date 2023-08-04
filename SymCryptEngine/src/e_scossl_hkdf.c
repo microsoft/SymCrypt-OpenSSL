@@ -210,7 +210,7 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (scossl_is_md_supported(e_scossl_hkdf_context->md))
+    if (scossl_is_md_supported(EVP_MD_type(e_scossl_hkdf_context->md)))
     {
         if (e_scossl_hkdf_context->mode == EVP_KDF_HKDF_MODE_EXTRACT_ONLY && key == NULL)
         {

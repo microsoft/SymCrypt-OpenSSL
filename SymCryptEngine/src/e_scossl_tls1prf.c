@@ -50,7 +50,7 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
         if (EVP_MD_type(p2) != NID_md5_sha1)
         {
-            if ((symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(p2)) == NULL)
+            if ((symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(p2))) == NULL)
                 return SCOSSL_FAILURE;
             isTlsPrf1_1 = FALSE;
         }
