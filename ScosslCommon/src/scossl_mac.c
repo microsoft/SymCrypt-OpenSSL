@@ -102,7 +102,7 @@ SCOSSL_STATUS scossl_mac_set_cipher(PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const EV
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
-    switch (EVP_CIPHER_get_nid(cipher))
+    switch (EVP_CIPHER_nid(cipher))
     {
     case NID_aes_128_cbc:
         ctx->cbKey = 16;
