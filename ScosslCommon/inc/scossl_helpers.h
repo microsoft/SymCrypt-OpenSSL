@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <symcrypt.h>
 #include <string.h>
+#include <symcrypt.h>
 
 #include <openssl/ossl_typ.h>
 #include <openssl/crypto.h>

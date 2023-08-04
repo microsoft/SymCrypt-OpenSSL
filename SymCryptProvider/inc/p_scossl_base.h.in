@@ -4,6 +4,7 @@
 
 #include <openssl/core_names.h>
 #include <openssl/params.h>
+#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +16,7 @@ extern "C" {
 
 typedef struct
 {
+    OSSL_LIB_CTX *libctx;
     const OSSL_CORE_HANDLE *handle;
 } SCOSSL_PROVCTX;
 

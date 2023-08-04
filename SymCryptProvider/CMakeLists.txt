@@ -17,11 +17,15 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
+    ./src/asymcipher/p_scossl_rsa_cipher.c
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     # ./src/ciphers/p_scossl_aes_xts.c
+    ./src/keymgmt/p_scossl_rsa_keymgmt.c
+    ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_rand.c
+    ./src/p_scossl_rsa.c
     ./src/p_scossl_base.c
 )
 
