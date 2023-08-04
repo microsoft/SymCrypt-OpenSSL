@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_hmac.h"
+#include "scossl_mac.h"
 #include "p_scossl_base.h"
 
 #include <openssl/proverr.h>

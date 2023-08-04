@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_hmac.h"
+#include "scossl_mac.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,38 +65,62 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_set_md(PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const EVP_MD *md)
 {
     SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
     int type = EVP_MD_type(md);
 
     switch (type)
     {
     case NID_sha1:
         ctx->pMac = SymCryptHmacSha1Algorithm;
-        ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)&SymCryptHmacSha1KeyCopy;
-        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)&SymCryptHmacSha1StateCopy;
-        break;
+        ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha1KeyCopy;
+        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha1StateCopy;
+        return SCOSSL_SUCCESS;
     case NID_sha256:
         ctx->pMac = SymCryptHmacSha256Algorithm;
         ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha256KeyCopy;
-        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)&SymCryptHmacSha256StateCopy;
-        break;
+        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha256StateCopy;
+        return SCOSSL_SUCCESS;
     case NID_sha384:
         ctx->pMac = SymCryptHmacSha384Algorithm;
         ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha384KeyCopy;
-        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)&SymCryptHmacSha384StateCopy;
-        break;
+        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha384StateCopy;
+        return SCOSSL_SUCCESS;
     case NID_sha512:
         ctx->pMac = SymCryptHmacSha512Algorithm;
         ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha512KeyCopy;
-        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)&SymCryptHmacSha512StateCopy;
-        break;
+        ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha512StateCopy;
+        return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt engine does not support hash algorithm %d", type);
-        ret = SCOSSL_FAILURE;
+                         "SymCrypt engine does not support hash algorithm for MAC %d", type);
     }
 
-    return ret;
+    return SCOSSL_FAILURE;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_mac_set_cipher(PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const EVP_CIPHER *cipher)
+{
+    SCOSSL_MAC_CTX *ctx = (SCOSSL_MAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+
+    switch (EVP_CIPHER_get_nid(cipher))
+    {
+    case NID_aes_128_cbc:
+        ctx->cbKey = 16;
+        break;
+    case NID_aes_192_cbc:
+        ctx->cbKey = 24;
+        break;
+    case NID_aes_256_cbc:
+        ctx->cbKey = 32;
+        break;
+    default:
+        return SCOSSL_FAILURE;
+    }
+    ctx->pMac = SymCryptAesCmacAlgorithm;
+    ctx->keyCopyFunc = (PSYMCRYPT_MAC_KEY_COPY)SymCryptAesCmacKeyCopy;
+    ctx->stateCopyFunc = (PSYMCRYPT_MAC_STATE_COPY)SymCryptAesCmacStateCopy;
+
+    return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_

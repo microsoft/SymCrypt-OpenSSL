@@ -2,10 +2,11 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_mac.h"
 #include "p_scossl_base.h"
 
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,13 +17,8 @@ typedef struct
     // Needed for fetching cipher
     OSSL_LIB_CTX *libctx;
 
-    SIZE_T cbKey;
-
-    SYMCRYPT_AES_CMAC_EXPANDED_KEY expandedKey;
-    SYMCRYPT_AES_CMAC_STATE macState;
-} SCOSSL_CMAC_CTX;
-
-typedef PVOID PSCOSSL_CMAC_ALIGNED_CTX;
+    PSCOSSL_MAC_ALIGNED_CTX cmacAlignedCtx;
+} SCOSSL_PROV_CMAC_CTX;
 
 static const OSSL_PARAM p_scossl_cmac_ctx_gettable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_SIZE, NULL),
@@ -35,103 +31,73 @@ static const OSSL_PARAM p_scossl_cmac_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
-static PSCOSSL_CMAC_ALIGNED_CTX *p_scossl_cmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
+static SCOSSL_PROV_CMAC_CTX *p_scossl_cmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    PSCOSSL_CMAC_ALIGNED_CTX alignedCtx = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_CMAC_CTX));
-    if (alignedCtx != NULL)
+    SCOSSL_PROV_CMAC_CTX *ctx = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_PROV_CMAC_CTX));
+    if (ctx != NULL)
     {
-        SCOSSL_CMAC_CTX *ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+        if ((ctx->cmacAlignedCtx = scossl_mac_newctx()) == NULL)
+        {
+            OPENSSL_free(ctx);
+            return NULL;
+        }
 
         ctx->libctx = provctx->libctx;
     }
 
-    return alignedCtx;
+    return ctx;
 }
 
-static void p_scossl_cmac_freectx(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx)
+static void p_scossl_cmac_freectx(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx)
 {
-    if (alignedCtx == NULL)
+    if (ctx == NULL)
         return;
 
-    SCOSSL_COMMON_ALIGNED_FREE(alignedCtx, OPENSSL_clear_free, SCOSSL_CMAC_CTX);
+    scossl_mac_freectx(ctx->cmacAlignedCtx);
+    OPENSSL_free(ctx);
+
 }
 
-static PSCOSSL_CMAC_ALIGNED_CTX p_scossl_cmac_dupctx(_In_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx)
+static SCOSSL_PROV_CMAC_CTX* p_scossl_cmac_dupctx(_In_ SCOSSL_PROV_CMAC_CTX *ctx)
 {
-    SCOSSL_CMAC_CTX *ctx, *copyCtx;
-    PSCOSSL_CMAC_ALIGNED_CTX alignedCopy;
+    SCOSSL_PROV_CMAC_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_CMAC_CTX));
 
-    if ((alignedCopy = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_CMAC_CTX))) == NULL)
+    if (copyCtx != NULL)
     {
-        return NULL;
+        if ((copyCtx->cmacAlignedCtx = scossl_mac_dupctx(ctx)) == NULL)
+        {
+            OPENSSL_free(copyCtx);
+            return NULL;
+        }
+
+        copyCtx->libctx = ctx->libctx;
     }
 
-    ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-    copyCtx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCopy);
-
-    SymCryptAesCmacKeyCopy(&ctx->expandedKey, &copyCtx->expandedKey);
-    SymCryptAesCmacStateCopy(&ctx->macState, &copyCtx->expandedKey, &copyCtx->macState);
-    copyCtx->cbKey = ctx->cbKey;
-    copyCtx->libctx = ctx->libctx;
-
-    return alignedCopy;
+    return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
                                         const _In_ OSSL_PARAM params[])
 {
-    SCOSSL_CMAC_CTX *ctx;
+    return p_scossl_cmac_set_ctx_params(ctx, params) &&
+           scossl_mac_init(ctx->cmacAlignedCtx, key, keylen);
 
-    if (!p_scossl_cmac_set_ctx_params(alignedCtx, params))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-
-    if (key != NULL &&
-        ((keylen | ctx->cbKey) != keylen ||
-         SymCryptAesCmacExpandKey(&ctx->expandedKey, key, keylen) != SYMCRYPT_NO_ERROR))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    SymCryptAesCmacInit(&ctx->macState, &ctx->expandedKey);
-
-    return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_cmac_update(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_cmac_update(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx,
                                           _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    SCOSSL_CMAC_CTX *ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-
-    SymCryptAesCmacAppend(&ctx->macState, in, inl);
-
-    return SCOSSL_SUCCESS;
+    return scossl_mac_update(ctx->cmacAlignedCtx, in, inl);
 }
 
-static SCOSSL_STATUS p_scossl_cmac_final(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_cmac_final(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx,
                                          _Out_writes_bytes_opt_(*outl) char *out, _Out_ size_t *outl, size_t outsize)
 {
-    SCOSSL_CMAC_CTX *ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
+    return scossl_mac_final(ctx->cmacAlignedCtx, (PBYTE) out, outl, outsize);
 
-    if (out != NULL)
-    {
-        if (outsize < SYMCRYPT_AES_CMAC_RESULT_SIZE)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        SymCryptAesCmacResult(&ctx->macState, (PBYTE)out);
-    }
-
-    *outl = SYMCRYPT_AES_CMAC_RESULT_SIZE;
-
-    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_PARAM *p_scossl_cmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -165,17 +131,16 @@ static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(ossl_unused void *ctx, _Inout_
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ PSCOSSL_CMAC_ALIGNED_CTX alignedCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
-    SCOSSL_CMAC_CTX *ctx = (SCOSSL_CMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_CIPHER)) != NULL)
     {
+        SCOSSL_STATUS success;
         const OSSL_PARAM *param_propq;
         const char *cipherName, *cipherProps;
         EVP_CIPHER *cipher;
-        SIZE_T cbKey = 0;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &cipherName))
         {
@@ -192,27 +157,14 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ PSCOSSL_CMAC_ALIGNED_C
             return SCOSSL_FAILURE;
         }
 
-        switch (EVP_CIPHER_get_nid(cipher))
-        {
-        case NID_aes_128_cbc:
-            cbKey = 16;
-            break;
-        case NID_aes_192_cbc:
-            cbKey = 24;
-            break;
-        case NID_aes_256_cbc:
-            cbKey = 32;
-            break;
-        }
+        success = scossl_mac_set_cipher(ctx->cmacAlignedCtx, cipher);
         EVP_CIPHER_free(cipher);
 
-        if (cbKey == 0)
+        if (!success)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             return SCOSSL_FAILURE;
         }
-
-        ctx->cbKey = cbKey;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
@@ -220,14 +172,11 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ PSCOSSL_CMAC_ALIGNED_C
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            (cbMacKey | ctx->cbKey) != cbMacKey ||
-            SymCryptAesCmacExpandKey(&ctx->expandedKey, pbMacKey, cbMacKey) != SYMCRYPT_NO_ERROR)
+            !scossl_mac_init(ctx->cmacAlignedCtx, pbMacKey, cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
-        SymCryptAesCmacInit(&ctx->macState, &ctx->expandedKey);
     }
 
     return SCOSSL_SUCCESS;

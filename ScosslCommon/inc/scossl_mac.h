@@ -32,7 +32,8 @@ PSCOSSL_MAC_ALIGNED_CTX scossl_mac_newctx();
 PSCOSSL_MAC_ALIGNED_CTX scossl_mac_dupctx(_In_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx);
 void scossl_mac_freectx(_Inout_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx);
 
-SCOSSL_STATUS scossl_mac_set_md(_Inout_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const _In_ EVP_MD *md);
+SCOSSL_STATUS scossl_mac_set_md(_Inout_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx, _In_ const EVP_MD *md);
+SCOSSL_STATUS scossl_mac_set_cipher(_Inout_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx, _In_ const EVP_CIPHER *cipher);
 SCOSSL_STATUS scossl_mac_set_mac_key(_Inout_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx,
                                       _In_reads_bytes_(cbMacKey) PCBYTE pbMacKey, SIZE_T cbMacKey);
 SIZE_T scossl_mac_get_result_size(_In_ PSCOSSL_MAC_ALIGNED_CTX alignedCtx);
