@@ -37,6 +37,9 @@ void e_scossl_hmac_cleanup(EVP_PKEY_CTX *ctx)
     EVP_PKEY_CTX_set_data(ctx, NULL);
 }
 
+// The const modifier on src was added in OpenSSL 3, but is not expected
+// in OpenSSL 1.1.1. Building the Engine for OpenSSL 1.1.1 will generate
+// an incompatible pointer warning that can be safely ignored.
 _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_hmac_copy(EVP_PKEY_CTX *dst, const EVP_PKEY_CTX *src)
 {
@@ -90,7 +93,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             break;
         }
 
-        ret = scossl_mac_init(e_scossl_hmac_context_alloc, p2, p1);
+        ret = scossl_mac_init(e_scossl_hmac_context_alloc, key->data, key->length);
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,

@@ -116,35 +116,18 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx
 {
     OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, scossl_mac_get_result_size(ctx->hmacAlignedCtx)))
     {
-        SIZE_T cbResult;
-        if ((cbResult = scossl_mac_get_result_size(ctx->hmacAlignedCtx)) == 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-            return SCOSSL_FAILURE;
-        }
-
-        if (!OSSL_PARAM_set_size_t(p, cbResult))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
     }
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, scossl_mac_get_block_size(ctx->hmacAlignedCtx)))
     {
-        SIZE_T cbResult;
-        if ((cbResult = scossl_mac_get_block_size(ctx->hmacAlignedCtx)) == 0)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        if (!OSSL_PARAM_set_size_t(p, cbResult))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_DIGEST)) != NULL &&
@@ -163,6 +146,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_DIGEST)) != NULL)
     {
+        SCOSSL_STATUS success;
         const OSSL_PARAM *param_propq;
         const char *mdName, *mdProps;
         EVP_MD *md;
@@ -188,14 +172,17 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
             return SCOSSL_FAILURE;
         }
 
-        if (!scossl_mac_set_md(ctx->hmacAlignedCtx, md))
+        mdName = EVP_MD_get0_name(md);
+        success = scossl_mac_set_md(ctx->hmacAlignedCtx, md);
+        EVP_MD_free(md);
+
+        if (!success)
         {
-            EVP_MD_free(md);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             return SCOSSL_FAILURE;
         }
 
-        ctx->mdName = EVP_MD_get0_name(md);
-        EVP_MD_free(md);
+        ctx->mdName = mdName;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)

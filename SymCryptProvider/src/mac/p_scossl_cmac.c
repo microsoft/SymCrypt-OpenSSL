@@ -7,7 +7,6 @@
 
 #include <openssl/proverr.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,7 +30,7 @@ static const OSSL_PARAM p_scossl_cmac_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 static SCOSSL_PROV_CMAC_CTX *p_scossl_cmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -80,7 +79,7 @@ static SCOSSL_PROV_CMAC_CTX* p_scossl_cmac_dupctx(_In_ SCOSSL_PROV_CMAC_CTX *ctx
 
 static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
-                                        const _In_ OSSL_PARAM params[])
+                                        _In_ const OSSL_PARAM params[])
 {
     return p_scossl_cmac_set_ctx_params(ctx, params) &&
            scossl_mac_init(ctx->cmacAlignedCtx, key, keylen);
@@ -97,7 +96,6 @@ static SCOSSL_STATUS p_scossl_cmac_final(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx,
                                          _Out_writes_bytes_opt_(*outl) char *out, _Out_ size_t *outl, size_t outsize)
 {
     return scossl_mac_final(ctx->cmacAlignedCtx, (PBYTE) out, outl, outsize);
-
 }
 
 static const OSSL_PARAM *p_scossl_cmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -110,19 +108,19 @@ static const OSSL_PARAM *p_scossl_cmac_settable_ctx_params(ossl_unused void *ctx
     return p_scossl_cmac_ctx_settable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(ossl_unused void *ctx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(_In_ SCOSSL_PROV_CMAC_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
-        !OSSL_PARAM_set_size_t(p, SYMCRYPT_AES_CMAC_RESULT_SIZE))
+        !OSSL_PARAM_set_size_t(p, scossl_mac_get_result_size(ctx->cmacAlignedCtx)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL &&
-        !OSSL_PARAM_set_size_t(p, SYMCRYPT_AES_CMAC_INPUT_BLOCK_SIZE))
+        !OSSL_PARAM_set_size_t(p, scossl_mac_get_block_size(ctx->cmacAlignedCtx)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -131,7 +129,7 @@ static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(ossl_unused void *ctx, _Inout_
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -194,7 +192,6 @@ const OSSL_DISPATCH p_scossl_cmac_functions[] = {
     {OSSL_FUNC_MAC_GET_CTX_PARAMS, (void (*)(void))p_scossl_cmac_get_ctx_params},
     {OSSL_FUNC_MAC_SET_CTX_PARAMS, (void (*)(void))p_scossl_cmac_set_ctx_params},
     {0, NULL}};
-
 
 #ifdef __cplusplus
 }

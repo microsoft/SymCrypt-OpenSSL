@@ -41,6 +41,7 @@ typedef struct
     PSYMCRYPT_KMAC_EXTRACT       extractFunc;
     PSYMCRYPT_KMAC_KEY_COPY      keyCopyFunc;
     PSYMCRYPT_KMAC_STATE_COPY    stateCopyFunc;
+    SIZE_T blockSize;
 } SCOSSL_KMAC_EXTENSIONS;
 
 const SCOSSL_KMAC_EXTENSIONS SymCryptKmac128AlgorithmEx = {
@@ -48,7 +49,8 @@ const SCOSSL_KMAC_EXTENSIONS SymCryptKmac128AlgorithmEx = {
     (PSYMCRYPT_KMAC_RESULT_EX)     SymCryptKmac128ResultEx,
     (PSYMCRYPT_KMAC_EXTRACT)       SymCryptKmac128Extract,
     (PSYMCRYPT_KMAC_KEY_COPY)      SymCryptKmac128KeyCopy,
-    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac128StateCopy
+    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac128StateCopy,
+    SYMCRYPT_KMAC128_INPUT_BLOCK_SIZE
 };
 
 const SCOSSL_KMAC_EXTENSIONS SymCryptKmac256AlgorithmEx = {
@@ -56,7 +58,8 @@ const SCOSSL_KMAC_EXTENSIONS SymCryptKmac256AlgorithmEx = {
     (PSYMCRYPT_KMAC_RESULT_EX)     SymCryptKmac256ResultEx,
     (PSYMCRYPT_KMAC_EXTRACT)       SymCryptKmac256Extract,
     (PSYMCRYPT_KMAC_KEY_COPY)      SymCryptKmac256KeyCopy,
-    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac256StateCopy
+    (PSYMCRYPT_KMAC_STATE_COPY)    SymCryptKmac256StateCopy,
+    SYMCRYPT_KMAC256_INPUT_BLOCK_SIZE
 };
 
 typedef struct
@@ -87,7 +90,7 @@ static const OSSL_PARAM p_scossl_kmac_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_CUSTOM, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, _In_ const OSSL_PARAM params[]);
 
 static PSCOSSL_KMAC_ALIGNED_CTX *p_scossl_kmac128_newctx(ossl_unused void *provctx)
 {
@@ -156,7 +159,7 @@ static PSCOSSL_KMAC_ALIGNED_CTX p_scossl_kmac_dupctx(_In_ PSCOSSL_KMAC_ALIGNED_C
 
 static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
-                                        const _In_ OSSL_PARAM params[])
+                                        _In_ const OSSL_PARAM params[])
 {
     SCOSSL_KMAC_CTX *ctx;
 
@@ -240,30 +243,17 @@ static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ PSCOSSL_KMAC_ALIGNED_CTX 
         return SCOSSL_FAILURE;
     }
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL &&
+        (ctx->pMacEx == NULL || !OSSL_PARAM_set_size_t(p, ctx->pMacEx ->blockSize)))
     {
-        SIZE_T blockSize = 0;
-        if (ctx->pMac == SymCryptKmac128Algorithm)
-        {
-            blockSize = SYMCRYPT_KMAC128_INPUT_BLOCK_SIZE;
-        }
-        else if (ctx->pMac == SymCryptKmac256Algorithm)
-        {
-            blockSize = SYMCRYPT_KMAC256_INPUT_BLOCK_SIZE;
-        }
-
-        if (blockSize == 0 ||
-            !OSSL_PARAM_set_size_t(p, blockSize))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
     }
 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, _In_ const OSSL_PARAM params[])
 {
     SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     const OSSL_PARAM *p;
