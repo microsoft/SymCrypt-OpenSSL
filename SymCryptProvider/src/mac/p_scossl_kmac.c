@@ -208,7 +208,7 @@ static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligne
 
         if (ctx->xofMode)
         {
-            ctx->pMacEx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
+            ctx->pMacEx->extractFunc(&ctx->macState, out, ctx->cbOutput, FALSE);
         }
         else
         {
@@ -283,22 +283,6 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_C
         ctx->cbOutput = cbOutput;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
-    {
-        PCBYTE pbMacKey;
-        SIZE_T cbMacKey;
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            ctx->pMacEx->expandKeyExFunc(&ctx->expandedKey,
-                                         pbMacKey, cbMacKey,
-                                         ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        ctx->pMac->initFunc(&ctx->macState, &ctx->expandedKey);
-    }
-
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_CUSTOM)) != NULL)
     {
         PCBYTE pbCustomizationString;
@@ -320,6 +304,24 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_C
         memcpy(ctx->customizationString, pbCustomizationString, cbCustomizationString);
         ctx->cbCustomizationString = cbCustomizationString;
     }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
+    {
+        PCBYTE pbMacKey;
+        SIZE_T cbMacKey;
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
+            ctx->pMacEx->expandKeyExFunc(&ctx->expandedKey,
+                                         pbMacKey, cbMacKey,
+                                         ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->pMac->initFunc(&ctx->macState, &ctx->expandedKey);
+    }
+
+
 
     return SCOSSL_SUCCESS;
 }
