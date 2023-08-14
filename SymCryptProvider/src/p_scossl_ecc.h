@@ -12,7 +12,7 @@ typedef struct {
     BOOL initialized;
     int includePublic;
     PSYMCRYPT_ECKEY key;
-    EC_GROUP* ecGroup;
+    PCSYMCRYPT_ECURVE curve;
 } SCOSSL_ECC_KEY_CTX;
 
 #ifdef __cplusplus

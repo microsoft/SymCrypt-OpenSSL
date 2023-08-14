@@ -19,7 +19,7 @@ extern "C" {
 typedef struct
 {
     OSSL_LIB_CTX *libctx;
-    EC_GROUP *ecGroup;
+    PCSYMCRYPT_ECURVE curve;
 } SCOSSL_ECC_KEYGEN_CTX;
 
 // ScOSSL only supports named curves
@@ -67,14 +67,14 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
 
     if (keyCtx->initialized)
     {
-        if (keyCtx->ecGroup == NULL)
+        if (keyCtx->curve == NULL)
         {
             SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
-                "ECC key inititalized but group not set");
+                "ECC key inititalized but curve not set");
         }
 
-        if (((copyCtx->ecGroup = EC_GROUP_dup(keyCtx->ecGroup)) == NULL) ||
-            ((copyCtx->key = SymCryptEckeyAllocate(scossl_ecc_group_to_symcrypt_curve(copyCtx->ecGroup))) == NULL))
+        if (((copyCtx->curve = keyCtx->curve) == NULL) ||
+            ((copyCtx->key = SymCryptEckeyAllocate(copyCtx->curve)) == NULL))
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return NULL;
@@ -85,7 +85,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
     {
         copyCtx->initialized = 0;
         copyCtx->key = NULL;
-        copyCtx->ecGroup = NULL;
+        copyCtx->curve = NULL;
     }
 
     copyCtx->libctx = keyCtx->libctx;
@@ -101,10 +101,6 @@ static void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
     {
         SymCryptEckeyFree(keyCtx->key);
     }
-    if (keyCtx->ecGroup != NULL)
-    {
-        EC_GROUP_free(keyCtx->ecGroup);
-    }
 
     OPENSSL_free(keyCtx);
 }
@@ -112,14 +108,17 @@ static void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
 //
 // Key Generation
 //
-static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
-        genCtx->ecGroup = EC_GROUP_new_from_params(params, genCtx->libctx, NULL);
-        if (genCtx->ecGroup == NULL)
+        EC_GROUP *ecGroup = EC_GROUP_new_from_params(params, genCtx->libctx, NULL);
+        genCtx->curve = scossl_ecc_group_to_symcrypt_curve(ecGroup);
+        EC_GROUP_free(ecGroup);
+
+        if (genCtx->curve == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
             return SCOSSL_FAILURE;
@@ -136,15 +135,11 @@ static const OSSL_PARAM *p_scossl_ecc_keygen_settable_params(ossl_unused void *g
 
 static void p_scossl_ecc_keygen_cleanup(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx)
 {
-    if (genCtx != NULL)
-    {
-        EC_GROUP_free(genCtx->ecGroup);
-    }
     OPENSSL_free(genCtx);
 }
 
 static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
-                                                       const _In_ OSSL_PARAM params[])
+                                                       _In_ const OSSL_PARAM params[])
 {
     SCOSSL_ECC_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEYGEN_CTX));
     if (genCtx == NULL)
@@ -167,7 +162,6 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *prov
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PCSYMCRYPT_ECURVE pCurve = NULL;
 
     SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (keyCtx == NULL)
@@ -177,17 +171,9 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     }
 
     keyCtx->libctx = genCtx->libctx;
-    keyCtx->ecGroup = genCtx->ecGroup;
-    genCtx->ecGroup = NULL;
+    keyCtx->curve = genCtx->curve;
 
-    pCurve = scossl_ecc_group_to_symcrypt_curve(keyCtx->ecGroup);
-    if (pCurve == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
-        goto cleanup;
-    }
-
-    keyCtx->key = SymCryptEckeyAllocate(pCurve);
+    keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve);
     if (keyCtx->key == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -430,11 +416,11 @@ static const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_types(int selection)
     return p_scossl_ecc_keymgmt_impexp_param_types[idx];
 }
 
-static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    PCSYMCRYPT_ECURVE pCurve;
+    EC_GROUP *ecGroup = NULL;
     BIGNUM *bnPrivateKey = NULL;
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
@@ -450,18 +436,9 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         goto cleanup;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
-    {
-        keyCtx->ecGroup = EC_GROUP_new_from_params(params, keyCtx->libctx, NULL);
-        if (keyCtx->ecGroup == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
-            goto cleanup;
-        }
-    }
-
-    pCurve = scossl_ecc_group_to_symcrypt_curve(keyCtx->ecGroup);
-    if (pCurve == NULL)
+    ecGroup = EC_GROUP_new_from_params(params, keyCtx->libctx, NULL);
+    keyCtx->curve = scossl_ecc_group_to_symcrypt_curve(ecGroup);
+    if (keyCtx->curve == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
         goto cleanup;
@@ -481,7 +458,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     // Keypair
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if ((keyCtx->key = SymCryptEckeyAllocate(pCurve))== NULL)
+        if ((keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve))== NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
@@ -499,7 +476,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
                 goto cleanup;
             }
 
-            if (((ecPoint = EC_POINT_new(keyCtx->ecGroup))    == NULL) ||
+            if (((ecPoint = EC_POINT_new(ecGroup))    == NULL) ||
                 ((bnCtx = BN_CTX_new_ex(keyCtx->libctx))      == NULL) ||
                 ((pbPublicKey = OPENSSL_malloc(cbPublicKey))  == NULL))
             {
@@ -507,8 +484,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
                 goto cleanup;
             }
 
-            if (!EC_POINT_oct2point(keyCtx->ecGroup, ecPoint, encodedPoint, encodedLen, bnCtx) ||
-                !scossl_ec_point_to_pubkey(ecPoint, keyCtx->ecGroup, bnCtx, pbPublicKey, cbPublicKey))
+            if (!EC_POINT_oct2point(ecGroup, ecPoint, encodedPoint, encodedLen, bnCtx) ||
+                !scossl_ec_point_to_pubkey(ecPoint, ecGroup, bnCtx, pbPublicKey, cbPublicKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
@@ -566,6 +543,7 @@ cleanup:
     {
         OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
     }
+    EC_GROUP_free(ecGroup);
     BN_clear_free(bnPrivateKey);
     OPENSSL_free(pbPublicKey);
     EC_POINT_free(ecPoint);
@@ -603,8 +581,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
     }
 
     // Curve is assumed to be a valid named curve if it was loaded by SCOSSL
-    curveName = OSSL_EC_curve_nid2name(EC_GROUP_get_curve_name(keyCtx->ecGroup));
-    if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curveName, strlen(curveName)))
+    if ((curveName = scossl_ecc_get_curve_name(keyCtx->curve)) == NULL ||
+        !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curveName, strlen(curveName)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;

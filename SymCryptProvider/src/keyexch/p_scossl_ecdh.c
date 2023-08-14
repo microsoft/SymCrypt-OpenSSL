@@ -22,7 +22,7 @@ typedef struct
 static const OSSL_PARAM p_scossl_ecdh_ctx_param_types[] = {
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(_Inout_ SCOSSL_ECDH_CTX *ctx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 static SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -86,7 +86,7 @@ static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ S
         goto cleanup;
     }
 
-    if (EC_GROUP_cmp(ctx->keyCtx->ecGroup, peerKeyCtx->ecGroup, bnCtx) != 0)
+    if (!SymCryptEcurveIsSame(ctx->keyCtx->curve, peerKeyCtx->curve))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
         goto cleanup;

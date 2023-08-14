@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+#define SN_secp192r1 (SN_X9_62_prime192v1)
+#define SN_secp256r1 (SN_X9_62_prime256v1)
+
 #define NID_secp192r1 (NID_X9_62_prime192v1)
 #define NID_secp256r1 (NID_X9_62_prime256v1)
 
@@ -41,33 +44,34 @@ SCOSSL_STATUS scossl_ecc_init_static()
 
 void scossl_ecc_destroy_ecc_curves()
 {
-    if( _hidden_curve_P192 )
+    if (_hidden_curve_P192)
     {
         SymCryptEcurveFree(_hidden_curve_P192);
         _hidden_curve_P192 = NULL;
     }
-    if( _hidden_curve_P224 )
+    if (_hidden_curve_P224)
     {
         SymCryptEcurveFree(_hidden_curve_P224);
         _hidden_curve_P224 = NULL;
     }
-    if( _hidden_curve_P256 )
+    if (_hidden_curve_P256)
     {
         SymCryptEcurveFree(_hidden_curve_P256);
         _hidden_curve_P256 = NULL;
     }
-    if( _hidden_curve_P384 )
+    if (_hidden_curve_P384)
     {
         SymCryptEcurveFree(_hidden_curve_P384);
         _hidden_curve_P384 = NULL;
     }
-    if( _hidden_curve_P521 )
+    if (_hidden_curve_P521)
     {
         SymCryptEcurveFree(_hidden_curve_P521);
         _hidden_curve_P521 = NULL;
     }
 }
 
+_Use_decl_annotations_
 PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
 {
     if (group == NULL)
@@ -96,6 +100,35 @@ PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
     }
 
     return NULL;
+}
+
+_Use_decl_annotations_
+const char *scossl_ecc_get_curve_name(PCSYMCRYPT_ECURVE curve)
+{
+    const char *ret = NULL;
+
+    if (curve == _hidden_curve_P192)
+    {
+        ret = SN_secp192r1;
+    }
+    else if (curve == _hidden_curve_P224)
+    {
+        ret = SN_secp224r1;
+    }
+    else if (curve == _hidden_curve_P256)
+    {
+        ret = SN_secp256r1;
+    }
+    else if (curve == _hidden_curve_P384)
+    {
+        ret = SN_secp384r1;
+    }
+    else if (curve == _hidden_curve_P521)
+    {
+        ret = SN_secp521r1;
+    }
+
+    return ret;
 }
 
 _Use_decl_annotations_
