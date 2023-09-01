@@ -2,8 +2,10 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_helpers.h"
+#include "scossl_dh.h"
 
+#include <openssl/param_build.h>
+#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
@@ -12,65 +14,179 @@ extern "C" {
 
 typedef struct
 {
-
+    PCSYMCRYPT_DLGROUP pDlGroup;
+    SIZE_T pbits;
+    UINT32 nBitsPriv;
+    int selection;
 } SCOSSL_DH_KEYGEN_CTX;
 
-typedef struct
-{
+#define P_SCOSSL_DH_PBITS_DEFAULT 2048
 
-} SCOSSL_DH_KEY_CTX;
+#define P_SCOSSL_DH_FFC_TYPE_DEFAULT "default"
+#define P_SCOSSL_DH_FFC_TYPE_GROUP   "group"
 
-static const OSSL_PARAM p_scossl_dh_keygen_settable_param_types[] = {
+// Constant values for parameters not used but may
+// be expected by caller
+#define P_SCOSSL_DH_GINDEX -1
+#define P_SCOSSL_DH_PCOUNTER -1
+#define P_SCOSSL_DH_H 0
+
+#define P_SCOSSL_DH_PARAMETER_TYPES                             \
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_DH_PRIV_LEN, NULL),          \
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0)
+#define P_SCOSSL_DH_PKEY_PARAMETER_TYPES             \
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0), \
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0)
+
+// Keygen param types
+static const OSSL_PARAM p_scossl_dh_keygen_param_types[] = {
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_FFC_TYPE, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
+    OSSL_PARAM_size_t(OSSL_PKEY_PARAM_FFC_PBITS, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_DH_PRIV_LEN, NULL),
     OSSL_PARAM_END};
+
+// Import/export types
+static const OSSL_PARAM p_scossl_dh_param_types[] = {
+    P_SCOSSL_DH_PARAMETER_TYPES,
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_dh_pkey_types[] = {
+    P_SCOSSL_DH_PKEY_PARAMETER_TYPES,
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_dh_all_types[] = {
+    P_SCOSSL_DH_PARAMETER_TYPES,
+    P_SCOSSL_DH_PKEY_PARAMETER_TYPES,
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM *p_scossl_dh_impexp_types[] = {
+    NULL,
+    p_scossl_dh_param_types,
+    p_scossl_dh_pkey_types,
+    p_scossl_dh_all_types};
+
+// Gettable/settable key types
 
 static const OSSL_PARAM p_scossl_dh_keymgmt_gettable_param_types[] = {
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_dh_keymgmt_impexp_param_types[] = {
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_P, NULL, 0),
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_Q, NULL, 0),
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_G, NULL, 0),
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_COFACTOR, NULL, 0),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_FFC_GINDEX, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_FFC_PCOUNTER, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_FFC_H, NULL),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_FFC_SEED, NULL, 0),
+    P_SCOSSL_DH_PARAMETER_TYPES,
+    P_SCOSSL_DH_PKEY_PARAMETER_TYPES,
     OSSL_PARAM_END};
 
 static SCOSSL_DH_KEY_CTX *p_scossl_dh_keymgmt_new_ctx(ossl_unused void *provctx)
 {
-    SCOSSL_DH_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_DH_KEY_CTX));
-    if (keyCtx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return NULL;
-    }
-
-    return keyCtx;
+    return scossl_dh_new_key_ctx();
 }
 
-static SCOSSL_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_ctx(_In_ const SCOSSL_DH_KEY_CTX *keyCtx)
-{
-    SCOSSL_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEY_CTX));
-    if (copyCtx == NULL)
-    {
-        return NULL;
-    }
+// static SCOSSL_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_ctx(_In_ const SCOSSL_DH_KEY_CTX *keyCtx)
+// {
+//     SCOSSL_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEY_CTX));
+//     if (copyCtx == NULL)
+//     {
+//         return NULL;
+//     }
 
-    return copyCtx;
-}
+//     return copyCtx;
+// }
 
-static void p_scossl_dh_keymgmt_free_ctx(_In_ SCOSSL_DH_KEY_CTX *keyCtx)
-{
-    if (keyCtx == NULL)
-        return;
+// static void p_scossl_dh_keymgmt_free_ctx(_In_ SCOSSL_DH_KEY_CTX *keyCtx)
+// {
+//     if (keyCtx == NULL)
+//         return;
 
-    OPENSSL_free(keyCtx);
-}
+//     OPENSSL_free(keyCtx);
+// }
 
 //
 // Key Generation
 //
-static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
-   return SCOSSL_FAILURE;
+    const OSSL_PARAM *p;
+
+    // SymCrypt provider only supports named groups. We don't set anything here,
+    // instead notifying the caller that the operation is unsupported.
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_TYPE)) != NULL)
+    {
+        const char *ffcTypeName;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &ffcTypeName))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(ffcTypeName, P_SCOSSL_DH_FFC_TYPE_DEFAULT) != 0 &&
+            OPENSSL_strcasecmp(ffcTypeName, P_SCOSSL_DH_FFC_TYPE_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
+    {
+        const char *groupName;
+        PCSYMCRYPT_DLGROUP pDlGroup;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &groupName))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (!scossl_dh_get_group(OBJ_sn2nid(groupName), NULL, &pDlGroup) ||
+            pDlGroup == NULL)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        genCtx->pDlGroup = pDlGroup;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_PBITS)) != NULL &&
+        !OSSL_PARAM_get_size_t(p, &genCtx->pbits))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL)
+    {
+        int nBitsPriv;
+        if (!OSSL_PARAM_get_int(p, &nBitsPriv))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        // SymCryptDlkeySetPrivateKeyLength will validate this key size.
+        // Here we just need to be sure we can safely cast to UINT32
+        if (nBitsPriv < 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            return SCOSSL_FAILURE;
+        }
+
+        genCtx->nBitsPriv = (UINT32)nBitsPriv;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_PARAM *p_scossl_dh_keygen_settable_params(ossl_unused void *genCtx, ossl_unused void *provctx)
 {
-    return p_scossl_dh_keygen_settable_param_types;
+    return p_scossl_dh_keygen_param_types;
 }
 
 static void p_scossl_dh_keygen_cleanup(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx)
@@ -81,20 +197,76 @@ static void p_scossl_dh_keygen_cleanup(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx)
     OPENSSL_free(genCtx);
 }
 
-static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
-                                                       const _In_ OSSL_PARAM params[])
+static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(ossl_unused void *provctx, int selection,
+                                                     _In_ const OSSL_PARAM params[])
 {
-    return NULL;
+    SCOSSL_DH_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEYGEN_CTX));
+    if (genCtx != NULL)
+    {
+        genCtx->pDlGroup = NULL;
+        genCtx->nBitsPriv = 0;
+        genCtx->pbits = P_SCOSSL_DH_PBITS_DEFAULT;
+        genCtx->selection = selection;
+
+        if (!p_scossl_dh_keygen_set_params(genCtx, params))
+        {
+            OPENSSL_free(genCtx);
+            genCtx = NULL;
+        }
+    }
+
+    return genCtx;
 }
 
 static SCOSSL_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    return NULL;
-}
+    SCOSSL_DH_KEY_CTX *ctx;
+    BOOL generateKeyPair;
 
-static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_DH_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
-{
-    return SCOSSL_FAILURE;
+    // Select named group based on pbits if one was not supplied by
+    // the caller
+    if (genCtx->pDlGroup == NULL)
+    {
+        int dlGroupNid = 0;
+        PCSYMCRYPT_DLGROUP pDlGroup = NULL;
+        switch(genCtx->pbits)
+        {
+            case 2048:
+                dlGroupNid = NID_ffdhe2048;
+                break;
+            case 3072:
+                dlGroupNid = NID_ffdhe3072;
+                break;
+            case 4096:
+                dlGroupNid = NID_ffdhe4096;
+                break;
+        }
+
+        if (!scossl_dh_get_group(dlGroupNid, NULL, &pDlGroup) ||
+            pDlGroup == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+            return NULL;
+        }
+
+        genCtx->pDlGroup = pDlGroup;
+    }
+
+    if ((ctx = scossl_dh_new_key_ctx()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
+
+    generateKeyPair = (genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0;
+
+    if (!scossl_dh_create_key(ctx, genCtx->pDlGroup, genCtx->nBitsPriv, generateKeyPair))
+    {
+        OPENSSL_free(ctx);
+        return NULL;
+    }
+
+    return ctx;
 }
 
 static const OSSL_PARAM *p_scossl_dh_keymgmt_gettable_params(ossl_unused void *provctx)
@@ -102,15 +274,441 @@ static const OSSL_PARAM *p_scossl_dh_keymgmt_gettable_params(ossl_unused void *p
     return p_scossl_dh_keymgmt_gettable_param_types;
 }
 
+static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SCOSSL_DH_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
+{
+    PBYTE  pbCur;
+    PBYTE  pbData = NULL;
+    SIZE_T cbData = 0;
+    PBYTE  pbPrimeP;
+    SIZE_T cbPrimeP;
+    PBYTE  pbPrimeQ;
+    SIZE_T cbPrimeQ;
+    PBYTE  pbGenG;
+    SIZE_T cbGenG;
+    PBYTE  pbSeed;
+    SIZE_T cbSeed;
+    OSSL_PARAM *p;
+    OSSL_PARAM *paramPrimeP;
+    OSSL_PARAM *paramPrimeQ;
+    OSSL_PARAM *paramGenG;
+    OSSL_PARAM *paramSeed;
+    BIGNUM *bnPrimeP = NULL;
+    BIGNUM *bnPrimeQ = NULL;
+    BIGNUM *bnGenG = NULL;
+
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    SymCryptDlgroupGetSizes(
+        keyCtx->dlkey->pDlgroup,
+        &cbPrimeP,
+        &cbPrimeQ,
+        &cbGenG,
+        &cbSeed);
+
+    paramPrimeP = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_P);
+    paramPrimeQ = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_Q);
+    paramGenG = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_G);
+    paramSeed = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_SEED);
+
+    cbPrimeP = paramPrimeP == NULL ? 0 : cbPrimeP;
+    cbPrimeQ = paramPrimeQ == NULL ? 0 : cbPrimeQ;
+    cbGenG = paramGenG == NULL ? 0 : cbGenG;
+    cbSeed = paramSeed == NULL ? 0 : cbSeed;
+
+    cbData =
+        cbPrimeP +
+        cbPrimeQ +
+        cbGenG +
+        cbSeed;
+
+    if (cbData != 0)
+    {
+        if ((pbData = OPENSSL_malloc(cbData)) == NULL ||
+            ((bnPrimeP = BN_new()) == NULL) ||
+            ((bnPrimeQ = BN_new()) == NULL) ||
+            ((bnGenG = BN_new()) == NULL))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbCur = pbData;
+
+        pbPrimeP = cbPrimeP == 0 ? NULL : pbCur;
+        pbCur += cbPrimeP;
+
+        pbPrimeQ = cbPrimeQ == 0 ? NULL : pbCur;
+        pbCur += cbPrimeQ;
+
+        pbGenG = cbGenG == 0 ? NULL : pbCur;
+        pbCur += cbGenG;
+
+        pbSeed = cbSeed == 0 ? NULL : pbCur;
+        pbCur += cbSeed;
+
+        if (SymCryptDlgroupGetValue(
+                keyCtx->dlkey->pDlgroup,
+                pbPrimeP, cbPrimeP,
+                pbPrimeQ, cbPrimeQ,
+                pbGenG, cbGenG,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                NULL,
+                pbSeed, cbSeed,
+                NULL) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+
+        if (pbPrimeP != NULL &&
+            (BN_bin2bn(pbPrimeP, cbPrimeP, bnPrimeP) == NULL ||
+                !OSSL_PARAM_set_BN(paramPrimeP, bnPrimeP)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (pbPrimeQ != NULL &&
+            (BN_bin2bn(pbPrimeQ, cbPrimeQ, bnPrimeQ) == NULL ||
+                !OSSL_PARAM_set_BN(paramPrimeQ, bnPrimeQ)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (pbGenG != NULL &&
+            (BN_bin2bn(pbGenG, cbGenG, bnGenG) == NULL ||
+                !OSSL_PARAM_set_BN(paramGenG, bnGenG)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (pbSeed != NULL &&
+            !OSSL_PARAM_set_octet_string(paramSeed, pbSeed, cbSeed))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_GINDEX)) != NULL &&
+        !OSSL_PARAM_set_int(p, P_SCOSSL_DH_GINDEX))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_PCOUNTER)) != NULL &&
+        !OSSL_PARAM_set_int(p, P_SCOSSL_DH_PCOUNTER))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_H)) != NULL &&
+        !OSSL_PARAM_set_int(p, P_SCOSSL_DH_H))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    BN_free(bnPrimeP);
+    BN_free(bnPrimeQ);
+    BN_free(bnGenG);
+
+    return ret;
+}
+
+static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
+{
+    PBYTE  pbData;
+    SIZE_T cbData;
+    PBYTE  pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
+    PBYTE  pbPublicKey = NULL;
+    SIZE_T cbPublicKey = 0;
+    BIGNUM *bnPrivKey = NULL;
+    BIGNUM *bnPubKey = NULL;
+    OSSL_PARAM *paramEncodedKey;
+    OSSL_PARAM *paramPrivKey;
+    OSSL_PARAM *paramPubKey;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    paramEncodedKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
+    paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
+    paramPubKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY);
+
+    if (paramPrivKey != NULL)
+    {
+        cbPrivateKey = SymCryptDlkeySizeofPrivateKey(keyCtx->dlkey);
+    }
+
+    if (paramEncodedKey != NULL ||
+        paramPubKey != NULL)
+    {
+        cbPublicKey = SymCryptDlkeySizeofPublicKey(keyCtx->dlkey);
+    }
+
+    cbData = cbPublicKey + cbPrivateKey;
+    pbData = OPENSSL_zalloc(cbData);
+    if (pbData == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    pbPrivateKey = cbPrivateKey == 0 ? NULL : pbData;
+    pbPublicKey = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey;
+
+    if (SymCryptDlkeyGetValue(
+            keyCtx->dlkey,
+            pbPrivateKey, cbPrivateKey,
+            pbPublicKey, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0) != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if (paramEncodedKey != NULL &&
+        !OSSL_PARAM_set_octet_string(paramEncodedKey, pbPublicKey, cbPublicKey))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    if (paramPrivKey != NULL)
+    {
+        if ((bnPrivKey = BN_secure_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if ((BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivKey)) == NULL ||
+            !OSSL_PARAM_set_BN(paramPrivKey, bnPrivKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if (paramPubKey != NULL)
+    {
+        if ((bnPubKey = BN_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if ((BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey)) == NULL ||
+            !OSSL_PARAM_set_BN(paramPubKey, bnPubKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    BN_clear_free(bnPrivKey);
+    BN_free(bnPubKey);
+
+    return ret;
+}
+
+static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_DH_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
+{
+
+    OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
+        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPublicKey(keyCtx->dlkey) * 8))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL)
+    {
+        int pubKeyBits = SymCryptDlkeySizeofPublicKey(keyCtx->dlkey) * 8;
+        int privKeyBits = SymCryptDlkeySizeofPrivateKey(keyCtx->dlkey) * 8;
+
+        if (!OSSL_PARAM_set_int(p, BN_security_bits(pubKeyBits, privKeyBits)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
+        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPublicKey(keyCtx->dlkey)))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL &&
+        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPrivateKey(keyCtx->dlkey) * 8))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
+    {
+        int dlGroupNid = scossl_dh_get_group_nid(keyCtx->dlkey->pDlgroup);
+        if (dlGroupNid == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
+
+        if (!OSSL_PARAM_set_utf8_string(p, OBJ_nid2sn(dlGroupNid)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    return p_scossl_dh_keymgmt_get_ffc_params(keyCtx, params) &&
+           p_scossl_dh_keymgmt_get_key_params(keyCtx, params);
+}
+
+
 static BOOL p_scossl_dh_keymgmt_has(_In_ SCOSSL_DH_KEY_CTX *keyCtx, int selection)
 {
-    return FALSE;
+    BOOL ret = TRUE;
+
+    if (keyCtx->dlkey == NULL)
+    {
+        return FALSE;
+    }
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
+    {
+        ret = ret && (keyCtx->dlkey->pDlgroup != NULL);
+    }
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        ret = ret && keyCtx->initialized;
+    }
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        ret = ret && SymCryptDlkeyHasPrivateKey(keyCtx->dlkey);
+    }
+
+    return ret;
 }
 
 static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_DH_KEY_CTX *keyCtx1, _In_ SCOSSL_DH_KEY_CTX *keyCtx2,
                                        int selection)
 {
-    return SCOSSL_FAILURE;
+    BOOL ret = FALSE;
+    PBYTE  pbData = NULL;
+    SIZE_T cbData = 0;
+    PBYTE  pbPrivateKey1 = NULL;
+    PBYTE  pbPrivateKey2 = NULL;
+    SIZE_T cbPrivateKey = 0;
+    PBYTE  pbPublicKey1 = NULL;
+    PBYTE  pbPublicKey2 = NULL;
+    SIZE_T cbPublicKey = 0;
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    {
+        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        {
+            cbPrivateKey = SymCryptDlkeySizeofPrivateKey(keyCtx1->dlkey);
+            if (SymCryptDlkeySizeofPrivateKey(keyCtx2->dlkey) != cbPrivateKey)
+            {
+                goto cleanup;
+            }
+        }
+
+        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+        {
+            cbPublicKey = SymCryptDlkeySizeofPublicKey(keyCtx1->dlkey);
+            if (SymCryptDlkeySizeofPublicKey(keyCtx2->dlkey) != cbPublicKey)
+            {
+                goto cleanup;
+            }
+        }
+
+        cbData = cbPrivateKey * 2 + cbPublicKey * 2;
+        if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbPrivateKey1 = cbPrivateKey == 0 ? NULL : pbData;
+        pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPrivateKey;
+
+        pbPublicKey1 = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey * 2;
+        pbPublicKey2 = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey * 2 + cbPublicKey;
+
+        if (SymCryptDlkeyGetValue(
+                keyCtx1->dlkey,
+                pbPrivateKey1, cbPrivateKey,
+                pbPublicKey1, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0) != SYMCRYPT_NO_ERROR ||
+            SymCryptDlkeyGetValue(
+                keyCtx2->dlkey,
+                pbPrivateKey2, cbPrivateKey,
+                pbPublicKey2, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+
+        if (memcmp(pbPrivateKey1, pbPrivateKey2, cbPrivateKey) != 0 ||
+            memcmp(pbPublicKey1, pbPublicKey2, cbPublicKey) != 0)
+        {
+            goto cleanup;
+        }
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
+    {
+        BOOL isGroup1Set = keyCtx1->dlkey != NULL && keyCtx1->dlkey->pDlgroup != NULL;
+        BOOL isGroup2Set = keyCtx2->dlkey != NULL && keyCtx2->dlkey->pDlgroup != NULL;
+
+        // Both groups must be either NULL or equal
+        if (isGroup1Set != isGroup2Set ||
+            (isGroup1Set && isGroup2Set &&
+             !SymCryptDlgroupIsSame(keyCtx1->dlkey->pDlgroup, keyCtx2->dlkey->pDlgroup)))
+        {
+            goto cleanup;
+        }
+    }
+
+    ret = TRUE;
+
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    return ret;
 }
 
 //
@@ -118,36 +716,258 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_DH_KEY_CTX *keyCtx1, _In_ SCOS
 //
 static const OSSL_PARAM *p_scossl_dh_keymgmt_impexp_types(int selection)
 {
-    return p_scossl_dh_keymgmt_impexp_param_types;
+    int idx = 0;
+    if ((selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0)
+    {
+        idx += 1;
+    }
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    {
+        idx += 2;
+    }
+
+    return p_scossl_dh_impexp_types[idx];
 }
 
-static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_DH_KEY_CTX *keyCtx, int selection, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_DH_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
-    return SCOSSL_FAILURE;
+    const OSSL_PARAM *p;
+    const char *groupName;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    PCSYMCRYPT_DLGROUP pDlGroup = NULL;
+    BIGNUM *bnPrivateKey = NULL;
+    BIGNUM *bnPublicKey = NULL;
+    int nBitsPriv = 0;
+
+    // Group required for import
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0 ||
+        (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (!OSSL_PARAM_get_utf8_string_ptr(p, &groupName))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
+    }
+
+    if (!scossl_dh_get_group(OBJ_sn2nid(groupName), NULL, &pDlGroup) ||
+        pDlGroup == NULL)
+    {
+        goto cleanup;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL)
+    {
+        if (!OSSL_PARAM_get_int(p, &nBitsPriv))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+        // SymCryptDlkeySetPrivateKeyLength will validate this key size.
+        // Here we just need to be sure we can safely cast to UINT32
+        if (nBitsPriv < 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            goto cleanup;
+        }
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+            goto cleanup;
+        }
+
+        if ((bnPrivateKey = BN_secure_new()) == NULL ||
+            !OSSL_PARAM_get_BN(p, &bnPrivateKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+            goto cleanup;
+        }
+
+        if ((bnPublicKey = BN_new()) == NULL ||
+            !OSSL_PARAM_get_BN(p, &bnPublicKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if (!scossl_dh_import_keypair(keyCtx, pDlGroup, nBitsPriv, bnPrivateKey, bnPublicKey))
+    {
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+cleanup:
+    if (!ret)
+    {
+        if (keyCtx->dlkey != NULL)
+        {
+            SymCryptDlkeyFree(keyCtx->dlkey);
+            keyCtx->dlkey = NULL;
+            keyCtx->initialized = FALSE;
+        }
+
+        BN_clear_free(bnPrivateKey);
+        BN_free(bnPublicKey);
+    }
+
+    return ret;
 }
 
 static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_DH_KEY_CTX *keyCtx, int selection,
-                                                 _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
+                                                _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    return SCOSSL_FAILURE;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    OSSL_PARAM_BLD *bld = NULL;
+    OSSL_PARAM *params = NULL;
+    BOOL includePublic = (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0;
+    BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
+    int dlGroupNid;
+    const char *dlGroup;
+    PBYTE  pbData;
+    SIZE_T cbData;
+    PBYTE  pbPrivateKey;
+    PBYTE  pbPublicKey;
+    SIZE_T cbPrivateKey;
+    SIZE_T cbPublicKey;
+    BIGNUM *bnPrivKey;
+    BIGNUM *bnPubKey;
+
+    if (keyCtx == NULL ||
+        keyCtx->dlkey == NULL ||
+        keyCtx->dlkey->pDlgroup == NULL ||
+        (selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0 ||
+        ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && !keyCtx->initialized))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if ((bld = OSSL_PARAM_BLD_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if ((dlGroupNid = scossl_dh_get_group_nid(keyCtx->dlkey->pDlgroup)) == 0 ||
+        (dlGroup = OBJ_nid2sn(dlGroupNid)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    {
+        cbPrivateKey = includePrivate ? SymCryptDlkeySizeofPrivateKey(keyCtx->dlkey) : 0;
+        cbPublicKey = includePublic ? SymCryptDlkeySizeofPublicKey(keyCtx->dlkey) : 0;
+
+        cbData = cbPrivateKey + cbPublicKey;
+        if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbPrivateKey = includePrivate ? pbData : NULL;
+        pbPublicKey = includePublic ? pbData + cbPrivateKey : NULL;
+
+        if (SymCryptDlkeyGetValue(
+                keyCtx->dlkey,
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+
+        if (includePrivate)
+        {
+            if ((bnPrivKey = BN_secure_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivKey) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+                goto cleanup;
+            }
+        }
+
+        if (includePublic)
+        {
+            if ((bnPubKey = BN_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+                goto cleanup;
+            }
+        }
+    }
+
+    if (!OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, SymCryptDlkeySizeofPrivateKey(keyCtx->dlkey) * 8) ||
+        !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, dlGroup, strlen(dlGroup))  ||
+        (includePrivate && OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, bnPrivKey)) ||
+        (includePublic && OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, bnPubKey)) ||
+        (params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    ret = param_cb(params, cbarg);
+
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_clear_free(pbData, cbData);
+    }
+
+    BN_clear_free(bnPrivKey);
+    BN_free(bnPubKey);
+    OSSL_PARAM_BLD_free(bld);
+    return ret;
 }
 
-static const char *p_scossl_dh_keymgmt_query_operation_name(int operation_id)
+static const char *p_scossl_dh_keymgmt_query_operation_name(ossl_unused int operation_id)
 {
-    return NULL;
+    return "DH";
 }
 
 const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_dh_keymgmt_new_ctx},
-    {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_dh_keymgmt_dup_ctx},
-    {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))p_scossl_dh_keymgmt_free_ctx},
+    {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))scossl_dh_dup_key_ctx},
+    {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))scossl_dh_free_key_ctx},
     {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_dh_keygen_set_params},
     {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_dh_keygen_settable_params},
     {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_dh_keygen_cleanup},
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_dh_keygen_init},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_dh_keygen},
-    {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_gettable_params},
+    {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_dh_keymgmt_has},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_dh_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_dh_keymgmt_impexp_types},
