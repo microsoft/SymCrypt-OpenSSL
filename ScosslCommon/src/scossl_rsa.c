@@ -801,6 +801,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
 {
     BOOL    includePrivate = rsaParams->privateParams != NULL;
     UINT64  pubExp64;
+    BYTE    pbPubExp64[8];
     PBYTE   pbModulus = NULL;
     SIZE_T  cbModulus = 0;
     PBYTE   ppbPrimes[2] = {0};
@@ -896,8 +897,11 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
         goto cleanup;
     }
 
+    // Explicitly convert UINT64 public exponent to little-endian byte array (no-op on little-endian target)
+    SYMCRYPT_STORE_LSBFIRST64( pbPubExp64, pubExp64 );
+
     if (BN_bin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
-        BN_bin2bn(pbModulus, pubExp64, rsaParams->e) == NULL)
+        BN_lebin2bn(pbPubExp64, 8, rsaParams->e) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
             "BN_bin2bn failed.");
