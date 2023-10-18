@@ -137,7 +137,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    cbResult = 2*SymCryptEcurveSizeofFieldElement(ctx->keyCtx->key->pCurve);
+    cbResult = 2*SymCryptEcurveSizeofFieldElement(ctx->keyCtx->curve);
     if (sig == NULL)
     {
         *siglen = cbResult;
@@ -226,23 +226,26 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_update(_In_ SCOSSL_ECDSA_C
 static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx,
                                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
-    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     BYTE digest[EVP_MAX_MD_SIZE];
     UINT cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
-        return ret;
+        return SCOSSL_FAILURE;
     }
 
     // If sig is NULL, this is a size fetch, and the digest does not need to be computed
-    if (sig == NULL || EVP_DigestFinal(ctx->mdctx, digest, &cbDigest))
+    if (sig != NULL)
     {
-        ctx->allowMdUpdates = sig != NULL;
-        ret = p_scossl_ecdsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
+        ctx->allowMdUpdates = TRUE;
+
+        if (!EVP_DigestFinal(ctx->mdctx, digest, &cbDigest))
+        {
+            return SCOSSL_FAILURE;
+        }
     }
 
-    return ret;
+    return p_scossl_ecdsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,

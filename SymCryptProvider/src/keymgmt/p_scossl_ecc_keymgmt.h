@@ -78,20 +78,20 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x07[] = {
     OSSL_PARAM_END};
 
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x80[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x08[] = {
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
     OSSL_PARAM_END};
 
 // OSSL_KEYMGMT_SELECT_PRIVATE_KEY
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x81[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x09[] = {
     SCOSSL_ECC_IMPEXP_PRIV_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
     OSSL_PARAM_END};
 
 // OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x82[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0a[] = {
     SCOSSL_ECC_IMPEXP_PUB_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
     OSSL_PARAM_END};
@@ -99,7 +99,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x82[] = {
 // OSSL_KEYMGMT_SELECT_PRIVATE_KEY
 // OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x83[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0b[] = {
     SCOSSL_ECC_IMPEXP_PRIV_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_PUB_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
@@ -107,7 +107,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x83[] = {
 
 // OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x84[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0c[] = {
     SCOSSL_ECC_IMPEXP_DOMAIN_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
     OSSL_PARAM_END};
@@ -115,7 +115,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x84[] = {
 // OSSL_KEYMGMT_SELECT_PRIVATE_KEY
 // OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x85[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0d[] = {
     SCOSSL_ECC_IMPEXP_PRIV_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_DOMAIN_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
@@ -124,7 +124,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x85[] = {
 // OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 // OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x86[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0e[] = {
     SCOSSL_ECC_IMPEXP_PUB_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_DOMAIN_PARAMS
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
@@ -134,7 +134,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x86[] = {
 // OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 // OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS
-static const OSSL_PARAM p_scossl_ecc_impexp_types_0x87[] = {
+static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0f[] = {
     SCOSSL_ECC_IMPEXP_PRIV_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_PUB_KEY_PARAMS
     SCOSSL_ECC_IMPEXP_DOMAIN_PARAMS
@@ -150,14 +150,14 @@ static const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_param_types[] = {
     p_scossl_ecc_impexp_types_0x05,
     p_scossl_ecc_impexp_types_0x06,
     p_scossl_ecc_impexp_types_0x07,
-    p_scossl_ecc_impexp_types_0x80,
-    p_scossl_ecc_impexp_types_0x81,
-    p_scossl_ecc_impexp_types_0x82,
-    p_scossl_ecc_impexp_types_0x83,
-    p_scossl_ecc_impexp_types_0x84,
-    p_scossl_ecc_impexp_types_0x85,
-    p_scossl_ecc_impexp_types_0x86,
-    p_scossl_ecc_impexp_types_0x87};
+    p_scossl_ecc_impexp_types_0x08,
+    p_scossl_ecc_impexp_types_0x09,
+    p_scossl_ecc_impexp_types_0x0a,
+    p_scossl_ecc_impexp_types_0x0b,
+    p_scossl_ecc_impexp_types_0x0c,
+    p_scossl_ecc_impexp_types_0x0d,
+    p_scossl_ecc_impexp_types_0x0e,
+    p_scossl_ecc_impexp_types_0x0f};
 
 #ifdef __cplusplus
 }

@@ -10,9 +10,12 @@ extern "C" {
 typedef struct {
     OSSL_LIB_CTX *libctx;
     BOOL initialized;
-    int includePublic;
     PSYMCRYPT_ECKEY key;
     PCSYMCRYPT_ECURVE curve;
+    // Not used for crypto operations. Only used in import/export
+    // to let the provider handling encoding/decoding whether to
+    // include the public key.
+    int includePublic;
 } SCOSSL_ECC_KEY_CTX;
 
 #ifdef __cplusplus
