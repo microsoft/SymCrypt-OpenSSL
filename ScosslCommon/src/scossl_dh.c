@@ -36,17 +36,46 @@ void scossl_dh_free_key_ctx(SCOSSL_DH_KEY_CTX *ctx)
     OPENSSL_free(ctx);
 }
 
-SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx)
+SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 {
     SCOSSL_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEY_CTX));
+    PCSYMCRYPT_DLGROUP pDlgroup;
+    PSYMCRYPT_DLGROUP pDlgroupCopy;
 
     if (copyCtx != NULL)
     {
         copyCtx->initialized = ctx->initialized;
         if (ctx->initialized)
         {
-            if ((copyCtx->dlkey = SymCryptDlkeyAllocate(ctx->dlkey->pDlgroup)) == NULL)
+            pDlgroup = SymCryptDlkeyGetGroup(ctx->dlkey);
+
+            // The provider supports importing groups by parameters.
+            // In that case we need to copy the group as well rather than
+            // using a pointer to one of the statically defined groups.
+            if (copyGroup)
             {
+                SIZE_T pcbPrimeP;
+                SIZE_T pcbPrimeQ;
+
+                SymCryptDlgroupGetSizes(
+                    pDlgroup,
+                    &pcbPrimeP,
+                    &pcbPrimeQ,
+                    NULL,
+                    NULL);
+
+                if ((pDlgroupCopy = SymCryptDlgroupAllocate(pcbPrimeP, pcbPrimeQ)) != NULL)
+                {
+                    SymCryptDlgroupCopy(pDlgroup, pDlgroupCopy);
+                }
+
+                pDlgroup = pDlgroupCopy;
+            }
+
+            if (pDlgroup == NULL ||
+                (copyCtx->dlkey = SymCryptDlkeyAllocate(pDlgroup)) == NULL)
+            {
+                SymCryptDlgroupFree(pDlgroupCopy);
                 OPENSSL_free(copyCtx);
                 copyCtx = NULL;
             }
@@ -129,7 +158,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, PCSYMCRYPT_DLGROU
             cbPrivateKey = 0;
         }
 
-        if (pbPublicKey != NULL)
+        if (publicKey != NULL)
         {
             pbPublicKey = pbData + cbPrivateKey;
             if ((SIZE_T)BN_bn2binpad(publicKey, pbPublicKey, cbPublicKey) != cbPublicKey)

@@ -433,7 +433,7 @@ PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid)
         return SymCryptHmacSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support hmac algorithm %d", mdnid);
+        "SCOSSL does not support hmac algorithm %d", mdnid);
     return NULL;
 }
 
@@ -458,7 +458,7 @@ PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
         return SymCryptSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support hash algorithm %d", mdnid);
+        "SCOSSL does not support hash algorithm %d", mdnid);
     return NULL;
 }
 

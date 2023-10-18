@@ -16,7 +16,7 @@ typedef struct
 
 SCOSSL_DH_KEY_CTX *scossl_dh_new_key_ctx(void);
 void scossl_dh_free_key_ctx(_Inout_ SCOSSL_DH_KEY_CTX *ctx);
-SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(_In_ SCOSSL_DH_KEY_CTX *ctx);
+SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(_In_ SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup);
 
 SCOSSL_STATUS scossl_dh_import_keypair(_Inout_ SCOSSL_DH_KEY_CTX *ctx, _In_ PCSYMCRYPT_DLGROUP pDlgroup, UINT32 nBitsPriv,
                                        _In_ const BIGNUM *privateKey, _In_ const BIGNUM *publicKey);
