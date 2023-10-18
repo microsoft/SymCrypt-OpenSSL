@@ -3,6 +3,7 @@
 //
 
 #include <openssl/core_names.h>
+#include <openssl/params.h>
 
 #ifdef __cplusplus
 extern "C" {
