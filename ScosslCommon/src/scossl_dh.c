@@ -94,7 +94,8 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, PCSYMCRYPT_DLGROUP pDlgroup, UINT32 nBitsPriv,
+SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv,
+                                       PCSYMCRYPT_DLGROUP pDlgroup, BOOL skipGroupValidation,
                                        const BIGNUM *privateKey, const BIGNUM *publicKey)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -104,6 +105,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, PCSYMCRYPT_DLGROU
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPrivateKey;
     SIZE_T cbPublicKey;
+    UINT32 flags = SYMCRYPT_FLAG_DLKEY_DH;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx->dlkey != NULL)
@@ -173,11 +175,20 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, PCSYMCRYPT_DLGROU
             cbPublicKey = 0;
         }
 
+        // The SymCrypt provider must support non-FIPS groups since it cannot
+        // fallback to the default implementation like the engine.
+        if (skipGroupValidation)
+        {
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+                            "Importing non-FIPS DH group.");
+            flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+        }
+
         scError = SymCryptDlkeySetValue(
             pbPrivateKey, cbPrivateKey,
             pbPublicKey, cbPublicKey,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SYMCRYPT_FLAG_DLKEY_DH,
+            flags,
             ctx->dlkey);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -195,6 +206,7 @@ cleanup:
     {
         ctx->initialized = FALSE;
         SymCryptDlkeyFree(ctx->dlkey);
+        ctx->dlkey = NULL;
     }
 
     if (pbData != NULL)
@@ -326,30 +338,67 @@ void scossl_destroy_safeprime_dlgroups(void)
     _hidden_bignum_modp4096 = NULL;
 }
 
+// Other providers may export the group to the SymCrypt provider by parameters
+// rather than by NID. In that case, we need to check whether the group is known
+// to avoid redundant allocations and ensure that the group will pass any FIPS
+// related validation by SymCrypt.
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_dh_get_group(int dlGroupNid, const BIGNUM* p, PCSYMCRYPT_DLGROUP *ppDlGroup)
+PCSYMCRYPT_DLGROUP scossl_dh_get_known_group(PCSYMCRYPT_DLGROUP pDlGroup)
 {
-    *ppDlGroup = NULL;
+    PCSYMCRYPT_DLGROUP pKnownDlGroup = NULL;
+
+    if (SymCryptDlgroupIsSame(_hidden_dlgroup_ffdhe2048, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_ffdhe2048;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_ffdhe3072, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_ffdhe3072;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_ffdhe4096, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_ffdhe4096;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_modp2048, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_modp2048;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_modp3072, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_modp3072;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_modp4096, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_modp4096;
+    }
+
+    return pKnownDlGroup;
+}
+
+_Use_decl_annotations_
+PCSYMCRYPT_DLGROUP scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p)
+{
+    PCSYMCRYPT_DLGROUP pDlGroup = NULL;
     switch (dlGroupNid)
     {
     case NID_ffdhe2048:
-        *ppDlGroup = _hidden_dlgroup_ffdhe2048;
+        pDlGroup = _hidden_dlgroup_ffdhe2048;
         break;
     case NID_ffdhe3072:
-        *ppDlGroup = _hidden_dlgroup_ffdhe3072;
+        pDlGroup = _hidden_dlgroup_ffdhe3072;
         break;
     case NID_ffdhe4096:
-        *ppDlGroup = _hidden_dlgroup_ffdhe4096;
+        pDlGroup = _hidden_dlgroup_ffdhe4096;
         break;
 #if OPENSSL_VERSION_MAJOR >= 3
     case NID_modp_2048:
-        *ppDlGroup = _hidden_dlgroup_modp2048;
+        pDlGroup = _hidden_dlgroup_modp2048;
         break;
     case NID_modp_3072:
-        *ppDlGroup = _hidden_dlgroup_modp3072;
+        pDlGroup = _hidden_dlgroup_modp3072;
         break;
     case NID_modp_4096:
-        *ppDlGroup = _hidden_dlgroup_modp4096;
+        pDlGroup = _hidden_dlgroup_modp4096;
         break;
 #endif // OPENSSL_VERSION_MAJOR >= 3
     default:
@@ -359,25 +408,20 @@ SCOSSL_STATUS scossl_dh_get_group(int dlGroupNid, const BIGNUM* p, PCSYMCRYPT_DL
         {
             if (BN_cmp(p, _hidden_bignum_modp2048) == 0)
             {
-                *ppDlGroup = _hidden_dlgroup_modp2048;
+                pDlGroup = _hidden_dlgroup_modp2048;
             }
             else if (BN_cmp(p, _hidden_bignum_modp3072) == 0)
             {
-                *ppDlGroup = _hidden_dlgroup_modp3072;
+                pDlGroup = _hidden_dlgroup_modp3072;
             }
             else if (BN_cmp(p, _hidden_bignum_modp4096) == 0)
             {
-                *ppDlGroup = _hidden_dlgroup_modp4096;
+                pDlGroup = _hidden_dlgroup_modp4096;
             }
-        }
-
-        if (*ppDlGroup == NULL)
-        {
-            return SCOSSL_FAILURE;
         }
     }
 
-    return SCOSSL_SUCCESS;
+    return pDlGroup;
 }
 
 _Use_decl_annotations_
