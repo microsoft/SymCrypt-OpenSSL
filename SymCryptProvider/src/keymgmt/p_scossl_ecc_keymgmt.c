@@ -53,42 +53,112 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
     }
 
     keyCtx->libctx = provctx->libctx;
+    keyCtx->includePublic = 1;
 
     return keyCtx;
 }
 
-static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx)
+static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
+    PBYTE pbData = NULL;
+    PBYTE pbPrivateKey = NULL;
+    PBYTE pbPublicKey = NULL;
+    SIZE_T cbData = 0;
+    SIZE_T cbPublicKey = 0;
+    SIZE_T cbPrivateKey = 0;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
     SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
-    if (copyCtx == NULL)
-    {
-        return NULL;
-    }
 
-    if (keyCtx->initialized)
+    if (copyCtx != NULL)
     {
-        if (keyCtx->curve == NULL)
+        if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {
-            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
-                "ECC key inititalized but curve not set");
+            copyCtx->curve = keyCtx->curve;
+        }
+        else
+        {
+            copyCtx->curve = NULL;
         }
 
-        if (((copyCtx->curve = keyCtx->curve) == NULL) ||
-            ((copyCtx->key = SymCryptEckeyAllocate(copyCtx->curve)) == NULL))
+        if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->initialized)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return NULL;
+            if (copyCtx->curve == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+                goto cleanup;
+            }
+
+            if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+                SymCryptEckeyHasPrivateKey(keyCtx->key))
+            {
+                cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
+            }
+
+            if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+            {
+                cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
+            }
+
+            cbData = cbPrivateKey + cbPublicKey;
+            if ((pbData = OPENSSL_secure_malloc(cbData)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            pbPrivateKey = cbPrivateKey != 0 ? pbData : NULL;
+            pbPublicKey = cbPublicKey != 0 ? pbData + cbPrivateKey : NULL;
+
+            scError = SymCryptEckeyGetValue(
+                keyCtx->key,
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                SYMCRYPT_ECPOINT_FORMAT_XY,
+                0);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                goto cleanup;
+            }
+
+            if ((copyCtx->key = SymCryptEckeyAllocate(keyCtx->curve)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            scError = SymCryptEckeySetValue(
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                SYMCRYPT_ECPOINT_FORMAT_XY,
+                SYMCRYPT_FLAG_ECKEY_ECDSA | SYMCRYPT_FLAG_ECKEY_ECDH,
+                copyCtx->key);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                goto cleanup;
+            }
+
+            copyCtx->includePublic = keyCtx->includePublic;
         }
-        SymCryptEckeyCopy(keyCtx->key, copyCtx->key);
-    }
-    else
-    {
-        copyCtx->initialized = 0;
-        copyCtx->key = NULL;
-        copyCtx->curve = NULL;
+        else
+        {
+            copyCtx->key = NULL;
+            copyCtx->initialized = 0;
+            copyCtx->includePublic = 1;
+        }
+
+        copyCtx->libctx = keyCtx->libctx;
     }
 
-    copyCtx->libctx = keyCtx->libctx;
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_secure_clear_free(pbData, cbData);
+    }
 
     return copyCtx;
 }
