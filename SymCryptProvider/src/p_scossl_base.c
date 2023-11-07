@@ -117,11 +117,13 @@ static const OSSL_ALGORITHM p_scossl_rand[] = {
 extern const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_keymgmt_functions),
     ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
     ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
+    ALG("X25519:1.3.101.110", p_scossl_x25519_keymgmt_functions),
     ALG_TABLE_END};
 
 // Key exchange
@@ -134,7 +136,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_keyexch_functions[];
 static const OSSL_ALGORITHM p_scossl_keyexch[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_functions),
     ALG("ECDH", p_scossl_ecdh_functions),
-    // ALG("X25519:1.3.101.110", p_scossl_x25519_functions),
+    // ALG("X25519:1.3.101.110", p_scossl_ecdh_functions),
     // ALG("HKDF", p_scossl_hkdf_keyexch_functions),
     // ALG("TLS1-PRF", p_scossl_tls1prf_keyexch_functions),
     ALG_TABLE_END};
