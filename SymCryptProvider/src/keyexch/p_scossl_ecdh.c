@@ -98,6 +98,7 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
                                           size_t outlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_NUMBER_FORMAT numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (ctx == NULL || secretlen == NULL)
     {
@@ -119,7 +120,7 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
     scError = SymCryptEcDhSecretAgreement(
         ctx->keyCtx->key,
         ctx->peerKeyCtx->key,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        numberFormat,
         0,
         secret,
         outlen);
