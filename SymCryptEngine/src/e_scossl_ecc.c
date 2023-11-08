@@ -480,7 +480,7 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
         return SCOSSL_FAILURE;
     }
 
-    return scossl_ecdsa_sign(keyCtx->key, dgst, dlen, sig, siglen);
+    return scossl_ecdsa_sign(keyCtx->key, keyCtx->key->pCurve, dgst, dlen, sig, siglen);
 }
 
 SCOSSL_STATUS e_scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in, _Out_ BIGNUM** kinvp, _Out_ BIGNUM** rp)
@@ -646,7 +646,7 @@ SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const u
         return SCOSSL_FAILURE;
     }
 
-    return scossl_ecdsa_verify(keyCtx->key, dgst, dgst_len, sigbuf, sig_len);
+    return scossl_ecdsa_verify(keyCtx->key, keyCtx->key->pCurve, dgst, dgst_len, sigbuf, sig_len);
 }
 
 SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,

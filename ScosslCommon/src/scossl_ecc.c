@@ -449,14 +449,22 @@ cleanup:
     return res;
 }
 
+// Return the max length of the DER encoded signature
+// 2 * (private key length) + 7 DER encoding header bytes
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key,
+SIZE_T scossl_ecdsa_size(PCSYMCRYPT_ECURVE curve)
+{
+    return 2*SymCryptEcurveSizeofScalarMultiplier(curve) + 7;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
                                 PCBYTE pbHashValue, SIZE_T cbHashValue,
                                 PBYTE pbSignature, unsigned int* pcbSignature)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
-    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
+    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofScalarMultiplier(curve);
 
     scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if (scError != SYMCRYPT_NO_ERROR)
@@ -492,13 +500,13 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key,
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key,
+SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
                                   PCBYTE pbHashValue, SIZE_T cbHashValue,
                                   PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
-    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofFieldElement(key->pCurve);
+    SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofScalarMultiplier(curve);
 
     if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
     {

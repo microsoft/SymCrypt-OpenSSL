@@ -107,6 +107,11 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
     if (keyCtx != NULL)
     {
+        if (SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
         ctx->keyCtx = keyCtx;
     }
 
@@ -137,7 +142,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    cbResult = 2*SymCryptEcurveSizeofFieldElement(ctx->keyCtx->curve);
+    cbResult = scossl_ecdsa_size(ctx->keyCtx->curve);
     if (sig == NULL)
     {
         *siglen = cbResult;
@@ -150,20 +155,20 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if ((tbslen | ctx->mdSize) != tbslen)
+    if (ctx->mdSize != 0 && tbslen != ctx->mdSize)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
         return SCOSSL_FAILURE;
     }
 
-    return scossl_ecdsa_sign(ctx->keyCtx->key, tbs, tbslen, sig, (unsigned int *)siglen);
+    return scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
                                            _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                            _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    return scossl_ecdsa_verify(ctx->keyCtx->key, tbs, tbslen, sig, siglen);
+    return scossl_ecdsa_verify(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, siglen);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const char *mdname,
@@ -177,7 +182,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX
     if (mdname != NULL &&
         (mdname[0] == '\0' || !EVP_MD_is_a(ctx->md, mdname)))
     {
-        // Different digest specified than what was previously set by paramters.
+        // Different digest specified than what was previously set by parameters.
         EVP_MD_free(ctx->md);
 
         ctx->md = EVP_MD_fetch(ctx->libctx, mdname, NULL);

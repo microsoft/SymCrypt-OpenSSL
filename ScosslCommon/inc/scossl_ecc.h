@@ -19,10 +19,12 @@ const char *scossl_ecc_get_curve_name(_In_ PCSYMCRYPT_ECURVE curve);
 SCOSSL_STATUS scossl_ec_point_to_pubkey(_In_ const EC_POINT* ecPoint, _In_ const EC_GROUP *ecGroup, _In_ BN_CTX* bnCtx,
                                         _Out_writes_bytes_(cbPublicKey) PBYTE pbPublicKey, SIZE_T cbPublicKey);
 
-SCOSSL_STATUS scossl_ecdsa_sign(_In_ PSYMCRYPT_ECKEY key,
+SIZE_T scossl_ecdsa_size(_In_ PCSYMCRYPT_ECURVE curve);
+
+SCOSSL_STATUS scossl_ecdsa_sign(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
                                 _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                 _Out_writes_bytes_opt_(*pcbSignature) PBYTE pbSignature, _Out_ unsigned int* pcbSignature);
-SCOSSL_STATUS scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key,
+SCOSSL_STATUS scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
                                   _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                   _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
