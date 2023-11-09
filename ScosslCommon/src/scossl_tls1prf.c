@@ -90,7 +90,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5+SHA1 which is not FIPS compliant");
 
         scError = SymCryptTlsPrf1_1(
             ctx->pbSecret, ctx->cbSecret,

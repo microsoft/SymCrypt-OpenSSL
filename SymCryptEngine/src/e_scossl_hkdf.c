@@ -222,7 +222,7 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
     }
 
     SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                    "SymCrypt engine does not support Mac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
+                    "SymCrypt engine does not support Hmac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
 
     switch (e_scossl_hkdf_context->mode)
     {
