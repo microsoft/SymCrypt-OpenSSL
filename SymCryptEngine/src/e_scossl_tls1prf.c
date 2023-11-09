@@ -41,7 +41,7 @@ _Use_decl_annotations_
 SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
     SCOSSL_TLS1_PRF_CTX *key_context = (SCOSSL_TLS1_PRF_CTX *)EVP_PKEY_CTX_get_data(ctx);
-    PCSYMCRYPT_MAC symcryptMacAlg = NULL;
+    PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
     BOOL isTlsPrf1_1 = TRUE;
 
     switch (type)
@@ -50,11 +50,11 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
         if (EVP_MD_type(p2) != NID_md5_sha1)
         {
-            if ((symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(p2))) == NULL)
+            if ((symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(p2))) == NULL)
                 return SCOSSL_FAILURE;
             isTlsPrf1_1 = FALSE;
         }
-        key_context->pMac = symcryptMacAlg;
+        key_context->pHmac = symcryptHmacAlg;
         key_context->isTlsPrf1_1 = isTlsPrf1_1;
         return SCOSSL_SUCCESS;
     case EVP_PKEY_CTRL_TLS_SECRET:

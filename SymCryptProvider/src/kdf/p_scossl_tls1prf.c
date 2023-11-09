@@ -150,7 +150,7 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
-        PCSYMCRYPT_MAC symcryptMacAlg = NULL;
+        PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
         BOOL isTlsPrf1_1 = FALSE;
         const OSSL_PARAM *param_propq;
         const char *mdName, *mdProps;
@@ -181,10 +181,10 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
             }
 
             mdName = EVP_MD_get0_name(md);
-            symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(md));
+            symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(md));
             EVP_MD_free(md);
 
-            if (symcryptMacAlg == NULL)
+            if (symcryptHmacAlg == NULL)
             {
                 return SCOSSL_FAILURE;
             }
@@ -196,7 +196,7 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
         }
 
         ctx->mdName = mdName;
-        ctx->tls1prfCtx->pMac = symcryptMacAlg;
+        ctx->tls1prfCtx->pHmac = symcryptHmacAlg;
         ctx->tls1prfCtx->isTlsPrf1_1 = isTlsPrf1_1;
     }
 

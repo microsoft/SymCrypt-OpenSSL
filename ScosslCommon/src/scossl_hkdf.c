@@ -75,7 +75,7 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_hkdf_append_info(SCOSSL_HKDF_CTX *ctx,
                                       PCBYTE pbInfo, SIZE_T cbInfo)
 {
-    if (cbInfo + ctx->cbInfo > HKDF_MAXBUF)
+    if (cbInfo > HKDF_MAXBUF - ctx->cbInfo)
     {
         return SCOSSL_FAILURE;
     }
@@ -91,7 +91,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
                                  PBYTE key, SIZE_T keylen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PCSYMCRYPT_MAC symcryptMacAlg = NULL;
+    PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
     SYMCRYPT_HKDF_EXPANDED_KEY scExpandedKey;
 
     if (ctx->md == NULL)
@@ -108,8 +108,8 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    symcryptMacAlg = scossl_get_symcrypt_mac_algorithm(EVP_MD_type(ctx->md));
-    if (symcryptMacAlg == NULL)
+    symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
+    if (symcryptHmacAlg == NULL)
     {
         return SCOSSL_FAILURE;
     }
@@ -118,7 +118,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
     {
     case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
         scError = SymCryptHkdf(
-            symcryptMacAlg,
+            symcryptHmacAlg,
             ctx->pbKey, ctx->cbKey,
             ctx->pbSalt, ctx->cbSalt,
             ctx->info, ctx->cbInfo,
@@ -130,7 +130,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         break;
     case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
         scError = SymCryptHkdfExtractPrk(
-            symcryptMacAlg,
+            symcryptHmacAlg,
             ctx->pbKey, ctx->cbKey,
             ctx->pbSalt, ctx->cbSalt,
             key, keylen);
@@ -142,7 +142,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
     case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
         scError = SymCryptHkdfPrkExpandKey(
             &scExpandedKey,
-            symcryptMacAlg,
+            symcryptHmacAlg,
             ctx->pbKey, ctx->cbKey);
         if (scError != SYMCRYPT_NO_ERROR)
         {

@@ -13,7 +13,7 @@ extern "C" {
 typedef struct
 {
     BOOL isTlsPrf1_1;
-    PCSYMCRYPT_MAC pMac;
+    PCSYMCRYPT_MAC pHmac;
     PBYTE pbSecret;
     SIZE_T cbSecret;
     BYTE seed[TLS1_PRF_MAXBUF];

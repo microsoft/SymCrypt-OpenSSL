@@ -30,7 +30,7 @@ SCOSSL_TLS1_PRF_CTX *scossl_tls1prf_dupctx(SCOSSL_TLS1_PRF_CTX *ctx)
         }
 
         copyCtx->isTlsPrf1_1 = ctx->isTlsPrf1_1;
-        copyCtx->pMac = ctx->pMac;
+        copyCtx->pHmac = ctx->pHmac;
         copyCtx->cbSecret = ctx->cbSecret;
         copyCtx->cbSeed = ctx->cbSeed;
         memcpy(copyCtx->seed, ctx->seed, ctx->cbSeed);
@@ -100,7 +100,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
     }
     else
     {
-        if (ctx->pMac == NULL)
+        if (ctx->pHmac == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
                              "Missing Digest");
@@ -108,7 +108,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
         }
 
         scError = SymCryptTlsPrf1_2(
-            ctx->pMac,
+            ctx->pHmac,
             ctx->pbSecret, ctx->cbSecret,
             NULL, 0,
             ctx->seed, ctx->cbSeed,

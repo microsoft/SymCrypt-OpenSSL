@@ -245,7 +245,7 @@ void _scossl_log_SYMCRYPT_ERROR(
 
 // Functions for converting OpenSSL types to their SymCrypt equivalent
 BOOL scossl_is_md_supported(int mdnid);
-PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(int mdnid);
+PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid);
 PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid);
 
 #ifdef __cplusplus

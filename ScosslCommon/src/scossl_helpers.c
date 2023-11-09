@@ -67,7 +67,7 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_GET_DH_CONTEXT_EX, 0), "scossl_get_dh_context_ex"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, 0), "scossl_get_ecc_context_ex"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, 0), "scossl_get_symcrypt_hash_algorithm"},
-    {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, 0), "scossl_get_symcrypt_mac_algorithm"},
+    {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, 0), "scossl_get_symcrypt_hmac_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_CTRL, 0), "scossl_hkdf_ctrl"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_DERIVE, 0), "scossl_hkdf_derive"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_INIT, 0), "scossl_hkdf_init"},
@@ -413,7 +413,7 @@ BOOL scossl_is_md_supported(int mdnid)
 }
 
 _Use_decl_annotations_
-PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(int mdnid)
+PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid)
 {
     switch(mdnid)
     {
@@ -433,7 +433,7 @@ PCSYMCRYPT_MAC scossl_get_symcrypt_mac_algorithm(int mdnid)
         return SymCryptHmacSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support Mac algorithm %d", mdnid);
+        "SymCrypt-OpenSSL does not support hmac algorithm %d", mdnid);
     return NULL;
 }
 
