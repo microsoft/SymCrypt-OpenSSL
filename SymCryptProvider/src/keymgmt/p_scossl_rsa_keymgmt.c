@@ -65,7 +65,7 @@ static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provct
     return scossl_rsa_new_key_ctx();
 }
 
-// Temporary solution until SymCryptRsakeyCopy is enabled. For now we need to export, then import the key to copy.
+// We need to export, then import the key to copy with optional private key.
 static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fromKey, _Out_ PSYMCRYPT_RSAKEY *toKey, BOOL includePrivate)
 {
     UINT64  pubExp64;
