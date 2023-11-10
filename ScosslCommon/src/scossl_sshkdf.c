@@ -21,23 +21,15 @@ SCOSSL_SSHKDF_CTX *scossl_sshkdf_dupctx(SCOSSL_SSHKDF_CTX *ctx)
 
     if (copyCtx != NULL)
     {
-        if (ctx->pbKey == NULL)
-        {
-            copyCtx->pbKey = NULL;
-        }
-        else if ((copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
+        *copyCtx = *ctx;
+        copyCtx->pbKey = NULL;
+
+        if (ctx->pbKey != NULL &&
+            (copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
         {
             scossl_sshkdf_freectx(copyCtx);
-            return NULL;
+            copyCtx = NULL;
         }
-
-        copyCtx->pHash = ctx->pHash;
-        copyCtx->cbKey = ctx->cbKey;
-        memcpy(copyCtx->hashValue, ctx->hashValue, ctx->cbHashValue);
-        memcpy(copyCtx->sessionId, ctx->sessionId, ctx->cbSessionId);
-        copyCtx->cbHashValue = ctx->cbHashValue;
-        copyCtx->cbSessionId = ctx->cbSessionId;
-        copyCtx->label = ctx->label;
     }
 
     return copyCtx;
