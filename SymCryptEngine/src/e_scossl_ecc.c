@@ -472,14 +472,6 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
         return pfn_eckey_sign(type, dgst, dlen, sig, siglen, kinv, r, eckey);
     }
 
-    scError = SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA);
-    if( scError != SYMCRYPT_NO_ERROR )
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptEckeyExtendKeyUsage failed", scError);
-        return SCOSSL_FAILURE;
-    }
-
     return scossl_ecdsa_sign(keyCtx->key, keyCtx->key->pCurve, dgst, dlen, sig, siglen);
 }
 

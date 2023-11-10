@@ -107,11 +107,6 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
     if (keyCtx != NULL)
     {
-        if (SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA) != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
-        }
         ctx->keyCtx = keyCtx;
     }
 

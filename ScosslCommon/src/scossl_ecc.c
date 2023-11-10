@@ -508,6 +508,14 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
     SIZE_T cbSymCryptSig = 2*SymCryptEcurveSizeofScalarMultiplier(curve);
 
+    scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyExtendKeyUsage failed", scError);
+        return SCOSSL_FAILURE;
+    }
+
     if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,

@@ -150,7 +150,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
                 pbPublicKey, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 SYMCRYPT_ECPOINT_FORMAT_XY,
-                keyCtx->key->fAlgorithmInfo,
+                SYMCRYPT_FLAG_ECKEY_ECDH,
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
