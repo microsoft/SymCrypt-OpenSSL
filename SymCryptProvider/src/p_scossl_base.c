@@ -5,13 +5,14 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/proverr.h>
 
+#include "scossl_ecc.h"
 #include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME, funcs, NULL}
+#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 static int scossl_prov_initialized = 0;
@@ -125,7 +126,7 @@ extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_keymgmt_functions),
     ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
-    // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
+    ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
     ALG_TABLE_END};
 
 // Key exchange
@@ -137,7 +138,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_keyexch_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keyexch[] = {
     // ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_functions),
-    // ALG("ECDH", p_scossl_ecdh_functions),
+    ALG("ECDH", p_scossl_ecdh_functions),
     // ALG("X25519:1.3.101.110", p_scossl_x25519_functions),
     // ALG("HKDF", p_scossl_hkdf_keyexch_functions),
     // ALG("TLS1-PRF", p_scossl_tls1prf_keyexch_functions),
@@ -149,7 +150,7 @@ extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_signature_functions),
-    // ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecdsa_signature_functions),
+    ALG("ECDSA", p_scossl_ecdsa_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher
@@ -166,6 +167,7 @@ static int p_scossl_get_status()
 
 static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
+    scossl_ecc_destroy_ecc_curves();
     OPENSSL_free(provctx);
 }
 
@@ -255,6 +257,11 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
+        if(!scossl_ecc_init_static())
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+            return SCOSSL_FAILURE;
+        }
         scossl_prov_initialized = 1;
     }
 
@@ -281,7 +288,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                 break;
         }
     }
-    
+
     p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
     if (p_ctx != NULL)
     {
