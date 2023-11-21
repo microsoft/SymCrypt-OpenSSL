@@ -39,8 +39,8 @@ void scossl_dh_free_key_ctx(SCOSSL_DH_KEY_CTX *ctx)
 SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 {
     SCOSSL_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEY_CTX));
+    PSYMCRYPT_DLGROUP pDlgroupCopy = NULL;
     PCSYMCRYPT_DLGROUP pDlgroup;
-    PSYMCRYPT_DLGROUP pDlgroupCopy;
 
     if (copyCtx != NULL)
     {

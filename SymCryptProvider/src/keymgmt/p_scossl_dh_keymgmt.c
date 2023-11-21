@@ -1040,15 +1040,15 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     int dlGroupNid;
     const char *dlGroup;
-    PBYTE  pbData;
-    SIZE_T cbData;
+    PBYTE  pbData = NULL;
+    SIZE_T cbData = 0;
 
     PBYTE  pbPrivateKey;
     PBYTE  pbPublicKey;
     SIZE_T cbPrivateKey;
     SIZE_T cbPublicKey;
-    BIGNUM *bnPrivKey;
-    BIGNUM *bnPubKey;
+    BIGNUM *bnPrivKey = NULL;
+    BIGNUM *bnPubKey = NULL;
 
     BIGNUM *bnP = NULL;
     BIGNUM *bnQ = NULL;
