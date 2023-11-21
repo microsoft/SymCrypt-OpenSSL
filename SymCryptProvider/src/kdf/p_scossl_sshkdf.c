@@ -178,27 +178,26 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         PCSYMCRYPT_HASH symcryptHashAlg = NULL;
-        const OSSL_PARAM *param_propq;
-        const char *propMdName, *mdProps;
+        const char *paramMdName, *mdProps;
         char *mdName;
         EVP_MD *md;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &propMdName))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &paramMdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-        if (param_propq != NULL &&
+        p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
+        if (p != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((md = EVP_MD_fetch(ctx->libctx, propMdName, mdProps)) == NULL)
+        if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;

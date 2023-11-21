@@ -153,30 +153,29 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
     {
         PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
         BOOL isTlsPrf1_1 = FALSE;
-        const OSSL_PARAM *param_propq;
-        const char *propMdName, *mdProps;
+        const char *paramMdName, *mdProps;
         char *mdName;
         EVP_MD *md;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &propMdName))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &paramMdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
-        if (OPENSSL_strcasecmp(propMdName, SN_md5_sha1) != 0)
+        if (OPENSSL_strcasecmp(paramMdName, SN_md5_sha1) != 0)
         {
             mdProps = NULL;
-            param_propq = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-            if ((param_propq != NULL &&
+            p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
+            if ((p != NULL &&
                 !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps)))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
 
-            if ((md = EVP_MD_fetch(ctx->libctx, propMdName, mdProps)) == NULL)
+            if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
                 return SCOSSL_FAILURE;
