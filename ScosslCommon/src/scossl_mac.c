@@ -120,7 +120,7 @@ SCOSSL_STATUS scossl_mac_set_md(PSCOSSL_MAC_ALIGNED_CTX alignedCtx, const EVP_MD
         return SCOSSL_SUCCESS;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt engine does not support hash algorithm for MAC %d", type);
+                         "SCOSSL does not support hash algorithm for MAC %d", type);
     }
 
     return SCOSSL_FAILURE;

@@ -414,7 +414,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
 #endif
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt for OpenSSL does not support RSA_PSS_SALTLEN_AUTO saltlen");
+                         "SCOSSL does not support RSA_PSS_SALTLEN_AUTO saltlen");
         return SCOSSL_UNSUPPORTED;
     }
 

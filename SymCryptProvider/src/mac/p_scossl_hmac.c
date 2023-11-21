@@ -17,7 +17,7 @@ typedef struct
     OSSL_LIB_CTX *libctx;
 
     // Purely informational
-    const char* mdName;
+    char* mdName;
 
     PSCOSSL_MAC_ALIGNED_CTX hmacAlignedCtx;
 } SCOSSL_PROV_HMAC_CTX;
@@ -47,7 +47,7 @@ static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
             return NULL;
         }
 
-        ctx->mdName = "";
+        ctx->mdName = NULL;
         ctx->libctx = provctx->libctx;
     }
 
@@ -59,6 +59,7 @@ static void p_scossl_hmac_freectx(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx)
     if (ctx == NULL)
         return;
 
+    OPENSSL_free(ctx->mdName);
     scossl_mac_freectx(ctx->hmacAlignedCtx);
     OPENSSL_free(ctx);
 }
@@ -75,7 +76,7 @@ static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_dupctx(_In_ SCOSSL_PROV_HMAC_CTX *ctx
             return NULL;
         }
 
-        copyCtx->mdName = ctx->mdName;
+        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
         copyCtx->libctx = ctx->libctx;
     }
 
@@ -131,7 +132,7 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_DIGEST)) != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->mdName))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mdName == NULL ? "" : ctx->mdName))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -147,41 +148,43 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_DIGEST)) != NULL)
     {
         SCOSSL_STATUS success;
-        const OSSL_PARAM *param_propq;
-        const char *mdName, *mdProps;
+        const char *paramMdName, *mdProps;
+        char *mdName;
         EVP_MD *md;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &paramMdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
         mdProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-        if (param_propq != NULL &&
+        p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
+        if (p != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((md = EVP_MD_fetch(ctx->libctx, mdName, mdProps)) == NULL)
+        if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             return SCOSSL_FAILURE;
         }
 
-        mdName = EVP_MD_get0_name(md);
+        mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
         success = scossl_mac_set_md(ctx->hmacAlignedCtx, md);
         EVP_MD_free(md);
 
         if (!success)
         {
+            OPENSSL_free(mdName);
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             return SCOSSL_FAILURE;
         }
 
+        OPENSSL_free(ctx->mdName);
         ctx->mdName = mdName;
     }
 

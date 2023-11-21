@@ -34,7 +34,7 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *
 
 static SCOSSL_PROV_CMAC_CTX *p_scossl_cmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_PROV_CMAC_CTX *ctx = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_PROV_CMAC_CTX));
+    SCOSSL_PROV_CMAC_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_CMAC_CTX));
     if (ctx != NULL)
     {
         if ((ctx->cmacAlignedCtx = scossl_mac_newctx()) == NULL)
@@ -136,7 +136,6 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_CIPHER)) != NULL)
     {
         SCOSSL_STATUS success;
-        const OSSL_PARAM *param_propq;
         const char *cipherName, *cipherProps;
         EVP_CIPHER *cipher;
 
@@ -147,8 +146,8 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_PROV_CMAC_CTX *
         }
 
         cipherProps = NULL;
-        param_propq = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-        if ((param_propq != NULL && !OSSL_PARAM_get_utf8_string_ptr(p, &cipherProps)) ||
+        p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_PROPERTIES);
+        if ((p != NULL && !OSSL_PARAM_get_utf8_string_ptr(p, &cipherProps)) ||
             (cipher = EVP_CIPHER_fetch(ctx->libctx, cipherName, cipherProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
