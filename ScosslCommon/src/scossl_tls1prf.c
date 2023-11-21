@@ -62,7 +62,7 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_tls1prf_append_seed(SCOSSL_TLS1_PRF_CTX *ctx,
                                          PCBYTE pbSeed, SIZE_T cbSeed)
 {
-    if (cbSeed + ctx->cbSeed > TLS1_PRF_MAXBUF)
+    if (cbSeed > TLS1_PRF_MAXBUF - ctx->cbSeed )
     {
         return SCOSSL_FAILURE;
     }

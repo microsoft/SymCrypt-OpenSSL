@@ -82,6 +82,7 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx
         if ((copyCtx->hkdfCtx = scossl_hkdf_dupctx(ctx->hkdfCtx)) == NULL ||
             (ctx->hkdfCtx->md != NULL && !EVP_MD_up_ref(ctx->hkdfCtx->md)))
         {
+            scossl_hkdf_freectx(copyCtx->hkdfCtx);
             OPENSSL_free(copyCtx);
             return NULL;
         }

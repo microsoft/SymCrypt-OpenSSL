@@ -16,7 +16,7 @@ typedef struct {
     OSSL_LIB_CTX *libctx;
 
     // Purely informational
-    const char* mdName;
+    char *mdName;
 
     SCOSSL_TLS1_PRF_CTX *tls1prfCtx;
 } SCOSSL_PROV_TLS1_PRF_CTX;
@@ -48,7 +48,7 @@ SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_newctx(_In_ SCOSSL_PROVCTX *provctx)
             return NULL;
         }
 
-        ctx->mdName = "";
+        ctx->mdName = NULL;
         ctx->libctx = provctx->libctx;
     }
 
@@ -76,7 +76,7 @@ SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_dupctx(_In_ SCOSSL_PROV_TLS1_PRF_CTX 
             return NULL;
         }
 
-        copyCtx->mdName = ctx->mdName;
+        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
         copyCtx->libctx = ctx->libctx;
     }
 
@@ -85,7 +85,8 @@ SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_dupctx(_In_ SCOSSL_PROV_TLS1_PRF_CTX 
 
 SCOSSL_STATUS p_scossl_tls1prf_reset(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
 {
-    ctx->mdName = "";
+    OPENSSL_free(ctx->mdName);
+    ctx->mdName = NULL;
     return scossl_tls1prf_reset(ctx->tls1prfCtx);
 }
 
@@ -119,7 +120,7 @@ SCOSSL_STATUS p_scossl_tls1prf_get_ctx_params(_In_ SCOSSL_PROV_TLS1_PRF_CTX *ctx
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_DIGEST)) != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, ctx->mdName))
+        !OSSL_PARAM_set_utf8_string(p, ctx->mdName == NULL ? "" : ctx->mdName))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -153,17 +154,18 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
         PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
         BOOL isTlsPrf1_1 = FALSE;
         const OSSL_PARAM *param_propq;
-        const char *mdName, *mdProps;
+        const char *propMdName, *mdProps;
+        char *mdName;
         EVP_MD *md;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &propMdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
-        if (OPENSSL_strcasecmp(mdName, SN_md5_sha1) != 0)
+        if (OPENSSL_strcasecmp(propMdName, SN_md5_sha1) != 0)
         {
             mdProps = NULL;
             param_propq = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
@@ -174,13 +176,13 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
                 return SCOSSL_FAILURE;
             }
 
-            if ((md = EVP_MD_fetch(ctx->libctx, mdName, mdProps)) == NULL)
+            if ((md = EVP_MD_fetch(ctx->libctx, propMdName, mdProps)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
                 return SCOSSL_FAILURE;
             }
 
-            mdName = EVP_MD_get0_name(md);
+            mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
             symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(md));
             EVP_MD_free(md);
 
@@ -191,10 +193,11 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
         }
         else
         {
-            mdName = SN_md5_sha1;
+            mdName = OPENSSL_strdup(SN_md5_sha1);
             isTlsPrf1_1 = TRUE;
         }
 
+        OPENSSL_free(ctx->mdName);
         ctx->mdName = mdName;
         ctx->tls1prfCtx->pHmac = symcryptHmacAlg;
         ctx->tls1prfCtx->isTlsPrf1_1 = isTlsPrf1_1;

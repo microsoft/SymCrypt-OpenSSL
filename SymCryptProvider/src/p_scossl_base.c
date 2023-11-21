@@ -252,8 +252,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     SCOSSL_PROVCTX *p_ctx = NULL;
     OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
-    *out = p_scossl_base_dispatch;
-
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();

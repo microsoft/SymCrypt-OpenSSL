@@ -28,6 +28,7 @@ SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
             scossl_hkdf_freectx(copyCtx);
             return NULL;
         }
+        copyCtx->cbSalt = ctx->cbSalt;
 
         if (ctx->pbKey == NULL)
         {
@@ -38,11 +39,10 @@ SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
             scossl_hkdf_freectx(copyCtx);
             return NULL;
         }
+        copyCtx->cbKey = ctx->cbKey;
 
         copyCtx->md = ctx->md;
         copyCtx->mode = ctx->mode;
-        copyCtx->cbSalt = ctx->cbSalt;
-        copyCtx->cbKey = ctx->cbKey;
         copyCtx->cbInfo = ctx->cbInfo;
         memcpy(copyCtx->info, ctx->info, ctx->cbInfo);
     }
