@@ -72,7 +72,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
     SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_keymgmt_new_ctx(provctx);
     if (keyCtx != NULL)
     {
-        keyCtx->curve = scossl_ecc_group_to_symcrypt_curve(NID_X25519);
+        keyCtx->curve = scossl_ecc_get_x25519_curve();
         keyCtx->isX25519 = TRUE;
     }
 
@@ -220,19 +220,16 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CT
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
         EC_GROUP *ecGroup = EC_GROUP_new_from_params(params, genCtx->libctx, NULL);
-        int ecGroupNid = NID_undef;
+        PCSYMCRYPT_ECURVE pCurve = scossl_ecc_group_to_symcrypt_curve(ecGroup);
+        EC_GROUP_free(ecGroup);
 
-        if (ecGroup != NULL)
-        {
-            ecGroupNid = EC_GROUP_get_curve_name(ecGroup);
-            EC_GROUP_free(ecGroup);
-        }
-
-        if ((genCtx->curve = scossl_ecc_group_to_symcrypt_curve(ecGroupNid)) == NULL)
+        if (pCurve == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
             return SCOSSL_FAILURE;
         }
+
+        genCtx->curve = pCurve;
     }
 
     return SCOSSL_SUCCESS;
@@ -302,7 +299,7 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(_In_ SCOSSL_PROVCTX *p
     // Always set curve to X25519
     if (genCtx != NULL)
     {
-        genCtx->curve = scossl_ecc_group_to_symcrypt_curve(NID_X25519);
+        genCtx->curve = scossl_ecc_get_x25519_curve();
     }
 
     return genCtx;
@@ -579,8 +576,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    EC_GROUP *ecGroup = NULL;
-    int ecGroupNid = NID_undef;
+    EC_GROUP *ecGroup;
+    PCSYMCRYPT_ECURVE pCurve;
     BIGNUM *bnPrivateKey = NULL;
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
@@ -597,17 +594,15 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     }
 
     ecGroup = EC_GROUP_new_from_params(params, keyCtx->libctx, NULL);
-    if (ecGroup != NULL)
-    {
-        ecGroupNid = EC_GROUP_get_curve_name(ecGroup);
-        EC_GROUP_free(ecGroup);
-    }
+    pCurve = scossl_ecc_group_to_symcrypt_curve(ecGroup);
 
-    if ((keyCtx->curve = scossl_ecc_group_to_symcrypt_curve(ecGroupNid)) == NULL)
+    if (pCurve == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
         goto cleanup;
     }
+
+    keyCtx->curve = pCurve;
 
     // Other parameters
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)

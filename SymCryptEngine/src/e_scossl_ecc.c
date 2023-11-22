@@ -358,11 +358,11 @@ SCOSSL_STATUS e_scossl_ecc_init_static()
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_ECC_KEY_CONTEXT on success
 SCOSSL_STATUS e_scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_ECC_KEY_CONTEXT** ppKeyCtx, BOOL generate)
 {
-    PCSYMCRYPT_ECURVE pCurve;
     const EC_GROUP* ecgroup = EC_KEY_get0_group(eckey);
 
-    if( ecgroup == NULL ||
-        (pCurve = scossl_ecc_group_to_symcrypt_curve(EC_GROUP_get_curve_name(ecgroup))) == NULL)
+    PCSYMCRYPT_ECURVE pCurve = scossl_ecc_group_to_symcrypt_curve(ecgroup);
+
+    if( pCurve == NULL )
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
             "SymCryptEcurveAllocate failed.");
@@ -431,7 +431,6 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
                         _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
