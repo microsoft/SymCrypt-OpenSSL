@@ -378,21 +378,43 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         return SCOSSL_FAILURE;
     }
 
+    // b p_scossl_ecc_keymgmt.c:384
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
-        SYMCRYPT_ERROR scError = SymCryptEckeyGetValue(
-            keyCtx->key,
-            NULL, 0,
-            p->data, p->return_size,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY,
-            0);
+        SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+        SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+        UINT32 cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
 
-        if (scError != SYMCRYPT_NO_ERROR)
+        if (p->data != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
+            if (p->data_type != OSSL_PARAM_OCTET_STRING)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+
+            if (p->data_size < cbPublicKey)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+                return SCOSSL_FAILURE;
+            }
+
+            SYMCRYPT_ERROR scError = SymCryptEckeyGetValue(
+                keyCtx->key,
+                NULL, 0,
+                p->data, cbPublicKey,
+                numFormat,
+                pointFormat,
+                0);
+
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                return SCOSSL_FAILURE;
+            }
         }
+
+        p->return_size = cbPublicKey;
     }
 
     // SCOSSL only allows named curves, so these is never true

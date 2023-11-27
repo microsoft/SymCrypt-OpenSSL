@@ -4,6 +4,7 @@
 
 #include <openssl/core_dispatch.h>
 #include <openssl/proverr.h>
+#include <openssl/prov_ssl.h>
 
 #include "scossl_ecc.h"
 #include "p_scossl_base.h"
@@ -12,8 +13,66 @@
 extern "C" {
 #endif
 
+#define OSSL_TLS_GROUP_ID_secp192r1        0x0013
+#define OSSL_TLS_GROUP_ID_secp224r1        0x0015
+#define OSSL_TLS_GROUP_ID_secp256r1        0x0017
+#define OSSL_TLS_GROUP_ID_secp384r1        0x0018
+#define OSSL_TLS_GROUP_ID_secp521r1        0x0019
+#define OSSL_TLS_GROUP_ID_x25519           0x001D
+
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
+
+typedef struct {
+    unsigned int groupId;
+    unsigned int securityBits;
+    int minTls;
+    int maxTls;
+    int minDtls;
+    int maxDtls;
+} SCOSSL_TLS_GROUP_INFO;
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p192 = {
+    OSSL_TLS_GROUP_ID_secp192r1, 80,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p224 = {
+    OSSL_TLS_GROUP_ID_secp224r1, 112,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p256 = {
+    OSSL_TLS_GROUP_ID_secp256r1, 128,
+    TLS1_VERSION, 0,
+    DTLS1_VERSION, 0};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p384 = {
+    OSSL_TLS_GROUP_ID_secp384r1, 192,
+    TLS1_VERSION, 0,
+    DTLS1_VERSION, 0};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p521 = {
+    OSSL_TLS_GROUP_ID_secp521r1, 256,
+    TLS1_VERSION, 0,
+    DTLS1_VERSION, 0};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
+    OSSL_TLS_GROUP_ID_x25519, 128,
+    TLS1_VERSION, 0,
+    DTLS1_VERSION, 0};
+
+#define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) { \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)), \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)), \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_ALG, algorithm, sizeof(algorithm)), \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_ID, (unsigned int *)&group_info.groupId), \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, (unsigned int *)&group_info.securityBits), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls), \
+    OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;
 
@@ -21,6 +80,19 @@ static OSSL_FUNC_CRYPTO_malloc_fn *c_CRYPTO_malloc;
 static OSSL_FUNC_CRYPTO_zalloc_fn *c_CRYPTO_zalloc;
 static OSSL_FUNC_CRYPTO_free_fn *c_CRYPTO_free;
 static OSSL_FUNC_CRYPTO_clear_free_fn *c_CRYPTO_clear_free;
+
+static const OSSL_PARAM p_scossl_supported_group_list[][10] = {
+    TLS_GROUP_ENTRY("secp192r1", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
+    TLS_GROUP_ENTRY("P-192", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
+    TLS_GROUP_ENTRY("secp224r1", SN_secp224r1, "EC", scossl_tls_group_info_p224),
+    TLS_GROUP_ENTRY("P-224", SN_secp224r1, "EC", scossl_tls_group_info_p224),
+    TLS_GROUP_ENTRY("secp256r1", SN_X9_62_prime256v1, "EC", scossl_tls_group_info_p256),
+    TLS_GROUP_ENTRY("P-256", SN_X9_62_prime256v1, "EC", scossl_tls_group_info_p256),
+    TLS_GROUP_ENTRY("secp384r1", SN_secp384r1, "EC", scossl_tls_group_info_p384),
+    TLS_GROUP_ENTRY("P-384", SN_secp384r1, "EC", scossl_tls_group_info_p384),
+    TLS_GROUP_ENTRY("secp521r1", SN_secp521r1, "EC", scossl_tls_group_info_p521),
+    TLS_GROUP_ENTRY("P-521", SN_secp521r1, "EC", scossl_tls_group_info_p521),
+    TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -234,11 +306,31 @@ static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx,
     return NULL;
 }
 
+static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ const char *capability,
+                                               _In_ OSSL_CALLBACK *cb, _In_ void *arg)
+{
+    if (OPENSSL_strcasecmp(capability, "TLS-GROUP") == 0)
+    {
+        for (size_t i = 0; i < sizeof(p_scossl_supported_group_list) / sizeof(p_scossl_supported_group_list[0]); i++)
+        {
+            if (!cb(p_scossl_supported_group_list[i], arg))
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+
+        return SCOSSL_SUCCESS;
+    }
+
+    return SCOSSL_FAILURE;
+}
+
 static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))p_scossl_teardown},
     {OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (void (*)(void))p_scossl_gettable_params},
     {OSSL_FUNC_PROVIDER_GET_PARAMS, (void (*)(void))p_scossl_get_params},
     {OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))p_scossl_query_operation},
+    {OSSL_FUNC_PROVIDER_GET_CAPABILITIES, (void (*)(void))p_scossl_get_capabilities},
     {0, NULL}};
 
 SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
