@@ -208,7 +208,7 @@ static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligne
 
         if (ctx->xofMode)
         {
-            ctx->pMacEx->extractFunc(&ctx->macState, out, ctx->cbOutput, FALSE);
+            ctx->pMacEx->extractFunc(&ctx->macState, out, ctx->cbOutput, TRUE);
         }
         else
         {
