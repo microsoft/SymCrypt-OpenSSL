@@ -67,7 +67,7 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
     SCOSSL_STATUS success = SCOSSL_FAILURE;
     SCOSSL_MAC_CTX *copyCtx = NULL;
 
-    if ((copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MAC_CTX))) != NULL)
+    if ((copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MAC_CTX))) != NULL)
     {
         if (ctx->pbKey != NULL)
         {
