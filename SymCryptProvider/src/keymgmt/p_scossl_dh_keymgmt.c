@@ -957,41 +957,48 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
         }
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    // If keypair is selected, either the private or public key must be
+    // available. Private or public key flags may be set in selection,
+    // but only one needs to be set in the parameters.
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) == NULL)
+        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+            (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-            goto cleanup;
+            if ((bnPrivateKey = BN_secure_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (!OSSL_PARAM_get_BN(p, &bnPrivateKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
         }
 
-        if ((bnPrivateKey = BN_secure_new()) == NULL ||
-            !OSSL_PARAM_get_BN(p, &bnPrivateKey))
+        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 &&
+            (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            if ((bnPublicKey = BN_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (!OSSL_PARAM_get_BN(p, &bnPublicKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+        }
+
+        if ((bnPrivateKey == NULL && bnPublicKey == NULL)||
+            !scossl_dh_import_keypair(ctx->keyCtx, nBitsPriv, pDlGroup, groupSetByParams, bnPrivateKey, bnPublicKey))
+        {
             goto cleanup;
         }
-    }
-
-    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
-    {
-        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-            goto cleanup;
-        }
-
-        if ((bnPublicKey = BN_new()) == NULL ||
-            !OSSL_PARAM_get_BN(p, &bnPublicKey))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
-    }
-
-    if (!scossl_dh_import_keypair(ctx->keyCtx, nBitsPriv, pDlGroup, groupSetByParams, bnPrivateKey, bnPublicKey))
-    {
-        goto cleanup;
     }
 
     if (groupSetByParams)
