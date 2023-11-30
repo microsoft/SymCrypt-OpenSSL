@@ -38,7 +38,7 @@ endif()
 add_library(scossl_static STATIC ${SCOSSL_SOURCES})
 add_dependencies(scossl_static scossl_common)
 
-set_target_properties(scossl_static PROPERTIES PUBLIC_HEADER ../inc/scossl.h)
+set_target_properties(scossl_static PROPERTIES PUBLIC_HEADER ../inc/e_scossl.h)
 # target_link_libraries(scossl_static ${OPENSSL_CRYPTO_LIBRARY})
 target_include_directories(scossl_static PUBLIC ../inc)
 target_include_directories(scossl_static PRIVATE ../src)

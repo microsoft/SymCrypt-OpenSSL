@@ -21,6 +21,9 @@ set(SCOSSL_SOURCES
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     # ./src/ciphers/p_scossl_aes_xts.c
+    ./src/kdf/p_scossl_hkdf.c
+    ./src/kdf/p_scossl_sshkdf.c
+    ./src/kdf/p_scossl_tls1prf.c
     ./src/keyexch/p_scossl_ecdh.c
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c

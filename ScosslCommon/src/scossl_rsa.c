@@ -64,30 +64,6 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
     return NULL;
 }
 
-static PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
-{
-    switch (mdnid)
-    {
-    case NID_md5:
-        return SymCryptMd5Algorithm;
-    case NID_sha1:
-        return SymCryptSha1Algorithm;
-    case NID_sha256:
-        return SymCryptSha256Algorithm;
-    case NID_sha384:
-        return SymCryptSha384Algorithm;
-    case NID_sha512:
-        return SymCryptSha512Algorithm;
-    case NID_sha3_256:
-        return SymCryptSha3_256Algorithm;
-    case NID_sha3_384:
-        return SymCryptSha3_384Algorithm;
-    case NID_sha3_512:
-        return SymCryptSha3_512Algorithm;
-    }
-    return NULL;
-}
-
 static SIZE_T scossl_get_expected_hash_length(int mdnid)
 {
     switch (mdnid)
@@ -196,15 +172,15 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
     {
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5+SHA1 which is not FIPS compliant");
         break;
     case NID_md5:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5 which is not FIPS compliant");
         break;
     case NID_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm SHA1 which is not FIPS compliant");
         break;
     }
 
@@ -258,15 +234,15 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
     {
     case NID_md5_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5+SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5+SHA1 which is not FIPS compliant");
         break;
     case NID_md5:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5 which is not FIPS compliant");
         break;
     case NID_sha1:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm SHA1 which is not FIPS compliant");
         break;
     }
 
@@ -363,12 +339,12 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
     if (mdnid == NID_md5)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5 which is not FIPS compliant");
     }
     else if (mdnid == NID_sha1)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm SHA1 which is not FIPS compliant");
     }
 
     if (cbHashValue != expectedHashLength)
@@ -458,12 +434,12 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
     if (mdnid == NID_md5)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm MD5 which is not FIPS compliant");
+                        "Using Hmac algorithm MD5 which is not FIPS compliant");
     }
     else if (mdnid == NID_sha1)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using Mac algorithm SHA1 which is not FIPS compliant");
+                        "Using Hmac algorithm SHA1 which is not FIPS compliant");
     }
 
     scError = SymCryptRsaPssVerify(

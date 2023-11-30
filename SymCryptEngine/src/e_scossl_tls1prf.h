@@ -24,12 +24,12 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(_Inout_ EVP_PKEY_CTX *ctx, int type, int p1,
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_tls1prf_derive_init(_Inout_ EVP_PKEY_CTX *ctx);
 
-// Derives a shared secret using ctx. If key is NULL then the maximum size of the output buffer
-// is written to the keylen parameter. If key is not NULL, then keylen should contain the length of
-// the key buffer, the shared secret is written to key and the amount of data written to keylen.
+// Derives a shared secret using ctx.
+// NOTE: The documentation states that if the key is NULL, then keylen will be set to the maximum size of
+// the output buffer. This is not true for TLS1-PRF, and the keylen is always expected.
 // Returns SCOSSL_SUCCESS on success, or SCOSSL_FAILURE on error.
-SCOSSL_STATUS e_scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*keylen) unsigned char *key,
-                                        _Inout_ size_t *keylen);
+SCOSSL_STATUS e_scossl_tls1prf_derive(_Inout_ EVP_PKEY_CTX *ctx,
+                                      _Out_writes_bytes_(*keylen) unsigned char *key, _In_ size_t *keylen);
 
 #ifdef __cplusplus
 }

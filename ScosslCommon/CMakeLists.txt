@@ -12,7 +12,10 @@ set(SCOSSL_SOURCES
     ./src/scossl_helpers.c
     ./src/scossl_aes_aead.c
     ./src/scossl_ecc.c
+    ./src/scossl_hkdf.c
     ./src/scossl_rsa.c
+    ./src/scossl_sshkdf.c
+    ./src/scossl_tls1prf.c
 )
 
 add_library(scossl_common STATIC ${SCOSSL_SOURCES})

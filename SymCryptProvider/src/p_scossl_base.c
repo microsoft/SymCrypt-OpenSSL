@@ -106,9 +106,9 @@ extern const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
-    // ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
-    // ALG("HKDF", p_scossl_hkdf_kdf_functions),
-    // ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
+    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
+    ALG("HKDF", p_scossl_hkdf_kdf_functions),
+    ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
 // Rand
@@ -252,8 +252,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     SCOSSL_PROVCTX *p_ctx = NULL;
     OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
-    *out = p_scossl_base_dispatch;
-
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
@@ -289,22 +287,11 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         }
     }
 
-    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
-    if (p_ctx != NULL)
-    {
-        p_ctx->handle = handle;
-        *provctx = p_ctx;
-    }
-
-    *out = p_scossl_base_dispatch;
-
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
         scossl_prov_initialized = 1;
     }
-
-    scossl_setup_logging();
 
     if (core_get_libctx == NULL)
     {
@@ -321,6 +308,8 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     p_ctx->handle = handle;
     p_ctx->libctx = (OSSL_LIB_CTX *)core_get_libctx(handle);
     *provctx = p_ctx;
+
+    *out = p_scossl_base_dispatch;
 
     return SCOSSL_SUCCESS;
 }

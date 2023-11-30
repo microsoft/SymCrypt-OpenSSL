@@ -239,6 +239,15 @@ void _scossl_log_SYMCRYPT_ERROR(
 #define SCOSSL_LOG_SYMCRYPT_ERROR(func_code, reason_code, description, scError) \
     _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, description, scError)
 
+//
+// Common helper functions
+//
+
+// Functions for converting OpenSSL types to their SymCrypt equivalent
+BOOL scossl_is_md_supported(int mdnid);
+PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid);
+PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid);
+
 #ifdef __cplusplus
 }
 #endif
