@@ -168,7 +168,7 @@ static int p_scossl_get_status()
 
 static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
-    // scossl_destroy_safeprime_dlgroups();
+    scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
     OPENSSL_free(provctx);
 }

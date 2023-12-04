@@ -75,6 +75,13 @@ static SCOSSL_DH_CTX *p_scossl_dh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 
 static void p_scossl_dh_freectx(_In_ SCOSSL_DH_CTX *ctx)
 {
+    if (ctx == NULL)
+        return;
+
+    OPENSSL_free(ctx->kdfMdName);
+    OPENSSL_free(ctx->kdfMdProps);
+    OPENSSL_free(ctx->kdfCekAlg);
+    OPENSSL_free(ctx->kdfUkm);
     OPENSSL_free(ctx);
 }
 
@@ -83,27 +90,30 @@ static SCOSSL_DH_CTX *p_scossl_dh_dupctx(_In_ SCOSSL_DH_CTX *ctx)
     SCOSSL_DH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_CTX));
     if (copyCtx != NULL)
     {
-        copyCtx->libCtx = ctx->libCtx;
-        copyCtx->provKey = ctx->provKey;
-        copyCtx->peerProvKey = ctx->peerProvKey;
-        copyCtx->pad = ctx->pad;
-        copyCtx->kdfType = ctx->kdfType;
-        copyCtx->kdfMdName = ctx->kdfMdName == NULL ? NULL : OPENSSL_strdup(ctx->kdfMdName);
-        copyCtx->kdfMdProps = ctx->kdfMdProps == NULL ? NULL : OPENSSL_strdup(ctx->kdfMdProps);
-        copyCtx->kdfCekAlg = ctx->kdfCekAlg == NULL ? NULL : OPENSSL_strdup(ctx->kdfCekAlg);
-        copyCtx->kdfUkm = ctx->kdfUkm == NULL ? NULL : OPENSSL_memdup(ctx->kdfUkm, ctx->kdfUkmlen);
-        copyCtx->kdfUkmlen = ctx->kdfUkmlen;
-        copyCtx->kdfOutlen = ctx->kdfOutlen;
+        *copyCtx = *ctx;
+
+        copyCtx->kdfMdName = OPENSSL_strdup(ctx->kdfMdName);
+        copyCtx->kdfMdProps = OPENSSL_strdup(ctx->kdfMdProps);
+        copyCtx->kdfCekAlg = OPENSSL_strdup(ctx->kdfCekAlg);
+        copyCtx->kdfUkm = OPENSSL_memdup(ctx->kdfUkm, ctx->kdfUkmlen);
+
+        if ((ctx->kdfMdName != NULL && (copyCtx->kdfMdName == NULL)) ||
+            (ctx->kdfMdProps != NULL && (copyCtx->kdfMdProps == NULL)) ||
+            (ctx->kdfCekAlg != NULL && (copyCtx->kdfCekAlg == NULL)) ||
+            (ctx->kdfUkm != NULL && (copyCtx->kdfUkm == NULL)))
+        {
+            p_scossl_dh_freectx(copyCtx);
+            copyCtx = NULL;
+        }
     }
 
     return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_dh_init(_In_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_DH_KEY_CTX *provKey,
-                                      ossl_unused const OSSL_PARAM params[])
+                                      _In_ const OSSL_PARAM params[])
 {
-    if (ctx == NULL ||
-        provKey == NULL)
+    if (ctx == NULL || provKey == NULL)
     {
         return SCOSSL_FAILURE;
     }
@@ -115,7 +125,18 @@ static SCOSSL_STATUS p_scossl_dh_init(_In_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_
 
 static SCOSSL_STATUS p_scossl_dh_set_peer(_Inout_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_DH_KEY_CTX *peerProvKey)
 {
-    if (!SymCryptDlgroupIsSame(ctx->provKey->keyCtx->dlkey->pDlgroup, peerProvKey->keyCtx->dlkey->pDlgroup))
+
+    if (ctx == NULL ||
+        ctx->provKey == NULL || peerProvKey == NULL ||
+        !ctx->provKey->keyCtx->initialized || !peerProvKey->keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!SymCryptDlgroupIsSame(
+            SymCryptDlkeyGetGroup(ctx->provKey->keyCtx->dlkey),
+            SymCryptDlkeyGetGroup(peerProvKey->keyCtx->dlkey)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
         return SCOSSL_FAILURE;
@@ -253,7 +274,6 @@ static SCOSSL_STATUS p_scossl_dh_plain_derive(_In_ SCOSSL_DH_CTX *ctx,
 
     return SCOSSL_SUCCESS;
 }
-
 
 static SCOSSL_STATUS p_scossl_dh_derive(_In_ SCOSSL_DH_CTX *ctx,
                                         _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen,
