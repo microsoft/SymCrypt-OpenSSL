@@ -28,7 +28,8 @@ SCOSSL_STATUS scossl_dh_init_static(void);
 void scossl_destroy_safeprime_dlgroups(void);
 
 PCSYMCRYPT_DLGROUP scossl_dh_get_known_group(_In_ PCSYMCRYPT_DLGROUP pDlGroup);
-PCSYMCRYPT_DLGROUP scossl_dh_get_group_by_nid(int dlGroupNid, _In_opt_ const BIGNUM* p);
+SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, _In_opt_ const BIGNUM* p,
+                                         _Out_ PCSYMCRYPT_DLGROUP *ppDlGroup);
 int scossl_dh_get_group_nid(_In_ PCSYMCRYPT_DLGROUP pDlGroup);
 
 #ifdef __cplusplus

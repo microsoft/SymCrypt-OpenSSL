@@ -2,6 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_dh.h"
 #include "e_scossl_dh.h"
 
 #ifdef __cplusplus
@@ -21,36 +22,10 @@ typedef int (*PFN_DH_meth_bn_mod_exp)(const DH* dh, BIGNUM* r,
 typedef int (*PFN_DH_meth_init)(DH* dh);
 typedef int (*PFN_DH_meth_finish)(DH* dh);
 
-typedef struct _SCOSSL_DH_KEY_CONTEXT {
-    int initialized;
-    PSYMCRYPT_DLKEY dlkey;
-} SCOSSL_DH_KEY_CONTEXT;
-typedef       SCOSSL_DH_KEY_CONTEXT * PSCOSSL_DH_KEY_CONTEXT;
-
-void e_scossl_dh_free_key_context(_Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx)
-{
-    pKeyCtx->initialized = 0;
-    if( pKeyCtx->dlkey )
-    {
-        SymCryptDlkeyFree(pKeyCtx->dlkey);
-    }
-    return;
-}
-
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp2048 = NULL;
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp3072 = NULL;
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp4096 = NULL;
-static BIGNUM* _hidden_bignum_modp2048 = NULL;
-static BIGNUM* _hidden_bignum_modp3072 = NULL;
-static BIGNUM* _hidden_bignum_modp4096 = NULL;
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe2048 = NULL;
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe3072 = NULL;
-static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
-
 // Generates a new keypair using pDlgroup, storing the new keypair in dh and pKeyCtx.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_dh_generate_keypair(
-    _Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup, _Inout_ DH* dh)
+    _Inout_ SCOSSL_DH_KEY_CTX* pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup, _Inout_ DH* dh)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     PBYTE  pbData = NULL;
@@ -59,35 +34,19 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
-    UINT32 nBitsPriv = 0;
 
     BIGNUM* dh_privkey = NULL;
     BIGNUM* dh_pubkey = NULL;
 
     int res = SCOSSL_FAILURE;
 
-    pKeyCtx->dlkey = SymCryptDlkeyAllocate(pDlgroup);
-    if( pKeyCtx->dlkey == NULL )
+    if (!scossl_dh_generate_keypair(pKeyCtx, DH_get_length(dh), pDlgroup))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptDlkeyAllocate returned NULL.");
         goto cleanup;
     }
 
     cbPrivateKey = SymCryptDlkeySizeofPrivateKey(pKeyCtx->dlkey);
     cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
-
-    nBitsPriv = DH_get_length(dh);
-    if( nBitsPriv != 0 )
-    {
-        scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
-        if( scError != SYMCRYPT_NO_ERROR )
-        {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptDlkeySetPrivateKeyLength failed", scError);
-            goto cleanup;
-        }
-    }
 
     cbData = cbPublicKey + cbPrivateKey;
     pbData = OPENSSL_zalloc(cbData);
@@ -95,14 +54,6 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL.");
-        goto cleanup;
-    }
-
-    scError = SymCryptDlkeyGenerate( SYMCRYPT_FLAG_DLKEY_DH, pKeyCtx->dlkey );
-    if( scError != SYMCRYPT_NO_ERROR )
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptDlkeyGenerate failed", scError);
         goto cleanup;
     }
 
@@ -148,22 +99,23 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     dh_privkey = NULL;
     dh_pubkey = NULL;
 
-    pKeyCtx->initialized = 1;
     res = SCOSSL_SUCCESS;
 
 cleanup:
-    if( res != SCOSSL_SUCCESS )
-    {
-        // On error free the partially constructed key context
-        e_scossl_dh_free_key_context(pKeyCtx);
-    }
-
     BN_clear_free(dh_privkey);
     BN_free(dh_pubkey);
 
     if( pbData )
     {
         OPENSSL_clear_free(pbData, cbData);
+
+        if( res != SCOSSL_SUCCESS )
+        {
+            // On error free the partially constructed key context
+            pKeyCtx->initialized = FALSE;
+            SymCryptDlkeyFree(pKeyCtx->dlkey);
+            pKeyCtx->dlkey = NULL;
+        }
     }
 
     return res;
@@ -173,42 +125,17 @@ cleanup:
 // Also populates the public key of dh if it only currently has a private key specified.
 // Returns SCOSSL_SUCCESS on success or SCOSSL_FAILURE on error.
 SCOSSL_STATUS e_scossl_dh_import_keypair(
-    _Inout_ DH* dh, _Inout_ PSCOSSL_DH_KEY_CONTEXT pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup )
+    _Inout_ DH* dh, _Inout_ SCOSSL_DH_KEY_CTX* pKeyCtx, _In_ PCSYMCRYPT_DLGROUP pDlgroup )
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PBYTE  pbData = NULL;
-    SIZE_T cbData = 0;
-    PBYTE  pbPrivateKey = NULL;
-    SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
-    UINT32 nBitsPriv = 0;
 
     const BIGNUM*   dh_privkey = NULL;
     const BIGNUM*   dh_pubkey = NULL;
     BIGNUM*   generated_dh_pubkey = NULL;
 
     int res = SCOSSL_FAILURE;
-
-    pKeyCtx->dlkey = SymCryptDlkeyAllocate(pDlgroup);
-    if( pKeyCtx->dlkey == NULL )
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptDlkeyAllocate returned NULL.");
-        goto cleanup;
-    }
-
-    nBitsPriv = DH_get_length(dh);
-    if( nBitsPriv != 0 )
-    {
-        scError = SymCryptDlkeySetPrivateKeyLength( pKeyCtx->dlkey, nBitsPriv, 0 );
-        if( scError != SYMCRYPT_NO_ERROR )
-        {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                "SymCryptDlkeySetPrivateKeyLength failed", scError);
-            goto cleanup;
-        }
-    }
 
     DH_get0_key(dh, &dh_pubkey, &dh_privkey);
 
@@ -219,58 +146,8 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
         goto cleanup;
     }
 
-    cbPrivateKey = SymCryptDlkeySizeofPrivateKey(pKeyCtx->dlkey);
-    cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
-    // For simplicity, always allocate enough space for a private key and a public key, even if we may only use one
-    cbData = cbPublicKey + cbPrivateKey;
-    pbData = OPENSSL_zalloc(cbData);
-    if( pbData == NULL )
+    if (!scossl_dh_import_keypair(pKeyCtx, DH_get_length(dh), pDlgroup, FALSE, dh_privkey, dh_pubkey))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
-            "OPENSSL_zalloc returned NULL.");
-        goto cleanup;
-    }
-
-    if( dh_pubkey == NULL )
-    {
-        cbPublicKey = 0;
-    }
-    if( dh_privkey == NULL )
-    {
-        cbPrivateKey = 0;
-    }
-
-    if( cbPrivateKey != 0 )
-    {
-        pbPrivateKey = pbData;
-        if( (SIZE_T) BN_bn2binpad(dh_privkey, pbPrivateKey, cbPrivateKey) != cbPrivateKey )
-        {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
-                "BN_bn2binpad did not write expected number of private key bytes.");
-            goto cleanup;
-        }
-    }
-    if( cbPublicKey != 0 )
-    {
-        pbPublicKey = pbData + cbPrivateKey;
-        if( (SIZE_T) BN_bn2binpad(dh_pubkey, pbPublicKey, cbPublicKey) != cbPublicKey )
-        {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
-                "BN_bn2binpad did not write expected number of public key bytes.");
-            goto cleanup;
-        }
-    }
-
-    scError = SymCryptDlkeySetValue(
-        pbPrivateKey, cbPrivateKey,
-        pbPublicKey, cbPublicKey,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_DLKEY_DH,
-        pKeyCtx->dlkey );
-    if( scError != SYMCRYPT_NO_ERROR )
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-            "SymCryptDlkeySetValue failed", scError);
         goto cleanup;
     }
 
@@ -279,7 +156,12 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
     if( cbPublicKey == 0 )
     {
         cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
-        pbPublicKey = pbData + cbPrivateKey;
+        if( (pbPublicKey = OPENSSL_zalloc(cbPublicKey)) == NULL )
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+                            "OPENSSL_zalloc returned NULL.");
+            goto cleanup;
+        }
 
         scError = SymCryptDlkeyGetValue(
             pKeyCtx->dlkey,
@@ -318,70 +200,35 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
         generated_dh_pubkey = NULL;
     }
 
-    pKeyCtx->initialized = 1;
     res = SCOSSL_SUCCESS;
 
 cleanup:
-    if( res != SCOSSL_SUCCESS )
+    // Key only needs to be cleanup up by this function if we fail to populate the public key with
+    // the generated value. scossl_dh_import_keypair will clean up in case of import failure.
+    if ( res != SCOSSL_SUCCESS && cbPublicKey != 0 )
     {
-        // On error free the partially constructed key context
-        e_scossl_dh_free_key_context(pKeyCtx);
+        pKeyCtx->initialized = FALSE;
+        SymCryptDlkeyFree(pKeyCtx->dlkey);
+        pKeyCtx->dlkey = NULL;
     }
 
     BN_free(generated_dh_pubkey);
-
-    if( pbData )
-    {
-        OPENSSL_clear_free( pbData, cbData );
-    }
+    OPENSSL_free(pbPublicKey);
 
     return res;
 }
 
-PSYMCRYPT_DLGROUP e_scossl_initialize_safeprime_dlgroup(_Inout_ PSYMCRYPT_DLGROUP* ppDlgroup,
-    SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE dhSafePrimeType, UINT32 nBitsOfP )
-{
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-
-    *ppDlgroup = SymCryptDlgroupAllocate( nBitsOfP, nBitsOfP-1 );
-    if( *ppDlgroup == NULL )
-    {
-        goto cleanup;
-    }
-
-    scError = SymCryptDlgroupSetValueSafePrime(dhSafePrimeType, *ppDlgroup);
-
-cleanup:
-    if( *ppDlgroup != NULL && scError != SYMCRYPT_NO_ERROR )
-    {
-        SymCryptDlgroupFree(*ppDlgroup);
-        *ppDlgroup = NULL;
-    }
-    return *ppDlgroup;
-}
-
 SCOSSL_STATUS e_scossl_dh_init_static()
 {
-    if( (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048 ) == NULL) ||
-        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072 ) == NULL) ||
-        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_ffdhe4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096 ) == NULL) ||
-        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp2048, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048 ) == NULL) ||
-        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp3072, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072 ) == NULL) ||
-        (e_scossl_initialize_safeprime_dlgroup( &_hidden_dlgroup_modp4096, SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096 ) == NULL) ||
-        ((_hidden_bignum_modp2048 = BN_get_rfc3526_prime_2048(NULL)) == NULL) ||
-        ((_hidden_bignum_modp3072 = BN_get_rfc3526_prime_3072(NULL)) == NULL) ||
-        ((_hidden_bignum_modp4096 = BN_get_rfc3526_prime_4096(NULL)) == NULL) )
-    {
-        return SCOSSL_FAILURE;
-    }
-    return SCOSSL_SUCCESS;
+    return scossl_dh_init_static();
 }
 
 // returns SCOSSL_FALLBACK when the dh is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_DH_KEY_CONTEXT on success
-SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx, BOOL generate)
+SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX** ppKeyCtx, BOOL generate)
 {
+    SCOSSL_STATUS status;
     PSYMCRYPT_DLGROUP pDlgroup = NULL;
 
     const BIGNUM* p = NULL;
@@ -398,56 +245,16 @@ SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CO
 
     // OpenSSL is a bit inconsistent with how it handles different named safe-prime groups
     // We can get OpenSSL to return a nid for ffdhe groups we support
-    int dlgroupNid = DH_get_nid(dh);
-
-    switch( dlgroupNid )
+    if ( (status = scossl_dh_get_group_by_nid(DH_get_nid(dh), p, &pDlgroup)) != SCOSSL_SUCCESS )
     {
-    case NID_ffdhe2048:
-        pDlgroup = _hidden_dlgroup_ffdhe2048;
-        break;
-    case NID_ffdhe3072:
-        pDlgroup = _hidden_dlgroup_ffdhe3072;
-        break;
-    case NID_ffdhe4096:
-        pDlgroup = _hidden_dlgroup_ffdhe4096;
-        break;
-    default:
-        // Not one of the supported ffdhe groups, but may still be a supported MODP group
-        // Given we know the generator is 2, we can now check whether P corresponds to a MODP group
-        if( BN_cmp( p, _hidden_bignum_modp2048 ) == 0 )
-        {
-            pDlgroup = _hidden_dlgroup_modp2048;
-            break;
-        }
-        else if( BN_cmp( p, _hidden_bignum_modp3072 ) == 0 )
-        {
-            pDlgroup = _hidden_dlgroup_modp3072;
-        }
-        else if( BN_cmp( p, _hidden_bignum_modp4096 ) == 0 )
-        {
-            pDlgroup = _hidden_dlgroup_modp4096;
-        }
-        else
-        {
-            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                "SymCrypt engine does not support this DH dlgroup - falling back to OpenSSL.");
-            return SCOSSL_FALLBACK; // <-- early return
-        }
-        break;
+        return status;
     }
 
-    if( pDlgroup == NULL )
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
-            "_hidden_dlgroup_* is NULL.");
-        return SCOSSL_FAILURE;
-    }
-
-    *ppKeyCtx = (PSCOSSL_DH_KEY_CONTEXT) DH_get_ex_data(dh, e_scossl_dh_idx);
+    *ppKeyCtx = (SCOSSL_DH_KEY_CTX*) DH_get_ex_data(dh, e_scossl_dh_idx);
 
     if( *ppKeyCtx == NULL )
     {
-        PSCOSSL_DH_KEY_CONTEXT pKeyCtx = OPENSSL_zalloc(sizeof(*pKeyCtx));
+        SCOSSL_DH_KEY_CTX* pKeyCtx = scossl_dh_new_key_ctx();
         if( !pKeyCtx )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
@@ -488,7 +295,7 @@ SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CO
 // returns SCOSSL_FALLBACK when the dh is not supported by the engine, so we should fallback to OpenSSL
 // returns SCOSSL_FAILURE on an error
 // returns SCOSSL_SUCCESS and sets pKeyCtx to a pointer to an initialized SCOSSL_DH_KEY_CONTEXT on success
-SCOSSL_STATUS e_scossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTEXT* ppKeyCtx)
+SCOSSL_STATUS e_scossl_get_dh_context(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX** ppKeyCtx)
 {
     return e_scossl_get_dh_context_ex(dh, ppKeyCtx, FALSE);
 }
@@ -496,7 +303,7 @@ SCOSSL_STATUS e_scossl_get_dh_context(_Inout_ DH* dh, _Out_ PSCOSSL_DH_KEY_CONTE
 SCOSSL_STATUS e_scossl_dh_generate_key(_Inout_ DH* dh)
 {
     PFN_DH_meth_generate_key pfn_dh_meth_generate_key = NULL;
-    PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
+    SCOSSL_DH_KEY_CTX* pKeyCtx = NULL;
 
     switch( e_scossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
     {
@@ -526,7 +333,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
 {
     PFN_DH_meth_compute_key pfn_dh_meth_compute_key = NULL;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    PSCOSSL_DH_KEY_CONTEXT pKeyCtx = NULL;
+    SCOSSL_DH_KEY_CTX* pKeyCtx = NULL;
     BYTE buf[SCOSSL_DH_MAX_PUBLIC_KEY_LEN] = { 0 };
 
     UINT32 cbPublicKey = 0;
@@ -615,14 +422,10 @@ cleanup:
 SCOSSL_STATUS e_scossl_dh_finish(_Inout_ DH* dh)
 {
     PFN_DH_meth_finish pfn_dh_meth_finish = DH_meth_get_finish(DH_OpenSSL());
-    PSCOSSL_DH_KEY_CONTEXT pKeyCtx = DH_get_ex_data(dh, e_scossl_dh_idx);
+    SCOSSL_DH_KEY_CTX* pKeyCtx = DH_get_ex_data(dh, e_scossl_dh_idx);
     if( pKeyCtx )
     {
-        if( pKeyCtx->initialized == 1 )
-        {
-            e_scossl_dh_free_key_context(pKeyCtx);
-        }
-        OPENSSL_free(pKeyCtx);
+        scossl_dh_free_key_ctx(pKeyCtx);
         DH_set_ex_data(dh, e_scossl_dh_idx, NULL);
     }
 
@@ -636,42 +439,7 @@ SCOSSL_STATUS e_scossl_dh_finish(_Inout_ DH* dh)
 
 void e_scossl_destroy_safeprime_dlgroups(void)
 {
-    if( _hidden_dlgroup_ffdhe2048 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_ffdhe2048);
-        _hidden_dlgroup_ffdhe2048 = NULL;
-    }
-    if( _hidden_dlgroup_ffdhe3072 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_ffdhe3072);
-        _hidden_dlgroup_ffdhe3072 = NULL;
-    }
-    if( _hidden_dlgroup_ffdhe4096 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_ffdhe4096);
-        _hidden_dlgroup_ffdhe4096 = NULL;
-    }
-    if( _hidden_dlgroup_modp2048 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_modp2048);
-        _hidden_dlgroup_modp2048 = NULL;
-    }
-    if( _hidden_dlgroup_modp3072 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_modp3072);
-        _hidden_dlgroup_modp3072 = NULL;
-    }
-    if( _hidden_dlgroup_modp4096 )
-    {
-        SymCryptDlgroupFree(_hidden_dlgroup_modp4096);
-        _hidden_dlgroup_modp4096 = NULL;
-    }
-    BN_free(_hidden_bignum_modp2048);
-    _hidden_bignum_modp2048 = NULL;
-    BN_free(_hidden_bignum_modp3072);
-    _hidden_bignum_modp3072 = NULL;
-    BN_free(_hidden_bignum_modp4096);
-    _hidden_bignum_modp4096 = NULL;
+    scossl_destroy_safeprime_dlgroups();
 }
 
 #ifdef __cplusplus

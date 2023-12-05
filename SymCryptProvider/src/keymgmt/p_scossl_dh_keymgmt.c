@@ -175,10 +175,14 @@ static SCOSSL_STATUS p_scossl_dh_params_to_group(_In_ OSSL_LIB_CTX *libCtx, _In_
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &groupName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
+            return SCOSSL_FAILURE;
         }
 
-        pDlGroupTmp = (PSYMCRYPT_DLGROUP)scossl_dh_get_group_by_nid(OBJ_sn2nid(groupName), NULL);
+        // Provider does not support fallback, so fail in case of SCOSSL_FALLBACK too.
+        if (scossl_dh_get_group_by_nid(OBJ_sn2nid(groupName), NULL, (PCSYMCRYPT_DLGROUP *)&pDlGroupTmp) != SCOSSL_SUCCESS)
+        {
+            return SCOSSL_FAILURE;
+        }
     }
     else if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_P)) != NULL)
     {
@@ -475,7 +479,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
                 break;
         }
 
-        if ((genCtx->pDlGroup = scossl_dh_get_group_by_nid(dlGroupNid, NULL)) == NULL)
+        if (scossl_dh_get_group_by_nid(dlGroupNid, NULL, &genCtx->pDlGroup) != SCOSSL_SUCCESS)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
             return NULL;

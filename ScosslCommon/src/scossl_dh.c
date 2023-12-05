@@ -11,11 +11,9 @@ extern "C" {
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
-#if OPENSSL_VERSION_MAJOR >= 3
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp4096 = NULL;
-#endif // OPENSSL_VERSION_MAJOR >= 3
 static BIGNUM* _hidden_bignum_modp2048 = NULL;
 static BIGNUM* _hidden_bignum_modp3072 = NULL;
 static BIGNUM* _hidden_bignum_modp4096 = NULL;
@@ -232,6 +230,7 @@ cleanup:
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv, PCSYMCRYPT_DLGROUP pDlgroup)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     ctx->dlkey = SymCryptDlkeyAllocate(pDlgroup);
@@ -239,7 +238,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPri
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                          "SymCryptDlkeyAllocate returned NULL.");
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if (nBitsPriv != 0)
@@ -249,7 +248,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPri
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                                       "SymCryptDlkeySetPrivateKeyLength failed", scError);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
@@ -258,12 +257,21 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPri
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                                 "SymCryptDlkeyGenerate failed", scError);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     ctx->initialized = TRUE;
+    ret = SCOSSL_SUCCESS;
 
-    return SCOSSL_SUCCESS;
+cleanup:
+    if (!ret)
+    {
+        ctx->initialized = FALSE;
+        SymCryptDlkeyFree(ctx->dlkey);
+        ctx->dlkey = NULL;
+    }
+
+    return ret;
 }
 
 static PSYMCRYPT_DLGROUP scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE dhSafePrimeType,
@@ -295,11 +303,9 @@ SCOSSL_STATUS scossl_dh_init_static(void)
     if (((_hidden_dlgroup_ffdhe2048 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048)) == NULL) ||
         ((_hidden_dlgroup_ffdhe3072 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072)) == NULL) ||
         ((_hidden_dlgroup_ffdhe4096 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096)) == NULL) ||
-#if OPENSSL_VERSION_MAJOR >= 3
         ((_hidden_dlgroup_modp2048 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048)) == NULL) ||
         ((_hidden_dlgroup_modp3072 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072)) == NULL) ||
         ((_hidden_dlgroup_modp4096 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096)) == NULL) ||
-#endif // OPENSSL_VERSION_MAJOR >= 3
         ((_hidden_bignum_modp2048 = BN_get_rfc3526_prime_2048(NULL)) == NULL) ||
         ((_hidden_bignum_modp3072 = BN_get_rfc3526_prime_3072(NULL)) == NULL) ||
         ((_hidden_bignum_modp4096 = BN_get_rfc3526_prime_4096(NULL)) == NULL) )
@@ -326,7 +332,6 @@ void scossl_destroy_safeprime_dlgroups(void)
         SymCryptDlgroupFree(_hidden_dlgroup_ffdhe4096);
         _hidden_dlgroup_ffdhe4096 = NULL;
     }
-#if OPENSSL_VERSION_MAJOR >= 3
     if (_hidden_dlgroup_modp2048)
     {
         SymCryptDlgroupFree(_hidden_dlgroup_modp2048);
@@ -342,7 +347,6 @@ void scossl_destroy_safeprime_dlgroups(void)
         SymCryptDlgroupFree(_hidden_dlgroup_modp4096);
         _hidden_dlgroup_modp4096 = NULL;
     }
-#endif // OPENSSL_VERSION_MAJOR >= 3
     BN_free(_hidden_bignum_modp2048);
     _hidden_bignum_modp2048 = NULL;
     BN_free(_hidden_bignum_modp3072);
@@ -371,7 +375,6 @@ PCSYMCRYPT_DLGROUP scossl_dh_get_known_group(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         pKnownDlGroup = _hidden_dlgroup_ffdhe4096;
     }
-#if OPENSSL_VERSION_MAJOR >= 3
     else if (SymCryptDlgroupIsSame(_hidden_dlgroup_modp2048, pDlGroup))
     {
         pKnownDlGroup = _hidden_dlgroup_modp2048;
@@ -384,37 +387,35 @@ PCSYMCRYPT_DLGROUP scossl_dh_get_known_group(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         pKnownDlGroup = _hidden_dlgroup_modp4096;
     }
-#endif // OPENSSL_VERSION_MAJOR >= 3
 
     return pKnownDlGroup;
 }
 
 _Use_decl_annotations_
-PCSYMCRYPT_DLGROUP scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p)
+SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
+                                         PCSYMCRYPT_DLGROUP *ppDlGroup)
 {
-    PCSYMCRYPT_DLGROUP pDlGroup = NULL;
+    *ppDlGroup = NULL;
     switch (dlGroupNid)
     {
     case NID_ffdhe2048:
-        pDlGroup = _hidden_dlgroup_ffdhe2048;
+        *ppDlGroup = _hidden_dlgroup_ffdhe2048;
         break;
     case NID_ffdhe3072:
-        pDlGroup = _hidden_dlgroup_ffdhe3072;
+        *ppDlGroup = _hidden_dlgroup_ffdhe3072;
         break;
     case NID_ffdhe4096:
-        pDlGroup = _hidden_dlgroup_ffdhe4096;
+        *ppDlGroup = _hidden_dlgroup_ffdhe4096;
         break;
-#if OPENSSL_VERSION_MAJOR >= 3
     case NID_modp_2048:
-        pDlGroup = _hidden_dlgroup_modp2048;
+        *ppDlGroup = _hidden_dlgroup_modp2048;
         break;
     case NID_modp_3072:
-        pDlGroup = _hidden_dlgroup_modp3072;
+        *ppDlGroup = _hidden_dlgroup_modp3072;
         break;
     case NID_modp_4096:
-        pDlGroup = _hidden_dlgroup_modp4096;
+        *ppDlGroup = _hidden_dlgroup_modp4096;
         break;
-#endif // OPENSSL_VERSION_MAJOR >= 3
     default:
         // Not one of the supported ffdhe groups, but may still be a supported MODP group
         // Given we know the generator is 2, we can now check whether P corresponds to a MODP group
@@ -422,20 +423,34 @@ PCSYMCRYPT_DLGROUP scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p)
         {
             if (BN_cmp(p, _hidden_bignum_modp2048) == 0)
             {
-                pDlGroup = _hidden_dlgroup_modp2048;
+                *ppDlGroup = _hidden_dlgroup_modp2048;
             }
             else if (BN_cmp(p, _hidden_bignum_modp3072) == 0)
             {
-                pDlGroup = _hidden_dlgroup_modp3072;
+                *ppDlGroup = _hidden_dlgroup_modp3072;
             }
             else if (BN_cmp(p, _hidden_bignum_modp4096) == 0)
             {
-                pDlGroup = _hidden_dlgroup_modp4096;
+                *ppDlGroup = _hidden_dlgroup_modp4096;
             }
+        }
+
+        if (*ppDlGroup == NULL)
+        {
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+                "SymCrypt engine does not support this DH dlgroup - falling back to OpenSSL.");
+            return SCOSSL_FALLBACK; // <-- early return
         }
     }
 
-    return pDlGroup;
+    if (*ppDlGroup == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
+            "_hidden_dlgroup_* is NULL.");
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_
@@ -455,7 +470,6 @@ int scossl_dh_get_group_nid(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         dlGroupNid = NID_ffdhe4096;
     }
-#if OPENSSL_VERSION_MAJOR >= 3
     else if (pDlGroup == _hidden_dlgroup_modp2048)
     {
         dlGroupNid = NID_modp_2048;
@@ -468,7 +482,6 @@ int scossl_dh_get_group_nid(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         dlGroupNid = NID_modp_4096;
     }
-#endif // OPENSSL_VERSION_MAJOR >= 3
 
     return dlGroupNid;
 }
