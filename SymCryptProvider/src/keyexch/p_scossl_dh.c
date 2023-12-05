@@ -115,6 +115,13 @@ static SCOSSL_STATUS p_scossl_dh_init(_In_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_
 {
     if (ctx == NULL || provKey == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (provKey->keyCtx == NULL ||!provKey->keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
         return SCOSSL_FAILURE;
     }
 
@@ -126,11 +133,15 @@ static SCOSSL_STATUS p_scossl_dh_init(_In_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_
 static SCOSSL_STATUS p_scossl_dh_set_peer(_Inout_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_DH_KEY_CTX *peerProvKey)
 {
 
-    if (ctx == NULL ||
-        ctx->provKey == NULL || peerProvKey == NULL ||
-        !ctx->provKey->keyCtx->initialized || !peerProvKey->keyCtx->initialized)
+    if (ctx == NULL || peerProvKey == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (peerProvKey->keyCtx == NULL || !peerProvKey->keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
         return SCOSSL_FAILURE;
     }
 
