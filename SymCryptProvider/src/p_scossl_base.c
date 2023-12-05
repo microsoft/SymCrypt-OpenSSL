@@ -81,7 +81,7 @@ static OSSL_FUNC_CRYPTO_zalloc_fn *c_CRYPTO_zalloc;
 static OSSL_FUNC_CRYPTO_free_fn *c_CRYPTO_free;
 static OSSL_FUNC_CRYPTO_clear_free_fn *c_CRYPTO_clear_free;
 
-static const OSSL_PARAM p_scossl_supported_group_list[][10] = {
+static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("secp192r1", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("P-192", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("secp224r1", SN_secp224r1, "EC", scossl_tls_group_info_p224),

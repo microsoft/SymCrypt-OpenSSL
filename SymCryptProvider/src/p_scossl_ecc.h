@@ -20,7 +20,7 @@ typedef struct {
     // SymCrypt expects the operation to be applied to the private
     // key before import. In order to preserve the original key data
     // for export, the transformed bits are stored here. The position
-    // of the midified bits in the MSB and LSB differ, so we can use
+    // of the modified bits in the MSB and LSB differ, so we can use
     // a single byte.
     BYTE modifiedPrivateBits;
     // Not used for crypto operations. Only used in import/export
