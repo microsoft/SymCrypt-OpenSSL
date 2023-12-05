@@ -407,6 +407,7 @@ SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
     case NID_ffdhe4096:
         *ppDlGroup = _hidden_dlgroup_ffdhe4096;
         break;
+#if OPENSSL_VERSION_MAJOR >= 3
     case NID_modp_2048:
         *ppDlGroup = _hidden_dlgroup_modp2048;
         break;
@@ -416,6 +417,7 @@ SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
     case NID_modp_4096:
         *ppDlGroup = _hidden_dlgroup_modp4096;
         break;
+#endif // OPENSSL_VERSION_MAJOR >= 3
     default:
         // Not one of the supported ffdhe groups, but may still be a supported MODP group
         // Given we know the generator is 2, we can now check whether P corresponds to a MODP group
@@ -470,6 +472,7 @@ int scossl_dh_get_group_nid(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         dlGroupNid = NID_ffdhe4096;
     }
+#if OPENSSL_VERSION_MAJOR >= 3
     else if (pDlGroup == _hidden_dlgroup_modp2048)
     {
         dlGroupNid = NID_modp_2048;
@@ -482,6 +485,7 @@ int scossl_dh_get_group_nid(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         dlGroupNid = NID_modp_4096;
     }
+#endif // OPENSSL_VERSION_MAJOR >= 3
 
     return dlGroupNid;
 }

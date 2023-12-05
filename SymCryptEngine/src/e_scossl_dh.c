@@ -229,7 +229,7 @@ SCOSSL_STATUS e_scossl_dh_init_static()
 SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX** ppKeyCtx, BOOL generate)
 {
     SCOSSL_STATUS status;
-    PSYMCRYPT_DLGROUP pDlgroup = NULL;
+    PCSYMCRYPT_DLGROUP pDlgroup = NULL;
 
     const BIGNUM* p = NULL;
     const BIGNUM* g = NULL;
