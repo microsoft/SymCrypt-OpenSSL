@@ -37,6 +37,13 @@ static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),
     OSSL_PARAM_END};
 
+static const OSSL_PARAM p_scossl_x25519_keymgmt_gettable_param_types[] = {
+    OSSL_PARAM_uint32(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_END};
+
 static const OSSL_PARAM p_scossl_ecc_keymgmt_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_END};
@@ -365,9 +372,6 @@ cleanup:
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
 {
     PBYTE pbPublicKey = NULL;
-    SIZE_T cbPublicKey = 0;
-    SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *p;
@@ -399,28 +403,15 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         goto cleanup;
     }
 
-    // SCOSSL only allows named curves, so these is never true
-    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS)) != NULL &&
-        !OSSL_PARAM_set_int(p, 0))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        goto cleanup;
-    }
-
-
-    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH)) != NULL &&
-        !OSSL_PARAM_set_int(p, 0))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        goto cleanup;
-    }
-
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
-        // In the general ECC case,  0x04 must be prepended to the public key to
+        // In the general ECC case, 0x04 must be prepended to the public key to
         // indicate this is an uncompressed point. In the X25519 case, the public
         // key can be set as-is.
-        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
+        SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+        SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+        PBYTE pbPublicKeyTmp;
+        SIZE_T cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
 
         if (!keyCtx->isX25519)
         {
@@ -433,17 +424,19 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
             goto cleanup;
         }
 
+        pbPublicKeyTmp = pbPublicKey;
+
         if (!keyCtx->isX25519)
         {
-            pbPublicKey[0] = 0x04;
-            pbPublicKey++;
-            cbPublicKey--;
+            pbPublicKeyTmp[0] = 0x04;
+            pbPublicKeyTmp++;
+            pbPublicKeyTmp--;
         }
 
         scError = SymCryptEckeyGetValue(
                 keyCtx->key,
                 NULL, 0,
-                pbPublicKey, cbPublicKey,
+                pbPublicKeyTmp, cbPublicKey,
                 numFormat,
                 pointFormat,
                 0);
@@ -456,11 +449,31 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
 
         if (!keyCtx->isX25519)
         {
-            pbPublicKey--;
+            pbPublicKeyTmp--;
             cbPublicKey++;
         }
 
-        if (!OSSL_PARAM_set_octet_string(p, pbPublicKey, cbPublicKey))
+        if (!OSSL_PARAM_set_octet_string(p, pbPublicKeyTmp, cbPublicKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    // General ECDH only
+    if (!keyCtx->isX25519)
+    {
+        // SCOSSL only allows named curves, so these is never true
+        if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS)) != NULL &&
+            !OSSL_PARAM_set_int(p, 0))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+
+        if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH)) != NULL &&
+            !OSSL_PARAM_set_int(p, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
@@ -478,6 +491,11 @@ cleanup:
 static const OSSL_PARAM *p_scossl_ecc_keymgmt_gettable_params(ossl_unused void *provctx)
 {
     return p_scossl_ecc_keymgmt_gettable_param_types;
+}
+
+static const OSSL_PARAM *p_scossl_x25519_keymgmt_gettable_params(ossl_unused void *provctx)
+{
+    return p_scossl_x25519_keymgmt_gettable_param_types;
 }
 
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
@@ -959,7 +977,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)
     {
         if (!OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, keyCtx->includePublic) ||
-            !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 0))
+            (!keyCtx->isX25519 && !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 0)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -1209,7 +1227,7 @@ const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_x25519_keygen_init},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_ecc_keygen},
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_get_params},
-    {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_gettable_params},
+    {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_x25519_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_settable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_ecc_keymgmt_has},
