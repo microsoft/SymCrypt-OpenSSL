@@ -92,45 +92,6 @@ SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
     return OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
 }
 
-// _Use_decl_annotations_
-// SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(const SCOSSL_RSA_KEY_CTX *keyCtx)
-// {
-//     SCOSSL_RSA_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_KEY_CTX));
-//     if (copyCtx == NULL)
-//     {
-//         return NULL;
-//     }
-
-//     if (keyCtx->initialized)
-//     {
-//         SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
-//         UINT32 cbModulus = SymCryptRsakeyModulusBits(keyCtx->key);
-//         UINT32 nPrimes = SymCryptRsakeyGetNumberOfPrimes(keyCtx->key);
-
-//         SymcryptRsaParam.version = 1;
-//         SymcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-//         SymcryptRsaParam.nPrimes = nPrimes;
-//         SymcryptRsaParam.nPubExp = 1;
-//         copyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
-//         if (copyCtx->key == NULL)
-//         {
-//             scossl_rsa_free_key_ctx(copyCtx);
-//             return NULL;
-//         }
-
-//         // TODO: Enable in SymCrypt
-//         SymCryptRsakeyCopy((PCSYMCRYPT_RSAKEY)keyCtx->key, copyCtx->key);
-//         copyCtx->initialized = 1;
-//     }
-//     else
-//     {
-//         copyCtx->initialized = 0;
-//         copyCtx->key = NULL;
-//     }
-
-//     return copyCtx;
-// }
-
 _Use_decl_annotations_
 void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
 {
@@ -386,6 +347,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
     int cbSaltMax;
     PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
     SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);
+    UINT32 scFlags = 0;
 
     if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
@@ -410,12 +372,11 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
         break;
     case RSA_PSS_SALTLEN_AUTO:
 #ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
-    // Added in 3.1, unsupported auto salt len for verify
+    // Added in 3.1; auto salt len for verify
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
 #endif
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt for OpenSSL does not support RSA_PSS_SALTLEN_AUTO saltlen");
-        return SCOSSL_UNSUPPORTED;
+        scFlags = SYMCRYPT_FLAG_RSA_PSS_VERIFY_WITH_MINIMUM_SALT;
+        cbSalt = 0;
     }
 
     if (cbSalt < 0 || cbSalt > cbSaltMax)
@@ -451,7 +412,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
         scosslHashAlgo,
         cbSalt,
-        0);
+        scFlags);
 
     if (scError == SYMCRYPT_NO_ERROR)
     {

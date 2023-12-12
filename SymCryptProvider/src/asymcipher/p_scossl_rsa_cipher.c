@@ -334,6 +334,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *
         }
 
         ctx->mgf1MdInfo = mgf1MdInfo;
+        ctx->oaepMdInfo = mgf1MdInfo;
     }
 
 

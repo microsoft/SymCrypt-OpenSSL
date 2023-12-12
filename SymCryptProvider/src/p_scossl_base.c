@@ -62,13 +62,8 @@ extern const OSSL_DISPATCH p_scossl_aes256gcm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes128ccm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes192ccm_functions[];
 extern const OSSL_DISPATCH p_scossl_aes256ccm_functions[];
-
-// Disabling XTS for now, also disabled in engine pending
-// the same dependencies.
-// Need to push the FIPS mode XTS flag into the SymCrypt API,
-// and expose an XTS key copy method.
-// extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
-// extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
+extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
+extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
 
 static const OSSL_ALGORITHM p_scossl_cipher[] = {
     ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", p_scossl_aes128cbc_functions),
@@ -89,8 +84,8 @@ static const OSSL_ALGORITHM p_scossl_cipher[] = {
     ALG("AES-128-CCM:id-aes128-CCM:2.16.840.1.101.3.4.1.7", p_scossl_aes128ccm_functions),
     ALG("AES-192-CCM:id-aes192-CCM:2.16.840.1.101.3.4.1.27", p_scossl_aes192ccm_functions),
     ALG("AES-256-CCM:id-aes256-CCM:2.16.840.1.101.3.4.1.47", p_scossl_aes256ccm_functions),
-    // ALG("AES-128-XTS:1.3.111.2.1619.0.1.1", p_scossl_aes256xts_functions),
-    // ALG("AES-256-XTS:1.3.111.2.1619.0.1.2", p_scossl_aes128xts_functions),
+    ALG("AES-128-XTS:1.3.111.2.1619.0.1.1", p_scossl_aes128xts_functions),
+    ALG("AES-256-XTS:1.3.111.2.1619.0.1.2", p_scossl_aes256xts_functions),
     ALG_TABLE_END};
 
 // MAC
