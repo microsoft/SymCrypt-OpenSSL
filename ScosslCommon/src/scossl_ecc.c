@@ -113,6 +113,36 @@ PCSYMCRYPT_ECURVE scossl_ecc_get_x25519_curve()
 }
 
 _Use_decl_annotations_
+EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(PCSYMCRYPT_ECURVE pCurve)
+{
+    if (pCurve == NULL)
+        return NULL;
+
+    if (pCurve == _hidden_curve_P192)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp192r1);
+    }
+    else if (pCurve == _hidden_curve_P224)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp224r1);
+    }
+    else if (pCurve == _hidden_curve_P256)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp256r1);
+    }
+    else if (pCurve == _hidden_curve_P384)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp384r1);
+    }
+    else if (pCurve == _hidden_curve_P521)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp521r1);
+    }
+
+    return NULL;
+}
+
+_Use_decl_annotations_
 const char *scossl_ecc_get_curve_name(PCSYMCRYPT_ECURVE curve)
 {
     const char *ret = NULL;
