@@ -94,7 +94,10 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 cleanup:
     if (!success)
     {
-        OPENSSL_free(pDlgroupCopy);
+        if (pDlgroupCopy != NULL)
+        {
+            SymCryptDlgroupFree(pDlgroupCopy);
+        }
         scossl_dh_free_key_ctx(copyCtx);
         copyCtx = NULL;
     }
@@ -194,7 +197,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv,
     if (skipGroupValidation)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Importing non-FIPS DH group.");
+                        "Importing DH key in non-FIPS group.");
         flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
     }
 
@@ -217,9 +220,12 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv,
 cleanup:
     if (!ret)
     {
+        if (ctx->dlkey != NULL)
+        {
+            SymCryptDlkeyFree(ctx->dlkey);
+            ctx->dlkey = NULL;
+        }
         ctx->initialized = FALSE;
-        SymCryptDlkeyFree(ctx->dlkey);
-        ctx->dlkey = NULL;
     }
 
     OPENSSL_clear_free(pbData, cbData);
@@ -266,9 +272,12 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPri
 cleanup:
     if (!ret)
     {
+        if (ctx->dlkey != NULL)
+        {
+            SymCryptDlkeyFree(ctx->dlkey);
+            ctx->dlkey = NULL;
+        }
         ctx->initialized = FALSE;
-        SymCryptDlkeyFree(ctx->dlkey);
-        ctx->dlkey = NULL;
     }
 
     return ret;
@@ -439,8 +448,6 @@ SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
 
         if (*ppDlGroup == NULL)
         {
-            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                "SymCrypt engine does not support this DH dlgroup - falling back to OpenSSL.");
             return SCOSSL_FALLBACK; // <-- early return
         }
     }

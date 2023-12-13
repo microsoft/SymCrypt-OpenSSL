@@ -124,8 +124,9 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL
             return NULL;
         }
 
-        // If we also copied a custom group make sure it gets
-        // set in the caller so it can be properly freed.
+        // scossl_dh_dup_key_ctx performs a deep copy. If a custom group was set in ctx,
+        // then a new copy of that group is used by the key in copyCtx. We need to save this
+        // to copyCtx to ensure it properly gets freed.
         if (copyCtx->keyCtx->initialized &&
             ctx->pDlGroup != NULL)
         {
@@ -151,8 +152,11 @@ static void p_scossl_dh_keymgmt_free_key_ctx(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx)
     }
 }
 
-// Returns true if this is a known group. If this returns false, then the caller
-// is responsible for freeing the group. On error *ppDlGroup is set to NULL.
+// This function attempts to create a PSYMCRYPT_DLGROUP from params, and store the result in *ppDlGroup.
+// If the group name is present, it will be the only thing used to fetch a known group. If the group is named
+// but unknown, this will fail. If no group name is supplied, then the group parameters are used to create
+// a new group and *pGroupSetByParams will be TRUE on success. If *pGroupSetByParams is TRUE, then the caller
+// is responsible for freeing the group.
 static SCOSSL_STATUS p_scossl_dh_params_to_group(_In_ OSSL_LIB_CTX *libCtx, _In_ const OSSL_PARAM params[],
                                                  _Out_ PSYMCRYPT_DLGROUP *ppDlGroup, _Out_ BOOL *pGroupSetByParams)
 {
@@ -181,6 +185,7 @@ static SCOSSL_STATUS p_scossl_dh_params_to_group(_In_ OSSL_LIB_CTX *libCtx, _In_
         // Provider does not support fallback, so fail in case of SCOSSL_FALLBACK too.
         if (scossl_dh_get_group_by_nid(OBJ_sn2nid(groupName), NULL, (PCSYMCRYPT_DLGROUP *)&pDlGroupTmp) != SCOSSL_SUCCESS)
         {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
             return SCOSSL_FAILURE;
         }
     }
@@ -481,7 +486,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
 
         if (scossl_dh_get_group_by_nid(dlGroupNid, NULL, &genCtx->pDlGroup) != SCOSSL_SUCCESS)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
             return NULL;
         }
     }
@@ -680,63 +685,67 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
     }
 
     cbData = cbPublicKey + cbPrivateKey;
-    pbData = OPENSSL_zalloc(cbData);
-    if (pbData == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
 
-    pbPrivateKey = cbPrivateKey == 0 ? NULL : pbData;
-    pbPublicKey = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey;
-
-    if (SymCryptDlkeyGetValue(
-            keyCtx->dlkey,
-            pbPrivateKey, cbPrivateKey,
-            pbPublicKey, cbPublicKey,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            0) != SYMCRYPT_NO_ERROR)
+    if (cbData != 0)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-        goto cleanup;
-    }
-
-    if (paramEncodedKey != NULL &&
-        !OSSL_PARAM_set_octet_string(paramEncodedKey, pbPublicKey, cbPublicKey))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
-    }
-
-    if (paramPrivKey != NULL)
-    {
-        if ((bnPrivKey = BN_secure_new()) == NULL)
+        pbData = OPENSSL_zalloc(cbData);
+        if (pbData == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        if ((BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivKey)) == NULL ||
-            !OSSL_PARAM_set_BN(paramPrivKey, bnPrivKey))
+        pbPrivateKey = cbPrivateKey == 0 ? NULL : pbData;
+        pbPublicKey = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey;
+
+        if (SymCryptDlkeyGetValue(
+                keyCtx->dlkey,
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0) != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+
+        if (paramEncodedKey != NULL &&
+            !OSSL_PARAM_set_octet_string(paramEncodedKey, pbPublicKey, cbPublicKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-    }
 
-    if (paramPubKey != NULL)
-    {
-        if ((bnPubKey = BN_new()) == NULL)
+        if (paramPrivKey != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
+            if ((bnPrivKey = BN_secure_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if ((BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivKey)) == NULL ||
+                !OSSL_PARAM_set_BN(paramPrivKey, bnPrivKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
         }
 
-        if ((BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey)) == NULL ||
-            !OSSL_PARAM_set_BN(paramPubKey, bnPubKey))
+        if (paramPubKey != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
+            if ((bnPubKey = BN_new()) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if ((BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey)) == NULL ||
+                !OSSL_PARAM_set_BN(paramPubKey, bnPubKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
         }
     }
 

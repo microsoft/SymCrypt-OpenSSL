@@ -166,7 +166,7 @@ static SCOSSL_STATUS p_scossl_dh_X9_42_derive(_In_ SCOSSL_DH_CTX *ctx,
     SIZE_T cbAgreedSecret = 0;
     EVP_KDF *kdf = NULL;
     EVP_KDF_CTX *kdfCtx = NULL;
-    OSSL_PARAM params[6];
+    OSSL_PARAM params[6], *pCur = params;
 
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -174,6 +174,12 @@ static SCOSSL_STATUS p_scossl_dh_X9_42_derive(_In_ SCOSSL_DH_CTX *ctx,
     // Perform derivation, and pass result to X9_42 implementation
     if (secret != NULL)
     {
+        if (outlen < ctx->kdfOutlen)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            goto cleanup;
+        }
+
         cbAgreedSecret = SymCryptDlkeySizeofPublicKey(ctx->provKey->keyCtx->dlkey);
 
         if ((pbAgreedSecret = OPENSSL_secure_malloc(cbAgreedSecret)) == NULL)
@@ -202,19 +208,19 @@ static SCOSSL_STATUS p_scossl_dh_X9_42_derive(_In_ SCOSSL_DH_CTX *ctx,
             goto cleanup;
         }
 
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, ctx->kdfMdName, 0);
-        params[1] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_PROPERTIES, ctx->kdfMdProps, 0);
-        params[2] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG, ctx->kdfCekAlg, 0);
-        params[3] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, pbAgreedSecret, cbAgreedSecret);
+        *pCur++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, ctx->kdfMdName, 0);
+        *pCur++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_PROPERTIES, ctx->kdfMdProps, 0);
+        *pCur++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG, ctx->kdfCekAlg, 0);
+        *pCur++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, pbAgreedSecret, cbAgreedSecret);
 
         if (ctx->kdfUkm != NULL)
         {
-            params[4] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_UKM, ctx->kdfUkm, ctx->kdfUkmlen);
+            *pCur++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_UKM, ctx->kdfUkm, ctx->kdfUkmlen);
         }
 
-        params[5] = OSSL_PARAM_construct_end();
+        *pCur = OSSL_PARAM_construct_end();
 
-        if (!EVP_KDF_derive(kdfCtx, secret, outlen, params))
+        if (!EVP_KDF_derive(kdfCtx, secret, ctx->kdfOutlen, params))
         {
             goto cleanup;
         }

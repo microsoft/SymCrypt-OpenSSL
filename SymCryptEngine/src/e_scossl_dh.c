@@ -102,20 +102,22 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     res = SCOSSL_SUCCESS;
 
 cleanup:
+    if( res != SCOSSL_SUCCESS )
+    {
+        // On error free the partially constructed key context
+        if (pKeyCtx->dlkey != NULL)
+        {
+            SymCryptDlkeyFree(pKeyCtx->dlkey);
+            pKeyCtx->dlkey = NULL;
+        }
+        pKeyCtx->initialized = FALSE;
+    }
     BN_clear_free(dh_privkey);
     BN_free(dh_pubkey);
 
     if( pbData )
     {
         OPENSSL_clear_free(pbData, cbData);
-
-        if( res != SCOSSL_SUCCESS )
-        {
-            // On error free the partially constructed key context
-            pKeyCtx->initialized = FALSE;
-            SymCryptDlkeyFree(pKeyCtx->dlkey);
-            pKeyCtx->dlkey = NULL;
-        }
     }
 
     return res;
@@ -207,9 +209,12 @@ cleanup:
     // the generated value. scossl_dh_import_keypair will clean up in case of import failure.
     if ( res != SCOSSL_SUCCESS && cbPublicKey != 0 )
     {
+        if (pKeyCtx->dlkey != NULL)
+        {
+            SymCryptDlkeyFree(pKeyCtx->dlkey);
+            pKeyCtx->dlkey = NULL;
+        }
         pKeyCtx->initialized = FALSE;
-        SymCryptDlkeyFree(pKeyCtx->dlkey);
-        pKeyCtx->dlkey = NULL;
     }
 
     BN_free(generated_dh_pubkey);
@@ -243,10 +248,13 @@ SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX
         return SCOSSL_FALLBACK;
     }
 
-    // OpenSSL is a bit inconsistent with how it handles different named safe-prime groups
-    // We can get OpenSSL to return a nid for ffdhe groups we support
     if ( (status = scossl_dh_get_group_by_nid(DH_get_nid(dh), p, &pDlgroup)) != SCOSSL_SUCCESS )
     {
+        if (status == SCOSSL_FALLBACK)
+        {
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+                "SymCrypt engine does not support this DH dlgroup - falling back to OpenSSL.");
+        }
         return status;
     }
 
