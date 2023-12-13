@@ -56,11 +56,6 @@ static const SCOSSL_MAC_EX SymCryptAesCmacEx = {
     SYMCRYPT_AES_CMAC_INPUT_BLOCK_SIZE
 };
 
-SCOSSL_MAC_CTX *scossl_mac_newctx()
-{
-    return OPENSSL_zalloc(sizeof(SCOSSL_MAC_CTX));
-}
-
 _Use_decl_annotations_
 SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
 {
@@ -87,7 +82,7 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
         {
             if (ctx->expandedKey != NULL)
             {
-                SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, PSCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+                SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
                 if (expandedKey == NULL)
                 {
                     goto cleanup;
@@ -99,7 +94,7 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
 
             if (ctx->macState != NULL)
             {
-                SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, PSCOSSL_MAC_STATE, ctx->pMac->stateSize);
+                SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
                 if (macState == NULL)
                 {
                     goto cleanup;
@@ -109,6 +104,9 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                 ctx->pMacEx->stateCopyFunc(ctx->macState, ctx->expandedKey, copyCtx->macState);
             }
         }
+
+        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
+        copyCtx->libctx = ctx->libctx;
     }
 
     success = SCOSSL_SUCCESS;
@@ -139,6 +137,7 @@ void scossl_mac_freectx(SCOSSL_MAC_CTX *ctx)
         SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
     }
 
+    OPENSSL_free(ctx->mdName);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
 
     OPENSSL_free(ctx);
@@ -146,10 +145,21 @@ void scossl_mac_freectx(SCOSSL_MAC_CTX *ctx)
 
 // HMAC
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_mac_set_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
+SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
 {
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
     int type = EVP_MD_type(md);
+
+    if (ctx->macState != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
+        ctx->macState = NULL;
+    }
+
+    if (ctx->expandedKey != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->expandedKey, OPENSSL_clear_free, ctx->pMac->expandedKeySize);
+        ctx->expandedKey = NULL;
+    }
 
     switch (type)
     {
@@ -184,31 +194,31 @@ SCOSSL_STATUS scossl_mac_set_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
                          "SCOSSL does not support hash algorithm for MAC %d", type);
-        ret = SCOSSL_FAILURE;
+        return SCOSSL_FAILURE;
     }
 
-    if (ctx->macState != NULL)
-    {
-        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
-    }
+    SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
+    ctx->macState = macState;
 
-    SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, PSCOSSL_MAC_STATE, ctx->pMac->stateSize);
-    if (macState == NULL)
-    {
-        ret = SCOSSL_FAILURE;
-    }
-    else
-    {
-        ctx->macState = macState;
-    }
-
-    return ret;
+    return ctx->macState != NULL;
 }
 
 // CMAC
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_mac_set_cipher(SCOSSL_MAC_CTX *ctx, const EVP_CIPHER *cipher)
+SCOSSL_STATUS scossl_mac_set_cmac_cipher(SCOSSL_MAC_CTX *ctx, const EVP_CIPHER *cipher)
 {
+    if (ctx->macState != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
+        ctx->macState = NULL;
+    }
+
+    if (ctx->expandedKey != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->expandedKey, OPENSSL_clear_free, ctx->pMac->expandedKeySize);
+        ctx->expandedKey = NULL;
+    }
+
     switch (EVP_CIPHER_nid(cipher))
     {
     case NID_aes_128_cbc:
@@ -226,15 +236,10 @@ SCOSSL_STATUS scossl_mac_set_cipher(SCOSSL_MAC_CTX *ctx, const EVP_CIPHER *ciphe
     ctx->pMac = SymCryptAesCmacAlgorithm;;
     ctx->pMacEx = &SymCryptAesCmacEx;
 
-    if (ctx->macState != NULL)
-    {
-        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
-    }
-
-    SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, PSCOSSL_MAC_STATE, ctx->pMac->stateSize);
+    SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
     ctx->macState = macState;
 
-    return  ctx->macState != NULL;
+    return ctx->macState != NULL;
 }
 
 _Use_decl_annotations_
@@ -258,30 +263,16 @@ SCOSSL_STATUS scossl_mac_set_mac_key(SCOSSL_MAC_CTX *ctx,
 }
 
 _Use_decl_annotations_
-SIZE_T scossl_mac_get_result_size(SCOSSL_MAC_CTX *ctx)
-{
-    return ctx->pMac == NULL ? 0 : ctx->pMac->resultSize;
-}
-
-_Use_decl_annotations_
-SIZE_T scossl_mac_get_block_size(SCOSSL_MAC_CTX *ctx)
-{
-    return ctx->pMacEx == NULL ? 0 : ctx->pMacEx->blockSize;
-}
-
-_Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
                               PCBYTE pbKey, SIZE_T cbKey)
 {
     if (pbKey != NULL)
     {
-        if (ctx->expandedKey != NULL)
+        if (ctx->expandedKey == NULL)
         {
-            SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->expandedKey, OPENSSL_clear_free, ctx->pMac->expandedKeySize);
+            SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+            ctx->expandedKey = expandedKey;
         }
-
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, PSCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
-        ctx->expandedKey = expandedKey;
 
         if (ctx->expandedKey == NULL ||
             ctx->pMac->expandKeyFunc(ctx->expandedKey, pbKey, cbKey) != SYMCRYPT_NO_ERROR)

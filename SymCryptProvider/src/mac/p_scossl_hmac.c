@@ -11,17 +11,6 @@
 extern "C" {
 #endif
 
-typedef struct
-{
-    // Needed for fetching md
-    OSSL_LIB_CTX *libctx;
-
-    // Purely informational
-    char* mdName;
-
-    SCOSSL_MAC_CTX *macCtx;
-} SCOSSL_PROV_HMAC_CTX;
-
 static const OSSL_PARAM p_scossl_hmac_ctx_gettable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_SIZE, NULL),
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_BLOCK_SIZE, NULL),
@@ -34,73 +23,25 @@ static const OSSL_PARAM p_scossl_hmac_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx, _In_ const OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
+static SCOSSL_MAC_CTX *p_scossl_hmac_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_PROV_HMAC_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_HMAC_CTX));
+    SCOSSL_MAC_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_MAC_CTX));
     if (ctx != NULL)
     {
-        if ((ctx->macCtx = scossl_mac_newctx()) == NULL)
-        {
-            OPENSSL_free(ctx);
-            return NULL;
-        }
-
-        ctx->mdName = NULL;
         ctx->libctx = provctx->libctx;
     }
 
     return ctx;
 }
 
-static void p_scossl_hmac_freectx(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx)
-{
-    if (ctx == NULL)
-        return;
-
-    OPENSSL_free(ctx->mdName);
-    scossl_mac_freectx(ctx->macCtx);
-    OPENSSL_free(ctx);
-}
-
-static SCOSSL_PROV_HMAC_CTX *p_scossl_hmac_dupctx(_In_ SCOSSL_PROV_HMAC_CTX *ctx)
-{
-    SCOSSL_PROV_HMAC_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HMAC_CTX));
-
-    if (copyCtx != NULL)
-    {
-        if ((copyCtx->macCtx = scossl_mac_dupctx(ctx->macCtx)) == NULL)
-        {
-            OPENSSL_free(copyCtx);
-            return NULL;
-        }
-
-        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
-        copyCtx->libctx = ctx->libctx;
-    }
-
-    return copyCtx;
-}
-
-static SCOSSL_STATUS p_scossl_hmac_init(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
+static SCOSSL_STATUS p_scossl_hmac_init(_Inout_ SCOSSL_MAC_CTX *ctx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
                                         _In_ const OSSL_PARAM params[])
 {
     return p_scossl_hmac_set_ctx_params(ctx, params) &&
-           scossl_mac_init(ctx->macCtx, key, keylen);
-}
-
-static SCOSSL_STATUS p_scossl_hmac_update(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
-                                          _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
-{
-    return scossl_mac_update(ctx->macCtx, in, inl);
-}
-
-static SCOSSL_STATUS p_scossl_hmac_final(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx,
-                                         _Out_writes_bytes_(*outl) char *out, _Out_ size_t *outl, size_t outsize)
-{
-    return scossl_mac_final(ctx->macCtx, (PBYTE) out, outl, outsize);
+           scossl_mac_init(ctx, key, keylen);
 }
 
 static const OSSL_PARAM *p_scossl_hmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -113,19 +54,19 @@ static const OSSL_PARAM *p_scossl_hmac_settable_ctx_params(ossl_unused void *ctx
     return p_scossl_hmac_ctx_settable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
-        !OSSL_PARAM_set_size_t(p, scossl_mac_get_result_size(ctx->macCtx)))
+        !OSSL_PARAM_set_size_t(p, ctx->pMac == NULL ? 0 : ctx->pMac->resultSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_BLOCK_SIZE)) != NULL &&
-        !OSSL_PARAM_set_size_t(p, scossl_mac_get_block_size(ctx->macCtx)))
+        !OSSL_PARAM_set_size_t(p, ctx->pMacEx == NULL ? 0 : ctx->pMacEx->blockSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -141,7 +82,7 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_PROV_HMAC_CTX *ctx
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *ctx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -174,7 +115,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
         }
 
         mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
-        success = scossl_mac_set_md(ctx->macCtx, md);
+        success = scossl_mac_set_hmac_md(ctx, md);
         EVP_MD_free(md);
 
         if (!success)
@@ -193,7 +134,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            !scossl_mac_init(ctx->macCtx, pbMacKey, cbMacKey))
+            !scossl_mac_init(ctx, pbMacKey, cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -205,11 +146,11 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_PROV_HMAC_CTX *
 
 const OSSL_DISPATCH p_scossl_hmac_functions[] = {
     {OSSL_FUNC_MAC_NEWCTX, (void (*)(void))p_scossl_hmac_newctx},
-    {OSSL_FUNC_MAC_FREECTX, (void (*)(void))p_scossl_hmac_freectx},
-    {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))p_scossl_hmac_dupctx},
+    {OSSL_FUNC_MAC_FREECTX, (void (*)(void))scossl_mac_freectx},
+    {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))scossl_mac_dupctx},
     {OSSL_FUNC_MAC_INIT, (void (*)(void))p_scossl_hmac_init},
-    {OSSL_FUNC_MAC_UPDATE, (void (*)(void))p_scossl_hmac_update},
-    {OSSL_FUNC_MAC_FINAL, (void (*)(void))p_scossl_hmac_final},
+    {OSSL_FUNC_MAC_UPDATE, (void (*)(void))scossl_mac_update},
+    {OSSL_FUNC_MAC_FINAL, (void (*)(void))scossl_mac_final},
     {OSSL_FUNC_MAC_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_hmac_gettable_ctx_params},
     {OSSL_FUNC_MAC_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_hmac_settable_ctx_params},
     {OSSL_FUNC_MAC_GET_CTX_PARAMS, (void (*)(void))p_scossl_hmac_get_ctx_params},

@@ -74,12 +74,12 @@ C_ASSERT( SYMCRYPT_ALIGN_VALUE < 256 );
     {                                                               \
         PBYTE scossl_aligned = (PBYTE) ptr;                         \
         PBYTE scossl_alloc = scossl_aligned - *(scossl_aligned-1);  \
-        deallocator(scossl_alloc, size);                            \
+        deallocator(scossl_alloc, size + SYMCRYPT_ALIGN_VALUE);     \
         ptr = NULL;                                                 \
     }
 
 #define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)      \
-    SCOSSL_COMMON_ALIGNED_FREE_EX(ptr, deallocator, SCOSSL_ALIGNED_SIZEOF(typename))
+    SCOSSL_COMMON_ALIGNED_FREE_EX(ptr, deallocator, sizeof(typename))
 
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
 void SCOSSL_set_trace_log_filename(const char *filename);

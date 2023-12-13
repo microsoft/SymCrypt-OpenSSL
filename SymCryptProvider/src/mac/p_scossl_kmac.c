@@ -76,8 +76,6 @@ typedef struct
     SIZE_T cbCustomizationString;
 } SCOSSL_KMAC_CTX;
 
-typedef PVOID PSCOSSL_KMAC_ALIGNED_CTX;
-
 static const OSSL_PARAM p_scossl_kmac_ctx_gettable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_SIZE, NULL),
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_BLOCK_SIZE, NULL),
@@ -90,54 +88,48 @@ static const OSSL_PARAM p_scossl_kmac_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_CUSTOM, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, _In_ const OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static PSCOSSL_KMAC_ALIGNED_CTX *p_scossl_kmac128_newctx(ossl_unused void *provctx)
+static SCOSSL_KMAC_CTX *p_scossl_kmac128_newctx(ossl_unused void *provctx)
 {
-    PSCOSSL_KMAC_ALIGNED_CTX alignedCtx = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_KMAC_CTX));
-    if (alignedCtx != NULL)
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_KMAC_CTX);
+    if (ctx != NULL)
     {
-        SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
         ctx->pMac = SymCryptKmac128Algorithm;
         ctx->pMacEx = &SymCryptKmac128AlgorithmEx;
         ctx->cbOutput = ctx->pMac->resultSize;
     }
-    return alignedCtx;
+    return ctx;
 }
 
-static PSCOSSL_KMAC_ALIGNED_CTX *p_scossl_kmac256_newctx(ossl_unused void *provctx)
+static SCOSSL_KMAC_CTX *p_scossl_kmac256_newctx(ossl_unused void *provctx)
 {
-    PSCOSSL_KMAC_ALIGNED_CTX alignedCtx = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_KMAC_CTX));
-    if (alignedCtx != NULL)
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_KMAC_CTX);
+    if (ctx != NULL)
     {
-        SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
         ctx->pMac = SymCryptKmac256Algorithm;
         ctx->pMacEx = &SymCryptKmac256AlgorithmEx;
         ctx->cbOutput = ctx->pMac->resultSize;
     }
-    return alignedCtx;
+    return ctx;
 }
 
-static void p_scossl_kmac_freectx(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx)
+static void p_scossl_kmac_freectx(_Inout_ SCOSSL_KMAC_CTX *ctx)
 {
-    if (alignedCtx == NULL)
+    if (ctx == NULL)
         return;
 
-    SCOSSL_COMMON_ALIGNED_FREE(alignedCtx, OPENSSL_clear_free, SCOSSL_KMAC_CTX);
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_KMAC_CTX);
 }
 
-static PSCOSSL_KMAC_ALIGNED_CTX p_scossl_kmac_dupctx(_In_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx)
+static SCOSSL_KMAC_CTX *p_scossl_kmac_dupctx(_In_ SCOSSL_KMAC_CTX *ctx)
 {
-    SCOSSL_KMAC_CTX *ctx, *copyCtx;
-    PSCOSSL_KMAC_ALIGNED_CTX alignedCopy;
+    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_KMAC_CTX);
 
-    if ((alignedCopy = OPENSSL_zalloc(SCOSSL_ALIGNED_SIZEOF(SCOSSL_KMAC_CTX))) == NULL)
+    if (copyCtx == NULL)
     {
         return NULL;
     }
-
-    ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-    copyCtx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCopy);
 
     copyCtx->pMac = ctx->pMac;
     copyCtx->pMacEx = ctx->pMacEx;
@@ -154,21 +146,17 @@ static PSCOSSL_KMAC_ALIGNED_CTX p_scossl_kmac_dupctx(_In_ PSCOSSL_KMAC_ALIGNED_C
     copyCtx->cbOutput = ctx->cbOutput;
     copyCtx->xofMode = ctx->xofMode;
 
-    return alignedCopy;
+    return ctx;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ SCOSSL_KMAC_CTX *ctx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
                                         _In_ const OSSL_PARAM params[])
 {
-    SCOSSL_KMAC_CTX *ctx;
-
-    if (!p_scossl_kmac_set_ctx_params(alignedCtx, params))
+    if (!p_scossl_kmac_set_ctx_params(ctx, params))
     {
         return SCOSSL_FAILURE;
     }
-
-    ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
 
     if (key != NULL &&
         ctx->pMacEx->expandKeyExFunc(
@@ -184,21 +172,17 @@ static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX aligned
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_update(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_kmac_update(_Inout_ SCOSSL_KMAC_CTX *ctx,
                                           _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-
     ctx->pMac->appendFunc(&ctx->macState, in, inl);
 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx,
+static SCOSSL_STATUS p_scossl_kmac_final(_Inout_ SCOSSL_KMAC_CTX *ctx,
                                          _Out_writes_bytes_(*outl) char *out, _Out_ size_t *outl, size_t outsize)
 {
-    SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
-
     if (out != NULL)
     {
         if (outsize < ctx->cbOutput)
@@ -231,9 +215,8 @@ static const OSSL_PARAM *p_scossl_kmac_settable_ctx_params(ossl_unused void *ctx
     return p_scossl_kmac_ctx_settable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ SCOSSL_KMAC_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
@@ -253,9 +236,8 @@ static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ PSCOSSL_KMAC_ALIGNED_CTX 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ PSCOSSL_KMAC_ALIGNED_CTX alignedCtx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    SCOSSL_KMAC_CTX *ctx = (SCOSSL_KMAC_CTX *)SCOSSL_ALIGN_UP(alignedCtx);
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_XOF)) != NULL &&

@@ -17,7 +17,7 @@ SCOSSL_STATUS e_scossl_hmac_init(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_MAC_CTX *e_scossl_hmac_context;
 
-    if ((e_scossl_hmac_context = scossl_mac_newctx()) == NULL)
+    if ((e_scossl_hmac_context = OPENSSL_zalloc(sizeof(SCOSSL_MAC_CTX))) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
                          "OPENSSL_zalloc returned NULL");
@@ -78,7 +78,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             ret = SCOSSL_FAILURE;
             break;
         }
-        ret = scossl_mac_set_md(e_scossl_hmac_context, p2);
+        ret = scossl_mac_set_hmac_md(e_scossl_hmac_context, p2);
         break;
     case EVP_PKEY_CTRL_SET_MAC_KEY:
         // p2 : pointer to the buffer containing the HMAC key, must not be NULL.

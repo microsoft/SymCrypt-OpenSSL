@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-typedef PVOID PSCOSSL_MAC_EXPANDED_KEY;
-typedef PVOID PSCOSSL_MAC_STATE;
+typedef VOID SCOSSL_MAC_EXPANDED_KEY, *PSCOSSL_MAC_EXPANDED_KEY;
+typedef VOID SCOSSL_MAC_STATE, *PSCOSSL_MAC_STATE;
 
 typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_MAC_KEY_COPY) (PSCOSSL_MAC_EXPANDED_KEY pSrc, PSCOSSL_MAC_EXPANDED_KEY pDst);
 typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_MAC_STATE_COPY) (PSCOSSL_MAC_STATE pSrc, PSCOSSL_MAC_EXPANDED_KEY pExpandedKey, PSCOSSL_MAC_STATE pDst);
@@ -31,24 +31,20 @@ typedef struct
     const SCOSSL_MAC_EX *pMacEx;
     PBYTE pbKey;
     SIZE_T cbKey;
+
+    // Provider specific fields
+    PVOID libctx;
+    // Purely informational
+    char* mdName;
 } SCOSSL_MAC_CTX;
 
-// The MAC context contains SymCrypt structures that must be properly
-// aligned. Because of this, these functions use the pointer to the aligned
-// memory rather than the SCOSSL_MAC_CTX directly. Callers can use
-// SCOSSL_ALIGN_UP if they need to access the SCOSSL_MAC_CTX directly.
-
-SCOSSL_MAC_CTX *scossl_mac_newctx();
 SCOSSL_MAC_CTX *scossl_mac_dupctx(_In_ SCOSSL_MAC_CTX *ctx);
 void scossl_mac_freectx(_Inout_ SCOSSL_MAC_CTX *ctx);
 
-SCOSSL_STATUS scossl_mac_set_md(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_MD *md);
-SCOSSL_STATUS scossl_mac_set_cipher(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_CIPHER *cipher);
+SCOSSL_STATUS scossl_mac_set_hmac_md(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_MD *md);
+SCOSSL_STATUS scossl_mac_set_cmac_cipher(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_CIPHER *cipher);
 SCOSSL_STATUS scossl_mac_set_mac_key(_Inout_ SCOSSL_MAC_CTX *ctx,
                                      _In_reads_bytes_(cbMacKey) PCBYTE pbMacKey, SIZE_T cbMacKey);
-
-SIZE_T scossl_mac_get_result_size(_In_ SCOSSL_MAC_CTX *ctx);
-SIZE_T scossl_mac_get_block_size(_In_ SCOSSL_MAC_CTX *ctx);
 
 SCOSSL_STATUS scossl_mac_init(_Inout_ SCOSSL_MAC_CTX *ctx,
                               _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
