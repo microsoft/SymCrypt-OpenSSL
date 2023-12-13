@@ -430,7 +430,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         {
             pbPublicKeyTmp[0] = 0x04;
             pbPublicKeyTmp++;
-            pbPublicKeyTmp--;
+            cbPublicKey--;
         }
 
         scError = SymCryptEckeyGetValue(
