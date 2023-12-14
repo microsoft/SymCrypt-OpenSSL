@@ -130,7 +130,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL
         if (copyCtx->keyCtx->initialized &&
             ctx->pDlGroup != NULL)
         {
-            copyCtx->pDlGroup = (PSYMCRYPT_DLGROUP) SymCryptDlkeyGetGroup(ctx->keyCtx->dlkey);
+            copyCtx->pDlGroup = (PSYMCRYPT_DLGROUP) SymCryptDlkeyGetGroup(copyCtx->keyCtx->dlkey);
         }
 
         copyCtx->libCtx = ctx->libCtx;
