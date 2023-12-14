@@ -253,6 +253,7 @@ void _scossl_log_SYMCRYPT_ERROR(
 BOOL scossl_is_md_supported(int mdnid);
 PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid);
 PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid);
+int scossl_get_mdnid_from_symcrypt_hash_algorithm(_In_ PCSYMCRYPT_HASH symCryptHash);
 
 #ifdef __cplusplus
 }

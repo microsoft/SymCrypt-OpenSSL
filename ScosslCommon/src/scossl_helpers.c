@@ -394,7 +394,6 @@ void _scossl_log_SYMCRYPT_ERROR(
     _scossl_log(trace_level, func_code, reason_code, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
 }
 
-_Use_decl_annotations_
 BOOL scossl_is_md_supported(int mdnid)
 {
     switch (mdnid)
@@ -412,7 +411,6 @@ BOOL scossl_is_md_supported(int mdnid)
     return FALSE;
 }
 
-_Use_decl_annotations_
 PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid)
 {
     switch(mdnid)
@@ -433,11 +431,10 @@ PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid)
         return SymCryptHmacSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support hmac algorithm %d", mdnid);
+        "SCOSSL does not support hmac algorithm %d", mdnid);
     return NULL;
 }
 
-_Use_decl_annotations_
 PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
 {
     switch (mdnid)
@@ -458,8 +455,43 @@ PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
         return SymCryptSha3_512Algorithm;
     }
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-        "SymCrypt-OpenSSL does not support hash algorithm %d", mdnid);
+        "SCOSSL does not support hash algorithm %d", mdnid);
     return NULL;
+}
+
+_Use_decl_annotations_
+int scossl_get_mdnid_from_symcrypt_hash_algorithm(PCSYMCRYPT_HASH symCryptHash)
+{
+    if (symCryptHash == SymCryptSha1Algorithm)
+    {
+        return NID_sha1;
+    }
+    else if (symCryptHash == SymCryptSha256Algorithm)
+    {
+        return NID_sha256;
+    }
+    else if (symCryptHash == SymCryptSha384Algorithm)
+    {
+        return NID_sha384;
+    }
+    else if (symCryptHash == SymCryptSha512Algorithm)
+    {
+        return NID_sha512;
+    }
+    else if (symCryptHash == SymCryptSha3_256Algorithm)
+    {
+        return NID_sha3_256;
+    }
+    else if (symCryptHash == SymCryptSha3_384Algorithm)
+    {
+        return NID_sha3_384;
+    }
+    else if (symCryptHash == SymCryptSha3_512Algorithm)
+    {
+        return NID_sha3_512;
+    }
+
+    return NID_undef;
 }
 
 #ifdef __cplusplus
