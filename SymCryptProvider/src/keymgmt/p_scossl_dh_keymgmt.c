@@ -663,8 +663,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
     PBYTE pbPrivateKey;
     PBYTE pbPublicKey;
     PBYTE pbData = NULL;
-    SIZE_T cbPrivateKey;
-    SIZE_T cbPublicKey;
+    SIZE_T cbPrivateKey = 0;
+    SIZE_T cbPublicKey = 0;
     SIZE_T cbData = 0;
     BIGNUM *bnPrivKey = NULL;
     BIGNUM *bnPubKey = NULL;
