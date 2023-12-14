@@ -928,7 +928,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_RSA_KEY_CTX *keyCtx
 
 cleanup:
     OSSL_PARAM_BLD_free(bld);
+    OSSL_PARAM_free(params);
     scossl_rsa_free_export_params(rsaParams, TRUE);
+
     return ret;
 }
 

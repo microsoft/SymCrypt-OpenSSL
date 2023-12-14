@@ -28,6 +28,7 @@ static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P384 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
+static PSYMCRYPT_ECURVE _hidden_curve_X25519 = NULL;
 
 SCOSSL_STATUS scossl_ecc_init_static()
 {
@@ -35,7 +36,8 @@ SCOSSL_STATUS scossl_ecc_init_static()
         ((_hidden_curve_P224 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP224, 0)) == NULL) ||
         ((_hidden_curve_P256 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP256, 0)) == NULL) ||
         ((_hidden_curve_P384 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP384, 0)) == NULL) ||
-        ((_hidden_curve_P521 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP521, 0)) == NULL) )
+        ((_hidden_curve_P521 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP521, 0)) == NULL) ||
+        ((_hidden_curve_X25519 = SymCryptEcurveAllocate(SymCryptEcurveParamsCurve25519, 0)) == NULL))
     {
         return SCOSSL_FAILURE;
     }
@@ -44,30 +46,35 @@ SCOSSL_STATUS scossl_ecc_init_static()
 
 void scossl_ecc_destroy_ecc_curves()
 {
-    if (_hidden_curve_P192)
+    if (_hidden_curve_P192 != NULL)
     {
         SymCryptEcurveFree(_hidden_curve_P192);
         _hidden_curve_P192 = NULL;
     }
-    if (_hidden_curve_P224)
+    if (_hidden_curve_P224 != NULL)
     {
         SymCryptEcurveFree(_hidden_curve_P224);
         _hidden_curve_P224 = NULL;
     }
-    if (_hidden_curve_P256)
+    if (_hidden_curve_P256 != NULL)
     {
         SymCryptEcurveFree(_hidden_curve_P256);
         _hidden_curve_P256 = NULL;
     }
-    if (_hidden_curve_P384)
+    if (_hidden_curve_P384 != NULL)
     {
         SymCryptEcurveFree(_hidden_curve_P384);
         _hidden_curve_P384 = NULL;
     }
-    if (_hidden_curve_P521)
+    if (_hidden_curve_P521 != NULL)
     {
         SymCryptEcurveFree(_hidden_curve_P521);
         _hidden_curve_P521 = NULL;
+    }
+    if (_hidden_curve_X25519 != NULL)
+    {
+        SymCryptEcurveFree(_hidden_curve_X25519);
+        _hidden_curve_X25519 = NULL;
     }
 }
 
@@ -75,9 +82,7 @@ _Use_decl_annotations_
 PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
 {
     if (group == NULL)
-    {
         return NULL;
-    }
 
     int groupNid = EC_GROUP_get_curve_name(group);
 
@@ -96,7 +101,42 @@ PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
         return _hidden_curve_P521;
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-            "SymCrypt-OpenSSL does not yet support this group (nid %d).", groupNid);
+            "SCOSSL does not yet support this group (nid %d).", groupNid);
+    }
+
+    return NULL;
+}
+
+PCSYMCRYPT_ECURVE scossl_ecc_get_x25519_curve()
+{
+    return _hidden_curve_X25519;
+}
+
+_Use_decl_annotations_
+EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(PCSYMCRYPT_ECURVE pCurve)
+{
+    if (pCurve == NULL)
+        return NULL;
+
+    if (pCurve == _hidden_curve_P192)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp192r1);
+    }
+    else if (pCurve == _hidden_curve_P224)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp224r1);
+    }
+    else if (pCurve == _hidden_curve_P256)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp256r1);
+    }
+    else if (pCurve == _hidden_curve_P384)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp384r1);
+    }
+    else if (pCurve == _hidden_curve_P521)
+    {
+        return EC_GROUP_new_by_curve_name(NID_secp521r1);
     }
 
     return NULL;
@@ -126,6 +166,10 @@ const char *scossl_ecc_get_curve_name(PCSYMCRYPT_ECURVE curve)
     else if (curve == _hidden_curve_P521)
     {
         ret = SN_secp521r1;
+    }
+    else if (curve == _hidden_curve_X25519)
+    {
+        ret = SN_X25519;
     }
 
     return ret;

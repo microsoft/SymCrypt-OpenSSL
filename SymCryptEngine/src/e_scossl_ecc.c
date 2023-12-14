@@ -431,7 +431,6 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
                         _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_ECC_KEY_CONTEXT *keyCtx = NULL;
 
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )

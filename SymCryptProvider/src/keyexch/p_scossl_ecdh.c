@@ -71,18 +71,11 @@ static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_E
 
 static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *peerKeyCtx)
 {
-    BN_CTX *bnCtx = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx == NULL || peerKeyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        goto cleanup;
-    }
-
-    if ((bnCtx = BN_CTX_new_ex(ctx->libctx)) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
@@ -96,7 +89,6 @@ static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ S
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    BN_CTX_free(bnCtx);
 
     return ret;
 }
@@ -106,6 +98,7 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
                                           size_t outlen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SYMCRYPT_NUMBER_FORMAT numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (ctx == NULL || secretlen == NULL)
     {
@@ -127,7 +120,7 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
     scError = SymCryptEcDhSecretAgreement(
         ctx->keyCtx->key,
         ctx->peerKeyCtx->key,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        numberFormat,
         0,
         secret,
         outlen);
