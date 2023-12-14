@@ -32,8 +32,6 @@ typedef struct
 } SCOSSL_RSA_EXPORT_PARAMS;
 
 SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx();
-// Enable SymCryptRsakeyCopy in SymCrypt
-// SCOSSL_RSA_KEY_CTX *scossl_rsa_dup_key_ctx(_In_ const SCOSSL_RSA_KEY_CTX *keyCtx);
 void scossl_rsa_free_key_ctx(_In_ SCOSSL_RSA_KEY_CTX *keyCtx);
 
 SCOSSL_STATUS scossl_rsa_pkcs1_sign(_In_ SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,

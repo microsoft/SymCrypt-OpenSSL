@@ -449,7 +449,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO) == 0)
             {
                 // Sign: Maximized salt length
-                // Verify: Autorecovered salt length (not supported)
+                // Verify: Autorecovered salt length
                 saltlen = RSA_PSS_SALTLEN_AUTO;
             }
             else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_MAX) == 0)
@@ -459,7 +459,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX) == 0)
             {
                 // Sign: Smaller of digest length or maximized salt length
-                // Verify: Autorecovered salt length (not supported)
+                // Verify: Autorecovered salt length
                 saltlen = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
             }
             else
@@ -472,10 +472,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             return SCOSSL_FAILURE;
         }
 
-        if (saltlen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX ||
-            (ctx->operation == EVP_PKEY_OP_VERIFY &&
-              (saltlen == RSA_PSS_SALTLEN_AUTO ||
-               saltlen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX)))
+        if (saltlen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
             return SCOSSL_FAILURE;
@@ -516,6 +513,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         EVP_MD_free(ctx->md);
         ctx->md = md;
         ctx->mgf1MdInfo = mgf1MdInfo;
+        ctx->mdInfo = mgf1MdInfo;
     }
 
     return SCOSSL_SUCCESS;
