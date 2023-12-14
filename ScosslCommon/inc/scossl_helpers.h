@@ -54,10 +54,10 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 // We need to be able to represent the offset into our allocation in a single byte
 C_ASSERT( SYMCRYPT_ALIGN_VALUE < 256 );
 
-#define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename)               \
+#define SCOSSL_COMMON_ALIGNED_ALLOC_EX(ptr, allocator, typename, size)      \
     typename *ptr;                                                          \
     {                                                                       \
-        PBYTE scossl_alloc = allocator(SCOSSL_ALIGNED_SIZEOF(typename));    \
+        PBYTE scossl_alloc = allocator(size + SYMCRYPT_ALIGN_VALUE);        \
         PBYTE scossl_aligned = NULL;                                        \
         if (scossl_alloc)                                                   \
         {                                                                   \
@@ -67,13 +67,19 @@ C_ASSERT( SYMCRYPT_ALIGN_VALUE < 256 );
         ptr = (typename *) scossl_aligned;                                  \
     }
 
-#define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)      \
+#define SCOSSL_COMMON_ALIGNED_ALLOC(ptr, allocator, typename) \
+    SCOSSL_COMMON_ALIGNED_ALLOC_EX(ptr, allocator, typename, sizeof(typename))
+
+#define SCOSSL_COMMON_ALIGNED_FREE_EX(ptr, deallocator, size)       \
     {                                                               \
         PBYTE scossl_aligned = (PBYTE) ptr;                         \
         PBYTE scossl_alloc = scossl_aligned - *(scossl_aligned-1);  \
-        deallocator(scossl_alloc, SCOSSL_ALIGNED_SIZEOF(typename)); \
+        deallocator(scossl_alloc, size + SYMCRYPT_ALIGN_VALUE);     \
         ptr = NULL;                                                 \
     }
+
+#define SCOSSL_COMMON_ALIGNED_FREE(ptr, deallocator, typename)      \
+    SCOSSL_COMMON_ALIGNED_FREE_EX(ptr, deallocator, sizeof(typename))
 
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level);
 void SCOSSL_set_trace_log_filename(const char *filename);

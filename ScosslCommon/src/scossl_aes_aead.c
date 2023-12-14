@@ -39,7 +39,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
         if (ivlen != SCOSSL_GCM_IV_LENGTH)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "SymCrypt for OpenSSL only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
+                             "SCOSSL only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         ctx->ivlen = ivlen;
@@ -655,7 +655,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_len(SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen
     if (ivlen < SCOSSL_CCM_MIN_IV_LENGTH || ivlen > SCOSSL_CCM_MAX_IV_LENGTH)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "SymCrypt for OpenSSL only supports [%d-%d] byte IVs for AES-CCM",
+                         "SCOSSL only supports [%d-%d] byte IVs for AES-CCM",
                          SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
         return SCOSSL_FAILURE;
     }
