@@ -20,6 +20,9 @@ extern "C" {
 #define OSSL_TLS_GROUP_ID_secp384r1        0x0018
 #define OSSL_TLS_GROUP_ID_secp521r1        0x0019
 #define OSSL_TLS_GROUP_ID_x25519           0x001D
+#define OSSL_TLS_GROUP_ID_ffdhe2048        0x0100
+#define OSSL_TLS_GROUP_ID_ffdhe3072        0x0101
+#define OSSL_TLS_GROUP_ID_ffdhe4096        0x0102
 
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
@@ -63,6 +66,21 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe2048 = {
+    OSSL_TLS_GROUP_ID_ffdhe2048, 112,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe3072 = {
+    OSSL_TLS_GROUP_ID_ffdhe3072, 128,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
+    OSSL_TLS_GROUP_ID_ffdhe4096, 128,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
 #define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) { \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)), \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)), \
@@ -93,7 +111,10 @@ static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("P-384", SN_secp384r1, "EC", scossl_tls_group_info_p384),
     TLS_GROUP_ENTRY("secp521r1", SN_secp521r1, "EC", scossl_tls_group_info_p521),
     TLS_GROUP_ENTRY("P-521", SN_secp521r1, "EC", scossl_tls_group_info_p521),
-    TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519)};
+    TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519),
+    TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
+    TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
+    TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];

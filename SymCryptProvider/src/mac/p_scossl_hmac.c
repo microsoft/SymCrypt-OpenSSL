@@ -84,64 +84,74 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Ino
 
 static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    char *paramMdName = NULL;
+    char *mdProps = NULL;
+    PBYTE pbMacKey = NULL;
+    EVP_MD *md = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_DIGEST)) != NULL)
     {
-        SCOSSL_STATUS success;
-        const char *paramMdName, *mdProps;
-        char *mdName;
-        EVP_MD *md;
+        OPENSSL_free(ctx->mdName);
+        ctx->mdName = NULL;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &paramMdName))
+        // mdname is not directly set from parameters. The name is fetched from the
+        // provider in case the provider is registered under multiple names for the
+        // same digest, or surfaces the digest under a different name.
+        if (!OSSL_PARAM_get_utf8_string(p, &paramMdName, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
-        mdProps = NULL;
-        p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-        if (p != NULL &&
-            !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES)) != NULL &&
+            !OSSL_PARAM_get_utf8_string(p, &mdProps, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
+        // Get mdname from proid
         if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
-        mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
-        success = scossl_mac_set_hmac_md(ctx, md);
-        EVP_MD_free(md);
-
-        if (!success)
+        if (!scossl_mac_set_hmac_md(ctx, md))
         {
-            OPENSSL_free(mdName);
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
-        OPENSSL_free(ctx->mdName);
-        ctx->mdName = mdName;
+        ctx->mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
     {
-        PCBYTE pbMacKey;
         SIZE_T cbMacKey;
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            !scossl_mac_init(ctx, pbMacKey, cbMacKey))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&pbMacKey, 0, &cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
+        }
+
+        if (!scossl_mac_init(ctx, pbMacKey, cbMacKey))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
         }
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+cleanup:
+    OPENSSL_free(paramMdName);
+    OPENSSL_free(mdProps);
+    OPENSSL_free(pbMacKey);
+    EVP_MD_free(md);
+
+    return ret;
 }
 
 const OSSL_DISPATCH p_scossl_hmac_functions[] = {
