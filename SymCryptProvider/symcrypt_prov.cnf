@@ -1,0 +1,9 @@
+# The SymCrypt provider needs to be registered with libcrypto,
+# either by config or with OSSL_PROVIDER_load. The provider can
+# be disabled by commenting out or removing "activate = 1". The
+# value assigned does not matter, and the provider will be
+# activated as long as the "activate" key is present.
+
+[symcrypt_prov_sect]
+activate = 1
+identity = symcryptprovider
