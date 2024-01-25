@@ -112,7 +112,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
             goto cleanup;
         }
 
-        // Get mdname from proid
+        // Get mdname from provider
         if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
