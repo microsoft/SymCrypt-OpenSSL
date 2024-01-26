@@ -250,19 +250,24 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CT
 static SCOSSL_STATUS p_scossl_x25519_keygen_set_params(ossl_unused void *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+    char *groupName = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
-        const char *groupName;
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &groupName) ||
+        if (!OSSL_PARAM_get_utf8_string(p, &groupName, 0) ||
             strcmp(groupName, SN_X25519) != 0)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_free(groupName);
+    return ret;
 }
 
 static const OSSL_PARAM *p_scossl_ecc_keygen_settable_params(ossl_unused void *genCtx, ossl_unused void *provctx)
@@ -376,12 +381,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *p;
 
-    if (!keyCtx->initialized)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        goto cleanup;
-    }
-
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
         !OSSL_PARAM_set_uint32(p, scossl_ecdsa_size(keyCtx->curve)))
     {
@@ -405,6 +404,13 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
+
+        if (!keyCtx->initialized)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
         // In the general ECC case, 0x04 must be prepended to the public key to
         // indicate this is an uncompressed point. In the X25519 case, the public
         // key can be set as-is.
@@ -501,6 +507,7 @@ static const OSSL_PARAM *p_scossl_x25519_keymgmt_gettable_params(ossl_unused voi
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
 {
     EC_GROUP *ecGroup = NULL;
+    PBYTE  encodedPoint = NULL;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
     BN_CTX *bnCtx = NULL;
@@ -512,7 +519,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
-        PCBYTE encodedPoint;
         SIZE_T encodedLen;
         SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -533,7 +539,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
         }
         else
         {
-            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&encodedPoint, &encodedLen))
+            if (!OSSL_PARAM_get_octet_string(p, (void **)&encodedPoint, 0, &encodedLen))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
@@ -575,6 +581,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
 
     ret = SCOSSL_SUCCESS;
 cleanup:
+    OPENSSL_free(encodedPoint);
     OPENSSL_free(pbPublicKey);
     EC_GROUP_free(ecGroup);
     EC_POINT_free(ecPoint);

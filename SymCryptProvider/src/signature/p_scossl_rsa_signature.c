@@ -482,6 +482,13 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MGF1_DIGEST)) != NULL)
     {
+        // PSS padding must be set before setting PSS parameters
+        if (ctx->padding != RSA_PKCS1_PSS_PADDING)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MGF1_MD);
+            return SCOSSL_FAILURE;
+        }
+
         EVP_MD *md;
         const OSSL_ITEM *mgf1MdInfo;
 

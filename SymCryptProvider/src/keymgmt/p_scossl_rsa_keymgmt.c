@@ -201,14 +201,27 @@ static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_RSA_KE
 static SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
-    p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_BITS);
-    if (p != NULL && !OSSL_PARAM_get_uint32(p, &genCtx->nBitsOfModulus))
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_BITS)) != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        return SCOSSL_FAILURE;
+        UINT32 nBitsOfModulus;
+
+        if (!OSSL_PARAM_get_uint32(p, &nBitsOfModulus))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        // Provider is expected to validate lower bound here
+        if (nBitsOfModulus < SYMCRYPT_RSAKEY_MIN_BITSIZE_MODULUS)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_KEY_SIZE_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
+
+        genCtx->nBitsOfModulus = nBitsOfModulus;
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E)) != NULL)
     {
         if (!OSSL_PARAM_get_uint64(p, &genCtx->pubExp64))
         {
@@ -276,7 +289,7 @@ static SCOSSL_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genCt
     symcryptRsaParam.version = 1;
     symcryptRsaParam.nBitsOfModulus = genCtx->nBitsOfModulus;
     symcryptRsaParam.nPrimes = 2;
-    symcryptRsaParam.nPubExp = genCtx->nPubExp;
+    symcryptRsaParam.nPubExp = 1;
 
     keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
     if (keyCtx->key == NULL)
