@@ -29,7 +29,7 @@ static const OSSL_PARAM p_scossl_param_types[] = {
 
 // EVP_MD_CTX_dup is a helpful function for the provider, but was not added until OpenSSL 3.1
 // This function is copied from 3.1 to allow its use when the provider is built against 3.0
-#if OPENSSL_VERSION_MINOR == 0
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
 EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in);
 #endif
 
