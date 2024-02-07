@@ -628,7 +628,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                     len = BIO_snprintf(p->data, p->data_size, "%d",
                                            ctx->cbSalt);
                     if (len <= 0)
-                        return 0;
+                        return SCOSSL_FAILURE;
                     p->return_size = len;
             }
 
