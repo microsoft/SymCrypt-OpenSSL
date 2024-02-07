@@ -145,7 +145,11 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         return SCOSSL_FAILURE;
     }
 
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
     ctx->cbSalt = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
+#else
+    ctx->cbSalt = RSA_PSS_SALTLEN_AUTO;
+#endif
     ctx->operation = operation;
     if (keyCtx != NULL)
     {
@@ -455,12 +459,14 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             {
                 saltlen = RSA_PSS_SALTLEN_MAX;
             }
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
             else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX) == 0)
             {
                 // Sign: Smaller of digest length or maximized salt length
                 // Verify: Autorecovered salt length
                 saltlen = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
             }
+#endif
             else
             {
                 saltlen = atoi(p->data);
@@ -470,8 +476,11 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
         if (saltlen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX)
+#else
+        if (saltlen < RSA_PSS_SALTLEN_MAX)
+#endif
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
             return SCOSSL_FAILURE;
@@ -610,14 +619,16 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                 case RSA_PSS_SALTLEN_MAX:
                     saltLenText = OSSL_PKEY_RSA_PSS_SALT_LEN_MAX;
                     break;
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
                 case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
                     saltLenText = OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX;
                     break;
+#endif
                 default:
                     len = BIO_snprintf(p->data, p->data_size, "%d",
                                            ctx->cbSalt);
                     if (len <= 0)
-                        return 0;
+                        return SCOSSL_FAILURE;
                     p->return_size = len;
             }
 
