@@ -21,10 +21,13 @@ typedef struct
 
 DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 
-BOOL p_scossl_is_keysinuse_enabled();
-
 SCOSSL_STATUS p_scsossl_keysinuse_init();
 void p_scossl_keysinuse_cleanup();
+
+BOOL p_scossl_keysinuse_enabled(_In_ char *logging_id);
+void p_scossl_keysinuse_set_enabled(BOOL enabled);
+void p_scossl_keysinuse_set_logging_id(_In_ char *id);
+SCOSSL_STATUS p_scossl_keysinuse_set_logging_delay(INT64 delay);
 
 SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_ char key_identifier[static KEY_IDENTIFIER_CHAR_SIZE]);
 void p_scossl_keysinuse_info_free(_Inout_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuse);
