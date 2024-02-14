@@ -5,6 +5,7 @@
 #include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
 #include "p_scossl_base.h"
+#include "p_scossl_keysinuse.h"
 
 #include <openssl/proverr.h>
 
@@ -24,6 +25,8 @@ typedef struct
     EVP_MD *md;
     SIZE_T mdSize;
     BOOL allowMdUpdates;
+
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_ECDSA_CTX;
 
 static const OSSL_PARAM p_scossl_ecdsa_ctx_gettable_param_types[] = {
@@ -95,7 +98,7 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                    _In_ const OSSL_PARAM params[])
+                                                    _In_ const OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
@@ -108,6 +111,25 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
     if (keyCtx != NULL)
     {
         ctx->keyCtx = keyCtx;
+
+        if (keyCtx->isImported && operation == EVP_PKEY_OP_SIGN)
+        {
+            // Initialize keysinuse for private keys. Generated keys are
+            // ignored to avoid noise from ephemeral keys.
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
+            {
+                ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+            else
+            {
+                ctx->keysinuseInfo = NULL;
+            }
+
+            OPENSSL_free(pbPublicKey);
+        }
     }
 
     return p_scossl_ecdsa_set_ctx_params(ctx, params);
@@ -116,13 +138,13 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 static SCOSSL_STATUS p_scossl_ecdsa_sign_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                               _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                                 _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
@@ -156,6 +178,8 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
+    p_scossl_keysinuse_on_sign(ctx->keysinuseInfo);
+
     return scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen);
 }
 
@@ -167,9 +191,10 @@ static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const char *mdname,
-                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], ossl_unused int operation)
+                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], 
+                                                           int operation)
 {
-    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params))
+    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, operation))
     {
         return SCOSSL_FAILURE;
     }

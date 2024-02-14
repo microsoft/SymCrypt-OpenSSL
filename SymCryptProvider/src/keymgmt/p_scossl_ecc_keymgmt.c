@@ -346,6 +346,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->libctx = genCtx->libctx;
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
+    keyCtx->isImported = FALSE;
 
     keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve);
     if (keyCtx->key == NULL)
@@ -377,91 +378,42 @@ cleanup:
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
 {
     PBYTE pbPublicKey = NULL;
-    SYMCRYPT_ERROR scError;
+    SIZE_T cbPublicKey;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
         !OSSL_PARAM_set_uint32(p, scossl_ecdsa_size(keyCtx->curve)))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve)))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL &&
         !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve) / 2))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
-
-        if (!keyCtx->initialized)
+        if (!p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            // Proper error raised in p_scossl_ecc_get_encoded_public_key
             goto cleanup;
         }
 
-        // In the general ECC case, 0x04 must be prepended to the public key to
-        // indicate this is an uncompressed point. In the X25519 case, the public
-        // key can be set as-is.
-        SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
-        SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
-        PBYTE pbPublicKeyTmp;
-        SIZE_T cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
-
-        if (!keyCtx->isX25519)
+        if (!OSSL_PARAM_set_octet_string(p, pbPublicKey, cbPublicKey))
         {
-            cbPublicKey++;
-        }
-
-        if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
-        pbPublicKeyTmp = pbPublicKey;
-
-        if (!keyCtx->isX25519)
-        {
-            pbPublicKeyTmp[0] = 0x04;
-            pbPublicKeyTmp++;
-            cbPublicKey--;
-        }
-
-        scError = SymCryptEckeyGetValue(
-                keyCtx->key,
-                NULL, 0,
-                pbPublicKeyTmp, cbPublicKey,
-                numFormat,
-                pointFormat,
-                0);
-
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            goto cleanup;
-        }
-
-        if (!keyCtx->isX25519)
-        {
-            pbPublicKeyTmp--;
-            cbPublicKey++;
-        }
-
-        if (!OSSL_PARAM_set_octet_string(p, pbPublicKeyTmp, cbPublicKey))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
     }
@@ -473,15 +425,14 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS)) != NULL &&
             !OSSL_PARAM_set_int(p, 0))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
 
         if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH)) != NULL &&
             !OSSL_PARAM_set_int(p, 0))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
     }
@@ -873,6 +824,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         }
 
         keyCtx->initialized = TRUE;
+        keyCtx->isImported = TRUE;
     }
 
     ret = SCOSSL_SUCCESS;

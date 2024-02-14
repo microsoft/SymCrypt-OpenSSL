@@ -669,7 +669,7 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseIn
 // Usage tracking
 static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning)
 {
-    if (p_scossl_keysinuse_is_enabled())
+    if (keysinuseInfo != NULL && p_scossl_keysinuse_is_enabled())
     {
         if (CRYPTO_THREAD_write_lock(keysinuseInfo->lock))
         {
