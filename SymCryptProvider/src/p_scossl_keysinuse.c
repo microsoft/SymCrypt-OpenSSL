@@ -384,7 +384,7 @@ cleanup:
 }
 
 // Setup/teardown
-SCOSSL_STATUS p_scsossl_keysinuse_init(char *logging_id)
+SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
 {
     pid_t pid = getpid();
     int cbSymlink;
@@ -537,7 +537,7 @@ void p_scossl_keysinuse_set_enabled(BOOL enabled)
 }
 
 _Use_decl_annotations_
-void p_scossl_keysinuse_set_logging_id(char *id)
+void p_scossl_keysinuse_set_logging_id(const char *id)
 {
     if (id != NULL && *id != '\0')
     {
