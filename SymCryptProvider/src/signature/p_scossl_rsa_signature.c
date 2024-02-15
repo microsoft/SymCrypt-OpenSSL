@@ -10,6 +10,7 @@
 #include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 #include "p_scossl_base.h"
+#include "p_scossl_keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +36,8 @@ typedef struct
     const OSSL_ITEM *mgf1MdInfo; // Informational, must match md if set
     int cbSalt;
     int cbSaltMin;
+
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_RSA_SIGN_CTX;
 
 #define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                        \
@@ -190,6 +193,19 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 
         ctx->keyCtx = keyCtx;
         ctx->padding = keyCtx->padding;
+
+        if (keyCtx->isImported && operation == EVP_PKEY_OP_SIGN)
+        {
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
+            {
+                ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+
+            OPENSSL_free(pbPublicKey);
+        }
     }
 
     return p_scossl_rsa_set_ctx_params(ctx, params);
@@ -222,6 +238,8 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
+
+    p_scossl_keysinuse_on_sign(ctx->keysinuseInfo);
 
     switch (ctx->padding)
     {

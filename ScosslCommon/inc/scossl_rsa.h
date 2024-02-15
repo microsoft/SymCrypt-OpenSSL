@@ -10,6 +10,14 @@ extern "C" {
 
 typedef struct
 {
+    int initialized;
+    PSYMCRYPT_RSAKEY key;
+
+    BOOL isImported;
+} SCOSSL_RSA_KEY_CTX;
+
+typedef struct
+{
     BIGNUM *p;
     BIGNUM *q;
     BIGNUM *d;

@@ -123,10 +123,6 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
             {
                 ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
             }
-            else
-            {
-                ctx->keysinuseInfo = NULL;
-            }
 
             OPENSSL_free(pbPublicKey);
         }

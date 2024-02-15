@@ -4,8 +4,11 @@
 
 // Common functions for rsa sign and rsa asym cipher interfaces
 
+#include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 #include <openssl/core_names.h>
 #include <openssl/evp.h>
 #include <openssl/param_build.h>
@@ -167,6 +170,45 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(const SCOSSL_RSA_PSS_RESTR
     return OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_RSA_DIGEST, pssRestrictions->mdInfo->ptr, 0) &&
            OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_RSA_MGF1_DIGEST, pssRestrictions->mgf1MdInfo->ptr, 0) &&
            OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN, pssRestrictions->cbSaltMin);
+}
+
+ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
+    ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, n, BIGNUM),
+    ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, e, BIGNUM),
+} ASN1_SEQUENCE_END_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
+
+IMPLEMENT_ASN1_FUNCTIONS_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
+                                                  PBYTE *ppbEncodedKey, SIZE_T *pcbEncodedKey)
+{
+    SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
+    PBYTE   pbEncodedKey = NULL;
+    SIZE_T  cbEncodedKey;
+    SCOSSL_STATUS  ret = SCOSSL_FAILURE;
+
+    rsaParams = scossl_rsa_new_export_params(TRUE);
+    if (rsaParams == NULL ||
+        !scossl_rsa_export_key(key, rsaParams))
+    {
+        goto cleanup;
+    }
+
+    if ((cbEncodedKey = i2d_SymcryptRsaPublicKey(rsaParams, &pbEncodedKey)) < 0)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    *ppbEncodedKey = pbEncodedKey;
+    *pcbEncodedKey = cbEncodedKey;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    scossl_rsa_free_export_params(rsaParams, TRUE);
+
+    return ret;
 }
 
 #ifdef __cplusplus

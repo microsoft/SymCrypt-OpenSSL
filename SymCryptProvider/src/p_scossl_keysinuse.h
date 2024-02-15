@@ -10,8 +10,9 @@ typedef struct
     time_t lastLoggedUse;
     UINT signCounter;
     UINT decryptCounter;
-    // The first 32 bytes of the SHA256 hash of the public key,
-    // encoded as a hex string
+    // The first 32 bytes of the SHA256 hash of the public key as it's encoded in
+    // the subjectPublicKey field of a certificate
+    // (PKCS#1 format for RSA, octet string for ECDSA)
     char keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE + 1];
     BOOL logPending;
     INT32 refCount;
