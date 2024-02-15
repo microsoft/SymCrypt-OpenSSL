@@ -67,9 +67,13 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In
 
 static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
 {
-    EVP_MD_CTX_free(ctx->mdctx);
-    EVP_MD_free(ctx->md);
-    OPENSSL_free(ctx->propq);
+    if (ctx != NULL)
+    {
+        EVP_MD_CTX_free(ctx->mdctx);
+        EVP_MD_free(ctx->md);
+        OPENSSL_free(ctx->propq);
+        p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
+    }
     OPENSSL_free(ctx);
 }
 
@@ -85,6 +89,11 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
             p_scossl_ecdsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             copyCtx = NULL;
+        }
+
+        if (ctx->keysinuseInfo != NULL)
+        {
+            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
         }
 
         copyCtx->libctx = ctx->libctx;

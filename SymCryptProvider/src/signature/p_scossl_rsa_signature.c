@@ -114,6 +114,7 @@ static void p_scossl_rsa_freectx(SCOSSL_RSA_SIGN_CTX *ctx)
     EVP_MD_CTX_free(ctx->mdctx);
     EVP_MD_free(ctx->md);
     OPENSSL_free(ctx->propq);
+    p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
     OPENSSL_free(ctx);
 }
 
@@ -131,6 +132,13 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
             copyCtx = NULL;
         }
 
+        if (ctx->keysinuseInfo != NULL)
+        {
+            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
+        }
+
+        copyCtx->libctx = ctx->libctx;
+        copyCtx->padding = ctx->padding;
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->padding = ctx->padding;
         copyCtx->operation = ctx->operation;

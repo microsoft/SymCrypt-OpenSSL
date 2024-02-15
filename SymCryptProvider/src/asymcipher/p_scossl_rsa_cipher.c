@@ -74,13 +74,24 @@ static void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
     if (ctx != NULL)
     {
         OPENSSL_free(ctx->pbLabel);
+        p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
     }
     OPENSSL_free(ctx);
 }
 
 static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    return OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+    SCOSSL_RSA_CIPHER_CTX* copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
+    if (copyCtx != NULL)
+    {
+        memcpy(copyCtx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+        if (ctx->keysinuseInfo != NULL)
+        {
+            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
+        }
+    }
+
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
