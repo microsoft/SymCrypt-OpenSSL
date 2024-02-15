@@ -381,7 +381,37 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
         {
             if (keysinuseMaxFileSize != NULL)
             {
-                p_scossl_keysinuse_set_max_file_size(atol(keysinuseMaxFileSize));
+                // Convert file size to off_t in bytes.
+                // This is essentially the same as atol but also handles MB, KB, and GB suffixes.
+                off_t maxFileSizeBytes = 0;
+                int i = 0;
+                for (i = 0; '0' <= keysinuseMaxFileSize[i] && keysinuseMaxFileSize[i] <= '9'; i++)
+                {
+                    maxFileSizeBytes = maxFileSizeBytes * 10 + (keysinuseMaxFileSize[i] - '0');
+                }
+
+                // Check for KB, MB, or GB suffixes, case insensitive.
+                if (keysinuseMaxFileSize[i] != '\0' &&
+                    (keysinuseMaxFileSize[i + 1] == 'B' || keysinuseMaxFileSize[i + 1] == 'b'))
+                {
+                    switch (keysinuseMaxFileSize[i])
+                    {
+                    case 'K':
+                    case 'k':
+                        maxFileSizeBytes <<= 10;
+                        break;
+                    case 'M':
+                    case 'm':
+                        maxFileSizeBytes <<= 20;
+                        break;
+                    case 'G':
+                    case 'g':
+                        maxFileSizeBytes <<= 30;
+                        break;
+                    }
+                }
+
+                p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
             }
 
             if (keysinuseLoggingDelay != NULL)
@@ -394,8 +424,7 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                 p_scossl_keysinuse_set_logging_id(keysinuseLoggingId);
             }
 
-            p_scossl_keysinuse_init();
-
+            p_scossl_keysinuse_init(NULL);
         }
 }
 
