@@ -26,10 +26,12 @@ static const char *default_prefix = "";
 static char log_id[LOG_ID_LEN_MAX+1] = {0};
 static char *prefix = NULL;
 static int prefix_size = 0;
-static off_t max_file_size = 1024 * 5; // 5KB
+static off_t max_file_size = 5 << 10; // Default to 5KB
 
 static int keysinuse_enabled = 0;
 static long loggingDelay = DEFAULT_loggingDelay;
+
+static CRYPTO_ONCE keysinuse_init_once = CRYPTO_ONCE_STATIC_INIT;
 
 // This lock should be aquired before accessing sk_keysinuse_info and first_use_counter
 static CRYPTO_RWLOCK *keysinuse_info_pending_lock = NULL;
@@ -242,7 +244,7 @@ static void p_scossl_keysinuse_log_notice(const char *message, ...)
 {
     va_list args;
     va_start(args, message);
-    p_scossl_keysinuse_log_common(KEYSINUSE_ERR, message, args);
+    p_scossl_keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
 }
 
 // The logging thread runs in a loop. It pops all pending usage from sk_keysinuse_info,
@@ -274,13 +276,12 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
         if (is_logging)
         {
             CRYPTO_THREAD_write_lock(keysinuse_info_pending_lock);
-
             // Only wait if no first use events are pending. Some may have been added while
             // this thread was logging. In that case immediately handle those events before
             // attempting to wait again.
             if (first_use_counter == 0)
             {
-                CRYPTO_THREAD_lock_free(keysinuse_info_pending_lock);
+                CRYPTO_THREAD_unlock(keysinuse_info_pending_lock);
 
                 clock_gettime(CLOCK_MONOTONIC, &abstime);
                 abstime.tv_sec += loggingDelay;
@@ -384,28 +385,20 @@ cleanup:
 }
 
 // Setup/teardown
-SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
+static void p_scossl_keysinuse_init_once()
 {
     pid_t pid = getpid();
     int cbSymlink;
     char *symlinkPath = NULL;
-    struct stat symlinkStat;
     char *procPath = NULL;
-    int cbProcPath = 0;
+    int cbProcPath = PATH_MAX;
     int cbProcPathUsed = 0;
-    struct timespec now;
-
-    int pthread_err;
+    time_t initTime = time(NULL);
+    int pthreadErr;
     pthread_condattr_t attr;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
-    if (logging_id != NULL && *logging_id != '\0')
-    {
-        strncpy(log_id, logging_id, LOG_ID_LEN_MAX);
-        log_id[LOG_ID_LEN_MAX] = '\0';
-    }
-    else
+    if (log_id[0] == '\0')
     {
         strcpy(log_id, default_log_id);
     }
@@ -413,28 +406,18 @@ SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
     // Generate prefix for all log messages
     // <keysinuse init time>,<process path>
 
-    // The only reasonable failure here is EINVAL, meaning the CLOCK_MONOTONIC
-    // is not supported. Additional KeysInUse behavior requires CLOCK_MONOTONIC,
-    // so fail here if it is not supported. This should usually be availabile.
-    if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-        goto cleanup;
-    }
-
     // Fetch running process path from /proc/<pid>/exe. This path is a symbolic link.
     cbSymlink = snprintf(NULL, 0, "/proc/%d/exe", pid) + 1;
     symlinkPath = OPENSSL_zalloc(cbSymlink);
 
     if (symlinkPath != NULL &&
-        snprintf(symlinkPath, cbSymlink, "/proc/%d/exe", pid) > 0 &&
-        lstat(symlinkPath, &symlinkStat) != -1)
+        snprintf(symlinkPath, cbSymlink, "/proc/%d/exe", pid) > 0)
     {
-        cbProcPath = symlinkStat.st_size == 0 ? PATH_MAX : symlinkStat.st_size;
-
-        procPath = OPENSSL_malloc(cbProcPath);
-        if (procPath != NULL &&
-            (cbProcPathUsed = readlink(procPath, symlinkPath, cbProcPath)) == -1)
+        if ((procPath = OPENSSL_malloc(cbProcPath)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        }
+        else if ((cbProcPathUsed = readlink(symlinkPath, procPath, cbProcPath)) == -1)
         {
             // Failure to read the the process path is not fatal but makes it
             // harder to match events to running processes.
@@ -447,11 +430,17 @@ SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
 
     // Failure to generate the logging prefix is not fatal but makes it
     // harder to match events to running processes.
-    prefix_size = snprintf(NULL, 0, "%ld,", now.tv_sec) + cbProcPathUsed;
-    if ((prefix = OPENSSL_malloc(prefix_size + 1)) == NULL ||
-        snprintf(prefix, prefix_size + 1, "%ld,%s", now.tv_sec, procPath == NULL ? "" : procPath) < 0)
+    prefix_size = snprintf(NULL, 0, "%ld,", initTime) + cbProcPathUsed;
+
+    if ((prefix = OPENSSL_malloc(prefix_size + 1)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        prefix = (char*)default_prefix;
+    }
+    else if (snprintf(prefix, prefix_size + 1, "%ld,%.*s", initTime, cbProcPathUsed, procPath) < 0)
     {
         OPENSSL_free(prefix);
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         prefix = (char*)default_prefix;
     }
 
@@ -460,10 +449,10 @@ SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
 
     // Start the logging thread
     is_logging = TRUE;
-    if (!pthread_condattr_init(&attr) ||
-        !pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) ||
-        !pthread_cond_init(&logging_thread_cond_wake_early, &attr) ||
-        (pthread_err = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+    if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+        (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
+        (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+        (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
     {
         is_logging = FALSE;
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -471,30 +460,27 @@ SCOSSL_STATUS p_scossl_keysinuse_init(char *logging_id)
     }
 
     keysinuse_enabled = TRUE;
-    ret = SCOSSL_SUCCESS;
+    status = SCOSSL_SUCCESS;
 
 cleanup:
-    if (!ret)
+    if (!status)
     {
         p_scossl_keysinuse_cleanup();
     }
 
     OPENSSL_free(symlinkPath);
     OPENSSL_free(procPath);
+}
 
-    return ret;
+SCOSSL_STATUS p_scossl_keysinuse_init()
+{
+    return CRYPTO_THREAD_run_once(&keysinuse_init_once, p_scossl_keysinuse_init_once) && keysinuse_enabled;
 }
 
 void p_scossl_keysinuse_cleanup()
 {
     SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfoTmp;
     int pthread_err;
-
-    if (prefix != default_prefix)
-    {
-        OPENSSL_free(prefix);
-        prefix = (char*)default_prefix;
-    }
 
     // Finish logging thread
     pthread_mutex_lock(&logging_thread_mutex);
@@ -512,6 +498,13 @@ void p_scossl_keysinuse_cleanup()
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
     }
 
+    if (prefix != default_prefix)
+    {
+        OPENSSL_free(prefix);
+        prefix = (char*)default_prefix;
+        prefix_size = 0;
+    }
+
     // Cleanup any elements in the stack in case the logging thread failed
     while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
     {
@@ -521,6 +514,7 @@ void p_scossl_keysinuse_cleanup()
 
     CRYPTO_THREAD_lock_free(keysinuse_info_pending_lock);
     sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+    keysinuse_info_pending_lock = NULL;
     sk_keysinuse_info = NULL;
     keysinuse_enabled = FALSE;
 }
@@ -582,7 +576,6 @@ SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_reads_bytes_(cbPubli
 {
     SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo = NULL;
     PBYTE pbHash = NULL;
-    SIZE_T hexStrLength;
 
     if (pbPublicKey == NULL)
     {
@@ -600,11 +593,9 @@ SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_reads_bytes_(cbPubli
 
         SymCryptSha256(pbPublicKey, cbPublicKey, pbHash);
 
-        if (!OPENSSL_buf2hexstr_ex(keysinuseInfo->keyIdentifier, SYMCRYPT_SHA256_RESULT_SIZE, &hexStrLength,
-                                   pbHash, SYMCRYPT_SHA256_RESULT_SIZE, '\0'))
+        for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            goto cleanup;
+            sprintf(&keysinuseInfo->keyIdentifier[i*2], "%02x", pbHash[i]);
         }
 
         if ((keysinuseInfo->lock = CRYPTO_THREAD_lock_new()) == NULL ||
@@ -669,6 +660,7 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseIn
 // Usage tracking
 static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning)
 {
+    int pthreadErr;
     if (keysinuseInfo != NULL && p_scossl_keysinuse_is_enabled())
     {
         if (CRYPTO_THREAD_write_lock(keysinuseInfo->lock))
@@ -700,8 +692,8 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
                         CRYPTO_THREAD_unlock(keysinuse_info_pending_lock);
 
                         // Immediatly log use, signal logging thread
-                        if (!pthread_mutex_lock(&logging_thread_mutex) ||
-                            !pthread_cond_signal(&logging_thread_cond_wake_early))
+                        if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) != 0 ||
+                            (pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
                         {
                             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
                         }

@@ -93,7 +93,8 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
 
         if (ctx->keysinuseInfo != NULL)
         {
-            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
+            copyCtx->keysinuseInfo = ctx->keysinuseInfo;
+            p_scossl_keysinuse_upref(copyCtx->keysinuseInfo, NULL);
         }
 
         copyCtx->libctx = ctx->libctx;

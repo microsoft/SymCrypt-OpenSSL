@@ -84,10 +84,10 @@ static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPH
     SCOSSL_RSA_CIPHER_CTX* copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
     if (copyCtx != NULL)
     {
-        memcpy(copyCtx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
-        if (ctx->keysinuseInfo != NULL)
+        *copyCtx = *ctx;
+        if (copyCtx->keysinuseInfo != NULL)
         {
-            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
+            p_scossl_keysinuse_upref(copyCtx->keysinuseInfo, NULL);
         }
     }
 

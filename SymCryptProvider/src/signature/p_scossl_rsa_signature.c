@@ -134,6 +134,7 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 
         if (ctx->keysinuseInfo != NULL)
         {
+            copyCtx->keysinuseInfo = ctx->keysinuseInfo;
             p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
         }
 
