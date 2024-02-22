@@ -98,6 +98,7 @@ void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
     {
         SymCryptEckeyFree(keyCtx->key);
     }
+    p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
 
     OPENSSL_free(keyCtx);
 }
@@ -201,6 +202,12 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
             copyCtx->key = NULL;
             copyCtx->initialized = 0;
             copyCtx->includePublic = 1;
+        }
+
+        if (keyCtx->keysinuseInfo != NULL &&
+            p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+        {
+            copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
         }
     }
 

@@ -5,7 +5,6 @@
 #include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 #include "p_scossl_base.h"
-#include "p_scossl_keysinuse.h"
 
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
@@ -28,8 +27,6 @@ typedef struct
     const OSSL_ITEM *mgf1MdInfo; // Informational, must match oaepMdInfo if set
     PBYTE pbLabel;
     SIZE_T cbLabel;
-
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_RSA_CIPHER_CTX;
 
 static const OSSL_PARAM p_scossl_rsa_cipher_gettable_ctx_param_types[] = {
@@ -74,7 +71,6 @@ static void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
     if (ctx != NULL)
     {
         OPENSSL_free(ctx->pbLabel);
-        p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
     }
     OPENSSL_free(ctx);
 }
@@ -85,49 +81,47 @@ static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPH
     if (copyCtx != NULL)
     {
         *copyCtx = *ctx;
-        if (copyCtx->keysinuseInfo != NULL)
-        {
-            p_scossl_keysinuse_upref(copyCtx->keysinuseInfo, NULL);
-        }
     }
 
     return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
                                               _In_ const OSSL_PARAM params[], int operation)
 {
     ctx->padding = RSA_PKCS1_PADDING;
 
     if (keyCtx != NULL)
     {
-        ctx->keyCtx = keyCtx;
-
-        if (keyCtx->isImported && operation == EVP_PKEY_OP_DECRYPT)
+        if (operation == EVP_PKEY_OP_DECRYPT &&
+            keyCtx->isImported &&
+            keyCtx->keysinuseInfo == NULL)
         {
             PBYTE pbPublicKey;
             SIZE_T cbPublicKey;
 
             if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
             {
-                ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
             }
 
             OPENSSL_free(pbPublicKey);
         }
+
+        ctx->keyCtx = keyCtx;
     }
 
     return p_scossl_rsa_cipher_set_ctx_params(ctx, params);
 }
 
 
-static SCOSSL_STATUS p_scossl_rsa_encrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_rsa_encrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
                                                _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_cipher_init(ctx, keyCtx, params, EVP_PKEY_OP_ENCRYPT);
 }
 
-static SCOSSL_STATUS p_scossl_rsa_decrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_rsa_decrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
                                                _In_ const OSSL_PARAM params[])
 {
     return p_scossl_rsa_cipher_init(ctx, keyCtx, params, EVP_PKEY_OP_DECRYPT);
@@ -204,13 +198,17 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
         mdnid = ctx->oaepMdInfo->id;
     }
 
-    p_scossl_keysinuse_on_decrypt(ctx->keysinuseInfo);
 
-    ret = scossl_rsa_decrypt(ctx->keyCtx, ctx->padding,
+    ret = scossl_rsa_decrypt(ctx->keyCtx->key, ctx->padding,
                              mdnid, ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
+
+    if (out != NULL)
+    {
+        p_scossl_keysinuse_on_decrypt(ctx->keyCtx->keysinuseInfo);
+    }
 
     return ret;
 }

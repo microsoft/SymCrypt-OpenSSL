@@ -3,6 +3,7 @@
 //
 
 #include "scossl_helpers.h"
+#include "p_scossl_keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +23,9 @@ typedef struct
     PSYMCRYPT_RSAKEY key;
     UINT padding;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
+
     BOOL isImported;
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_PROV_RSA_KEY_CTX;
 
 const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx,

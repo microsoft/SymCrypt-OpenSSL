@@ -101,12 +101,13 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
-
     if (keyCtx->key != NULL)
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
     OPENSSL_free(keyCtx->pssRestrictions);
+    p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+
     OPENSSL_free(keyCtx);
 }
 
@@ -245,6 +246,12 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         p_scossl_rsa_keymgmt_free_ctx(copyCtx);
         copyCtx = NULL;
+    }
+
+    if (keyCtx->keysinuseInfo != NULL &&
+        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+    {
+        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
     }
 
     return copyCtx;
@@ -717,7 +724,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection)
+static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
     BOOL ret = TRUE;
     if (keyCtx->key == NULL)
@@ -731,7 +738,7 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int 
     return ret;
 }
 
-static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx2,
+static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
     BOOL ret = FALSE;
@@ -840,7 +847,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
         NULL;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -987,7 +994,7 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection,
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection,
                                                  _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;

@@ -3,6 +3,7 @@
 //
 
 #include "scossl_helpers.h"
+#include "p_scossl_keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,7 @@ typedef struct {
     int includePublic;
 
     BOOL isImported;
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_ECC_KEY_CTX;
 
 // Helper function for retrieving the properly formatted encoded public key.

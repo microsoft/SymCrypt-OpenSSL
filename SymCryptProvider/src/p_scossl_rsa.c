@@ -184,8 +184,8 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
                                                   PBYTE *ppbEncodedKey, SIZE_T *pcbEncodedKey)
 {
     SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
-    PBYTE   pbEncodedKey = NULL;
-    SIZE_T  cbEncodedKey;
+    PBYTE pbEncodedKey = NULL;
+    int cbEncodedKey;
     SCOSSL_STATUS  ret = SCOSSL_FAILURE;
 
     rsaParams = scossl_rsa_new_export_params(TRUE);
@@ -202,7 +202,7 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
     }
 
     *ppbEncodedKey = pbEncodedKey;
-    *pcbEncodedKey = cbEncodedKey;
+    *pcbEncodedKey = (SIZE_T) cbEncodedKey;
     ret = SCOSSL_SUCCESS;
 
 cleanup:

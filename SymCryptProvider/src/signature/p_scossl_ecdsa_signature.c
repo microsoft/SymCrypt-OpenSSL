@@ -5,7 +5,6 @@
 #include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
 #include "p_scossl_base.h"
-#include "p_scossl_keysinuse.h"
 
 #include <openssl/proverr.h>
 
@@ -25,8 +24,6 @@ typedef struct
     EVP_MD *md;
     SIZE_T mdSize;
     BOOL allowMdUpdates;
-
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_ECDSA_CTX;
 
 static const OSSL_PARAM p_scossl_ecdsa_ctx_gettable_param_types[] = {
@@ -72,7 +69,6 @@ static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
         EVP_MD_CTX_free(ctx->mdctx);
         EVP_MD_free(ctx->md);
         OPENSSL_free(ctx->propq);
-        p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
     }
     OPENSSL_free(ctx);
 }
@@ -89,12 +85,6 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
             p_scossl_ecdsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             copyCtx = NULL;
-        }
-
-        if (ctx->keysinuseInfo != NULL)
-        {
-            copyCtx->keysinuseInfo = ctx->keysinuseInfo;
-            p_scossl_keysinuse_upref(copyCtx->keysinuseInfo, NULL);
         }
 
         copyCtx->libctx = ctx->libctx;
@@ -120,9 +110,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
     if (keyCtx != NULL)
     {
-        ctx->keyCtx = keyCtx;
-
-        if (keyCtx->isImported && operation == EVP_PKEY_OP_SIGN)
+        if (operation == EVP_PKEY_OP_SIGN &&
+            keyCtx->isImported &&
+            keyCtx->keysinuseInfo == NULL)
         {
             // Initialize keysinuse for private keys. Generated keys are
             // ignored to avoid noise from ephemeral keys.
@@ -131,11 +121,13 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
             if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
             {
-                ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
             }
 
             OPENSSL_free(pbPublicKey);
         }
+
+        ctx->keyCtx = keyCtx;
     }
 
     return p_scossl_ecdsa_set_ctx_params(ctx, params);
@@ -184,9 +176,14 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    p_scossl_keysinuse_on_sign(ctx->keysinuseInfo);
+    if (!scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen))
+    {
+        return SCOSSL_FAILURE;
+    }
 
-    return scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen);
+    p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
+
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,

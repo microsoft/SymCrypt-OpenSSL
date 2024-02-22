@@ -10,7 +10,6 @@
 #include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 #include "p_scossl_base.h"
-#include "p_scossl_keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,8 +35,6 @@ typedef struct
     const OSSL_ITEM *mgf1MdInfo; // Informational, must match md if set
     int cbSalt;
     int cbSaltMin;
-
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 } SCOSSL_RSA_SIGN_CTX;
 
 #define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                        \
@@ -114,7 +111,6 @@ static void p_scossl_rsa_freectx(SCOSSL_RSA_SIGN_CTX *ctx)
     EVP_MD_CTX_free(ctx->mdctx);
     EVP_MD_free(ctx->md);
     OPENSSL_free(ctx->propq);
-    p_scossl_keysinuse_info_free(ctx->keysinuseInfo);
     OPENSSL_free(ctx);
 }
 
@@ -130,12 +126,6 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
             p_scossl_rsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             copyCtx = NULL;
-        }
-
-        if (ctx->keysinuseInfo != NULL)
-        {
-            copyCtx->keysinuseInfo = ctx->keysinuseInfo;
-            p_scossl_keysinuse_upref(ctx->keysinuseInfo, NULL);
         }
 
         copyCtx->libctx = ctx->libctx;
@@ -203,18 +193,22 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ctx->keyCtx = keyCtx;
         ctx->padding = keyCtx->padding;
 
-        if (keyCtx->isImported && operation == EVP_PKEY_OP_SIGN)
+        if (operation == EVP_PKEY_OP_SIGN &&
+            keyCtx->isImported &&
+            keyCtx->keysinuseInfo == NULL)
         {
             PBYTE pbPublicKey;
             SIZE_T cbPublicKey;
 
             if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
             {
-                ctx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
             }
 
             OPENSSL_free(pbPublicKey);
         }
+
+        ctx->keyCtx = keyCtx;
     }
 
     return p_scossl_rsa_set_ctx_params(ctx, params);
@@ -236,31 +230,40 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
     if (sig != NULL && sigsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
+        goto err;
     }
 
     if (ctx->mdInfo == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-        return SCOSSL_FAILURE;
+        goto err;
     }
-
-    p_scossl_keysinuse_on_sign(ctx->keysinuseInfo);
 
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        break;
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        ret = scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        break;
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
+        goto err;
     }
 
-    return SCOSSL_FAILURE;
+    if (ret && sig != NULL)
+    {
+        p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
+    }
+
+err:
+    return ret;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
