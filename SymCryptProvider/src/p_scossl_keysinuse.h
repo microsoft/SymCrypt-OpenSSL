@@ -1,5 +1,13 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <scossl_helpers.h>
 #include <openssl/safestack.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // This structure is refcounted and only freed when all references are freed.
 // The key object this is associated with may be freed, but logging events may
@@ -19,13 +27,9 @@ typedef struct
     CRYPTO_RWLOCK *lock;
 } SCOSSL_PROV_KEYSINUSE_INFO;
 
-DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
-
 // Setup/teardown
 SCOSSL_STATUS p_scossl_keysinuse_init();
 void p_scossl_keysinuse_cleanup();
-BOOL p_scossl_keysinuse_is_enabled();
-
 // Configureation
 void p_scossl_keysinuse_set_logging_id(_In_ const char *id);
 SCOSSL_STATUS p_scossl_keysinuse_set_max_file_size(off_t size);
@@ -40,3 +44,7 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(_Inout_ SCOSSL_PROV_KEYSINUSE_INFO *key
 // Usage tracking
 void p_scossl_keysinuse_on_sign(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
 void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
+
+#ifdef __cplusplus
+}
+#endif
