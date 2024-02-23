@@ -172,6 +172,7 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(const SCOSSL_RSA_PSS_RESTR
            OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN, pssRestrictions->cbSaltMin);
 }
 
+#ifdef KEYSINUSE_ENABLED
 ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
     ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, n, BIGNUM),
     ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, e, BIGNUM),
@@ -210,6 +211,7 @@ cleanup:
 
     return ret;
 }
+#endif
 
 #ifdef __cplusplus
 }

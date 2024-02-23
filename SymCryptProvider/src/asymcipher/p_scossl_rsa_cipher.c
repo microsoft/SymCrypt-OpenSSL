@@ -17,10 +17,11 @@ extern "C" {
 
 typedef struct
 {
-    OSSL_LIB_CTX *libctx;
-
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
     UINT padding;
+    int operation;
+
+    OSSL_LIB_CTX *libctx;
 
     // OAEP Parameters
     const OSSL_ITEM *oaepMdInfo;
@@ -90,9 +91,11 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
                                               _In_ const OSSL_PARAM params[], int operation)
 {
     ctx->padding = RSA_PKCS1_PADDING;
+    ctx->operation = operation;
 
     if (keyCtx != NULL)
     {
+#ifdef KEYSINUSE_ENABLED
         if (operation == EVP_PKEY_OP_DECRYPT &&
             keyCtx->isImported &&
             keyCtx->keysinuseInfo == NULL)
@@ -107,6 +110,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
 
             OPENSSL_free(pbPublicKey);
         }
+#endif
 
         ctx->keyCtx = keyCtx;
     }
@@ -138,6 +142,11 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_ENCRYPT)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -178,6 +187,11 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_DECRYPT)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -205,10 +219,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
 
+#ifdef KEYSINUSE_ENABLED
     if (out != NULL)
     {
         p_scossl_keysinuse_on_decrypt(ctx->keyCtx->keysinuseInfo);
     }
+#endif
 
     return ret;
 }

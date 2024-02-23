@@ -15,10 +15,11 @@
 extern "C" {
 #endif
 
+#ifdef KEYSINUSE_ENABLED
 #define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
-#define CONF_KEYSINUSE_LOGGING_ID    "keysinuse.logging_id"
 #define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay"
+#endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
 #define OSSL_TLS_GROUP_ID_secp224r1        0x0015
@@ -271,7 +272,9 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
+#ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_cleanup();
+#endif
     OPENSSL_free(provctx);
 }
 
@@ -360,19 +363,18 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
     return SCOSSL_FAILURE;
 }
 
+#ifdef KEYSINUSE_ENABLED
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
         // All config params are provided as string pointers
         const char *keysinuseEnabled = NULL;
         const char *keysinuseMaxFileSize = NULL;
         const char *keysinuseLoggingDelay = NULL;
-        const char *keysinuseLoggingId = NULL;
 
         OSSL_PARAM keysinuse_params[] = {
             OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &keysinuseEnabled, 0),
             OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &keysinuseMaxFileSize, 0),
             OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &keysinuseLoggingDelay, 0),
-            OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_ID, &keysinuseLoggingId, 0),
             OSSL_PARAM_END};
 
         if (core_get_params(handle, keysinuse_params) &&
@@ -418,15 +420,11 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             {
                 p_scossl_keysinuse_set_logging_delay(atol(keysinuseLoggingDelay));
             }
-
-            if (keysinuseLoggingId != NULL)
-            {
-                p_scossl_keysinuse_set_logging_id(keysinuseLoggingId);
-            }
-
+        
             p_scossl_keysinuse_init(NULL);
         }
 }
+#endif
 
 static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))p_scossl_teardown},
@@ -507,11 +505,13 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     *out = p_scossl_base_dispatch;
 
+#ifdef KEYSINUSE_ENABLED
     // Start keysinuse if configured
     if (core_get_params != NULL)
     {
         p_scossl_start_keysinuse(handle);
     }
+#endif
 
     return SCOSSL_SUCCESS;
 }

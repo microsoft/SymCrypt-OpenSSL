@@ -36,11 +36,16 @@ set(SCOSSL_SOURCES
     ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_digests.c
     ./src/p_scossl_ecc.c
-    ./src/p_scossl_keysinuse.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_rsa.c
     ./src/p_scossl_base.c
 )
+
+if (KEYSINUSE_ENABLED)
+    list(APPEND SCOSSL_SOURCES ./src/p_scossl_keysinuse.c)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DKEYSINUSE_ENABLED")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKEYSINUSE_ENABLED")
+endif()
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 add_dependencies(scossl_provider scossl_common)

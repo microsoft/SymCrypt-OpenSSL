@@ -128,8 +128,6 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
             copyCtx = NULL;
         }
 
-        copyCtx->libctx = ctx->libctx;
-        copyCtx->padding = ctx->padding;
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->padding = ctx->padding;
         copyCtx->operation = ctx->operation;
@@ -193,6 +191,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ctx->keyCtx = keyCtx;
         ctx->padding = keyCtx->padding;
 
+#ifdef KEYSINUSE_ENABLED
         if (operation == EVP_PKEY_OP_SIGN &&
             keyCtx->isImported &&
             keyCtx->keysinuseInfo == NULL)
@@ -207,6 +206,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 
             OPENSSL_free(pbPublicKey);
         }
+#endif
 
         ctx->keyCtx = keyCtx;
     }
@@ -231,6 +231,12 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (ctx->operation != EVP_PKEY_OP_SIGN)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        goto err;
+    }
 
     if (sig != NULL && sigsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
     {
@@ -257,10 +263,12 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         goto err;
     }
 
+#ifdef KEYSINUSE_ENABLED
     if (ret && sig != NULL)
     {
         p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
     }
+#endif
 
 err:
     return ret;
@@ -270,6 +278,12 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    if (ctx->operation != EVP_PKEY_OP_VERIFY)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
     if (ctx->mdInfo == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);

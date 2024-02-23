@@ -98,7 +98,9 @@ void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
     {
         SymCryptEckeyFree(keyCtx->key);
     }
+#ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+#endif
 
     OPENSSL_free(keyCtx);
 }
@@ -204,11 +206,13 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
             copyCtx->includePublic = 1;
         }
 
+#ifdef KEYSINUSE_ENABLED
         if (keyCtx->keysinuseInfo != NULL &&
             p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
         {
             copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
         }
+#endif
     }
 
     success = SCOSSL_SUCCESS;
@@ -353,7 +357,9 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->libctx = genCtx->libctx;
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
+#ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
+#endif
 
     keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve);
     if (keyCtx->key == NULL)
@@ -831,7 +837,9 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         }
 
         keyCtx->initialized = TRUE;
+#ifdef KEYSINUSE_ENABLED
         keyCtx->isImported = TRUE;
+#endif
     }
 
     ret = SCOSSL_SUCCESS;

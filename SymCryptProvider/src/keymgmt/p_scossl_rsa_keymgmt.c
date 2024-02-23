@@ -101,13 +101,16 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
+
     if (keyCtx->key != NULL)
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
     OPENSSL_free(keyCtx->pssRestrictions);
+#ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
-
+#endif
+    OPENSSL_free(keyCtx->pssRestrictions);
     OPENSSL_free(keyCtx);
 }
 
@@ -248,11 +251,13 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         copyCtx = NULL;
     }
 
+#ifdef KEYSINUSE_ENABLED
     if (keyCtx->keysinuseInfo != NULL &&
         p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
     {
         copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
     }
+#endif
 
     return copyCtx;
 }
@@ -403,6 +408,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     keyCtx->padding = genCtx->padding;
     keyCtx->pssRestrictions = genCtx->pssRestrictions;
     genCtx->pssRestrictions = NULL;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+#endif
 
 cleanup:
     if (keyCtx != NULL && !keyCtx->initialized)
@@ -982,7 +990,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     }
 
     keyCtx->initialized = TRUE;
+#ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = TRUE;
+#endif
 
     ret = SCOSSL_SUCCESS;
 
