@@ -366,63 +366,76 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
 #ifdef KEYSINUSE_ENABLED
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
-        // All config params are provided as string pointers
-        const char *keysinuseEnabled = NULL;
-        const char *keysinuseMaxFileSize = NULL;
-        const char *keysinuseLoggingDelay = NULL;
+    int keysinuseEnabled = FALSE;
+    // All config params are provided as string pointers
+    const char *confKeysinuseEnabled = NULL;
+    const char *confKeysinuseMaxFileSize = NULL;
+    const char *confKeysinuseLoggingDelay = NULL;
+    const char *envKeysinuseEnabled = NULL;
 
-        OSSL_PARAM keysinuse_params[] = {
-            OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &keysinuseEnabled, 0),
-            OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &keysinuseMaxFileSize, 0),
-            OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &keysinuseLoggingDelay, 0),
-            OSSL_PARAM_END};
+    OSSL_PARAM keysinuseParams[] = {
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &confKeysinuseEnabled, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &confKeysinuseMaxFileSize, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confKeysinuseLoggingDelay, 0),
+        OSSL_PARAM_END};
 
-        if (core_get_params(handle, keysinuse_params) &&
-            keysinuseEnabled != NULL &&
-            atoi(keysinuseEnabled))
+    if (core_get_params(handle, keysinuseParams) &&
+        confKeysinuseEnabled != NULL)
+    {
+        keysinuseEnabled = atoi(confKeysinuseEnabled);
+    }
+
+    // KeysInUse can be enabled from environment. This takes precedense over config
+    // NCONF_get_string fetches from the environment if the conf parameter is NULL
+    if ((envKeysinuseEnabled = NCONF_get_string(NULL, NULL, "KEYSINUSE_ENABLED")) != NULL)
+    {
+        keysinuseEnabled = atoi(envKeysinuseEnabled);
+    }
+
+    if (keysinuseEnabled)
+    {
+        if (confKeysinuseMaxFileSize != NULL)
         {
-            if (keysinuseMaxFileSize != NULL)
+            // Convert file size to off_t in bytes.
+            // This is essentially the same as atol but also handles MB, KB, and GB suffixes.
+            off_t maxFileSizeBytes = 0;
+            int i = 0;
+            for (i = 0; '0' <= confKeysinuseMaxFileSize[i] && confKeysinuseMaxFileSize[i] <= '9'; i++)
             {
-                // Convert file size to off_t in bytes.
-                // This is essentially the same as atol but also handles MB, KB, and GB suffixes.
-                off_t maxFileSizeBytes = 0;
-                int i = 0;
-                for (i = 0; '0' <= keysinuseMaxFileSize[i] && keysinuseMaxFileSize[i] <= '9'; i++)
-                {
-                    maxFileSizeBytes = maxFileSizeBytes * 10 + (keysinuseMaxFileSize[i] - '0');
-                }
-
-                // Check for KB, MB, or GB suffixes, case insensitive.
-                if (keysinuseMaxFileSize[i] != '\0' &&
-                    (keysinuseMaxFileSize[i + 1] == 'B' || keysinuseMaxFileSize[i + 1] == 'b'))
-                {
-                    switch (keysinuseMaxFileSize[i])
-                    {
-                    case 'K':
-                    case 'k':
-                        maxFileSizeBytes <<= 10;
-                        break;
-                    case 'M':
-                    case 'm':
-                        maxFileSizeBytes <<= 20;
-                        break;
-                    case 'G':
-                    case 'g':
-                        maxFileSizeBytes <<= 30;
-                        break;
-                    }
-                }
-
-                p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
+                maxFileSizeBytes = maxFileSizeBytes * 10 + (confKeysinuseMaxFileSize[i] - '0');
             }
 
-            if (keysinuseLoggingDelay != NULL)
+            // Check for KB, MB, or GB suffixes, case insensitive.
+            if (confKeysinuseMaxFileSize[i] != '\0' &&
+                (confKeysinuseMaxFileSize[i + 1] == 'B' || confKeysinuseMaxFileSize[i + 1] == 'b'))
             {
-                p_scossl_keysinuse_set_logging_delay(atol(keysinuseLoggingDelay));
+                switch (confKeysinuseMaxFileSize[i])
+                {
+                case 'K':
+                case 'k':
+                    maxFileSizeBytes <<= 10;
+                    break;
+                case 'M':
+                case 'm':
+                    maxFileSizeBytes <<= 20;
+                    break;
+                case 'G':
+                case 'g':
+                    maxFileSizeBytes <<= 30;
+                    break;
+                }
             }
-        
-            p_scossl_keysinuse_init(NULL);
+
+            p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
         }
+
+        if (confKeysinuseLoggingDelay != NULL)
+        {
+            p_scossl_keysinuse_set_logging_delay(atol(confKeysinuseLoggingDelay));
+        }
+
+        p_scossl_keysinuse_init(NULL);
+    }
 }
 #endif
 

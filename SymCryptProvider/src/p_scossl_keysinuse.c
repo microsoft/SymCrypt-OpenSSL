@@ -157,6 +157,9 @@ void p_scossl_keysinuse_cleanup()
     SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfoTmp;
     int pthread_err;
 
+    if (!keysinuse_enabled)
+        return;
+
     // Finish logging thread
     if (pthread_mutex_lock(&logging_thread_mutex) == 0 &&
         is_logging)
