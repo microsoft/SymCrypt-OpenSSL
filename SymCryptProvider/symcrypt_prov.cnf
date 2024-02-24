@@ -11,6 +11,5 @@ keysinuse = keysinuse_sect
 
 [keysinuse_sect]
 enabled = 1
-logging_id = testing
 max_file_size = 5KB
 logging_delay = 3600
