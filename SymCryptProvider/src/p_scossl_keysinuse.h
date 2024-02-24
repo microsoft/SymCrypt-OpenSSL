@@ -8,8 +8,6 @@
 extern "C" {
 #endif
 
-#ifdef KEYSINUSE_ENABLED
-
 // This structure is refcounted and only freed when all references are freed.
 // The key object this is associated with may be freed, but logging events may
 // be pending according to the logging backoff.
@@ -45,8 +43,6 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(_Inout_ SCOSSL_PROV_KEYSINUSE_INFO *key
 // Usage tracking
 void p_scossl_keysinuse_on_sign(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
 void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
-
-#endif
 
 #ifdef __cplusplus
 }

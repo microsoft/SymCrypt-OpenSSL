@@ -158,22 +158,22 @@ void p_scossl_keysinuse_cleanup()
     int pthread_err;
 
     // Finish logging thread
-    if (pthread_mutex_lock(&logging_thread_mutex) &&
+    if (pthread_mutex_lock(&logging_thread_mutex) == 0 &&
         is_logging)
     {
         is_logging = FALSE;
 
         pthread_cond_signal(&logging_thread_cond_wake_early);
         pthread_mutex_unlock(&logging_thread_mutex);
-    }
 
-    if ((pthread_err = pthread_join(logging_thread, NULL)) != 0)
-    {
-        p_scossl_keysinuse_log_error("Failed to join logging thread,SYS_%d", pthread_err);
-    }
-    else if (logging_thread_exit_status != SCOSSL_SUCCESS)
-    {
-        p_scossl_keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
+        if ((pthread_err = pthread_join(logging_thread, NULL)) != 0)
+        {
+            p_scossl_keysinuse_log_error("Failed to join logging thread,SYS_%d", pthread_err);
+        }
+        else if (logging_thread_exit_status != SCOSSL_SUCCESS)
+        {
+            p_scossl_keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
+        }
     }
 
     if (prefix != default_prefix)
@@ -700,6 +700,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             {
                 pKeysinuseInfo->firstUse = pKeysinuseInfo->lastLoggedUse == 0 ? now : pKeysinuseInfo->firstUse;
                 pKeysinuseInfo->lastLoggedUse = now;
+                pKeysinuseInfo->logPending = FALSE;
 
                 keysinuseInfoTmp = *pKeysinuseInfo;
 
