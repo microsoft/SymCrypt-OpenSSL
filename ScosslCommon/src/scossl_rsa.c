@@ -87,30 +87,12 @@ static SIZE_T scossl_get_expected_hash_length(int mdnid)
     return -1;
 }
 
-SCOSSL_RSA_KEY_CTX *scossl_rsa_new_key_ctx()
-{
-    return OPENSSL_zalloc(sizeof(SCOSSL_RSA_KEY_CTX));
-}
-
 _Use_decl_annotations_
-void scossl_rsa_free_key_ctx(SCOSSL_RSA_KEY_CTX *keyCtx)
-{
-    if (keyCtx == NULL)
-        return;
-    if (keyCtx->key != NULL)
-    {
-        SymCryptRsakeyFree(keyCtx->key);
-    }
-
-    OPENSSL_free(keyCtx);
-}
-
-_Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
                                     PCBYTE pbHashValue, SIZE_T cbHashValue,
                                     PBYTE pbSignature, SIZE_T *pcbSignature)
 {
-    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(key);
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     const SCOSSL_RSA_PKCS1_PARAMS *pkcs1Params;
@@ -151,7 +133,7 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
     }
 
     scError = SymCryptRsaPkcs1Sign(
-        keyCtx->key,
+        key,
         pbHashValue,
         cbHashValue,
         pkcs1Params->pHashOIDs,
@@ -176,7 +158,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
+SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
                                       PCBYTE pbHashValue, SIZE_T cbHashValue,
                                       PCBYTE pbSignature, SIZE_T pcbSignature)
 {
@@ -213,7 +195,7 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid,
     }
 
     scError = SymCryptRsaPkcs1Verify(
-        keyCtx->key,
+        key,
         pbHashValue,
         cbHashValue,
         pbSignature,
@@ -238,7 +220,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSalt,
+SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
                                  PCBYTE pbHashValue, SIZE_T cbHashValue,
                                  PBYTE pbSignature, SIZE_T *pcbSignature)
 {
@@ -256,7 +238,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
         goto cleanup;
     }
 
-    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+    cbSaltMax = ((SymCryptRsakeyModulusBits(key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
@@ -280,7 +262,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
         return SCOSSL_UNSUPPORTED;
     }
 
-    cbResult = SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbResult = SymCryptRsakeySizeofModulus(key);
     if (pcbSignature == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_NULL_PARAMETER,
@@ -314,7 +296,7 @@ SCOSSL_STATUS scossl_rsapss_sign(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSa
     }
 
     scError = SymCryptRsaPssSign(
-        keyCtx->key,
+        key,
         pbHashValue,
         cbHashValue,
         scosslHashAlgo,
@@ -338,7 +320,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cbSalt,
+SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
                                    PCBYTE pbHashValue, SIZE_T cbHashValue,
                                    PCBYTE pbSignature, SIZE_T pcbSignature)
 {
@@ -361,7 +343,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
         goto cleanup;
     }
 
-    cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+    cbSaltMax = ((SymCryptRsakeyModulusBits(key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
@@ -404,7 +386,7 @@ SCOSSL_STATUS scossl_rsapss_verify(SCOSSL_RSA_KEY_CTX *keyCtx, int mdnid, int cb
     }
 
     scError = SymCryptRsaPssVerify(
-        keyCtx->key,
+        key,
         pbHashValue,
         cbHashValue,
         pbSignature,
@@ -429,14 +411,14 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
+SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
                                  int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(key);
     SIZE_T cbResult = -1;
 
     if (pbDst == NULL)
@@ -464,7 +446,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             goto cleanup;
         }
         scError = SymCryptRsaPkcs1Encrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             0,
@@ -494,7 +476,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         }
 
         scError = SymCryptRsaOaepEncrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             scosslHashAlgo,
@@ -518,7 +500,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
             goto cleanup;
         }
         scError = SymCryptRsaRawEncrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -547,7 +529,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
+SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
                                  int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
@@ -559,7 +541,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
     UINT64 err = 0;
     SIZE_T cbResult = -1;
 
-    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    cbModulus = SymCryptRsakeySizeofModulus(key);
 
     if (pbDst == NULL)
     {
@@ -584,7 +566,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
     {
     case RSA_PKCS1_PADDING:
         scError = SymCryptRsaPkcs1Decrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -618,7 +600,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         }
 
         scError = SymCryptRsaOaepDecrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
@@ -638,7 +620,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(SCOSSL_RSA_KEY_CTX *keyCtx, UINT padding,
         break;
     case RSA_NO_PADDING:
         scError = SymCryptRsaRawDecrypt(
-            keyCtx->key,
+            key,
             pbSrc,
             cbSrc,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
