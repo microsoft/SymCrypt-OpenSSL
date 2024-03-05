@@ -15,8 +15,8 @@
 extern "C" {
 #endif
 
-#define SCOSSL_PROV_RSA_PSS_DEFAULT_MD 0
-#define SCOSSL_PROV_RSA_PSS_DEFAULT_SATLLEN_MIN 20
+#define SCOSSL_PROV_RSA_PSS_DEFAULT_MD (0) // Index of the default MD in p_scossl_rsa_supported_mds (SHA1)
+#define SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN (20)
 
 static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
     {NID_sha1,     OSSL_DIGEST_NAME_SHA1}, // Default
@@ -113,7 +113,7 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_from_params(OSSL_LIB_CTX *libctx, co
         // as the default provider.
         pssRestrictions->mdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
         pssRestrictions->mgf1MdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
-        pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SATLLEN_MIN;
+        pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN;
 
         *pPssRestrictions = pssRestrictions;
     }

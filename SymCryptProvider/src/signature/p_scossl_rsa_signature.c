@@ -426,6 +426,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
         else
         {
+            EVP_MD_free(ctx->md);
             ctx->md = md;
             ctx->mdInfo = mdInfo;
         }
