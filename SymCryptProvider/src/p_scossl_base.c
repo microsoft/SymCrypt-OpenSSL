@@ -216,12 +216,14 @@ static const OSSL_ALGORITHM p_scossl_rand[] = {
 // Key management
 extern const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_keymgmt_functions),
     ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
+    ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsapss_keymgmt_functions),
     ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
     ALG("X25519:1.3.101.110", p_scossl_x25519_keymgmt_functions),
     ALG_TABLE_END};
@@ -230,15 +232,11 @@ static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
 extern const OSSL_DISPATCH p_scossl_dh_functions[];
 extern const OSSL_DISPATCH p_scossl_ecdh_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_functions[];
-extern const OSSL_DISPATCH p_scossl_hkdf_keyexch_functions[];
-extern const OSSL_DISPATCH p_scossl_tls1prf_keyexch_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keyexch[] = {
     ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_functions),
     ALG("ECDH", p_scossl_ecdh_functions),
     ALG("X25519:1.3.101.110", p_scossl_ecdh_functions),
-    // ALG("HKDF", p_scossl_hkdf_keyexch_functions),
-    // ALG("TLS1-PRF", p_scossl_tls1prf_keyexch_functions),
     ALG_TABLE_END};
 
 // Signature
@@ -388,21 +386,21 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     {
         switch(in->function_id)
         {
-            case OSSL_FUNC_CRYPTO_MALLOC:
-                c_CRYPTO_malloc = OSSL_FUNC_CRYPTO_malloc(in);
-                break;
-            case OSSL_FUNC_CRYPTO_ZALLOC:
-                c_CRYPTO_zalloc = OSSL_FUNC_CRYPTO_zalloc(in);
-                break;
-            case OSSL_FUNC_CRYPTO_FREE:
-                c_CRYPTO_free = OSSL_FUNC_CRYPTO_free(in);
-                break;
-            case OSSL_FUNC_CRYPTO_CLEAR_FREE:
-                c_CRYPTO_clear_free = OSSL_FUNC_CRYPTO_clear_free(in);
-                break;
-            case OSSL_FUNC_CORE_GET_LIBCTX:
-                core_get_libctx = OSSL_FUNC_core_get_libctx(in);
-                break;
+        case OSSL_FUNC_CRYPTO_MALLOC:
+            c_CRYPTO_malloc = OSSL_FUNC_CRYPTO_malloc(in);
+            break;
+        case OSSL_FUNC_CRYPTO_ZALLOC:
+            c_CRYPTO_zalloc = OSSL_FUNC_CRYPTO_zalloc(in);
+            break;
+        case OSSL_FUNC_CRYPTO_FREE:
+            c_CRYPTO_free = OSSL_FUNC_CRYPTO_free(in);
+            break;
+        case OSSL_FUNC_CRYPTO_CLEAR_FREE:
+            c_CRYPTO_clear_free = OSSL_FUNC_CRYPTO_clear_free(in);
+            break;
+        case OSSL_FUNC_CORE_GET_LIBCTX:
+            core_get_libctx = OSSL_FUNC_core_get_libctx(in);
+            break;
         }
     }
 

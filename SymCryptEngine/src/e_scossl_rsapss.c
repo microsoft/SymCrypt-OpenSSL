@@ -15,7 +15,7 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
 {
     EVP_PKEY* pkey = NULL;
     const RSA* rsa = NULL;
-    SCOSSL_RSA_KEY_CTX *keyCtx = NULL;
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     const EVP_MD *messageDigest;
     const EVP_MD *mgf1Digest;
     int type = 0;
@@ -72,7 +72,7 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
         }
     }
 
-    return scossl_rsapss_sign(keyCtx, type, cbSalt, tbs, tbslen, sig, (SIZE_T*)siglen);
+    return scossl_rsapss_sign(keyCtx->key, type, cbSalt, tbs, tbslen, sig, (SIZE_T*)siglen);
 }
 
 SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
@@ -80,7 +80,7 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
 {
     EVP_PKEY* pkey = NULL;
     const RSA* rsa = NULL;
-    SCOSSL_RSA_KEY_CTX *keyCtx = NULL;
+    SCOSSL_RSA_KEY_CONTEXT *keyCtx = NULL;
     const EVP_MD *messageDigest;
     const EVP_MD *mgf1Digest;
     int type = 0;
@@ -142,7 +142,7 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
         return SCOSSL_FAILURE;
     }
 
-    return scossl_rsapss_verify(keyCtx, type, cbSalt, tbs, tbslen, sig, siglen);
+    return scossl_rsapss_verify(keyCtx->key, type, cbSalt, tbs, tbslen, sig, siglen);
 }
 
 

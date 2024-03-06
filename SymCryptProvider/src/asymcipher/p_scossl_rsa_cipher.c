@@ -19,7 +19,7 @@ typedef struct
 {
     OSSL_LIB_CTX *libctx;
 
-    SCOSSL_RSA_KEY_CTX *keyCtx;
+    SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
     UINT padding;
 
     // OAEP Parameters
@@ -53,9 +53,9 @@ static OSSL_ITEM p_scossl_rsa_cipher_padding_modes[] = {
     {RSA_PKCS1_OAEP_PADDING, OSSL_PKEY_RSA_PAD_MODE_OAEP},
     {0, NULL}};
 
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
+static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_RSA_CIPHER_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
     if (ctx != NULL)
@@ -66,7 +66,7 @@ SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_newctx(_In_ SCOSSL_PROVCTX *provctx)
     return ctx;
 }
 
-void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
+static void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
     if (ctx != NULL)
     {
@@ -75,19 +75,13 @@ void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
     OPENSSL_free(ctx);
 }
 
-SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
+static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    SCOSSL_RSA_CIPHER_CTX* copyCtx = OPENSSL_malloc(sizeof(SCOSSL_RSA_CIPHER_CTX));
-    if (copyCtx != NULL)
-    {
-        memcpy(copyCtx, ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
-    }
-
-    return copyCtx;
+    return OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_RSA_KEY_CTX *keyCtx,
-                                       _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
+                                              _In_ const OSSL_PARAM params[])
 {
     ctx->keyCtx = keyCtx;
     ctx->padding = RSA_PKCS1_PADDING;
@@ -95,13 +89,19 @@ SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ 
     return p_scossl_rsa_cipher_set_ctx_params(ctx, params);
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                          _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                          _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
+                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
     SCOSSL_STATUS ret;
+
+    if (ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
 
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
@@ -120,7 +120,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
         mdnid = ctx->oaepMdInfo->id;
     }
 
-    ret = scossl_rsa_encrypt(ctx->keyCtx, ctx->padding,
+    ret = scossl_rsa_encrypt(ctx->keyCtx->key, ctx->padding,
                              mdnid, ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
@@ -129,13 +129,19 @@ SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                          _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                          _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
+                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
     SCOSSL_STATUS ret;
+
+    if (ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
 
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
@@ -154,7 +160,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
         mdnid = ctx->oaepMdInfo->id;
     }
 
-    ret = scossl_rsa_decrypt(ctx->keyCtx, ctx->padding,
+    ret = scossl_rsa_decrypt(ctx->keyCtx->key, ctx->padding,
                              mdnid, ctx->pbLabel, ctx->cbLabel,
                              in, inlen,
                              out, &cbResult, outsize);
@@ -163,7 +169,7 @@ SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
     return ret;
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
@@ -217,12 +223,12 @@ SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     return SCOSSL_SUCCESS;
 }
 
-const OSSL_PARAM *p_scossl_rsa_cipher_gettable_ctx_params(ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_rsa_cipher_gettable_ctx_params(ossl_unused void *provctx)
 {
     return p_scossl_rsa_cipher_gettable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
