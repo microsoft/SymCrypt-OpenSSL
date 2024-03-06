@@ -3,6 +3,7 @@
 //
 
 #include "p_scossl_base.h"
+#include "mac/p_scossl_kmac.h"
 
 #include <openssl/proverr.h>
 
@@ -14,9 +15,9 @@ extern "C" {
 // (digest type for HMAC, cipher for CMAC) may be set in multiple calls to p_scossl_kbkdf_set_ctx_params.
 // MAC type, digest, and cipher need to be tracked independently. ctx->pMac is only set when MAC type
 // and required additional parameters have been set.
-#define SCOSSL_MAC_TYPE_HMAC 0
-#define SCOSSL_MAC_TYPE_CMAC 1
-#define SCOSSL_MAC_TYPE_KMAC 2
+#define SCOSSL_MAC_TYPE_HMAC (1)
+#define SCOSSL_MAC_TYPE_CMAC (2)
+#define SCOSSL_MAC_TYPE_KMAC (3)
 
 typedef struct
 {
@@ -32,6 +33,7 @@ typedef struct
 
     UINT macType;
     SIZE_T cbCmacKey;
+    const SCOSSL_KMAC_EXTENSIONS *pMacEx;
 } SCOSSL_PROV_KBKDF_CTX;
 
 static const OSSL_PARAM p_scossl_kbkdf_gettable_ctx_param_types[] = {
@@ -112,6 +114,49 @@ static SCOSSL_STATUS p_scossl_kbkdf_reset(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
+// KMAC KBKDF is a special case. Pass the context as the input and lebel as the customization string.
+static SCOSSL_STATUS p_scossl_kbkdf_kmac_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
+                                                _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
+{
+    SCOSSL_KMAC_EXPANDED_KEY expandedKey;
+    SCOSSL_KMAC_STATE macState;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (ctx->pMacEx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MAC);
+        goto cleanup;
+    }
+
+    if (ctx->pbLabel != NULL)
+    {
+        scError = ctx->pMacEx->expandKeyExFunc(&expandedKey, ctx->pbKey, ctx->cbKey, ctx->pbLabel, ctx->cbLabel);
+    }
+    else
+    {
+        scError = ctx->pMac->expandKeyFunc(&expandedKey, ctx->pbKey, ctx->cbKey);
+    }
+
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    ctx->pMac->initFunc(&macState, &expandedKey);
+    ctx->pMac->appendFunc(&macState, ctx->pbContext, ctx->cbContext);
+    ctx->pMacEx->resultExFunc(&macState, key, keylen);
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_cleanse(&expandedKey, sizeof(SCOSSL_KMAC_EXPANDED_KEY));
+    OPENSSL_cleanse(&macState, sizeof(SCOSSL_KMAC_STATE));
+
+    return ret;
+}
+
 static SCOSSL_STATUS p_scossl_kbkdf_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
                                            _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
                                            _In_ const OSSL_PARAM params[])
@@ -135,13 +180,23 @@ static SCOSSL_STATUS p_scossl_kbkdf_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
+    if (keylen == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->macType == SCOSSL_MAC_TYPE_KMAC)
+    {
+        return p_scossl_kbkdf_kmac_derive(ctx, key, keylen);
+    }
+
     scError = SymCryptSp800_108(
         ctx->pMac,
         ctx->pbKey, ctx->cbKey,
         ctx->pbLabel, ctx->cbLabel,
         ctx->pbContext, ctx->cbContext,
         key, keylen);
-
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -262,20 +317,19 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         {
             ctx->macType = SCOSSL_MAC_TYPE_KMAC;
             ctx->pMac = SymCryptKmac128Algorithm;
+            ctx->pMacEx = &SymCryptKmac128AlgorithmEx;
         }
         else if (EVP_MAC_is_a(mac, SN_kmac256))
         {
             ctx->macType = SCOSSL_MAC_TYPE_KMAC;
             ctx->pMac = SymCryptKmac256Algorithm;
+            ctx->pMacEx = &SymCryptKmac256AlgorithmEx;
         }
         else
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
             goto cleanup;
         }
-
-        // New MAC
-        ctx->pMac = NULL;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE)) != NULL)
@@ -296,7 +350,8 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
+    if (ctx->macType == SCOSSL_MAC_TYPE_HMAC &&
+        (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         const char *mdName;
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName) ||
@@ -320,7 +375,8 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_CIPHER)) != NULL)
+    if (ctx->macType == SCOSSL_MAC_TYPE_CMAC &&
+        (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_CIPHER)) != NULL)
     {
         const char *cipherName;
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &cipherName))
@@ -335,30 +391,27 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             goto cleanup;
         }
 
-        if (ctx->macType == SCOSSL_MAC_TYPE_CMAC)
+        switch(EVP_CIPHER_type(cipher))
         {
-            switch(EVP_CIPHER_type(cipher))
-            {
-            case NID_aes_128_cbc:
-                ctx->cbCmacKey = 16;
-                break;
-            case NID_aes_192_cbc:
-                ctx->cbCmacKey = 24;
-                break;
-            case NID_aes_256_cbc:
-                ctx->cbCmacKey = 32;
-                break;
-            default:
-                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
-                goto cleanup;
-            }
+        case NID_aes_128_cbc:
+            ctx->cbCmacKey = 16;
+            break;
+        case NID_aes_192_cbc:
+            ctx->cbCmacKey = 24;
+            break;
+        case NID_aes_256_cbc:
+            ctx->cbCmacKey = 32;
+            break;
+        default:
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
+            goto cleanup;
+        }
 
-            if (ctx->pbKey != NULL &&
-                ctx->cbKey != ctx->cbCmacKey)
-            {
-                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
-                goto cleanup;
-            }
+        if (ctx->pbKey != NULL &&
+            ctx->cbKey != ctx->cbCmacKey)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            goto cleanup;
         }
     }
 
