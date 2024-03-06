@@ -11,13 +11,12 @@
 extern "C" {
 #endif
 
-// MAC algorithm and additional data needed to determine correct PCSYMCRYPT_MAC
-// (digest type for HMAC, cipher for CMAC) may be set in multiple calls to p_scossl_kbkdf_set_ctx_params.
-// MAC type, digest, and cipher need to be tracked independently. ctx->pMac is only set when MAC type
-// and required additional parameters have been set.
 #define SCOSSL_MAC_TYPE_HMAC (1)
 #define SCOSSL_MAC_TYPE_CMAC (2)
 #define SCOSSL_MAC_TYPE_KMAC (3)
+
+#define OSSL_KDF_PARAM_KBKDF_LABEL OSSL_KDF_PARAM_SALT
+#define OSSL_KDF_PARAM_KBKDF_CONTEXT OSSL_KDF_PARAM_INFO
 
 typedef struct
 {
@@ -25,10 +24,10 @@ typedef struct
 
     PBYTE pbKey;
     SIZE_T cbKey;
-    PBYTE pbLabel;
-    SIZE_T cbLabel;
     PBYTE pbContext;
     SIZE_T cbContext;
+    PBYTE pbLabel;
+    SIZE_T cbLabel;
     PCSYMCRYPT_MAC pMac;
 
     UINT macType;
@@ -42,15 +41,15 @@ static const OSSL_PARAM p_scossl_kbkdf_gettable_ctx_param_types[] = {
 
 static const OSSL_PARAM p_scossl_kbkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0), // Label
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0), // Context
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KBKDF_CONTEXT, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KBKDF_LABEL, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MAC, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_CIPHER, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),
     // Below parameters aren't configurable. The provider will reject anything that
     // does not match the fixed behavior of SymCrypt.
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_USE_L, NULL),
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_USE_SEPARATOR, NULL),
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_R, NULL),
@@ -82,7 +81,7 @@ static void p_scossl_kbkdf_freectx(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx)
 
 static SCOSSL_PROV_KBKDF_CTX *p_scossl_kbkdf_dupctx(_In_ SCOSSL_PROV_KBKDF_CTX *ctx)
 {
-    SCOSSL_PROV_KBKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_KBKDF_CTX));
+    SCOSSL_PROV_KBKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_KBKDF_CTX));
     if (copyCtx != NULL)
     {
         *copyCtx = *ctx;
@@ -232,7 +231,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_get_ctx_params(ossl_unused void *ctx, _Inout
 
 static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
-    char *propq = NULL;
+    const char *propq = NULL;
     EVP_MD *md = NULL;
     EVP_CIPHER *cipher = NULL;
     EVP_MAC *mac = NULL;
@@ -258,18 +257,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SALT)) != NULL)
-    {
-        OPENSSL_clear_free(ctx->pbLabel, ctx->cbLabel);
-
-        if (!OSSL_PARAM_get_octet_string(p, (void **) &ctx->pbLabel, 0, &ctx->cbLabel))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
-    }
-
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_CONTEXT)) != NULL)
     {
         OPENSSL_clear_free(ctx->pbContext, ctx->cbContext);
 
@@ -280,8 +268,19 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_LABEL)) != NULL)
+    {
+        OPENSSL_clear_free(ctx->pbLabel, ctx->cbLabel);
+
+        if (!OSSL_PARAM_get_octet_string(p, (void **) &ctx->pbLabel, 0, &ctx->cbLabel))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES)) != NULL &&
-        !OSSL_PARAM_get_utf8_string(p, &propq, 0))
+        !OSSL_PARAM_get_utf8_string_ptr(p, &propq))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         goto cleanup;
@@ -305,6 +304,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
 
         if (EVP_MAC_is_a(mac, SN_hmac))
         {
+            // Need digest to determine appropriate PCSYMCRYPT_MAC
             ctx->macType = SCOSSL_MAC_TYPE_HMAC;
             ctx->pMac = NULL;
         }
@@ -330,26 +330,12 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
             goto cleanup;
         }
+
+        ctx->cbCmacKey = 0;
+        ctx->pMacEx = NULL;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE)) != NULL)
-    {
-        const char *mode;
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mode) ||
-            mode == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
-
-        // SymCrypt only supports counter mode.
-        if (OPENSSL_strcasecmp(mode, "counter") != 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
-            goto cleanup;
-        }
-    }
-
+    // Digest only relevant for HMAC
     if (ctx->macType == SCOSSL_MAC_TYPE_HMAC &&
         (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
@@ -361,13 +347,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             goto cleanup;
         }
 
-        if ((md = EVP_MD_fetch(ctx->libCtx, mdName, propq)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-            goto cleanup;
-        }
-
-        if (ctx->macType == SCOSSL_MAC_TYPE_HMAC &&
+        if ((md = EVP_MD_fetch(ctx->libCtx, mdName, propq)) == NULL ||
             (ctx->pMac = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(md))) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
@@ -375,6 +355,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
+    // Cipher only relevant for CMAC
     if (ctx->macType == SCOSSL_MAC_TYPE_CMAC &&
         (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_CIPHER)) != NULL)
     {
@@ -411,6 +392,26 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             ctx->cbKey != ctx->cbCmacKey)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            goto cleanup;
+        }
+    }
+
+    // Fixed parameters. Anything that doesn't match the fixed behavior of SymCrypt will be rejected.
+
+    // SymCrypt only supports counter mode.
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE)) != NULL)
+    {
+        const char *mode;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &mode) ||
+            mode == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (OPENSSL_strcasecmp(mode, "counter") != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             goto cleanup;
         }
     }
@@ -471,7 +472,6 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_free(propq);
     EVP_MAC_free(mac);
     EVP_MD_free(md);
     EVP_CIPHER_free(cipher);

@@ -2,16 +2,13 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-// Some of the structures defined here are used for KBKDF KMAC.
 #include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define KMAC_MAX_OUTPUT_LEN (0xFFFFFF / 8)
-#define KMAC_MAX_CUSTOM 512
-
+// These types and constants are used by both KMAC and KBKDF using KMAC
 typedef union
 {
     SYMCRYPT_KMAC128_EXPANDED_KEY kmac128Key;
