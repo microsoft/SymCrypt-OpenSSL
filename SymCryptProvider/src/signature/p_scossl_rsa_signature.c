@@ -207,8 +207,6 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
             OPENSSL_free(pbPublicKey);
         }
 #endif
-
-        ctx->keyCtx = keyCtx;
     }
 
     return p_scossl_rsa_set_ctx_params(ctx, params);

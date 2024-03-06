@@ -76,7 +76,7 @@ static const OSSL_PARAM p_scossl_rsa_keymgmt_impexp_param_types[] = {
 // first, then passes that reference to keymgmt_import. Since
 // the size of the SYMPCRYPT_RSAKEY depends on parameters that aren't
 // known until import, no key is actually allocated here.
-static SCOSSL_PROV_RSA_KEY_CTX  *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
+static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx != NULL)
