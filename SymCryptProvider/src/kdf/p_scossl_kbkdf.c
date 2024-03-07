@@ -235,6 +235,19 @@ static SCOSSL_STATUS p_scossl_kbkdf_get_ctx_params(ossl_unused void *ctx, _Inout
     return SCOSSL_SUCCESS;
 }
 
+static SCOSSL_STATUS p_scossl_kbkdf_get_octet_string(_In_ const OSSL_PARAM *p, _Out_writes_bytes_(*cbData) PBYTE *ppbData, _Out_ SIZE_T *pcbData)
+{
+    if (p->data == NULL || p->data_size == 0)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    OPENSSL_clear_free(*ppbData, *pcbData);
+
+    *ppbData = NULL;
+    return OSSL_PARAM_get_octet_string(p, (void **) ppbData, 0, pcbData);
+}
+
 static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     const char *propq = NULL;
@@ -246,43 +259,33 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
     {
-        OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
-
-        if (!OSSL_PARAM_get_octet_string(p, (void **) &ctx->pbKey, 0, &ctx->cbKey))
+        if (!p_scossl_kbkdf_get_octet_string(p, &ctx->pbKey, &ctx->cbKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
         }
 
-        // Check that key size matches expected if cmac is intitialized
-        if (ctx->pMac == SymCryptAesCmacAlgorithm &&
+        // Check that key size matches expected if cmac is initialized
+        if (ctx->cbCmacKey != 0 &&
             ctx->cbKey != ctx->cbCmacKey)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             goto cleanup;
         }
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_CONTEXT)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_CONTEXT)) != NULL &&
+        !p_scossl_kbkdf_get_octet_string(p, &ctx->pbContext, &ctx->cbContext))
     {
-        OPENSSL_clear_free(ctx->pbContext, ctx->cbContext);
-
-        if (!OSSL_PARAM_get_octet_string(p, (void **) &ctx->pbContext, 0, &ctx->cbContext))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_LABEL)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_LABEL)) != NULL &&
+        !p_scossl_kbkdf_get_octet_string(p, &ctx->pbLabel, &ctx->cbLabel))
     {
-        OPENSSL_clear_free(ctx->pbLabel, ctx->cbLabel);
-
-        if (!OSSL_PARAM_get_octet_string(p, (void **) &ctx->pbLabel, 0, &ctx->cbLabel))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES)) != NULL &&
@@ -313,11 +316,13 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             // Need digest to determine appropriate PCSYMCRYPT_MAC
             ctx->macType = SCOSSL_MAC_TYPE_HMAC;
             ctx->pMac = NULL;
+            ctx->pMacEx = NULL;
         }
         else if (EVP_MAC_is_a(mac, SN_cmac))
         {
             ctx->macType = SCOSSL_MAC_TYPE_CMAC;
             ctx->pMac = SymCryptAesCmacAlgorithm;
+            ctx->pMacEx = NULL;
         }
         else if (EVP_MAC_is_a(mac, SN_kmac128))
         {
@@ -338,7 +343,6 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
 
         ctx->cbCmacKey = 0;
-        ctx->pMacEx = NULL;
     }
 
     // Digest only relevant for HMAC
