@@ -192,7 +192,8 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ctx->padding = keyCtx->padding;
 
 #ifdef KEYSINUSE_ENABLED
-        if (operation == EVP_PKEY_OP_SIGN &&
+        if (p_scossl_keysinuse_running() &&
+            operation == EVP_PKEY_OP_SIGN &&
             keyCtx->isImported &&
             keyCtx->keysinuseInfo == NULL)
         {

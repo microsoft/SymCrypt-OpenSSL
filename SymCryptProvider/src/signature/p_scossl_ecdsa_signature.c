@@ -65,12 +65,12 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In
 
 static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
 {
-    if (ctx != NULL)
-    {
-        EVP_MD_CTX_free(ctx->mdctx);
-        EVP_MD_free(ctx->md);
-        OPENSSL_free(ctx->propq);
-    }
+    if (ctx == NULL)
+        return;
+
+    EVP_MD_CTX_free(ctx->mdctx);
+    EVP_MD_free(ctx->md);
+    OPENSSL_free(ctx->propq);
     OPENSSL_free(ctx);
 }
 
@@ -114,8 +114,10 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
     if (keyCtx != NULL)
     {
+        ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
-        if (operation == EVP_PKEY_OP_SIGN &&
+        if (p_scossl_keysinuse_running() &&
+            operation == EVP_PKEY_OP_SIGN &&
             keyCtx->isImported &&
             keyCtx->keysinuseInfo == NULL)
         {
@@ -133,7 +135,6 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
         }
 #endif
 
-        ctx->keyCtx = keyCtx;
     }
 
     return p_scossl_ecdsa_set_ctx_params(ctx, params);

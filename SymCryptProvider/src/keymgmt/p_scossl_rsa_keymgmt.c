@@ -106,7 +106,6 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
-    OPENSSL_free(keyCtx->pssRestrictions);
 #ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
 #endif
@@ -882,104 +881,107 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         goto cleanup;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N)) != NULL)
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        cbModulus = p->data_size;
-
-        pbModulus = OPENSSL_zalloc(cbModulus);
-        if (pbModulus == NULL)
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N)) != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-        if (!OSSL_PARAM_get_BN(p, &bn) ||
-            !BN_bn2bin(bn, pbModulus))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
-    }
+            cbModulus = p->data_size;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E)) == NULL ||
-        !OSSL_PARAM_get_uint64(p, &pubExp64))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        goto cleanup;
-    }
-
-    if (include_private)
-    {
-        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1)) != NULL)
-        {
-            pcbPrimes[0] = p->data_size;
-
-            ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
+            pbModulus = OPENSSL_zalloc(cbModulus);
             if (pbModulus == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
             if (!OSSL_PARAM_get_BN(p, &bn) ||
-                !BN_bn2bin(bn, ppbPrimes[0]))
+                !BN_bn2bin(bn, pbModulus))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
             }
-            nPrimes++;
         }
 
-        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2)) != NULL)
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E)) == NULL ||
+            !OSSL_PARAM_get_uint64(p, &pubExp64))
         {
-            pcbPrimes[1] = p->data_size;
-
-            ppbPrimes[1] = OPENSSL_zalloc(pcbPrimes[1]);
-            if(pbModulus == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-            if (!OSSL_PARAM_get_BN(p, &bn) ||
-                !BN_bn2bin(bn, ppbPrimes[1]))
-            {
-                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                goto cleanup;
-            }
-            nPrimes++;
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
         }
-    }
 
-    if (nPrimes != 0 && nPrimes != 2)
-    {
-        // Only supporting 2 primes
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                            "Unsupported RSA version");
-        goto cleanup;
-    }
+        if (include_private)
+        {
+            if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1)) != NULL)
+            {
+                pcbPrimes[0] = p->data_size;
 
-    symcryptRsaParam.version = 1;
-    symcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-    symcryptRsaParam.nPrimes = nPrimes;
-    symcryptRsaParam.nPubExp = 1;
-    keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
-    if (keyCtx->key == NULL)
-    {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                            "SymCryptRsakeyAllocate failed");
-        goto cleanup;
-    }
+                ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
+                if (pbModulus == NULL)
+                {
+                    ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                    goto cleanup;
+                }
+                if (!OSSL_PARAM_get_BN(p, &bn) ||
+                    !BN_bn2bin(bn, ppbPrimes[0]))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+                nPrimes++;
+            }
 
-    scError = SymCryptRsakeySetValue(
-        pbModulus, cbModulus,
-        &pubExp64, 1,
-        (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
-        keyCtx->key);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                    "SymCryptRsakeySetValue failed", scError);
-        goto cleanup;
+            if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2)) != NULL)
+            {
+                pcbPrimes[1] = p->data_size;
+
+                ppbPrimes[1] = OPENSSL_zalloc(pcbPrimes[1]);
+                if(pbModulus == NULL)
+                {
+                    ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                    goto cleanup;
+                }
+                if (!OSSL_PARAM_get_BN(p, &bn) ||
+                    !BN_bn2bin(bn, ppbPrimes[1]))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+                nPrimes++;
+            }
+        }
+
+        if (nPrimes != 0 && nPrimes != 2)
+        {
+            // Only supporting 2 primes
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                                "Unsupported RSA version");
+            goto cleanup;
+        }
+
+        symcryptRsaParam.version = 1;
+        symcryptRsaParam.nBitsOfModulus = cbModulus * 8;
+        symcryptRsaParam.nPrimes = nPrimes;
+        symcryptRsaParam.nPubExp = 1;
+        keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
+        if (keyCtx->key == NULL)
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                "SymCryptRsakeyAllocate failed");
+            goto cleanup;
+        }
+
+        scError = SymCryptRsakeySetValue(
+            pbModulus, cbModulus,
+            &pubExp64, 1,
+            (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
+            keyCtx->key);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                        "SymCryptRsakeySetValue failed", scError);
+            goto cleanup;
+        }
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0 &&

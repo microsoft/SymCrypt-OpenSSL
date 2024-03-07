@@ -7,7 +7,6 @@
 #include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 
-#include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/core_names.h>
 #include <openssl/evp.h>
@@ -173,6 +172,8 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(const SCOSSL_RSA_PSS_RESTR
 }
 
 #ifdef KEYSINUSE_ENABLED
+// KeyInUse requires the public key encoded in the same format as subjectPublicKey in a certificate.
+// This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.
 ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
     ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, n, BIGNUM),
     ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, e, BIGNUM),
@@ -189,7 +190,7 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
     int cbEncodedKey;
     SCOSSL_STATUS  ret = SCOSSL_FAILURE;
 
-    rsaParams = scossl_rsa_new_export_params(TRUE);
+    rsaParams = scossl_rsa_new_export_params(FALSE);
     if (rsaParams == NULL ||
         !scossl_rsa_export_key(key, rsaParams))
     {

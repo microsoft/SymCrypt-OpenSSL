@@ -43,8 +43,6 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_
                                                       _Inout_ OSSL_PARAM_BLD *bld);
 
 #ifdef KEYSINUSE_ENABLED
-// Keysinuse requires the public key encoded in the same format as subjectPublicKey in a certificate.
-// This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.
 SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,
                                                   _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
 #endif

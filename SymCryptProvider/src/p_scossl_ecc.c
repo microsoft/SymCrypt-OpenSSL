@@ -1,6 +1,14 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
 #include <openssl/proverr.h>
 
 #include "p_scossl_ecc.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyCtx,
@@ -76,3 +84,7 @@ cleanup:
 
     return ret;
 }
+
+#ifdef __cplusplus
+}
+#endif

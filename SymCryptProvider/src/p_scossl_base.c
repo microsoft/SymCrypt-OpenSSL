@@ -8,8 +8,8 @@
 
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
-#include "p_scossl_base.h"
 #include "p_scossl_keysinuse.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -366,50 +366,54 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
 #ifdef KEYSINUSE_ENABLED
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
-    int keysinuseEnabled = FALSE;
+    BOOL keysinuseEnabled = FALSE;
     // All config params are provided as string pointers
-    const char *confKeysinuseEnabled = NULL;
-    const char *confKeysinuseMaxFileSize = NULL;
-    const char *confKeysinuseLoggingDelay = NULL;
-    const char *envKeysinuseEnabled = NULL;
+    const char *confEnabled = NULL;
+    const char *confMaxFileSize = NULL;
+    const char *confLoggingDelay = NULL;
+    const char *envEnabled = NULL;
 
     OSSL_PARAM keysinuseParams[] = {
-        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &confKeysinuseEnabled, 0),
-        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &confKeysinuseMaxFileSize, 0),
-        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confKeysinuseLoggingDelay, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &confEnabled, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &confMaxFileSize, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confLoggingDelay, 0),
         OSSL_PARAM_END};
 
     if (core_get_params(handle, keysinuseParams) &&
-        confKeysinuseEnabled != NULL)
+        confEnabled != NULL)
     {
-        keysinuseEnabled = atoi(confKeysinuseEnabled);
+        keysinuseEnabled = atoi(confEnabled) == 0 ? FALSE : TRUE;
     }
 
-    // KeysInUse can be enabled from environment. This takes precedense over config
+    // KeysInUse can be enabled from environment. This takes precedence over config.
     // NCONF_get_string fetches from the environment if the conf parameter is NULL
-    if ((envKeysinuseEnabled = NCONF_get_string(NULL, NULL, "KEYSINUSE_ENABLED")) != NULL)
+    if ((envEnabled = NCONF_get_string(NULL, NULL, "KEYSINUSE_ENABLED")) != NULL)
     {
-        keysinuseEnabled = atoi(envKeysinuseEnabled);
+        keysinuseEnabled = atoi(envEnabled) == 0 ? FALSE : TRUE;
     }
 
     if (keysinuseEnabled)
     {
-        if (confKeysinuseMaxFileSize != NULL)
+        if (confMaxFileSize != NULL)
         {
             // Convert file size to off_t in bytes.
-            // This is essentially the same as atol but also handles MB, KB, and GB suffixes.
+            // This is the same behavior as atol but also handles MB, KB, and GB suffixes.
             off_t maxFileSizeBytes = 0;
-            int i = 0;
-            for (i = 0; '0' <= confKeysinuseMaxFileSize[i] && confKeysinuseMaxFileSize[i] <= '9'; i++)
+            int i;
+            for (i = 0;
+                 confMaxFileSize[i] != '\0' && confMaxFileSize[i] < '0' && '9' < confMaxFileSize[i];
+                 i++);
+
+            while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
             {
-                maxFileSizeBytes = maxFileSizeBytes * 10 + (confKeysinuseMaxFileSize[i] - '0');
+                maxFileSizeBytes = maxFileSizeBytes * 10 + (confMaxFileSize[i++] - '0');
             }
 
             // Check for KB, MB, or GB suffixes, case insensitive.
-            if (confKeysinuseMaxFileSize[i] != '\0' &&
-                (confKeysinuseMaxFileSize[i + 1] == 'B' || confKeysinuseMaxFileSize[i + 1] == 'b'))
+            if (confMaxFileSize[i] != '\0' &&
+                (confMaxFileSize[i + 1] == 'B' || confMaxFileSize[i + 1] == 'b'))
             {
-                switch (confKeysinuseMaxFileSize[i])
+                switch (confMaxFileSize[i])
                 {
                 case 'K':
                 case 'k':
@@ -429,12 +433,12 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
         }
 
-        if (confKeysinuseLoggingDelay != NULL)
+        if (confLoggingDelay != NULL)
         {
-            p_scossl_keysinuse_set_logging_delay(atol(confKeysinuseLoggingDelay));
+            p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
         }
 
-        p_scossl_keysinuse_init(NULL);
+        p_scossl_keysinuse_init();
     }
 }
 #endif
