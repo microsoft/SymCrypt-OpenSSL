@@ -52,7 +52,9 @@ static const OSSL_PARAM p_scossl_kbkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_USE_L, NULL),
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_USE_SEPARATOR, NULL),
+#if OPENSSL_VERSION_MAJOR >= 3 && OPENSSL_VERSION_MINOR > 0
     OSSL_PARAM_int(OSSL_KDF_PARAM_KBKDF_R, NULL),
+#endif
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx, const _In_ OSSL_PARAM params[]);
@@ -86,9 +88,13 @@ static SCOSSL_PROV_KBKDF_CTX *p_scossl_kbkdf_dupctx(_In_ SCOSSL_PROV_KBKDF_CTX *
     {
         *copyCtx = *ctx;
 
-        if ((ctx->pbKey != NULL     && (copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL) ||
-            (ctx->pbLabel != NULL   && (copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel)) == NULL) ||
-            (ctx->pbContext != NULL && (copyCtx->pbContext = OPENSSL_memdup(ctx->pbContext, ctx->cbContext)) == NULL))
+        copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey);
+        copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel);
+        copyCtx->pbContext = OPENSSL_memdup(ctx->pbContext, ctx->cbContext);
+
+        if ((ctx->pbKey != NULL     && copyCtx->pbKey == NULL) ||
+            (ctx->pbLabel != NULL   && copyCtx->pbLabel == NULL) ||
+            (ctx->pbContext != NULL && copyCtx->pbContext == NULL))
         {
             p_scossl_kbkdf_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -113,7 +119,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_reset(_Inout_ SCOSSL_PROV_KBKDF_CTX *ctx)
     return SCOSSL_SUCCESS;
 }
 
-// KMAC KBKDF is a special case. Pass the context as the input and lebel as the customization string.
+// KMAC KBKDF is a special case. Pass the context as the input and label as the customization string.
 static SCOSSL_STATUS p_scossl_kbkdf_kmac_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
                                                 _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
 {
@@ -451,6 +457,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         }
     }
 
+#if OPENSSL_VERSION_MAJOR >= 3 && OPENSSL_VERSION_MINOR > 0
     // SymCrypt always uses a 32-bit counter size
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KBKDF_R)) != NULL)
     {
@@ -468,6 +475,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             goto cleanup;
         }
     }
+#endif
 
     ret = SCOSSL_SUCCESS;
 

@@ -451,7 +451,7 @@ void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line)
     return c_CRYPTO_clear_free(ptr, num, file, line);
 }
 
-#if OPENSSL_VERSION_MINOR == 0
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
 EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
 {
     EVP_MD_CTX *out = EVP_MD_CTX_new();
