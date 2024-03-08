@@ -15,6 +15,7 @@ extern "C" {
 typedef struct
 {
     SCOSSL_ECC_KEY_CTX *keyCtx;
+    int operation;
 
     // Needed for fetching md
     OSSL_LIB_CTX *libctx;
@@ -64,6 +65,9 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In
 
 static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
 {
+    if (ctx == NULL)
+        return;
+
     EVP_MD_CTX_free(ctx->mdctx);
     EVP_MD_free(ctx->md);
     OPENSSL_free(ctx->propq);
@@ -84,8 +88,9 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
             copyCtx = NULL;
         }
 
-        copyCtx->libctx = ctx->libctx;
         copyCtx->keyCtx = ctx->keyCtx;
+        copyCtx->operation = ctx->operation;
+        copyCtx->libctx = ctx->libctx;
         copyCtx->md = ctx->md;
         ctx->mdSize = ctx->mdSize;
         copyCtx->allowMdUpdates = ctx->allowMdUpdates;
@@ -95,7 +100,7 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                    _In_ const OSSL_PARAM params[])
+                                                    _In_ const OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
@@ -105,9 +110,31 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
         return SCOSSL_FAILURE;
     }
 
+    ctx->operation = operation;
+
     if (keyCtx != NULL)
     {
         ctx->keyCtx = keyCtx;
+#ifdef KEYSINUSE_ENABLED
+        if (p_scossl_keysinuse_running() &&
+            operation == EVP_PKEY_OP_SIGN &&
+            keyCtx->isImported &&
+            keyCtx->keysinuseInfo == NULL)
+        {
+            // Initialize keysinuse for private keys. Generated keys are
+            // ignored to avoid noise from ephemeral keys.
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
+            {
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+
+            OPENSSL_free(pbPublicKey);
+        }
+#endif
+
     }
 
     return p_scossl_ecdsa_set_ctx_params(ctx, params);
@@ -116,13 +143,13 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 static SCOSSL_STATUS p_scossl_ecdsa_sign_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                               _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                                 _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params);
+    return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
@@ -130,6 +157,12 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     SIZE_T cbResult;
+
+    if (ctx->operation != EVP_PKEY_OP_SIGN)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
 
     if (siglen == NULL)
     {
@@ -156,20 +189,36 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    return scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen);
+    if (!scossl_ecdsa_sign(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, (unsigned int *)siglen))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
+#endif
+
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
                                            _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                            _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    if (ctx->operation != EVP_PKEY_OP_VERIFY)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
     return scossl_ecdsa_verify(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, siglen);
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const char *mdname,
-                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], ossl_unused int operation)
+                                                           _In_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[],
+                                                           int operation)
 {
-    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params))
+    if (!p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, operation))
     {
         return SCOSSL_FAILURE;
     }

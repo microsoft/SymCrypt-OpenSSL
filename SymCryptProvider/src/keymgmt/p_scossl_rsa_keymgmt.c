@@ -76,7 +76,7 @@ static const OSSL_PARAM p_scossl_rsa_keymgmt_impexp_param_types[] = {
 // first, then passes that reference to keymgmt_import. Since
 // the size of the SYMPCRYPT_RSAKEY depends on parameters that aren't
 // known until import, no key is actually allocated here.
-static SCOSSL_PROV_RSA_KEY_CTX  *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
+static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx != NULL)
@@ -106,6 +106,9 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+#endif
     OPENSSL_free(keyCtx->pssRestrictions);
     OPENSSL_free(keyCtx);
 }
@@ -246,6 +249,14 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         p_scossl_rsa_keymgmt_free_ctx(copyCtx);
         copyCtx = NULL;
     }
+
+#ifdef KEYSINUSE_ENABLED
+    if (keyCtx->keysinuseInfo != NULL &&
+        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+    {
+        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
+    }
+#endif
 
     return copyCtx;
 }
@@ -396,6 +407,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     keyCtx->padding = genCtx->padding;
     keyCtx->pssRestrictions = genCtx->pssRestrictions;
     genCtx->pssRestrictions = NULL;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+#endif
 
 cleanup:
     if (keyCtx != NULL && !keyCtx->initialized)
@@ -717,7 +731,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection)
+static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
     BOOL ret = TRUE;
     if (keyCtx->key == NULL)
@@ -731,7 +745,7 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int 
     return ret;
 }
 
-static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx2,
+static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
     BOOL ret = FALSE;
@@ -840,7 +854,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
         NULL;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -939,7 +953,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         {
             // Only supporting 2 primes
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "Unsupported RSA version");
+                                "Unsupported RSA version");
             goto cleanup;
         }
 
@@ -951,7 +965,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         if (keyCtx->key == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                             "SymCryptRsakeyAllocate failed");
+                                "SymCryptRsakeyAllocate failed");
             goto cleanup;
         }
 
@@ -965,7 +979,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsakeySetValue failed", scError);
+                                        "SymCryptRsakeySetValue failed", scError);
             goto cleanup;
         }
     }
@@ -978,6 +992,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     }
 
     keyCtx->initialized = TRUE;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = TRUE;
+#endif
 
     ret = SCOSSL_SUCCESS;
 
@@ -989,7 +1006,7 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection,
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection,
                                                  _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;

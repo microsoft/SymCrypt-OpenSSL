@@ -8,10 +8,17 @@
 
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
+#include "p_scossl_keysinuse.h"
 #include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef KEYSINUSE_ENABLED
+#define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
+#define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
+#define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay"
 #endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
@@ -95,6 +102,7 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
 
 static int scossl_prov_initialized = 0;
 
+static OSSL_FUNC_core_get_params_fn *core_get_params;
 static OSSL_FUNC_CRYPTO_malloc_fn *c_CRYPTO_malloc;
 static OSSL_FUNC_CRYPTO_zalloc_fn *c_CRYPTO_zalloc;
 static OSSL_FUNC_CRYPTO_free_fn *c_CRYPTO_free;
@@ -266,6 +274,9 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_keysinuse_cleanup();
+#endif
     OPENSSL_free(provctx);
 }
 
@@ -354,6 +365,86 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
     return SCOSSL_FAILURE;
 }
 
+#ifdef KEYSINUSE_ENABLED
+static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
+{
+    BOOL keysinuseEnabled = FALSE;
+    // All config params are provided as string pointers
+    const char *confEnabled = NULL;
+    const char *confMaxFileSize = NULL;
+    const char *confLoggingDelay = NULL;
+    const char *envEnabled = NULL;
+
+    OSSL_PARAM keysinuseParams[] = {
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &confEnabled, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &confMaxFileSize, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confLoggingDelay, 0),
+        OSSL_PARAM_END};
+
+    if (core_get_params(handle, keysinuseParams) &&
+        confEnabled != NULL)
+    {
+        keysinuseEnabled = atoi(confEnabled) == 0 ? FALSE : TRUE;
+    }
+
+    // KeysInUse can be enabled from environment. This takes precedence over config.
+    // NCONF_get_string fetches from the environment if the conf parameter is NULL
+    if ((envEnabled = NCONF_get_string(NULL, NULL, "KEYSINUSE_ENABLED")) != NULL)
+    {
+        keysinuseEnabled = atoi(envEnabled) == 0 ? FALSE : TRUE;
+    }
+
+    if (keysinuseEnabled)
+    {
+        if (confMaxFileSize != NULL)
+        {
+            // Convert file size to off_t in bytes.
+            // This is the same behavior as atol but also handles MB, KB, and GB suffixes.
+            off_t maxFileSizeBytes = 0;
+            int i;
+            for (i = 0;
+                 confMaxFileSize[i] != '\0' && confMaxFileSize[i] < '0' && '9' < confMaxFileSize[i];
+                 i++);
+
+            while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
+            {
+                maxFileSizeBytes = maxFileSizeBytes * 10 + (confMaxFileSize[i++] - '0');
+            }
+
+            // Check for KB, MB, or GB suffixes, case insensitive.
+            if (confMaxFileSize[i] != '\0' &&
+                (confMaxFileSize[i + 1] == 'B' || confMaxFileSize[i + 1] == 'b'))
+            {
+                switch (confMaxFileSize[i])
+                {
+                case 'K':
+                case 'k':
+                    maxFileSizeBytes <<= 10;
+                    break;
+                case 'M':
+                case 'm':
+                    maxFileSizeBytes <<= 20;
+                    break;
+                case 'G':
+                case 'g':
+                    maxFileSizeBytes <<= 30;
+                    break;
+                }
+            }
+
+            p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
+        }
+
+        if (confLoggingDelay != NULL)
+        {
+            p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
+        }
+
+        p_scossl_keysinuse_init();
+    }
+}
+#endif
+
 static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))p_scossl_teardown},
     {OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (void (*)(void))p_scossl_gettable_params},
@@ -388,6 +479,9 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     {
         switch(in->function_id)
         {
+        case OSSL_FUNC_CORE_GET_PARAMS:
+            core_get_params = OSSL_FUNC_core_get_params(in);
+            break;
         case OSSL_FUNC_CRYPTO_MALLOC:
             c_CRYPTO_malloc = OSSL_FUNC_CRYPTO_malloc(in);
             break;
@@ -429,6 +523,14 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     *provctx = p_ctx;
 
     *out = p_scossl_base_dispatch;
+
+#ifdef KEYSINUSE_ENABLED
+    // Start keysinuse if configured
+    if (core_get_params != NULL)
+    {
+        p_scossl_start_keysinuse(handle);
+    }
+#endif
 
     return SCOSSL_SUCCESS;
 }
