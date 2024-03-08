@@ -196,13 +196,15 @@ static const OSSL_ALGORITHM p_scossl_mac[] = {
     ALG_TABLE_END};
 
 // KDF
-extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_kbkdf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
-    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
     ALG("HKDF", p_scossl_hkdf_kdf_functions),
+    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
+    ALG("KBKDF", p_scossl_kbkdf_kdf_functions),
     ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
@@ -449,7 +451,7 @@ void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line)
     return c_CRYPTO_clear_free(ptr, num, file, line);
 }
 
-#if OPENSSL_VERSION_MINOR == 0
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
 EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
 {
     EVP_MD_CTX *out = EVP_MD_CTX_new();
