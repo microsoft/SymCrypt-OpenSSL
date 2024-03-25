@@ -9,8 +9,10 @@
 #include "e_scossl_dh.h"
 #include "e_scossl_digests.h"
 #include "e_scossl_ciphers.h"
-#include "e_scossl_pkey_meths.h"
 #include "e_scossl_rand.h"
+#if OPENSSL_VERSION_MAJOR == 1
+#include "e_scossl_pkey_meths.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +34,9 @@ SCOSSL_STATUS e_scossl_destroy(ENGINE* e)
     {
         e_scossl_destroy_digests();
         e_scossl_destroy_ciphers();
+#if OPENSSL_VERSION_MAJOR == 1
         e_scossl_destroy_pkey_methods();
+#endif
         RSA_meth_free(e_scossl_rsa_method);
         e_scossl_rsa_method = NULL;
         e_scossl_destroy_ecc_curves();
@@ -164,7 +168,9 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
         || !ENGINE_set_RAND(e, e_scossl_rand_method())
         || !ENGINE_set_digests(e, e_scossl_digests)
         || !ENGINE_set_ciphers(e, e_scossl_ciphers)
+#if OPENSSL_VERSION_MAJOR == 1
         || !ENGINE_set_pkey_meths(e, e_scossl_pkey_methods)
+#endif
         )
     {
         goto end;
@@ -197,7 +203,9 @@ static SCOSSL_STATUS scossl_bind_engine(ENGINE* e)
         || !e_scossl_dh_init_static()
         || !e_scossl_digests_init_static()
         || !e_scossl_ciphers_init_static()
+#if OPENSSL_VERSION_MAJOR == 1
         || !e_scossl_pkey_methods_init_static()
+#endif
         )
     {
         e_scossl_destroy(e);
