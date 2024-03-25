@@ -920,7 +920,12 @@ int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, cha
     }
     exponent_bn = BN_new();
     BN_set_word(exponent_bn, exponent);
+
+#if OPENSSL_VERSION_MAJOR == 3
+    if (EVP_PKEY_CTX_set1_rsa_keygen_pubexp(pKeyContext, exponent_bn) <= 0) {
+#else
     if (EVP_PKEY_CTX_set_rsa_keygen_pubexp(pKeyContext, exponent_bn) <= 0) {
+#endif
         handleOpenSSLError("");
         goto end;
     }
@@ -987,6 +992,9 @@ end:
         EVP_PKEY_CTX_free(pKeyContext);
     if (pKey)
         EVP_PKEY_free(pKey);
+#if OPENSSL_VERSION_MAJOR == 3
+    BN_free(exponent_bn);
+#endif
     return ret;
 }
 
@@ -1033,7 +1041,9 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     // Sign/Verify
     //
+#if OPENSSL_VERSION_MAJOR == 1
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5(), 16);
+#endif
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha1", EVP_sha1(), 20);
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha256", EVP_sha256(), 32);
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha384", EVP_sha384(), 48);
@@ -1049,7 +1059,9 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     // DigestSign/DigestVerify
     //
+#if OPENSSL_VERSION_MAJOR == 1
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5());
+#endif
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha1", EVP_sha1());
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha256", EVP_sha256());
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha384", EVP_sha384());

@@ -433,10 +433,6 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         // cbDst is not caller supplied for engine
         cbDst = cbModulus;
     }
-    else if (cbDst < cbModulus)
-    {
-        goto cleanup;
-    }
 
     switch (padding)
     {
