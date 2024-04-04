@@ -269,7 +269,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
 
     // Different digest specified than what was previously set by paramters.
     if (mdname != NULL &&
-        (mdname[0] == '\0' || !EVP_MD_is_a(ctx->md, mdname)))
+        (mdname[0] == '\0' || ctx->md == NULL || !EVP_MD_is_a(ctx->md, mdname)))
     {
         if (ctx->pssRestricted)
         {
