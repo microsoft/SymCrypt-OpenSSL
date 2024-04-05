@@ -174,8 +174,8 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_init(_In_ SCOSSL_ECDSA_CTX
         return SCOSSL_FAILURE;
     }
 
-    if (mdname != NULL && ctx->md != NULL &&
-        (mdname[0] == '\0' || ctx->md == NULL || !EVP_MD_is_a(ctx->md, mdname)))
+    if (mdname != NULL &&
+        (mdname[0] == '\0' || ctx->md == NULL ||  !EVP_MD_is_a(ctx->md, mdname)))
     {
         // Different digest specified than what was previously set by parameters.
         EVP_MD_free(ctx->md);

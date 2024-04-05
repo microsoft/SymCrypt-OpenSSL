@@ -651,7 +651,23 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx1->initialized)
     {
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+        {
+            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx1->key, pointFormat);
+            if (cbPublicKey != SymCryptEckeySizeofPublicKey(keyCtx2->key, pointFormat))
+            {
+                goto cleanup;
+            }
+
+            if ((pbPublicKey1 = OPENSSL_malloc(cbPublicKey)) == NULL ||
+                (pbPublicKey2 = OPENSSL_malloc(cbPublicKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+        }
+        // Private key only needs to be checked if public key is not
+        else if (SymCryptEckeyHasPrivateKey(keyCtx1->key) && SymCryptEckeyHasPrivateKey(keyCtx2->key))
         {
             cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx1->key);
             if (cbPrivateKey != SymCryptEckeySizeofPrivateKey(keyCtx2->key))
@@ -667,21 +683,11 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
                 goto cleanup;
             }
         }
-
-        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+        // Private key comparison, but one key doesn't have a private key
+        else
         {
-            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx1->key, pointFormat);
-            if (cbPublicKey != SymCryptEckeySizeofPublicKey(keyCtx2->key, pointFormat))
-            {
-                goto cleanup;
-            }
-
-            if ((pbPublicKey1 = OPENSSL_malloc(cbPublicKey)) == NULL ||
-                (pbPublicKey2 = OPENSSL_malloc(cbPublicKey)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ret = FALSE;
+            goto cleanup;
         }
 
         if ((cbPrivateKey | cbPublicKey) == 0)

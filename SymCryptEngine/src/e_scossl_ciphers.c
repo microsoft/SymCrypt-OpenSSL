@@ -766,10 +766,9 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         // We must explicitly copy the GCM structs using SymCrypt as the AES key structure contains pointers
         // to itself, so a plain memcpy will maintain pointers to the source context
         dstCtx = (SCOSSL_CIPHER_GCM_CTX *) SCOSSL_ALIGN_UP(EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr));
-        SymCryptGcmKeyCopy(&cipherCtx->key, &dstCtx->key);
-        SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
 
-        dstCtx->ivlen = cipherCtx->ivlen;
+        memcpy(dstCtx, cipherCtx, sizeof(SCOSSL_CIPHER_GCM_CTX));
+
         if (cipherCtx->iv != NULL && (dstCtx->iv = OPENSSL_memdup(cipherCtx->iv, cipherCtx->ivlen)) == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
@@ -777,6 +776,11 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
             return SCOSSL_FAILURE;
         }
 
+        if (cipherCtx->operationInProgress)
+        {
+            SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
+        }
+        SymCryptGcmKeyCopy(&cipherCtx->key, &dstCtx->key);
         break;
     case EVP_CTRL_GCM_SET_IV_FIXED:
         return scossl_aes_gcm_set_iv_fixed(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);
