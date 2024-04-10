@@ -179,8 +179,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
-        if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
-            !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
+        if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
+            !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -194,8 +194,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
-        if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
-            !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
+        if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
+            !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -436,8 +436,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
-        if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
-            !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
+        if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
+            !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -451,8 +451,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
-        if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
-            !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
+        if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
+            !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
