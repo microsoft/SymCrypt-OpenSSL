@@ -12,7 +12,7 @@ extern "C" {
 
 // Value provided by CMake, defined in top level CMakeLists.txt
 #define P_SCOSSL_VERSION "@SymCrypt-OpenSSL_VERSION@"
-#define P_SCOSSL_NAME "SymCrypt"
+#define P_SCOSSL_NAME "symcryptprovider"
 
 typedef struct
 {
