@@ -100,6 +100,7 @@ The below steps assume you have some config file with the SymCrypt engine and/or
 | DH | evppkey_dh.txt |
 | ECDH | evppkey_ecdh.txt |
 | ECDSA | evppkey_ecdsa.txt |
+| ECDSA (Named curves only)| evppkey_ecdsa_names.txt |
 | X25519 | evppkey_ecx.txt |
 | FFDHE | evppkey_ffdhe.txt |
 | RSA | evppkey_rsa_common.txt |
