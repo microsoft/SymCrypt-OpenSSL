@@ -745,14 +745,14 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_INIT:
         return scossl_aes_gcm_set_iv_len(cipherCtx, EVP_CIPHER_CTX_iv_length(ctx)) && scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
     case EVP_CTRL_GET_IVLEN:
-        *(int *)ptr = SCOSSL_GCM_IV_LENGTH;
+        *(int *)ptr = SCOSSL_GCM_DEFAULT_IV_LENGTH;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // SymCrypt engine currently only supports SCOSSL_GCM_IV_LENGTH
-        if( arg != SCOSSL_GCM_IV_LENGTH )
+        // SymCrypt engine currently only supports SCOSSL_GCM_DEFAULT_IV_LENGTH
+        if( arg != SCOSSL_GCM_DEFAULT_IV_LENGTH )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
+                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_DEFAULT_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         break;

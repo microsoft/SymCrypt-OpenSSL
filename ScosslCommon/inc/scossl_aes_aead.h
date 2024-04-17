@@ -36,7 +36,7 @@ extern "C" {
 //  useInvocation is set to 1 to indicate that the ivInvocation field is in use (set on a successful
 //  call to EVP_CTRL_GCM_SET_IV_FIXED)
 
-#define SCOSSL_GCM_IV_LENGTH (12)
+#define SCOSSL_GCM_DEFAULT_IV_LENGTH (12)
 #define SCOSSL_GCM_MIN_IV_LENGTH (1)
 #define SCOSSL_GCM_MIN_TAG_LENGTH (12)
 #define SCOSSL_GCM_MAX_TAG_LENGTH (16)

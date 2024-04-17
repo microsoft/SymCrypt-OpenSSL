@@ -921,6 +921,8 @@ int CreateKeys(int id, int modulus, uint32_t exponent, char* publicFileName, cha
     exponent_bn = BN_new();
     BN_set_word(exponent_bn, exponent);
 
+    // API name change. Note, that in 3.0 it is now the caller's
+    // responsibility to free exponent_bn
 #if OPENSSL_VERSION_MAJOR == 3
     if (EVP_PKEY_CTX_set1_rsa_keygen_pubexp(pKeyContext, exponent_bn) <= 0) {
 #else
@@ -992,6 +994,9 @@ end:
         EVP_PKEY_CTX_free(pKeyContext);
     if (pKey)
         EVP_PKEY_free(pKey);
+
+    // In 1.1.1, the EVP_PKEY_CTX takes ownership of this bignum and will free it
+    // in EVP_PKEY_CTX_free. In 3.0, it's the caller's responsibility.
 #if OPENSSL_VERSION_MAJOR == 3
     BN_free(exponent_bn);
 #endif
@@ -1041,6 +1046,8 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     // Sign/Verify
     //
+
+    // MD5+PKCS1 is not supported by the provider
 #if OPENSSL_VERSION_MAJOR == 1
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5(), 16);
 #endif
@@ -1059,6 +1066,8 @@ void TestRsaEvp(int modulus, uint32_t exponent)
     //
     // DigestSign/DigestVerify
     //
+
+    // MD5+PKCS1 is not supported by the provider
 #if OPENSSL_VERSION_MAJOR == 1
     TestRsaDigestSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5());
 #endif
