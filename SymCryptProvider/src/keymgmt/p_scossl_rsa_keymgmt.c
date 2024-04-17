@@ -901,7 +901,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
                 pcbPrimes[0] = p->data_size;
 
                 ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
-                if (pbModulus == NULL)
+                if (ppbPrimes[0] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
@@ -920,7 +920,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
                 pcbPrimes[1] = p->data_size;
 
                 ppbPrimes[1] = OPENSSL_zalloc(pcbPrimes[1]);
-                if(pbModulus == NULL)
+                if(ppbPrimes[1] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;

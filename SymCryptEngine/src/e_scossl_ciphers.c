@@ -743,17 +743,16 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     switch( type )
     {
     case EVP_CTRL_INIT:
-        scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
-        break;
+        return scossl_aes_gcm_set_iv_len(cipherCtx, EVP_CIPHER_CTX_iv_length(ctx)) && scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
     case EVP_CTRL_GET_IVLEN:
-        *(int *)ptr = SCOSSL_GCM_IV_LENGTH;
+        *(int *)ptr = SCOSSL_GCM_DEFAULT_IV_LENGTH;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // SymCrypt currently only supports SCOSSL_GCM_IV_LENGTH
-        if( arg != SCOSSL_GCM_IV_LENGTH )
+        // SymCrypt engine currently only supports SCOSSL_GCM_DEFAULT_IV_LENGTH
+        if( arg != SCOSSL_GCM_DEFAULT_IV_LENGTH )
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
+                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_DEFAULT_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
         break;
@@ -767,8 +766,21 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         // We must explicitly copy the GCM structs using SymCrypt as the AES key structure contains pointers
         // to itself, so a plain memcpy will maintain pointers to the source context
         dstCtx = (SCOSSL_CIPHER_GCM_CTX *) SCOSSL_ALIGN_UP(EVP_CIPHER_CTX_get_cipher_data((EVP_CIPHER_CTX *)ptr));
+
+        memcpy(dstCtx, cipherCtx, sizeof(SCOSSL_CIPHER_GCM_CTX));
+
+        if (cipherCtx->iv != NULL && (dstCtx->iv = OPENSSL_memdup(cipherCtx->iv, cipherCtx->ivlen)) == NULL)
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
+                             "Failed to copy IV");
+            return SCOSSL_FAILURE;
+        }
+
+        if (cipherCtx->operationInProgress)
+        {
+            SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
+        }
         SymCryptGcmKeyCopy(&cipherCtx->key, &dstCtx->key);
-        SymCryptGcmStateCopy(&cipherCtx->state, &dstCtx->key, &dstCtx->state);
         break;
     case EVP_CTRL_GCM_SET_IV_FIXED:
         return scossl_aes_gcm_set_iv_fixed(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);

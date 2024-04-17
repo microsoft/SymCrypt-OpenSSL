@@ -39,7 +39,7 @@ const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,
     {
         for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
         {
-            if (EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
+            if (mdInt != NULL && EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
             {
                 mdInfo = &p_scossl_rsa_supported_mds[i];
             }

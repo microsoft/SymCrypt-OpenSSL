@@ -462,7 +462,15 @@ EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
     }
     return out;
 }
-#endif
+
+#if OPENSSL_VERSION_PATCH < 4
+int OPENSSL_strcasecmp(const char *s1, const char *s2)
+{
+    return strcasecmp(s1, s2);
+}
+#endif // OPENSSL_VERSION_PATCH < 4
+
+#endif // OPENSSL_VERSION_MINOR == 0
 
 #ifdef __cplusplus
 }

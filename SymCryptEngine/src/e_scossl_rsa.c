@@ -28,7 +28,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const 
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa,
     int padding)
 {
-    int ret = -1;
+    SCOSSL_RETURNLENGTH ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_pub_enc pfn_rsa_meth_pub_enc = NULL;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
@@ -78,7 +78,7 @@ cleanup:
 SCOSSL_RETURNLENGTH e_scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, int padding)
 {
-    int ret = -1;
+    SCOSSL_RETURNLENGTH ret = -1;
     const RSA_METHOD *ossl_rsa_meth = NULL;
     PFN_RSA_meth_priv_dec pfn_rsa_meth_priv_dec = NULL;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
@@ -162,7 +162,9 @@ SCOSSL_STATUS e_scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsig
     _Out_writes_bytes_(siglen) unsigned char* sigret, _Out_ unsigned int* siglen,
     _In_ const RSA* rsa)
 {
+    SIZE_T siglenOut;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
+    SCOSSL_STATUS ret;
 
     if( keyCtx == NULL )
     {
@@ -178,7 +180,9 @@ SCOSSL_STATUS e_scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsig
         }
     }
 
-    return scossl_rsa_pkcs1_sign(keyCtx->key, type, m, m_length, sigret, (SIZE_T*)siglen);
+    ret = scossl_rsa_pkcs1_sign(keyCtx->key, type, m, m_length, sigret, &siglenOut);
+    *siglen = (unsigned int)siglenOut;
+    return ret;
 }
 
 SCOSSL_STATUS e_scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const unsigned char* m,
@@ -211,7 +215,7 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     UINT64  pubExp64;
     SYMCRYPT_RSA_PARAMS SymcryptRsaParam;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int ret = SCOSSL_FAILURE;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
 
@@ -286,7 +290,7 @@ cleanup:
 
 SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_KEY_CONTEXT *keyCtx)
 {
-    int ret = SCOSSL_FAILURE;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     UINT64  pubExp64;
     PBYTE   pbModulus = NULL;
     SIZE_T  cbModulus = 0;
@@ -414,7 +418,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
                    &pubExp64,
                    1,
                    (PCBYTE *)ppbPrimes,
-                   (SIZE_T *)pcbPrimes,
+                   pcbPrimes,
                    nPrimes,
                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                    SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,

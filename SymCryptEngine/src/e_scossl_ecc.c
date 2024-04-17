@@ -364,9 +364,7 @@ SCOSSL_STATUS e_scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_EC
 
     if( pCurve == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
-            "SymCryptEcurveAllocate failed.");
-        return SCOSSL_FAILURE;
+        return SCOSSL_FALLBACK;
     }
 
     *ppKeyCtx = (SCOSSL_ECC_KEY_CONTEXT*) EC_KEY_get_ex_data(eckey, e_scossl_eckey_idx);
