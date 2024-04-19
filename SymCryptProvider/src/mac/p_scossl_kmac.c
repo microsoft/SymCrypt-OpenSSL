@@ -114,7 +114,7 @@ static SCOSSL_KMAC_CTX *p_scossl_kmac_dupctx(_In_ SCOSSL_KMAC_CTX *ctx)
     copyCtx->cbOutput = ctx->cbOutput;
     copyCtx->xofMode = ctx->xofMode;
 
-    return ctx;
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ SCOSSL_KMAC_CTX *ctx,
