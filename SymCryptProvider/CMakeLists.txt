@@ -56,6 +56,7 @@ set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
 
 target_link_libraries(scossl_provider PRIVATE scossl_common)
 target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
+target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 set(OPENSSL_PROVIDERS CACHE PATH "Path to OpenSSL providers" "${CMAKE_INSTALL_LIBDIR}/ossl-modules")
 
