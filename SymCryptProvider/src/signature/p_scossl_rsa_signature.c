@@ -811,16 +811,6 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             algNid = ctx->pssRestricted ? NID_rsassaPss : NID_rsaEncryption;
         }
 
-        // From RFC 4056:
-        // When the id-RSASSA-PSS algorithm identifier is used for a signature,
-        // the AlgorithmIdentifier parameters field MUST contain RSASSA-PSS- params.
-        //      RSASSA-PSS-params  ::=  SEQUENCE  {
-        // hashAlgorithm     [0] HashAlgorithm DEFAULT
-        //                          sha1Identifier,
-        // maskGenAlgorithm  [1] MaskGenAlgorithm DEFAULT
-        //                          mgf1SHA1Identifier,
-        // saltLength        [2] INTEGER DEFAULT 20,
-        // trailerField      [3] INTEGER DEFAULT 1  }
         if (ctx->pssRestricted)
         {
             ptype = V_ASN1_SEQUENCE;
