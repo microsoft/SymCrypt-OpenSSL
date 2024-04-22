@@ -105,6 +105,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
         else
         {
             ctx->pDlGroup = NULL;
+            ctx->groupSetByParams = FALSE;
             ctx->libCtx = provCtx->libctx;
         }
     }
@@ -118,22 +119,47 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL
 
     if (copyCtx != NULL)
     {
+        *copyCtx = *ctx;
+
         if ((copyCtx->keyCtx = scossl_dh_dup_key_ctx(ctx->keyCtx, ctx->pDlGroup != NULL)) == NULL)
         {
             OPENSSL_free(copyCtx);
             return NULL;
         }
 
-        // scossl_dh_dup_key_ctx performs a deep copy. If a custom group was set in ctx,
-        // then a new copy of that group is used by the key in copyCtx. We need to save this
-        // to copyCtx to ensure it properly gets freed.
-        if (copyCtx->keyCtx->initialized &&
-            ctx->pDlGroup != NULL)
+        // Group set by params means we need to copy the group, regardless of whether the
+        // key has been set
+        if (ctx->groupSetByParams)
         {
-            copyCtx->pDlGroup = (PSYMCRYPT_DLGROUP) SymCryptDlkeyGetGroup(copyCtx->keyCtx->dlkey);
-        }
+            // scossl_dh_dup_key_ctx performs a deep copy. If a custom group was set in ctx,
+            // then a new copy of that group is used by the key in copyCtx. We need to save this
+            // to copyCtx to ensure it properly gets freed.
+            if (copyCtx->keyCtx->initialized)
+            {
+                copyCtx->pDlGroup = (PSYMCRYPT_DLGROUP) SymCryptDlkeyGetGroup(copyCtx->keyCtx->dlkey);
+            }
+            // No key was set, but we still need to copy the group from ctx
+            else
+            {
+                SIZE_T pcbPrimeP;
+                SIZE_T pcbPrimeQ;
 
-        copyCtx->libCtx = ctx->libCtx;
+                SymCryptDlgroupGetSizes(
+                    ctx->pDlGroup,
+                    &pcbPrimeP,
+                    &pcbPrimeQ,
+                    NULL,
+                    NULL);
+
+                if ((copyCtx->pDlGroup = SymCryptDlgroupAllocate(pcbPrimeP, pcbPrimeQ)) == NULL)
+                {
+                    OPENSSL_free(copyCtx);
+                    return NULL;
+                }
+
+                SymCryptDlgroupCopy(ctx->pDlGroup, copyCtx->pDlGroup);
+            }
+        }
     }
 
     return copyCtx;
@@ -146,7 +172,7 @@ static void p_scossl_dh_keymgmt_free_key_ctx(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx)
 
     scossl_dh_free_key_ctx(ctx->keyCtx);
 
-    if (ctx->pDlGroup != NULL)
+    if (ctx->groupSetByParams)
     {
         SymCryptDlgroupFree(ctx->pDlGroup);
     }
@@ -503,6 +529,8 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
         return NULL;
     }
 
+    ctx->pDlGroup = (PSYMCRYPT_DLGROUP) genCtx->pDlGroup;
+
     return ctx;
 }
 
@@ -511,24 +539,74 @@ static const OSSL_PARAM *p_scossl_dh_keymgmt_gettable_params(ossl_unused void *p
     return p_scossl_dh_keymgmt_gettable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SCOSSL_DH_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
+// Helper functions for retrieving public and private key size.
+// ctx->keyCtx->dlkey may not be set, in which case the key size
+// must be retrieved from ctx->pDlGroup
+static int p_scossl_dh_pubkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
+{
+    if (ctx->keyCtx->initialized)
+    {
+        return SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) * 8;
+    }
+    else if (ctx->pDlGroup != NULL)
+    {
+        SIZE_T cbPrimeP;
+
+        SymCryptDlgroupGetSizes(
+            ctx->pDlGroup,
+            &cbPrimeP,
+            NULL,
+            NULL,
+            NULL);
+
+        return cbPrimeP * 8;
+    }
+
+    return -1;
+}
+
+static int p_scossl_dh_privkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
+{
+    if (ctx->keyCtx->initialized &&
+        SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey))
+    {
+        return SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8;
+    }
+    else if (ctx->pDlGroup != NULL)
+    {
+        SIZE_T cbPrimeQ;
+        SIZE_T cbPrimeP;
+
+        SymCryptDlgroupGetSizes(
+            ctx->pDlGroup,
+            &cbPrimeP,
+            &cbPrimeQ,
+            NULL,
+            NULL);
+
+        return cbPrimeQ != 0 ? cbPrimeQ * 8 : cbPrimeP * 8;
+    }
+
+    return -1;
+}
+
+static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SYMCRYPT_DLGROUP *pDlGroup, _Inout_ OSSL_PARAM params[])
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    PBYTE  pbPrimeP;
-    PBYTE  pbPrimeQ;
-    PBYTE  pbGenG;
-    PBYTE  pbSeed;
+    PBYTE  pbPrimeP = NULL;
+    PBYTE  pbPrimeQ = NULL;
+    PBYTE  pbGenG = NULL;
+    PBYTE  pbSeed = NULL;
     PBYTE  pbCur;
     PBYTE  pbData = NULL;
-    SIZE_T cbPrimeP;
-    SIZE_T cbPrimeQ;
-    SIZE_T cbGenG;
-    SIZE_T cbSeed;
+    SIZE_T cbPrimeP = 0;
+    SIZE_T cbPrimeQ = 0;
+    SIZE_T cbGenG = 0;
+    SIZE_T cbSeed = 0;
     SIZE_T cbData = 0;
     BIGNUM *bnPrimeP = NULL;
     BIGNUM *bnPrimeQ = NULL;
     BIGNUM *bnGenG = NULL;
-    PCSYMCRYPT_DLGROUP pDlGroup = SymCryptDlkeyGetGroup(keyCtx->dlkey);
     OSSL_PARAM *p;
     OSSL_PARAM *paramPrimeP = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_P);
     OSSL_PARAM *paramPrimeQ = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_Q);
@@ -589,37 +667,37 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SCOSSL_DH_KEY_CTX *
             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
             goto cleanup;
         }
+    }
 
-        if (pbPrimeP != NULL &&
-                (BN_bin2bn(pbPrimeP, cbPrimeP, bnPrimeP) == NULL ||
-                !OSSL_PARAM_set_BN(paramPrimeP, bnPrimeP)))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
-        }
+    if (pbPrimeP != NULL &&
+            (BN_bin2bn(pbPrimeP, cbPrimeP, bnPrimeP) == NULL ||
+            !OSSL_PARAM_set_BN(paramPrimeP, bnPrimeP)))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
 
-        if (pbPrimeQ != NULL &&
-                (BN_bin2bn(pbPrimeQ, cbPrimeQ, bnPrimeQ) == NULL ||
-                !OSSL_PARAM_set_BN(paramPrimeQ, bnPrimeQ)))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
-        }
+    if (pbPrimeQ != NULL &&
+            (BN_bin2bn(pbPrimeQ, cbPrimeQ, bnPrimeQ) == NULL ||
+            !OSSL_PARAM_set_BN(paramPrimeQ, bnPrimeQ)))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
 
-        if (pbGenG != NULL &&
-                (BN_bin2bn(pbGenG, cbGenG, bnGenG) == NULL ||
-                !OSSL_PARAM_set_BN(paramGenG, bnGenG)))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
-        }
+    if (pbGenG != NULL &&
+            (BN_bin2bn(pbGenG, cbGenG, bnGenG) == NULL ||
+            !OSSL_PARAM_set_BN(paramGenG, bnGenG)))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
 
-        if (pbSeed != NULL &&
-            !OSSL_PARAM_set_octet_string(paramSeed, pbSeed, cbSeed))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
-        }
+    if (pbSeed != NULL &&
+        !OSSL_PARAM_set_octet_string(paramSeed, pbSeed, cbSeed))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_FFC_GINDEX)) != NULL &&
@@ -672,6 +750,19 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
     OSSL_PARAM *paramEncodedKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
     OSSL_PARAM *paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
     OSSL_PARAM *paramPubKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY);
+
+    if (paramEncodedKey == NULL &&
+        paramPrivKey == NULL &&
+        paramPubKey == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    if (!keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
 
     if (paramPrivKey != NULL)
     {
@@ -766,9 +857,11 @@ cleanup:
 static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+    int pubKeyBits = p_scossl_dh_pubkey_bits(ctx);
+    int privKeyBits = p_scossl_dh_privkey_bits(ctx);
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
-        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) * 8))
+        (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -776,10 +869,9 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL)
     {
-        int pubKeyBits = SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) * 8;
-        int privKeyBits = SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8;
-
-        if (!OSSL_PARAM_set_int(p, BN_security_bits(pubKeyBits, privKeyBits)))
+        if (pubKeyBits < 0 ||
+            privKeyBits < 0 ||
+            !OSSL_PARAM_set_int(p, BN_security_bits(pubKeyBits, privKeyBits)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -787,14 +879,14 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
-        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey)))
+        (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL &&
-        !OSSL_PARAM_set_int(p, SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8))
+        (privKeyBits < 0 || !OSSL_PARAM_set_int(p, privKeyBits)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -816,7 +908,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
         }
     }
 
-    return p_scossl_dh_keymgmt_get_ffc_params(ctx->keyCtx, params) &&
+    return p_scossl_dh_keymgmt_get_ffc_params(ctx->pDlGroup, params) &&
            p_scossl_dh_keymgmt_get_key_params(ctx->keyCtx, params);
 }
 
@@ -831,7 +923,7 @@ static BOOL p_scossl_dh_keymgmt_has(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, int select
     }
     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
     {
-        ret = ret && SymCryptDlkeyGetGroup(ctx->keyCtx->dlkey) != NULL;
+        ret = ret && ctx->pDlGroup != NULL;
     }
     if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
     {
@@ -839,7 +931,8 @@ static BOOL p_scossl_dh_keymgmt_has(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, int select
     }
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        ret = ret && SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey);
+        ret = ret && ctx->keyCtx->dlkey != NULL &&
+                     SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey);
     }
 
     return ret;
@@ -860,13 +953,9 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        if (!ctx1->keyCtx->initialized || !ctx2->keyCtx->initialized)
         {
-            cbPrivateKey = SymCryptDlkeySizeofPrivateKey(ctx1->keyCtx->dlkey);
-            if (SymCryptDlkeySizeofPrivateKey(ctx2->keyCtx->dlkey) != cbPrivateKey)
-            {
-                goto cleanup;
-            }
+            goto cleanup;
         }
 
         if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
@@ -877,6 +966,22 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
                 goto cleanup;
             }
         }
+        // Only need to check the private key if we aren't already checking
+        // the public key. Same behavior as default openssl implementation.
+        else if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+                 SymCryptDlkeyHasPrivateKey(ctx1->keyCtx->dlkey) &&
+                 SymCryptDlkeyHasPrivateKey(ctx2->keyCtx->dlkey))
+        {
+            cbPrivateKey = SymCryptDlkeySizeofPrivateKey(ctx1->keyCtx->dlkey);
+            if (SymCryptDlkeySizeofPrivateKey(ctx2->keyCtx->dlkey) != cbPrivateKey)
+            {
+                goto cleanup;
+            }
+        }
+        else
+        {
+            goto cleanup;
+        }
 
         cbData = cbPrivateKey * 2 + cbPublicKey * 2;
         if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
@@ -885,11 +990,14 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
             goto cleanup;
         }
 
+        // Only the private or public keys will be compared, but not both.
+        // The below ensures the appropriate pointers are set for,
+        // SymCryptDlkeyGetValue and memcmp and the others are NULL.
+        pbPublicKey1 = cbPublicKey == 0 ? NULL : pbData;
         pbPrivateKey1 = cbPrivateKey == 0 ? NULL : pbData;
-        pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPrivateKey;
 
-        pbPublicKey1 = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey * 2;
-        pbPublicKey2 = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey * 2 + cbPublicKey;
+        pbPublicKey2 = cbPublicKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;
+        pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;;
 
         if (SymCryptDlkeyGetValue(
                 ctx1->keyCtx->dlkey,
@@ -908,21 +1016,19 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
             goto cleanup;
         }
 
-        if (memcmp(pbPrivateKey1, pbPrivateKey2, cbPrivateKey) != 0 ||
-            memcmp(pbPublicKey1, pbPublicKey2, cbPublicKey) != 0)
+        if (memcmp(pbPublicKey1, pbPublicKey2, cbPublicKey) != 0 ||
+            memcmp(pbPrivateKey1, pbPrivateKey2, cbPrivateKey) != 0)
         {
             goto cleanup;
         }
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0 &&
+        ctx1->pDlGroup != ctx2->pDlGroup)
     {
-        PCSYMCRYPT_DLGROUP pDlGroup1 = ctx1->keyCtx->dlkey != NULL ? SymCryptDlkeyGetGroup(ctx1->keyCtx->dlkey) : NULL;
-        PCSYMCRYPT_DLGROUP pDlGroup2 = ctx2->keyCtx->dlkey != NULL ? SymCryptDlkeyGetGroup(ctx2->keyCtx->dlkey) : NULL;
-
-        // Both groups must be either NULL or equal
-        if (pDlGroup1 != pDlGroup2 ||
-            !SymCryptDlgroupIsSame(pDlGroup1, pDlGroup2))
+        if (ctx1->pDlGroup == NULL ||
+            ctx2->pDlGroup == NULL ||
+            !SymCryptDlgroupIsSame(ctx1->pDlGroup, ctx2->pDlGroup))
         {
             goto cleanup;
         }
@@ -973,10 +1079,11 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->pDlGroup != NULL)
+    if (ctx->groupSetByParams)
     {
         SymCryptDlgroupFree(ctx->pDlGroup);
         ctx->pDlGroup = NULL;
+        ctx->groupSetByParams = FALSE;
     }
 
     if (!p_scossl_dh_params_to_group(ctx->libCtx,
@@ -1052,6 +1159,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
     {
         ctx->pDlGroup = pDlGroup;
     }
+    ctx->groupSetByParams = groupSetByParams;
 
     ret = SCOSSL_SUCCESS;
 
@@ -1097,8 +1205,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     SIZE_T cbPrimeQ;
     SIZE_T cbGenG;
     SIZE_T cbSeed;
-    SIZE_T cbPrivateKey;
     SIZE_T cbPublicKey;
+    SIZE_T cbPrivateKey;
     SIZE_T cbData = 0;
     BIGNUM *bnPrimeP = NULL;
     BIGNUM *bnPrimeQ = NULL;
@@ -1107,8 +1215,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     BIGNUM *bnPubKey = NULL;
     int mdNid;
     int dlGroupNid;
+    int privateKeyBits;
     const char *dlGroupName;
-    PCSYMCRYPT_DLGROUP pDlGroup;
     PCSYMCRYPT_HASH pHashAlgorithm;
     UINT32 genCounter;
 
@@ -1116,14 +1224,11 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx->keyCtx == NULL ||
-        ctx->keyCtx->dlkey == NULL ||
         (selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0 ||
         ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && !ctx->keyCtx->initialized))
     {
         return SCOSSL_FAILURE;
     }
-
-    pDlGroup = SymCryptDlkeyGetGroup(ctx->keyCtx->dlkey);
 
     if ((bld = OSSL_PARAM_BLD_new()) == NULL)
     {
@@ -1132,7 +1237,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     }
 
     SymCryptDlgroupGetSizes(
-        pDlGroup,
+        ctx->pDlGroup,
         &cbPrimeP,
         &cbPrimeQ,
         &cbGenG,
@@ -1172,7 +1277,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
 
     // Always export group parameters
     scError = SymCryptDlgroupGetValue(
-        pDlGroup,
+        ctx->pDlGroup,
         pbPrimeP, cbPrimeP,
         pbPrimeQ, cbPrimeQ,
         pbGenG, cbGenG,
@@ -1229,7 +1334,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     }
 
     // Group name may not be available if the group was imported by params
-    if ((dlGroupNid = scossl_dh_get_group_nid(pDlGroup)) != 0)
+    if ((dlGroupNid = scossl_dh_get_group_nid(ctx->pDlGroup)) != 0)
     {
         if ((dlGroupName = OBJ_nid2sn(dlGroupNid)) == NULL ||
             !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, dlGroupName, strlen(dlGroupName)))
@@ -1299,7 +1404,10 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         }
     }
 
-    if (!OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8) ||
+    privateKeyBits = p_scossl_dh_privkey_bits(ctx);
+
+    if (privateKeyBits < 0 ||
+        !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, privateKeyBits) ||
         (params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

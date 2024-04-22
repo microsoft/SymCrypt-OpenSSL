@@ -12,9 +12,11 @@ extern "C" {
 typedef struct
 {
     // Provider needs to support importing group by parameters.
-    // This is only set if the group has been imported by parameters
-    // and needs to be freed.
+    // pDlGroup may be set by params, or reference a static, known
+    // named group. If the group is loaded from params it must be
+    // freed when the context is freed.
     PSYMCRYPT_DLGROUP pDlGroup;
+    BOOL groupSetByParams;
     SCOSSL_DH_KEY_CTX *keyCtx;
     OSSL_LIB_CTX *libCtx;
 } SCOSSL_PROV_DH_KEY_CTX;
