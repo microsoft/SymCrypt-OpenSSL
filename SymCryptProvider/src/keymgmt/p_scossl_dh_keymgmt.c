@@ -15,6 +15,9 @@ extern "C" {
 #define SCOSSL_DH_KEYHEN_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
 #define SCOSSL_DH_PBITS_DEFAULT 2048
+// Private key length determined by group
+// Setting this to -1 matches the OpenSSL implementation for paramter fetching
+#define SCOSSL_DH_PRIVATE_BITS_DEFAULT -1
 
 #define SCOSSL_DH_FFC_TYPE_DEFAULT "default"
 #define SCOSSL_DH_FFC_TYPE_GROUP   "group"
@@ -28,8 +31,8 @@ typedef struct
 {
     SCOSSL_PROVCTX *provCtx;
     PCSYMCRYPT_DLGROUP pDlGroup;
-    SIZE_T pbits;
-    UINT32 nBitsPriv;
+    SIZE_T nBitsPub;
+    int nBitsPriv;
 } SCOSSL_DH_KEYGEN_CTX;
 
 #define SCOSSL_DH_PARAMETER_TYPES                                      \
@@ -74,7 +77,9 @@ static const OSSL_PARAM *p_scossl_dh_impexp_types[] = {
     p_scossl_dh_pkey_types,
     p_scossl_dh_all_types};
 
-// Gettable/settable key types
+static const OSSL_PARAM p_scossl_dh_keymgmt_settable_param_types[] = {
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_dh_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
@@ -106,6 +111,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
         {
             ctx->pDlGroup = NULL;
             ctx->groupSetByParams = FALSE;
+            ctx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
             ctx->libCtx = provCtx->libctx;
         }
     }
@@ -121,7 +127,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL
     {
         *copyCtx = *ctx;
 
-        if ((copyCtx->keyCtx = scossl_dh_dup_key_ctx(ctx->keyCtx, ctx->pDlGroup != NULL)) == NULL)
+        if ((copyCtx->keyCtx = scossl_dh_dup_key_ctx(ctx->keyCtx, ctx->groupSetByParams)) == NULL)
         {
             OPENSSL_free(copyCtx);
             return NULL;
@@ -176,6 +182,57 @@ static void p_scossl_dh_keymgmt_free_key_ctx(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx)
     {
         SymCryptDlgroupFree(ctx->pDlGroup);
     }
+}
+
+// Helper functions for retrieving public and private key size.
+// ctx->keyCtx->dlkey may not be set, in which case the key size
+// must be retrieved from ctx->pDlGroup
+static int p_scossl_dh_pubkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
+{
+    if (ctx->pDlGroup != NULL)
+    {
+        SIZE_T cbPrimeP;
+
+        SymCryptDlgroupGetSizes(
+            ctx->pDlGroup,
+            &cbPrimeP,
+            NULL,
+            NULL,
+            NULL);
+
+        return cbPrimeP * 8;
+    }
+
+    return -1;
+}
+
+static int p_scossl_dh_privkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
+{
+    if (ctx->nBitsPriv > 0)
+    {
+        return ctx->nBitsPriv;
+    }
+    if (ctx->keyCtx->initialized &&
+        SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey))
+    {
+        return SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8;
+    }
+    else if (ctx->pDlGroup != NULL)
+    {
+        SIZE_T cbPrimeQ;
+        SIZE_T cbPrimeP;
+
+        SymCryptDlgroupGetSizes(
+            ctx->pDlGroup,
+            &cbPrimeP,
+            &cbPrimeQ,
+            NULL,
+            NULL);
+
+        return cbPrimeQ != 0 ? cbPrimeQ * 8 - 1  : cbPrimeP * 8 - 1;
+    }
+
+    return -1;
 }
 
 // This function attempts to create a PSYMCRYPT_DLGROUP from params, and store the result in *ppDlGroup.
@@ -422,7 +479,7 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
     genCtx->pDlGroup = (PCSYMCRYPT_DLGROUP) pDlGroup;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_PBITS)) != NULL &&
-        !OSSL_PARAM_get_size_t(p, &genCtx->pbits))
+        !OSSL_PARAM_get_size_t(p, &genCtx->nBitsPub))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -437,15 +494,7 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
             return SCOSSL_FAILURE;
         }
 
-        // SymCryptDlkeySetPrivateKeyLength will validate this key size.
-        // Here we just need to be sure we can safely cast to UINT32
-        if (nBitsPriv < 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
-            return SCOSSL_FAILURE;
-        }
-
-        genCtx->nBitsPriv = (UINT32)nBitsPriv;
+        genCtx->nBitsPriv = nBitsPriv;
     }
 
     return SCOSSL_SUCCESS;
@@ -473,8 +522,8 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
         (genCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEYGEN_CTX))) != NULL)
     {
         genCtx->pDlGroup = NULL;
-        genCtx->nBitsPriv = 0;
-        genCtx->pbits = SCOSSL_DH_PBITS_DEFAULT;
+        genCtx->nBitsPub = SCOSSL_DH_PBITS_DEFAULT;
+        genCtx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
         genCtx->provCtx = provCtx;
 
         if (!p_scossl_dh_keygen_set_params(genCtx, params))
@@ -487,17 +536,45 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
     return genCtx;
 }
 
+static SCOSSL_STATUS p_scossl_dh_keygen_set_template(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx, _In_ SCOSSL_PROV_DH_KEY_CTX *tmplCtx)
+{
+    if (genCtx == NULL ||
+        tmplCtx == NULL ||
+        tmplCtx->groupSetByParams)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (tmplCtx->pDlGroup != NULL)
+    {
+        genCtx->pDlGroup = tmplCtx->pDlGroup;
+        if (tmplCtx->keyCtx->initialized)
+        {
+            genCtx->nBitsPriv = p_scossl_dh_privkey_bits(tmplCtx);
+        }
+        // No keydata, use default private key length
+        else
+        {
+            genCtx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
+        }
+
+        genCtx->nBitsPub = p_scossl_dh_pubkey_bits(tmplCtx);
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SCOSSL_PROV_DH_KEY_CTX *ctx;
 
-    // Select named group based on pbits if named group was not explicitly set.
+    // Select named group based on nBitsPub if named group was not explicitly set.
     // Note that the ffdhe group, not the modp group is used to match the behavior
     // of the default openssl implementation.
     if (genCtx->pDlGroup == NULL)
     {
         int dlGroupNid = 0;
-        switch(genCtx->pbits)
+        switch(genCtx->nBitsPub)
         {
             case 2048:
                 dlGroupNid = NID_ffdhe2048;
@@ -534,60 +611,68 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
     return ctx;
 }
 
+static const OSSL_PARAM *p_scossl_dh_keymgmt_settable_params(ossl_unused void *provCtx)
+{
+    return p_scossl_dh_keymgmt_settable_param_types;
+}
+
+static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, _In_ const OSSL_PARAM params[])
+{
+    const OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
+    {
+        SYMCRYPT_ERROR scError;
+        PCBYTE pbPublicKey;
+        SIZE_T cbPublicKey;
+
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbPublicKey, &cbPublicKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (ctx->pDlGroup == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+            return SCOSSL_FAILURE;
+        }
+
+        if (ctx->keyCtx->initialized)
+        {
+            SymCryptDlkeyFree(ctx->keyCtx->dlkey);
+            ctx->keyCtx->initialized = FALSE;
+        }
+
+        if ((ctx->keyCtx->dlkey = SymCryptDlkeyAllocate(ctx->pDlGroup)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+
+        scError = SymCryptDlkeySetValue(
+            NULL, 0,
+            pbPublicKey, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            SYMCRYPT_FLAG_DLKEY_DH,
+            ctx->keyCtx->dlkey);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SymCryptDlkeyFree(ctx->keyCtx->dlkey);
+            ctx->keyCtx->dlkey = NULL;
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->keyCtx->initialized = TRUE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 static const OSSL_PARAM *p_scossl_dh_keymgmt_gettable_params(ossl_unused void *provCtx)
 {
     return p_scossl_dh_keymgmt_gettable_param_types;
-}
-
-// Helper functions for retrieving public and private key size.
-// ctx->keyCtx->dlkey may not be set, in which case the key size
-// must be retrieved from ctx->pDlGroup
-static int p_scossl_dh_pubkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
-{
-    if (ctx->keyCtx->initialized)
-    {
-        return SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) * 8;
-    }
-    else if (ctx->pDlGroup != NULL)
-    {
-        SIZE_T cbPrimeP;
-
-        SymCryptDlgroupGetSizes(
-            ctx->pDlGroup,
-            &cbPrimeP,
-            NULL,
-            NULL,
-            NULL);
-
-        return cbPrimeP * 8;
-    }
-
-    return -1;
-}
-
-static int p_scossl_dh_privkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
-{
-    if (ctx->keyCtx->initialized &&
-        SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey))
-    {
-        return SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8;
-    }
-    else if (ctx->pDlGroup != NULL)
-    {
-        SIZE_T cbPrimeQ;
-        SIZE_T cbPrimeP;
-
-        SymCryptDlgroupGetSizes(
-            ctx->pDlGroup,
-            &cbPrimeP,
-            &cbPrimeQ,
-            NULL,
-            NULL);
-
-        return cbPrimeQ != 0 ? cbPrimeQ * 8 : cbPrimeP * 8;
-    }
-
-    return -1;
 }
 
 static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SYMCRYPT_DLGROUP *pDlGroup, _Inout_ OSSL_PARAM params[])
@@ -879,7 +964,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
-        (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
+        (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits / 8)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -917,7 +1002,7 @@ static BOOL p_scossl_dh_keymgmt_has(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, int select
 {
     BOOL ret = TRUE;
 
-    if (ctx->keyCtx->dlkey == NULL)
+    if (ctx == NULL || ctx->keyCtx->dlkey == NULL)
     {
         return FALSE;
     }
@@ -1070,7 +1155,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
     PSYMCRYPT_DLGROUP pDlGroup = NULL;
     BIGNUM *bnPrivateKey = NULL;
     BIGNUM *bnPublicKey = NULL;
-    int nBitsPriv = 0;
+    int nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     // Group required for import
@@ -1095,21 +1180,11 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
         return SCOSSL_FAILURE;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL &&
+        !OSSL_PARAM_get_int(p, &nBitsPriv))
     {
-        if (!OSSL_PARAM_get_int(p, &nBitsPriv))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
-
-        // SymCryptDlkeySetPrivateKeyLength will validate this key size.
-        // Here we just need to be sure we can safely cast to UINT32
-        if (nBitsPriv < 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
     }
 
     // If keypair is selected, either the private or public key must be
@@ -1155,11 +1230,9 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
         }
     }
 
-    if (groupSetByParams)
-    {
-        ctx->pDlGroup = pDlGroup;
-    }
+    ctx->pDlGroup = pDlGroup;
     ctx->groupSetByParams = groupSetByParams;
+    ctx->nBitsPriv = nBitsPriv;
 
     ret = SCOSSL_SUCCESS;
 
@@ -1438,7 +1511,10 @@ const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_dh_keygen_settable_params},
     {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_dh_keygen_cleanup},
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_dh_keygen_init},
+    {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_dh_keygen_set_template},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_dh_keygen},
+    {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_settable_params},
+    {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_dh_keymgmt_has},

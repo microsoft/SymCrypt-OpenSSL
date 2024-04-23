@@ -132,7 +132,6 @@ static SCOSSL_STATUS p_scossl_dh_init(_In_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_
 
 static SCOSSL_STATUS p_scossl_dh_set_peer(_Inout_ SCOSSL_DH_CTX *ctx, _In_ SCOSSL_PROV_DH_KEY_CTX *peerProvKey)
 {
-
     if (ctx == NULL || peerProvKey == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);

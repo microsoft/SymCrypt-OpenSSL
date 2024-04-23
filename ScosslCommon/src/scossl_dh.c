@@ -38,6 +38,13 @@ void scossl_dh_free_key_ctx(SCOSSL_DH_KEY_CTX *ctx)
 
 SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 {
+    PBYTE  pbData = NULL;
+    SIZE_T cbData = 0;
+    PBYTE  pbPrivateKey;
+    SIZE_T cbPrivateKey;
+    PBYTE  pbPublicKey;
+    SIZE_T cbPublicKey;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS success = SCOSSL_FAILURE;
     SCOSSL_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEY_CTX));
     PSYMCRYPT_DLGROUP pDlgroupCopy = NULL;
@@ -81,7 +88,44 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
             }
             else
             {
-                SymCryptDlkeyCopy(ctx->dlkey, copyCtx->dlkey);
+                // SymCryptDlkeyCopy expects the private key to be allocated
+                // The private key is only allocated with a call to SymCryptDlkeySetValue
+                // or SymCryptDlkeyGenerate, so instead we need to copy the key
+                cbPublicKey = SymCryptDlkeySizeofPublicKey(ctx->dlkey);
+                cbPrivateKey = SymCryptDlkeySizeofPrivateKey(ctx->dlkey);
+                cbData = cbPublicKey + cbPrivateKey;
+
+                if ((pbData = OPENSSL_secure_malloc(cbData)) == NULL)
+                {
+                    goto cleanup;
+                }
+
+                pbPublicKey = pbData;
+                pbPrivateKey = pbData + cbPublicKey;
+
+                scError = SymCryptDlkeyGetValue(
+                    ctx->dlkey,
+                    pbPrivateKey, cbPrivateKey,
+                    pbPublicKey, cbPublicKey,
+                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                    0);
+
+                if (scError != SYMCRYPT_NO_ERROR)
+                {
+                    goto cleanup;
+                }
+
+                scError = SymCryptDlkeySetValue(
+                    pbPrivateKey, cbPrivateKey,
+                    pbPublicKey, cbPublicKey,
+                    SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                    SYMCRYPT_FLAG_DLKEY_DH | SYMCRYPT_FLAG_KEY_NO_FIPS, // Don't need to re-check group
+                    copyCtx->dlkey);
+
+                if (scError != SYMCRYPT_NO_ERROR)
+                {
+                    goto cleanup;
+                }
             }
         }
         else
@@ -102,11 +146,16 @@ cleanup:
         copyCtx = NULL;
     }
 
+    if (cbData > 0)
+    {
+        OPENSSL_secure_clear_free(pbData, cbData);
+    }
+
     return copyCtx;
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv,
+SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
                                        PCSYMCRYPT_DLGROUP pDlgroup, BOOL skipGroupValidation,
                                        const BIGNUM *privateKey, const BIGNUM *publicKey)
 {
@@ -133,7 +182,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv,
         goto cleanup;
     }
 
-    if (nBitsPriv != 0)
+    if (nBitsPriv > 0)
     {
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)
@@ -234,7 +283,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPriv, PCSYMCRYPT_DLGROUP pDlgroup)
+SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, PCSYMCRYPT_DLGROUP pDlgroup)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -247,7 +296,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, UINT32 nBitsPri
         goto cleanup;
     }
 
-    if (nBitsPriv != 0)
+    if (nBitsPriv > 0)
     {
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)

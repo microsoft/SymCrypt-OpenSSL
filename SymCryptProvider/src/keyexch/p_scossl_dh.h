@@ -16,8 +16,9 @@ typedef struct
     // named group. If the group is loaded from params it must be
     // freed when the context is freed.
     PSYMCRYPT_DLGROUP pDlGroup;
-    BOOL groupSetByParams;
     SCOSSL_DH_KEY_CTX *keyCtx;
+    BOOL groupSetByParams;
+    int nBitsPriv;
     OSSL_LIB_CTX *libCtx;
 } SCOSSL_PROV_DH_KEY_CTX;
 
