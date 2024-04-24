@@ -29,6 +29,7 @@ typedef struct
 static const OSSL_PARAM p_scossl_ecdsa_ctx_gettable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
     OSSL_PARAM_size_t(OSSL_SIGNATURE_PARAM_DIGEST_SIZE, NULL),
+    OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_ecdsa_ctx_settable_param_types[] = {
@@ -327,22 +328,96 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
     }
 
     OSSL_PARAM *p;
+    X509_ALGOR *x509Alg = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->md == NULL ? "" : EVP_MD_get0_name(ctx->md)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->mdSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    return SCOSSL_SUCCESS;
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL)
+    {
+        int cbAid;
+        int algNid = NID_undef;
+
+        if (p->data_type != OSSL_PARAM_OCTET_STRING)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+
+        }
+
+        p->return_size = 0;
+
+        if (ctx->md == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            goto cleanup;
+        }
+
+        if ((x509Alg = X509_ALGOR_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        switch (EVP_MD_nid(ctx->md))
+        {
+        case NID_sha1:
+            algNid = NID_ecdsa_with_SHA1;
+            break;
+        case NID_sha256:
+            algNid = NID_ecdsa_with_SHA256;
+            break;
+        case NID_sha384:
+            algNid = NID_ecdsa_with_SHA384;
+            break;
+        case NID_sha512:
+            algNid = NID_ecdsa_with_SHA512;
+            break;
+        case NID_sha3_256:
+            algNid = NID_ecdsa_with_SHA3_256;
+            break;
+        case NID_sha3_384:
+            algNid = NID_ecdsa_with_SHA3_384;
+            break;
+        case NID_sha3_512:
+            algNid = NID_ecdsa_with_SHA3_512;
+            break;
+        }
+
+        if (algNid == NID_undef ||
+            !X509_ALGOR_set0(x509Alg, OBJ_nid2obj(algNid), V_ASN1_UNDEF, NULL))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        if ((cbAid = i2d_X509_ALGOR(x509Alg, (unsigned char**)&p->data)) < 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        p->return_size = (SIZE_T)cbAid;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    X509_ALGOR_free(x509Alg);
+
+    return ret;
 }
 
 static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx)

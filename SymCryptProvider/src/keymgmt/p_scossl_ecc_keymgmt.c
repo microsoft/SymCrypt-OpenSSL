@@ -26,6 +26,7 @@ typedef struct
 // ScOSSL only supports named curves
 static const OSSL_PARAM p_scossl_ecc_keygen_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
@@ -35,6 +36,7 @@ static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_x25519_keymgmt_gettable_param_types[] = {
@@ -46,6 +48,7 @@ static const OSSL_PARAM p_scossl_x25519_keymgmt_gettable_param_types[] = {
 
 static const OSSL_PARAM p_scossl_ecc_keymgmt_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
     OSSL_PARAM_END};
 
 // We don't need to support setting the group for X25519 import/export
@@ -243,6 +246,22 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CT
         genCtx->curve = pCurve;
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -384,21 +403,21 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
         !OSSL_PARAM_set_uint32(p, scossl_ecdsa_size(keyCtx->curve)))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve)))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL &&
         !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve) / 2))
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
@@ -407,7 +426,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
 
         if (!keyCtx->initialized)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
 
@@ -461,9 +480,16 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
 
         if (!OSSL_PARAM_set_octet_string(p, pbPublicKeyTmp, cbPublicKey))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL &&
+        !OSSL_PARAM_set_utf8_string(p, OSSL_PKEY_EC_ENCODING_GROUP))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
     }
 
     // General ECDH only
@@ -473,7 +499,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS)) != NULL &&
             !OSSL_PARAM_set_int(p, 0))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
 
@@ -481,7 +507,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
         if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH)) != NULL &&
             !OSSL_PARAM_set_int(p, 0))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
     }
@@ -577,6 +603,22 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
         }
 
         keyCtx->initialized = TRUE;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            goto cleanup;
+        }
     }
 
     ret = SCOSSL_SUCCESS;
@@ -778,6 +820,23 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         goto cleanup;
     }
 
+    // Only allow named curves
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+
     ecGroup = EC_GROUP_new_from_params(params, keyCtx->libctx, NULL);
     pCurve = scossl_ecc_group_to_symcrypt_curve(ecGroup);
 
@@ -925,6 +984,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
 
     // Curve is assumed to be a valid named curve if it was loaded by SCOSSL
     if ((curveName = scossl_ecc_get_curve_name(keyCtx->curve)) == NULL ||
+        !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_EC_ENCODING, OSSL_PKEY_EC_ENCODING_GROUP, strlen(OSSL_PKEY_EC_ENCODING_GROUP)) ||
         !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curveName, strlen(curveName)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

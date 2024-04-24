@@ -38,8 +38,9 @@ typedef struct
 } SCOSSL_RSA_SIGN_CTX;
 
 #define SCOSSL_RSA_SIGNATURE_GETTABLE_PARAMS                        \
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),   \
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0), \
-    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
 
 #define SCOSSL_RSA_PSS_SIGNATURE_GETTABLE_PARAMS                       \
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0), \
@@ -640,6 +641,65 @@ static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_params(_In_ SCOSSL_RSA_SIGN_C
     return ctx->padding == RSA_PKCS1_PSS_PADDING ? p_scossl_rsa_pss_sig_ctx_gettable_param_types : p_scossl_rsa_sig_ctx_gettable_param_types;
 }
 
+static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
+{
+    SCOSSL_RSA_PSS_RESTRICTIONS defaultRestrictions;
+    RSA_PSS_PARAMS *pssParams = NULL;
+    ASN1_STRING *mgf1MdStr = NULL;
+    ASN1_STRING *pssParamSeq = NULL;
+
+    if ((pssParams = RSA_PSS_PARAMS_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    p_scossl_rsa_pss_restrictions_get_defaults(&defaultRestrictions);
+
+    // mgf1md must equal md for symcrypt
+    // If this changes, the mgf1md must be checked independently
+    if (ctx->mdInfo->id != defaultRestrictions.mdInfo->id)
+    {
+        if ((pssParams->hashAlgorithm = X509_ALGOR_new()) == NULL ||
+            (pssParams->maskGenAlgorithm = X509_ALGOR_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        X509_ALGOR_set_md(pssParams->hashAlgorithm, ctx->md);
+
+        if (ASN1_item_pack(pssParams->hashAlgorithm, ASN1_ITEM_rptr(X509_ALGOR), &mgf1MdStr) == NULL ||
+            !X509_ALGOR_set0(pssParams->maskGenAlgorithm, OBJ_nid2obj(NID_mgf1), V_ASN1_SEQUENCE, mgf1MdStr))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if (ctx->cbSaltMin != defaultRestrictions.cbSaltMin)
+    {
+        if ((pssParams->saltLength = ASN1_INTEGER_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (!ASN1_INTEGER_set(pssParams->saltLength, ctx->cbSaltMin))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    pssParamSeq = ASN1_item_pack(pssParams, ASN1_ITEM_rptr(RSA_PSS_PARAMS), NULL);
+
+cleanup:
+    RSA_PSS_PARAMS_free(pssParams);
+
+    return pssParamSeq;
+}
+
 static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     if (params == NULL)
@@ -648,12 +708,15 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
     }
 
     OSSL_PARAM *p;
+    ASN1_STRING *pval = NULL;
+    X509_ALGOR *x509Alg = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->mdInfo == NULL ? "" : ctx->mdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_PAD_MODE)) != NULL)
@@ -667,7 +730,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             if (!OSSL_PARAM_set_int(p, ctx->padding))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
@@ -680,13 +743,97 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             if (!OSSL_PARAM_set_utf8_string(p, p_scossl_rsa_sign_padding_modes[i].ptr))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
             break;
         default:
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
+    }
+
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL) {
+        int cbAid;
+        int algNid = NID_undef;
+        int ptype = V_ASN1_NULL;
+        void *pval = NULL;
+
+        if (p->data_type != OSSL_PARAM_OCTET_STRING)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        p->return_size = 0;
+
+        if (ctx->mdInfo == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            goto cleanup;
+        }
+
+        if ((x509Alg = X509_ALGOR_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (ctx->padding == RSA_PKCS1_PADDING)
+        {
+            switch (ctx->mdInfo->id)
+            {
+            case NID_sha1:
+                algNid = NID_sha1WithRSAEncryption;
+                break;
+            case NID_sha256:
+                algNid = NID_sha256WithRSAEncryption;
+                break;
+            case NID_sha384:
+                algNid = NID_sha384WithRSAEncryption;
+                break;
+            case NID_sha512:
+                algNid = NID_sha512WithRSAEncryption;
+                break;
+            case NID_sha3_256:
+                algNid = NID_RSA_SHA3_256;
+                break;
+            case NID_sha3_384:
+                algNid = NID_RSA_SHA3_384;
+                break;
+            case NID_sha3_512:
+                algNid = NID_RSA_SHA3_512;
+                break;
+            }
+        }
+        else if (ctx->padding == RSA_PKCS1_PSS_PADDING)
+        {
+            algNid = ctx->pssRestricted ? NID_rsassaPss : NID_rsaEncryption;
+        }
+
+        if (ctx->pssRestricted)
+        {
+            ptype = V_ASN1_SEQUENCE;
+            if ((pval = p_scossl_rsa_pss_params_to_asn1_sequence(ctx)) == NULL)
+            {
+                goto cleanup;
+            }
+        }
+
+        if (algNid == NID_undef ||
+            !X509_ALGOR_set0(x509Alg, OBJ_nid2obj(algNid), ptype, pval))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        if ((cbAid = i2d_X509_ALGOR(x509Alg, (unsigned char**)&p->data)) < 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
+        p->return_size = (SIZE_T)cbAid;
     }
 
     //
@@ -704,7 +851,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             if (!OSSL_PARAM_set_int(p, ctx->cbSalt))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
             break;
         case OSSL_PARAM_UTF8_STRING:
@@ -728,7 +875,7 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                     len = BIO_snprintf(p->data, p->data_size, "%d",
                                            ctx->cbSalt);
                     if (len <= 0)
-                        return SCOSSL_FAILURE;
+                        goto cleanup;
                     p->return_size = len;
             }
 
@@ -736,13 +883,13 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                 !OSSL_PARAM_set_utf8_string(p, saltLenText))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
 
             break;
         default:
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
@@ -750,10 +897,16 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
         !OSSL_PARAM_set_utf8_string(p, ctx->mgf1MdInfo == NULL ? "" : ctx->mgf1MdInfo->ptr))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    ASN1_STRING_free(pval);
+    X509_ALGOR_free(x509Alg);
+
+    return ret;
 }
 
 static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
