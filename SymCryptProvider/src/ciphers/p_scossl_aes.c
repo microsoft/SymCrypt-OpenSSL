@@ -142,27 +142,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
     return p_scossl_aes_generic_init_internal(ctx, FALSE, key, keylen, iv, ivlen, params);
 }
 
-//
-// From include/internal/contant_time.h
-// Returns the value unmodified, but avoids optimizations.
-// The barriers prevent the compiler from narrowing down the
-// possible value range of the mask and ~mask in the select
-// statements, which avoids the recognition of the select
-// and turning it into a conditional load or branch.
-//
-static ossl_inline BYTE value_barrier_8(BYTE a)
-{
-#if !defined(OPENSSL_NO_ASM) && defined(__GNUC__)
-    BYTE r;
-    __asm__("" : "=r"(r) : "0"(a));
-#else
-    volatile BYTE r = a;
-#endif
-    return r;
-}
-
-#define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (value_barrier_8(_mask) & _a) | (value_barrier_8(~_mask) & _b)
-
+#define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
 
 // Extracts the MAC from the end of out and saves the result to ctx->tlsMac
 // The mac will later be fetched through p_scossl_aes_generic_get_ctx_params

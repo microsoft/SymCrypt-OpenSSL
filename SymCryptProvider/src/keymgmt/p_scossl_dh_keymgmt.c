@@ -16,7 +16,7 @@ extern "C" {
 
 #define SCOSSL_DH_PBITS_DEFAULT 2048
 // Private key length determined by group
-// Setting this to -1 matches the OpenSSL implementation for paramter fetching
+// Setting this to -1 matches the OpenSSL implementation for paramater fetching
 #define SCOSSL_DH_PRIVATE_BITS_DEFAULT -1
 
 #define SCOSSL_DH_FFC_TYPE_DEFAULT "default"
@@ -212,27 +212,9 @@ static int p_scossl_dh_privkey_bits(SCOSSL_PROV_DH_KEY_CTX *ctx)
     {
         return ctx->nBitsPriv;
     }
-    if (ctx->keyCtx->initialized &&
-        SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey))
-    {
-        return SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) * 8;
-    }
-    else if (ctx->pDlGroup != NULL)
-    {
-        SIZE_T cbPrimeQ;
-        SIZE_T cbPrimeP;
 
-        SymCryptDlgroupGetSizes(
-            ctx->pDlGroup,
-            &cbPrimeP,
-            &cbPrimeQ,
-            NULL,
-            NULL);
-
-        return cbPrimeQ != 0 ? cbPrimeQ * 8 - 1  : cbPrimeP * 8 - 1;
-    }
-
-    return -1;
+    // Default max size is bits of P - 1
+    return p_scossl_dh_pubkey_bits(ctx) - 1;
 }
 
 // This function attempts to create a PSYMCRYPT_DLGROUP from params, and store the result in *ppDlGroup.
@@ -540,24 +522,17 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_template(_Inout_ SCOSSL_DH_KEYGEN_CT
 {
     if (genCtx == NULL ||
         tmplCtx == NULL ||
-        tmplCtx->groupSetByParams)
+        tmplCtx->groupSetByParams) 
     {
         return SCOSSL_FAILURE;
     }
 
+    // DH keygen only supports named groups, which are all statically
+    // defined, so we can safely copy tmplCtx->pDlGroup by reference.
     if (tmplCtx->pDlGroup != NULL)
     {
         genCtx->pDlGroup = tmplCtx->pDlGroup;
-        if (tmplCtx->keyCtx->initialized)
-        {
-            genCtx->nBitsPriv = p_scossl_dh_privkey_bits(tmplCtx);
-        }
-        // No keydata, use default private key length
-        else
-        {
-            genCtx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
-        }
-
+        genCtx->nBitsPriv = tmplCtx->nBitsPriv;
         genCtx->nBitsPub = p_scossl_dh_pubkey_bits(tmplCtx);
     }
 
@@ -1082,7 +1057,7 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
         pbPrivateKey1 = cbPrivateKey == 0 ? NULL : pbData;
 
         pbPublicKey2 = cbPublicKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;
-        pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;;
+        pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;
 
         if (SymCryptDlkeyGetValue(
                 ctx1->keyCtx->dlkey,
