@@ -370,20 +370,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     SCOSSL_PROVCTX *p_ctx = NULL;
     OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
-    if (!scossl_prov_initialized)
-    {
-        SYMCRYPT_MODULE_INIT();
-        if (!scossl_dh_init_static() ||
-            !scossl_ecc_init_static())
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
-            return SCOSSL_FAILURE;
-        }
-        scossl_prov_initialized = 1;
-    }
-
-    scossl_setup_logging();
-
     for (; in->function_id != 0; in++)
     {
         switch(in->function_id)
@@ -406,9 +392,17 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         }
     }
 
+    scossl_setup_logging();
+
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
+        if (!scossl_dh_init_static() ||
+            !scossl_ecc_init_static())
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+            return SCOSSL_FAILURE;
+        }
         scossl_prov_initialized = 1;
     }
 
