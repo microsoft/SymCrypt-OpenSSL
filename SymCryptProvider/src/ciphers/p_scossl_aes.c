@@ -163,10 +163,10 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
 
     UINT32 macEnd = *record;
     UINT32 macStart = macEnd - ctx->tlsMacSize;
-    UINT32 inMac;
+    UINT32 inMac = 0;
 
     UINT32 scanStart = 0;
-    UINT32 rotateOffset;
+    UINT32 rotateOffset = 0;
     UINT32 i, j;
 
     OPENSSL_free(ctx->tlsMac);
