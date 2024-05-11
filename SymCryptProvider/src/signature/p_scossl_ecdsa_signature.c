@@ -99,8 +99,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
                                                     _In_ const OSSL_PARAM params[])
 {
     if (ctx == NULL ||
-        (keyCtx == NULL && ctx->keyCtx == NULL) ||
-        !keyCtx->initialized)
+        (keyCtx == NULL && ctx->keyCtx == NULL))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
@@ -108,6 +107,12 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
     if (keyCtx != NULL)
     {
+        if (!keyCtx->initialized)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+            return SCOSSL_FAILURE;
+        }
+
         ctx->keyCtx = keyCtx;
     }
 
@@ -131,6 +136,12 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     SIZE_T cbResult;
+
+    if (ctx == NULL || ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
 
     if (siglen == NULL)
     {
@@ -164,6 +175,12 @@ static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
                                            _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                            _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    if (ctx == NULL || ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
     return scossl_ecdsa_verify(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, siglen);
 }
 
