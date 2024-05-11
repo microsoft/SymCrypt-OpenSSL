@@ -545,13 +545,14 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
     return SCOSSL_SUCCESS;
 }
 
-#define IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(kbits, ivlen, lcmode, UCMODE)                                       \
+#define IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(kbits, defaultIvLen, lcmode, UCMODE)                                \
     SCOSSL_CIPHER_##UCMODE##_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                 \
     {                                                                                                        \
         SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_CIPHER_##UCMODE##_CTX);                      \
         if (ctx != NULL)                                                                                     \
         {                                                                                                    \
             ctx->keylen = kbits >> 3;                                                                        \
+            ctx->ivlen = defaultIvLen;                                                                       \
             scossl_aes_##lcmode##_init_ctx(ctx, NULL);                                                       \
         }                                                                                                    \
                                                                                                              \
@@ -560,7 +561,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
     SCOSSL_STATUS p_scossl_aes_##kbits##_##lcmode##_get_params(_Inout_ OSSL_PARAM params[])                  \
     {                                                                                                        \
         return p_scossl_aes_generic_get_params(params, EVP_CIPH_##UCMODE##_MODE, kbits >> 3,                 \
-                                               ivlen, 1, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV);          \
+                                               defaultIvLen, 1, SCOSSL_FLAG_AEAD | SCOSSL_FLAG_CUSTOM_IV);   \
     }                                                                                                        \
                                                                                                              \
     const OSSL_DISPATCH p_scossl_aes##kbits##lcmode##_functions[] = {                                        \
