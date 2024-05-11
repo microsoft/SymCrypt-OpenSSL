@@ -64,7 +64,7 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
     return NULL;
 }
 
-static SIZE_T scossl_get_expected_hash_length(int mdnid)
+SIZE_T scossl_get_expected_hash_length(int mdnid)
 {
     switch (mdnid)
     {
@@ -561,6 +561,9 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
     switch (padding)
     {
     case RSA_PKCS1_PADDING:
+#ifdef RSA_PKCS1_WITH_TLS_PADDING
+    case RSA_PKCS1_WITH_TLS_PADDING:
+#endif
         scError = SymCryptRsaPkcs1Decrypt(
             key,
             pbSrc,

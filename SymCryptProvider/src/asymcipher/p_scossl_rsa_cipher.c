@@ -50,6 +50,7 @@ static const OSSL_PARAM p_scossl_rsa_cipher_settable_ctx_param_types[] = {
 static OSSL_ITEM p_scossl_rsa_cipher_padding_modes[] = {
     {RSA_NO_PADDING, OSSL_PKEY_RSA_PAD_MODE_NONE},
     {RSA_PKCS1_PADDING, OSSL_PKEY_RSA_PAD_MODE_PKCSV15},
+    {RSA_PKCS1_WITH_TLS_PADDING, OSSL_PKEY_RSA_PAD_MODE_PKCSV15},
     {RSA_PKCS1_OAEP_PADDING, OSSL_PKEY_RSA_PAD_MODE_OAEP},
     {0, NULL}};
 
@@ -178,7 +179,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
 
-    return ret;
+    return (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING) || ret;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
@@ -263,7 +264,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
             }
 
             while (p_scossl_rsa_cipher_padding_modes[i].id != 0 &&
-                   padding != p_scossl_rsa_cipher_padding_modes[i].id)
+                padding != p_scossl_rsa_cipher_padding_modes[i].id)
             {
                 i++;
             }

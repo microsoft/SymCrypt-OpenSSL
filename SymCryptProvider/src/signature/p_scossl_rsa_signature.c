@@ -146,8 +146,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
                                                   _In_ const OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
-        (keyCtx == NULL && ctx->keyCtx == NULL) ||
-        !keyCtx->initialized)
+        (keyCtx == NULL && ctx->keyCtx == NULL))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
@@ -161,6 +160,12 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
     ctx->operation = operation;
     if (keyCtx != NULL)
     {
+        if (!keyCtx->initialized)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+            return SCOSSL_FAILURE;
+        }
+
         if (keyCtx->pssRestrictions != NULL)
         {
             EVP_MD *md = NULL;
@@ -212,6 +217,12 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    if (ctx == NULL || ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
     if (sig != NULL && sigsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
@@ -241,6 +252,12 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    if (ctx == NULL || ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
     if (ctx->mdInfo == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
@@ -470,7 +487,9 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         padding = p_scossl_rsa_sign_padding_modes[i].id;
 
         if (padding == 0 ||
-            (ctx->pssRestricted && padding != RSA_PKCS1_PSS_PADDING))
+            (ctx->keyCtx != NULL &&
+             ctx->keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
+             padding != RSA_PKCS1_PSS_PADDING))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_ILLEGAL_OR_UNSUPPORTED_PADDING_MODE);
             return SCOSSL_FAILURE;
@@ -647,6 +666,9 @@ static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIG
     RSA_PSS_PARAMS *pssParams = NULL;
     ASN1_STRING *mgf1MdStr = NULL;
     ASN1_STRING *pssParamSeq = NULL;
+    int cbSalt;
+    int cbSaltMax;
+    int cbHash;
 
     if ((pssParams = RSA_PSS_PARAMS_new()) == NULL)
     {
@@ -677,7 +699,45 @@ static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIG
         }
     }
 
-    if (ctx->cbSaltMin != defaultRestrictions.cbSaltMin)
+    cbSalt = ctx->cbSalt;
+
+    // Determine actual salt value if some auto detect value is set
+    if (cbSalt < 0)
+    {
+        if (ctx->keyCtx == NULL ||
+            !ctx->keyCtx->initialized)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+            goto cleanup;
+        }
+
+        cbHash = scossl_get_expected_hash_length(ctx->mdInfo->id);
+        cbSaltMax = ((SymCryptRsakeyModulusBits(ctx->keyCtx->key) + 6) / 8) - cbHash - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+
+        switch(cbSalt)
+        {
+        case RSA_PSS_SALTLEN_DIGEST:
+            cbSalt = cbHash;
+            break;
+        case RSA_PSS_SALTLEN_MAX:
+        case RSA_PSS_SALTLEN_AUTO:
+            cbSalt = cbSaltMax;
+            break;
+#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
+        case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
+            cbSalt = cbSaltMax < (int)cbHash ? cbSaltMax : (int)cbHash;
+            break;
+#endif
+        }
+
+        if (cbSalt < 0)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+    }
+
+    if (cbSalt != defaultRestrictions.cbSaltMin)
     {
         if ((pssParams->saltLength = ASN1_INTEGER_new()) == NULL)
         {
@@ -685,7 +745,7 @@ static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIG
             goto cleanup;
         }
 
-        if (!ASN1_INTEGER_set(pssParams->saltLength, ctx->cbSaltMin))
+        if (!ASN1_INTEGER_set(pssParams->saltLength, cbSalt))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -808,17 +868,15 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
         }
         else if (ctx->padding == RSA_PKCS1_PSS_PADDING)
         {
-            algNid = ctx->pssRestricted ? NID_rsassaPss : NID_rsaEncryption;
-        }
+            algNid = NID_rsassaPss;
 
-        if (ctx->pssRestricted)
-        {
             ptype = V_ASN1_SEQUENCE;
             if ((pval = p_scossl_rsa_pss_params_to_asn1_sequence(ctx)) == NULL)
             {
                 goto cleanup;
             }
         }
+
 
         if (algNid == NID_undef ||
             !X509_ALGOR_set0(x509Alg, OBJ_nid2obj(algNid), ptype, pval))
