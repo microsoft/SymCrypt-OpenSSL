@@ -21,14 +21,15 @@ typedef struct
     PSYMCRYPT_MAC_KEY_COPY keyCopyFunc;
     PSYMCRYPT_MAC_STATE_COPY stateCopyFunc;
     SIZE_T blockSize;
-} SCOSSL_MAC_EX;
+} SCOSSL_MAC_EX, *PSCOSSL_MAC_EX;
+typedef const SCOSSL_MAC_EX *PCSCOSSL_MAC_EX;
 
 typedef struct
 {
     PSCOSSL_MAC_EXPANDED_KEY expandedKey;
     PSCOSSL_MAC_STATE macState;
     PCSYMCRYPT_MAC pMac;
-    const SCOSSL_MAC_EX *pMacEx;
+    PCSCOSSL_MAC_EX pMacEx;
     PBYTE pbKey;
     SIZE_T cbKey;
 
@@ -41,7 +42,7 @@ typedef struct
 SCOSSL_MAC_CTX *scossl_mac_dupctx(_In_ SCOSSL_MAC_CTX *ctx);
 void scossl_mac_freectx(_Inout_ SCOSSL_MAC_CTX *ctx);
 
-SCOSSL_STATUS scossl_mac_set_hmac_md(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_MD *md);
+SCOSSL_STATUS scossl_mac_set_hmac_md(_Inout_ SCOSSL_MAC_CTX *ctx, int mdNid);
 SCOSSL_STATUS scossl_mac_set_cmac_cipher(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const EVP_CIPHER *cipher);
 SCOSSL_STATUS scossl_mac_set_mac_key(_Inout_ SCOSSL_MAC_CTX *ctx,
                                      _In_reads_bytes_(cbMacKey) PCBYTE pbMacKey, SIZE_T cbMacKey);
