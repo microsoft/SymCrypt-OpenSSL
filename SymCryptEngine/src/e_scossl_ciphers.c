@@ -254,6 +254,7 @@ static EVP_CIPHER *_hidden_aes_192_gcm = NULL;
 static const EVP_CIPHER *e_scossl_aes_192_gcm(void)
 {
     if( (_hidden_aes_192_gcm = EVP_CIPHER_meth_new(NID_aes_192_gcm, 1, AES_192_KEY_SIZE)) == NULL
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_192_gcm, SCOSSL_GCM_DEFAULT_IV_LENGTH)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, e_scossl_aes_gcm_cipher)
@@ -271,6 +272,7 @@ static EVP_CIPHER *_hidden_aes_256_gcm = NULL;
 static const EVP_CIPHER *e_scossl_aes_256_gcm(void)
 {
     if( (_hidden_aes_256_gcm = EVP_CIPHER_meth_new(NID_aes_256_gcm, 1, AES_256_KEY_SIZE)) == NULL
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_256_gcm, SCOSSL_GCM_DEFAULT_IV_LENGTH)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, e_scossl_aes_gcm_cipher)
@@ -710,10 +712,8 @@ SCOSSL_STATUS e_scossl_aes_gcm_init_key(_Inout_ EVP_CIPHER_CTX *ctx, _In_ const 
                              _In_ const unsigned char *iv, ossl_unused int enc)
 {
     SCOSSL_CIPHER_GCM_CTX *cipherCtx = (SCOSSL_CIPHER_GCM_CTX *) SCOSSL_ALIGN_UP(EVP_CIPHER_CTX_get_cipher_data(ctx));
-    return scossl_aes_gcm_init_key(cipherCtx, key, EVP_CIPHER_CTX_key_length(ctx), iv, EVP_CIPHER_CTX_iv_length(ctx));
+    return scossl_aes_gcm_init_key(cipherCtx, key, EVP_CIPHER_CTX_key_length(ctx), iv, cipherCtx->ivlen);
 }
-
-#define EVP_GCM_TLS_IV_LEN (EVP_GCM_TLS_FIXED_IV_LEN + EVP_GCM_TLS_EXPLICIT_IV_LEN)
 
 // This is a EVP_CIPH_FLAG_CUSTOM_CIPHER do cipher method
 // return negative value on failure, and number of bytes written to out on success (may be 0)
@@ -743,19 +743,13 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     switch( type )
     {
     case EVP_CTRL_INIT:
-        return scossl_aes_gcm_set_iv_len(cipherCtx, EVP_CIPHER_CTX_iv_length(ctx)) && scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
+        return scossl_aes_gcm_init_ctx(cipherCtx, EVP_CIPHER_CTX_iv(ctx));
     case EVP_CTRL_GET_IVLEN:
-        *(int *)ptr = SCOSSL_GCM_DEFAULT_IV_LENGTH;
+        *(int *)ptr = cipherCtx->ivlen;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
         // SymCrypt engine currently only supports SCOSSL_GCM_DEFAULT_IV_LENGTH
-        if( arg != SCOSSL_GCM_DEFAULT_IV_LENGTH )
-        {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                "SymCrypt Engine only supports %d byte IV for AES-GCM", SCOSSL_GCM_DEFAULT_IV_LENGTH);
-            return SCOSSL_FAILURE;
-        }
-        break;
+        return scossl_aes_gcm_set_iv_len(cipherCtx, arg);
     case EVP_CTRL_AEAD_SET_TAG:
         return scossl_aes_gcm_set_aead_tag(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);
     case EVP_CTRL_AEAD_GET_TAG:
