@@ -1474,7 +1474,9 @@ cleanup:
     BN_free(bnGenG);
     BN_free(bnPubKey);
     BN_clear_free(bnPrivKey);
+    OSSL_PARAM_free(params);
     OSSL_PARAM_BLD_free(bld);
+
     return ret;
 }
 

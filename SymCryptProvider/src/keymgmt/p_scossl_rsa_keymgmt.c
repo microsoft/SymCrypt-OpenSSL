@@ -853,7 +853,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     SIZE_T pcbPrimes[2] = {0};
     SIZE_T nPrimes = 0;
     SYMCRYPT_RSA_PARAMS symcryptRsaParam;
-    BIGNUM *bn;
+    BIGNUM *bn = NULL;
 
     if (keyCtx == NULL ||
         (selection & SCOSSL_RSA_POSSIBLE_SELECTIONS) == 0)
@@ -985,6 +985,7 @@ cleanup:
     OPENSSL_free(pbModulus);
     OPENSSL_free(ppbPrimes[0]);
     OPENSSL_free(ppbPrimes[1]);
+    BN_free(bn);
 
     return ret;
 }
