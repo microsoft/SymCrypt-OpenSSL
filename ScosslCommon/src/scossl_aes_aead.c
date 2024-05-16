@@ -14,15 +14,17 @@ extern "C" {
 _Use_decl_annotations_
 SCOSSL_STATUS scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, const unsigned char *iv)
 {
-    if (iv != NULL && (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
     ctx->operationInProgress = 0;
     ctx->taglen = SCOSSL_GCM_MAX_TAG_LENGTH;
     ctx->tlsAadSet = 0;
     ctx->ivInvocation = 0;
     ctx->useInvocation = 0;
+    ctx->ivlen = SCOSSL_GCM_DEFAULT_IV_LENGTH;
+
+    if (iv != NULL && (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
 
     return SCOSSL_SUCCESS;
 }

@@ -21,6 +21,7 @@ typedef struct
     BOOL initialized;
     PSYMCRYPT_RSAKEY key;
     UINT padding;
+    UINT keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 } SCOSSL_PROV_RSA_KEY_CTX;
 

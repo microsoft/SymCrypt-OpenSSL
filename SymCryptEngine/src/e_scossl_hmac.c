@@ -78,7 +78,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             ret = SCOSSL_FAILURE;
             break;
         }
-        ret = scossl_mac_set_hmac_md(e_scossl_hmac_context, p2);
+        ret = scossl_mac_set_hmac_md(e_scossl_hmac_context, EVP_MD_type(p2));
         break;
     case EVP_PKEY_CTRL_SET_MAC_KEY:
         // p2 : pointer to the buffer containing the HMAC key, must not be NULL.

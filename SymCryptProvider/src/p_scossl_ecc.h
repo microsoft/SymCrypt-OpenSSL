@@ -27,6 +27,7 @@ typedef struct {
     // to let the provider handling encoding/decoding whether to
     // include the public key.
     int includePublic;
+    point_conversion_form_t conversionFormat;
 } SCOSSL_ECC_KEY_CTX;
 
 #ifdef __cplusplus

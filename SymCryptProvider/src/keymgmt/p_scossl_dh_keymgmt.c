@@ -440,6 +440,20 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
         }
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_PBITS)) != NULL &&
+        !OSSL_PARAM_get_size_t(p, &genCtx->nBitsPub))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL &&
+        !OSSL_PARAM_get_int(p, &genCtx->nBitsPriv))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     // We advertize only supporting named groups for keygen, but callers may still try to
     // import the group by parameters. This should only be done with the DHX key type,
     // which we defer to the default openssl implementation.
@@ -458,25 +472,9 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
         return SCOSSL_FAILURE;
     }
 
-    genCtx->pDlGroup = (PCSYMCRYPT_DLGROUP) pDlGroup;
-
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_PBITS)) != NULL &&
-        !OSSL_PARAM_get_size_t(p, &genCtx->nBitsPub))
+    if (pDlGroup != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        return SCOSSL_FAILURE;
-    }
-
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL)
-    {
-        int nBitsPriv;
-        if (!OSSL_PARAM_get_int(p, &nBitsPriv))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        genCtx->nBitsPriv = nBitsPriv;
+        genCtx->pDlGroup = (PCSYMCRYPT_DLGROUP) pDlGroup;
     }
 
     return SCOSSL_SUCCESS;

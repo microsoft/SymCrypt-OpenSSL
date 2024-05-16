@@ -53,6 +53,9 @@ SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate);
 void scossl_rsa_free_export_params(_In_ SCOSSL_RSA_EXPORT_PARAMS *rsaParam, BOOL freeParams);
 SCOSSL_STATUS scossl_rsa_export_key(_In_ PCSYMCRYPT_RSAKEY key, _Out_ SCOSSL_RSA_EXPORT_PARAMS *rsaParams);
 
+SIZE_T scossl_get_expected_hash_length(int mdnid);
+int scossl_rsa_pss_get_salt_max(_In_ PSYMCRYPT_RSAKEY key, SIZE_T cbHashValue);
+
 #ifdef __cplusplus
 }
 #endif
