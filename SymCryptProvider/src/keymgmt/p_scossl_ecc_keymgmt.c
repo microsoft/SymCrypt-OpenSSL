@@ -1434,7 +1434,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_encoded_public_key(SCOSSL_ECC_KEY_
     SYMCRYPT_ECPOINT_FORMAT pointFormat;
     PBYTE pbPublicKey, pbPublicKeyStart;
     SIZE_T cbPublicKey;
-    BIGNUM *ecPubY = NULL;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -1491,22 +1490,15 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_encoded_public_key(SCOSSL_ECC_KEY_
     {
         pbPublicKeyStart[0] = keyCtx->conversionFormat;
 
-        // Only prime finite fields are supported, so the first
-        // byte should be 2 if y is even, and 3 if y is odd.
+        // There are three possible point conversion formats based on SECG SEC 1 2.3.3:
+        // - COMPRESSED: The point is encoded as z||x, where z is 2 if y is even, and 3 if y is odd
+        // - UNCOMPRESSED: The point is encoded as 0x04||x||y
+        // - HYBRID: The point is encoded as z||x||y, where z is 6 if y is even, and 7 if y is odd
+        // Note that the z value for COMPRESSED and HYBRID is only the values above for prime finite
+        // fields.  SymCrypt only supports named, prime finite field curves.
         if (keyCtx->conversionFormat != POINT_CONVERSION_UNCOMPRESSED)
         {
-            if ((ecPubY = BN_new()) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-
-            if (BN_bin2bn(pbPublicKey + (cbPublicKey/2), cbPublicKey/2, ecPubY) == NULL)
-            {
-                goto cleanup;
-            }
-
-            if (BN_is_odd(ecPubY))
+            if (pbPublicKey[cbPublicKey-1] & 1)
             {
                 pbPublicKeyStart[0]++;
             }
@@ -1537,7 +1529,6 @@ cleanup:
     {
         OPENSSL_free(pbPublicKeyStart);
     }
-    BN_free(ecPubY);
 
     return ret;
 }

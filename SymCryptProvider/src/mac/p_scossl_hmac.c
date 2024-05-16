@@ -107,15 +107,15 @@ static int p_scossl_hmac_get_mdnid(_In_ EVP_MD *md)
         }
         if (EVP_MD_is_a(md, SN_sha3_256))
         {
-            mdNid = NID_sha256;
+            mdNid = NID_sha3_256;
         }
         if (EVP_MD_is_a(md, SN_sha3_384))
         {
-            mdNid = NID_sha384;
+            mdNid = NID_sha3_384;
         }
         if (EVP_MD_is_a(md, SN_sha3_512))
         {
-            mdNid = NID_sha512;
+            mdNid = NID_sha3_512;
         }
     }
 

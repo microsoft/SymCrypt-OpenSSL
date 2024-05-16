@@ -179,7 +179,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
 
-    return (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING) || ret;
+    if (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    return ret;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])

@@ -646,7 +646,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
         pbModulus, cbModulus,
         pPublicExponent, nPublicExponent,
         ppbPrimes, pcbPrimes, nPrimes,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -657,7 +657,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
     // Convert buffers to BIGNUMs and set parameters
     if (paramModulus != NULL)
     {
-        if (BN_bin2bn(pbModulus, cbModulus, bnModulus) == NULL ||
+        if (BN_lebin2bn(pbModulus, cbModulus, bnModulus) == NULL ||
             !OSSL_PARAM_set_BN(paramModulus, bnModulus))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -677,7 +677,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
 
     if (paramPrime1 != NULL)
     {
-        if (BN_bin2bn(ppbPrimes[0], pcbPrimes[0], bnPrime1) == NULL ||
+        if (BN_lebin2bn(ppbPrimes[0], pcbPrimes[0], bnPrime1) == NULL ||
             !OSSL_PARAM_set_BN(paramPrime1, bnPrime1))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -687,7 +687,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
 
     if (paramPrime2 != NULL)
     {
-        if (BN_bin2bn(ppbPrimes[1], pcbPrimes[1], bnPrime2) == NULL ||
+        if (BN_lebin2bn(ppbPrimes[1], pcbPrimes[1], bnPrime2) == NULL ||
             !OSSL_PARAM_set_BN(paramPrime2, bnPrime2))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -797,7 +797,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
         ppbCrtExponents, pcbCrtExponents, nCrtExponents,
         pbCrtCoefficient, cbCrtCoefficient,
         pbPrivateExponent, cbPrivateExponent,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -808,7 +808,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
     // Convert buffers to BIGNUMs and set parameters
     if (paramPrivateExponent != NULL)
     {
-        if (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, bnPrivateExponent) == NULL ||
+        if (BN_lebin2bn(pbPrivateExponent, cbPrivateExponent, bnPrivateExponent) == NULL ||
             !OSSL_PARAM_set_BN(paramPrivateExponent, bnPrivateExponent))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -818,7 +818,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
 
     if (paramCrtExp1 != NULL)
     {
-        if (BN_bin2bn(ppbCrtExponents[0], pcbCrtExponents[0], bnCrtExp1) == NULL ||
+        if (BN_lebin2bn(ppbCrtExponents[0], pcbCrtExponents[0], bnCrtExp1) == NULL ||
             !OSSL_PARAM_set_BN(paramCrtExp1, bnCrtExp1))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -828,7 +828,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
 
     if (paramCrtExp2 != NULL)
     {
-        if (BN_bin2bn(ppbCrtExponents[1], pcbCrtExponents[1], bnCrtExp2) == NULL ||
+        if (BN_lebin2bn(ppbCrtExponents[1], pcbCrtExponents[1], bnCrtExp2) == NULL ||
             !OSSL_PARAM_set_BN(paramCrtExp2, bnCrtExp2))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -838,7 +838,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
 
     if (paramCoefficient != NULL)
     {
-        if (BN_bin2bn(pbCrtCoefficient, cbCrtCoefficient, bnCoefficient) == NULL ||
+        if (BN_lebin2bn(pbCrtCoefficient, cbCrtCoefficient, bnCoefficient) == NULL ||
             !OSSL_PARAM_set_BN(paramCoefficient, bnCoefficient))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -896,8 +896,12 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_PROV_RSA_KEY_CT
         return SCOSSL_FAILURE;
     }
 
-    return p_scossl_rsa_keymgmt_get_keydata(keyCtx, params) &&
-           p_scossl_rsa_keymgmt_get_crt_keydata(keyCtx, params);
+    if (p_scossl_rsa_keymgmt_get_keydata(keyCtx, params) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return p_scossl_rsa_keymgmt_get_crt_keydata(keyCtx, params);
 }
 
 static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *provctx)

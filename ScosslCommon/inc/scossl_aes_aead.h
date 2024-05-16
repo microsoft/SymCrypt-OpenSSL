@@ -87,6 +87,7 @@ typedef struct
 {
     SCOSSL_CCM_STAGE ccmStage;
     BYTE iv[SCOSSL_CCM_MAX_IV_LENGTH];
+    SIZE_T ivlen;
     SYMCRYPT_CCM_STATE state;
     SYMCRYPT_AES_EXPANDED_KEY key;
     BYTE tag[EVP_CCM_TLS_TAG_LEN];
@@ -96,7 +97,6 @@ typedef struct
     INT32 tlsAadSet;
 
     // Provider-only fields. Tracked by EVP_CIPHER_CTX in engine
-    SIZE_T ivlen;
     SIZE_T keylen;
     INT32 encrypt;
 } SCOSSL_CIPHER_CCM_CTX;

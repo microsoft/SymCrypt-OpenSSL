@@ -177,7 +177,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
                 return SCOSSL_FAILURE;
             }
 
-            int cbSaltMax = ((SymCryptRsakeyModulusBits(keyCtx->key) + 6) / 8) - EVP_MD_get_size(md) - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2)
+            int cbSaltMax = scossl_rsa_pss_get_salt_max(keyCtx->key, EVP_MD_get_size(md));
             if (keyCtx->pssRestrictions->cbSaltMin < 0 ||
                 keyCtx->pssRestrictions->cbSaltMin > cbSaltMax)
             {
@@ -712,7 +712,7 @@ static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIG
         }
 
         cbHash = scossl_get_expected_hash_length(ctx->mdInfo->id);
-        cbSaltMax = ((SymCryptRsakeyModulusBits(ctx->keyCtx->key) + 6) / 8) - cbHash - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+        cbSaltMax = scossl_rsa_pss_get_salt_max(ctx->keyCtx->key, cbHash);
 
         switch(cbSalt)
         {

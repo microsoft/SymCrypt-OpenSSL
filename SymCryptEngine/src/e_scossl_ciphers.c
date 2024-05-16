@@ -237,6 +237,7 @@ static EVP_CIPHER *_hidden_aes_128_gcm = NULL;
 static const EVP_CIPHER *e_scossl_aes_128_gcm(void)
 {
     if( (_hidden_aes_128_gcm = EVP_CIPHER_meth_new(NID_aes_128_gcm, 1, AES_128_KEY_SIZE)) == NULL
+        || !EVP_CIPHER_meth_set_iv_length(_hidden_aes_128_gcm, SCOSSL_GCM_DEFAULT_IV_LENGTH)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, e_scossl_aes_gcm_cipher)
@@ -748,7 +749,6 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
         *(int *)ptr = cipherCtx->ivlen;
         break;
     case EVP_CTRL_AEAD_SET_IVLEN:
-        // SymCrypt engine currently only supports SCOSSL_GCM_DEFAULT_IV_LENGTH
         return scossl_aes_gcm_set_iv_len(cipherCtx, arg);
     case EVP_CTRL_AEAD_SET_TAG:
         return scossl_aes_gcm_set_aead_tag(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);

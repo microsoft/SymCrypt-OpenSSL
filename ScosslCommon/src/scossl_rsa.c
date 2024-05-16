@@ -88,6 +88,12 @@ SIZE_T scossl_get_expected_hash_length(int mdnid)
 }
 
 _Use_decl_annotations_
+int scossl_rsa_pss_get_salt_max(PSYMCRYPT_RSAKEY key, SIZE_T cbHashValue)
+{
+    return ((SymCryptRsakeyModulusBits(key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
+}
+
+_Use_decl_annotations_
 SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
                                     PCBYTE pbHashValue, SIZE_T cbHashValue,
                                     PBYTE pbSignature, SIZE_T *pcbSignature)
@@ -226,7 +232,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int cbSaltMax;
+    int cbSaltMax = scossl_rsa_pss_get_salt_max(key, cbHashValue);
     SIZE_T cbResult = 0;
     PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
     SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);
@@ -238,7 +244,6 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
         goto cleanup;
     }
 
-    cbSaltMax = ((SymCryptRsakeyModulusBits(key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
@@ -326,7 +331,7 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
 {
     int ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    int cbSaltMax;
+    int cbSaltMax = scossl_rsa_pss_get_salt_max(key, cbHashValue);
     PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
     SIZE_T expectedHashLength = scossl_get_expected_hash_length(mdnid);
     UINT32 scFlags = 0;
@@ -343,7 +348,6 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
         goto cleanup;
     }
 
-    cbSaltMax = ((SymCryptRsakeyModulusBits(key) + 6) / 8) - cbHashValue - 2; // ceil((ModulusBits - 1) / 8) - cbDigest - 2
     switch (cbSalt)
     {
     case RSA_PSS_SALTLEN_DIGEST:
@@ -806,7 +810,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                    pbModulus, cbModulus,
                    &pubExp64, 1,
                    ppbPrimes, pcbPrimes, nPrimes,
-                   SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                   SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
                    0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -818,7 +822,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
     // Explicitly convert UINT64 public exponent to little-endian byte array (no-op on little-endian target)
     SYMCRYPT_STORE_LSBFIRST64( pbPubExp64, pubExp64 );
 
-    if (BN_bin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
+    if (BN_lebin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
         BN_lebin2bn(pbPubExp64, 8, rsaParams->e) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
@@ -833,7 +837,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                         ppbCrtExponents, pcbCrtExponents, nPrimes,
                         pbCrtCoefficient, cbCrtCoefficient,
                         pbPrivateExponent, cbPrivateExponent,
-                        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
                         0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -842,12 +846,12 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
             goto cleanup;
         }
 
-        if ((BN_bin2bn(ppbPrimes[0], cbPrime1, rsaParams->privateParams->p) == NULL) ||
-            (BN_bin2bn(ppbPrimes[1], cbPrime2, rsaParams->privateParams->q) == NULL) ||
-            (BN_bin2bn(ppbCrtExponents[0], cbPrime1, rsaParams->privateParams->dmp1) == NULL) ||
-            (BN_bin2bn(ppbCrtExponents[1], cbPrime2, rsaParams->privateParams->dmq1) == NULL) ||
-            (BN_bin2bn(pbCrtCoefficient, cbPrime1, rsaParams->privateParams->iqmp)   == NULL) ||
-            (BN_bin2bn(pbPrivateExponent, cbPrivateExponent, rsaParams->privateParams->d) == NULL))
+        if ((BN_lebin2bn(ppbPrimes[0], cbPrime1, rsaParams->privateParams->p) == NULL) ||
+            (BN_lebin2bn(ppbPrimes[1], cbPrime2, rsaParams->privateParams->q) == NULL) ||
+            (BN_lebin2bn(ppbCrtExponents[0], cbPrime1, rsaParams->privateParams->dmp1) == NULL) ||
+            (BN_lebin2bn(ppbCrtExponents[1], cbPrime2, rsaParams->privateParams->dmq1) == NULL) ||
+            (BN_lebin2bn(pbCrtCoefficient, cbPrime1, rsaParams->privateParams->iqmp)   == NULL) ||
+            (BN_lebin2bn(pbPrivateExponent, cbPrivateExponent, rsaParams->privateParams->d) == NULL))
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
                 "BN_bin2bn failed.");
