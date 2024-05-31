@@ -117,21 +117,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
         ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
         if (p_scossl_keysinuse_running() &&
-            operation == EVP_PKEY_OP_SIGN &&
-            keyCtx->isImported &&
-            keyCtx->keysinuseInfo == NULL)
+            operation == EVP_PKEY_OP_SIGN)
         {
-            // Initialize keysinuse for private keys. Generated keys are
-            // ignored to avoid noise from ephemeral keys.
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
-
-            if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
-            {
-                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
-            }
-
-            OPENSSL_free(pbPublicKey);
+            p_scossl_ecc_init_keysinuse(keyCtx);
         }
 #endif
 

@@ -193,19 +193,9 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 
 #ifdef KEYSINUSE_ENABLED
         if (p_scossl_keysinuse_running() &&
-            operation == EVP_PKEY_OP_SIGN &&
-            keyCtx->isImported &&
-            keyCtx->keysinuseInfo == NULL)
+            operation == EVP_PKEY_OP_SIGN)
         {
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
-
-            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
-            {
-                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
-            }
-
-            OPENSSL_free(pbPublicKey);
+            p_scossl_rsa_init_keysinuse(keyCtx);
         }
 #endif
     }

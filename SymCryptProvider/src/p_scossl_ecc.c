@@ -83,6 +83,43 @@ cleanup:
     return ret;
 }
 
+#ifdef KEYSINUSE_ENABLED
+_Use_decl_annotations_
+void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
+{
+    if (keyCtx->isImported &&
+        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    {
+        if (keyCtx->keysinuseInfo == NULL)
+        {
+            // Initialize keysinuse for private keys. Generated keys are
+            // ignored to avoid noise from ephemeral keys.
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
+            {
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+
+            OPENSSL_free(pbPublicKey);
+        }
+        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+    }
+}
+
+_Use_decl_annotations_
+void p_scossl_ecc_reset_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
+{
+    if (CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    {
+        p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+        keyCtx->keysinuseInfo = NULL;
+        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+    }
+}
+#endif
+
 #ifdef __cplusplus
 }
 #endif

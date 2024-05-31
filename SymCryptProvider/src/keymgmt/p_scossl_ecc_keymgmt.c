@@ -66,14 +66,14 @@ static const OSSL_PARAM p_scossl_x25519_keymgmt_impexp_param_types[] = {
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
-    if (keyCtx == NULL)
+    if (keyCtx != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return NULL;
+        keyCtx->libctx = provctx->libctx;
+        keyCtx->includePublic = 1;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif
     }
-
-    keyCtx->libctx = provctx->libctx;
-    keyCtx->includePublic = 1;
 
     return keyCtx;
 }
@@ -85,6 +85,9 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
     {
         keyCtx->curve = scossl_ecc_get_x25519_curve();
         keyCtx->isX25519 = TRUE;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif
     }
 
     return keyCtx;
@@ -99,7 +102,8 @@ void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
         SymCryptEckeyFree(keyCtx->key);
     }
 #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+    p_scossl_ecc_reset_keysinuse(keyCtx);
+    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
 #endif
 
     OPENSSL_free(keyCtx);
@@ -207,6 +211,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
         }
 
 #ifdef KEYSINUSE_ENABLED
+        copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+
         if (keyCtx->keysinuseInfo != NULL &&
             p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
         {
@@ -493,6 +499,11 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
             goto cleanup;
         }
 
+#ifdef KEYSINUSE_ENABLED
+        // Reset keysinuse in case new key material is overwriting existing
+        p_scossl_ecc_reset_keysinuse(keyCtx);
+#endif
+
         if (keyCtx->isX25519)
         {
             if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPublicKey, 0, &cbPublicKey))
@@ -761,7 +772,17 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     // Keypair
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if ((keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve))== NULL)
+        if (keyCtx->key != NULL)
+        {
+            SymCryptEckeyFree(keyCtx->key);
+        }
+
+#ifdef KEYSINUSE_ENABLED
+        // Reset keysinuse in case new key material is overwriting existing
+        p_scossl_ecc_reset_keysinuse(keyCtx);
+#endif
+
+        if ((keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;

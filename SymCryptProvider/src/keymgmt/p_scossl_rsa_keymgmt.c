@@ -82,6 +82,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *p
     if (keyCtx != NULL)
     {
         keyCtx->padding = RSA_PKCS1_PADDING;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif
     }
     return keyCtx;
 }
@@ -93,6 +96,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
     {
         keyCtx->libctx = provctx->libctx;
         keyCtx->padding = RSA_PKCS1_PSS_PADDING;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif
     }
     return keyCtx;
 }
@@ -107,7 +113,8 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
         SymCryptRsakeyFree(keyCtx->key);
     }
 #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+    p_scossl_rsa_reset_keysinuse(keyCtx);
+    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
 #endif
     OPENSSL_free(keyCtx->pssRestrictions);
     OPENSSL_free(keyCtx);
@@ -251,6 +258,8 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
     }
 
 #ifdef KEYSINUSE_ENABLED
+    copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+
     if (keyCtx->keysinuseInfo != NULL &&
         p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
     {
@@ -956,6 +965,16 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
                                 "Unsupported RSA version");
             goto cleanup;
         }
+
+        if (keyCtx->key != NULL)
+        {
+            SymCryptRsakeyFree(keyCtx->key);
+        }
+
+#ifdef KEYSINUSE_ENABLED
+        // Reset keysinuse in case new key material is overwriting existing
+        p_scossl_rsa_reset_keysinuse(keyCtx);
+#endif
 
         symcryptRsaParam.version = 1;
         symcryptRsaParam.nBitsOfModulus = cbModulus * 8;

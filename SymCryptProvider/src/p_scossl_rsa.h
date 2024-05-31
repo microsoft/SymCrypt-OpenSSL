@@ -28,6 +28,7 @@ typedef struct
 
 #ifdef KEYSINUSE_ENABLED
     BOOL isImported;
+    CRYPTO_RWLOCK *keysinuseLock;
     SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 #endif
 } SCOSSL_PROV_RSA_KEY_CTX;
@@ -45,6 +46,8 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_
 #ifdef KEYSINUSE_ENABLED
 SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,
                                                   _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+void p_scossl_rsa_init_keysinuse(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx);
+void p_scossl_rsa_reset_keysinuse(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx);
 #endif
 
 #ifdef __cplusplus

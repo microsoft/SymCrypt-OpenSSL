@@ -34,6 +34,7 @@ typedef struct {
 
 #ifdef KEYSINUSE_ENABLED
     BOOL isImported;
+    CRYPTO_RWLOCK *keysinuseLock;
     SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
 #endif
 } SCOSSL_ECC_KEY_CTX;
@@ -42,6 +43,11 @@ typedef struct {
 // The format differs for x25519 keys. Caller is responsible for freeing *ppbEncodedKey.
 SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
                                                   _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+
+#ifdef KEYSINUSE_ENABLED
+void p_scossl_ecc_init_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
+void p_scossl_ecc_reset_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
+#endif
 
 #ifdef __cplusplus
 }
