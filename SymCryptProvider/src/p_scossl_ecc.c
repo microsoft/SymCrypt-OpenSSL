@@ -18,7 +18,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
     // indicate this is an uncompressed point. This is not added for x25519
     SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
-    PBYTE pbEncodedKey;
+    PBYTE pbEncodedKey = NULL;
     SIZE_T cbEncodedKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -39,8 +39,6 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
-
-    // pbPublicKeyTmp = *ppbEncodedPublicKey;
 
     if (!keyCtx->isX25519)
     {
@@ -75,7 +73,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    if (!ret)
+    if (ret != SCOSSL_SUCCESS)
     {
         *ppbEncodedKey = NULL;
         *pcbEncodedKey = 0;

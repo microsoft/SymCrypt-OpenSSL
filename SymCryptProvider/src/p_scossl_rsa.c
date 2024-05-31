@@ -179,6 +179,7 @@ ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
     ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, e, BIGNUM),
 } ASN1_SEQUENCE_END_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
 
+// Generates i2d_SymcryptRsaPublicKey
 IMPLEMENT_ASN1_FUNCTIONS_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
 
 _Use_decl_annotations_

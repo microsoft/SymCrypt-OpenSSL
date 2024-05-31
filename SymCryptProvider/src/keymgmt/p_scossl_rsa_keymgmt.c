@@ -237,7 +237,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
                                               (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0))
         {
             p_scossl_rsa_keymgmt_free_ctx(copyCtx);
-            copyCtx = NULL;
+            return NULL;
         }
     }
 
@@ -247,7 +247,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         p_scossl_rsa_keymgmt_free_ctx(copyCtx);
-        copyCtx = NULL;
+        return NULL;
     }
 
 #ifdef KEYSINUSE_ENABLED

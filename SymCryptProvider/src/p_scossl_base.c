@@ -18,7 +18,7 @@ extern "C" {
 #ifdef KEYSINUSE_ENABLED
 #define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
 #define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
-#define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay"
+#define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
 #endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
@@ -400,9 +400,6 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             // This is the same behavior as atol but also handles MB, KB, and GB suffixes.
             off_t maxFileSizeBytes = 0;
             int i;
-            for (i = 0;
-                 confMaxFileSize[i] != '\0' && confMaxFileSize[i] < '0' && '9' < confMaxFileSize[i];
-                 i++);
 
             while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
             {

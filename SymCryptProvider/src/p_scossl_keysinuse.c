@@ -179,7 +179,7 @@ void p_scossl_keysinuse_cleanup()
     }
     else
     {
-        p_scossl_keysinuse_log_error("Cleanup failed to accquire mutex,SYS_%d", pthreadErr);
+        p_scossl_keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
     }
     pthread_mutex_unlock(&logging_thread_mutex);
 
@@ -206,28 +206,20 @@ void p_scossl_keysinuse_cleanup()
 //
 // Configuration
 //
-SCOSSL_STATUS p_scossl_keysinuse_set_max_file_size(off_t size)
+void p_scossl_keysinuse_set_max_file_size(off_t size)
 {
-    if (size < 0)
+    if (size > 0)
     {
-        return SCOSSL_FAILURE;
+        max_file_size = size;
     }
-
-    max_file_size = size;
-
-    return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_keysinuse_set_logging_delay(INT64 delay)
+void p_scossl_keysinuse_set_logging_delay(INT64 delay)
 {
-    if (delay < 0)
+    if (delay >= 0)
     {
-        return SCOSSL_FAILURE;
+        logging_delay = delay;
     }
-
-    logging_delay = delay;
-
-    return SCOSSL_SUCCESS;
 }
 
 //
@@ -246,6 +238,8 @@ SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(PBYTE pbPublicKey, SIZE_
 
     if ((keysinuseInfo = OPENSSL_zalloc(sizeof(SCOSSL_PROV_KEYSINUSE_INFO))) != NULL)
     {
+        keysinuseInfo->refCount = 1;
+
         if ((pbHash = OPENSSL_malloc(SYMCRYPT_SHA256_RESULT_SIZE)) == NULL ||
             (keysinuseInfo->lock = CRYPTO_THREAD_lock_new()) == NULL)
         {
@@ -262,8 +256,6 @@ SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(PBYTE pbPublicKey, SIZE_
         {
             sprintf(&keysinuseInfo->keyIdentifier[i*2], "%02x", pbHash[i]);
         }
-
-        keysinuseInfo->refCount = 1;
     }
 
 cleanup:
@@ -295,7 +287,7 @@ SCOSSL_STATUS p_scossl_keysinuse_upref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
 
     INT32 ref = 0;
 
-    if (CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, keysinuseInfo->lock))
+    if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, keysinuseInfo->lock))
     {
         p_scossl_keysinuse_log_error("p_scossl_keysinuse_upref failed,OPENSSL_%d", ERR_get_error());
         return SCOSSL_FAILURE;
@@ -318,7 +310,7 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseIn
 
     if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, -1, &ref, keysinuseInfo->lock))
     {
-        p_scossl_keysinuse_log_error("p_scossl_keysinuse_upref failed,OPENSSL_%d", ERR_get_error());
+        p_scossl_keysinuse_log_error("p_scossl_keysinuse_downref failed,OPENSSL_%d", ERR_get_error());
         return SCOSSL_FAILURE;
     }
     else if (refOut != NULL)
@@ -358,8 +350,15 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
         {
             if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
             {
+                INT32 ref; // Unused, required for CRYPTO_atomic_add
+
                 keysinuseInfo->logPending = TRUE;
-                keysinuseInfo->refCount++;
+                if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, NULL))
+                {
+                    // Atomics aren't supported on the system and we already
+                    // have keysinuseInfo->lock. Increment refCount directly.
+                    keysinuseInfo->refCount++;
+                }
                 sk_SCOSSL_PROV_KEYSINUSE_INFO_push(sk_keysinuse_info, keysinuseInfo);
 
                 // First use of this key, wake the logging thread
@@ -698,8 +697,6 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
         if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
         {
-            now = time(NULL);
-
             // Condition signaled to wake the thread early. Log only first key use(s)
             if (waitStatus == 0)
             {
@@ -733,6 +730,8 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
             if (CRYPTO_THREAD_write_lock(pKeysinuseInfo->lock))
             {
+                now = time(NULL);
+
                 pKeysinuseInfo->firstUse = pKeysinuseInfo->lastUse == 0 ? now : pKeysinuseInfo->firstUse;
                 pKeysinuseInfo->lastUse = now;
                 pKeysinuseInfo->logPending = FALSE;

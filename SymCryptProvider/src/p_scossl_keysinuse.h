@@ -33,9 +33,10 @@ void p_scossl_keysinuse_cleanup();
 BOOL p_scossl_keysinuse_running();
 
 // Configuration
+// If an invalid config value is passed, the respective default is used instead
 void p_scossl_keysinuse_set_logging_id(_In_ const char *id);
-SCOSSL_STATUS p_scossl_keysinuse_set_max_file_size(off_t size);
-SCOSSL_STATUS p_scossl_keysinuse_set_logging_delay(INT64 delay);
+void p_scossl_keysinuse_set_max_file_size(off_t size);
+void p_scossl_keysinuse_set_logging_delay(INT64 delay);
 
 // KeysInUse info management
 SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_reads_bytes_(cbPublicKey) PBYTE pbPublicKey, SIZE_T cbPublicKey);
