@@ -29,7 +29,7 @@ typedef struct
 
 // Setup/teardown
 void p_scossl_keysinuse_init();
-void p_scossl_keysinuse_cleanup();
+void p_scossl_keysinuse_teardown();
 BOOL p_scossl_keysinuse_running();
 
 // Configuration

@@ -41,6 +41,8 @@ static int prefix_size = 0;
 //
 DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 // Stack of keysinuseInfo that have pending usage events to be logged by the logging thread.
+// This is destroyed if the logging thread fails to start, or when the logging thread exits.
+// Always check this is non-NULL outside the logging thread.
 static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info = NULL;
 // This lock should be aquired before accessing sk_keysinuse_info
 static CRYPTO_RWLOCK *sk_keysinuse_info_lock = NULL;
@@ -75,6 +77,27 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg);
 //
 // Setup/teardown
 //
+static void p_scossl_keysinuse_cleanup()
+{
+    if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
+    {
+        // Cleanup any elements in the keysinuse_info stack in case the logging thread failed
+        while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
+        {
+            p_scossl_keysinuse_info_free(sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info));
+        }
+
+        sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+        sk_keysinuse_info = NULL;
+
+        CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
+    }
+    else
+    {
+        p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
+    }
+}
+
 static void p_scossl_keysinuse_init_once()
 {
     pid_t pid = getpid();
@@ -139,7 +162,9 @@ static void p_scossl_keysinuse_init_once()
 cleanup:
     if (!status)
     {
-        p_scossl_keysinuse_cleanup();
+        sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+        sk_keysinuse_info = NULL;
+        p_scossl_keysinuse_teardown();
     }
 
     OPENSSL_free(symlinkPath);
@@ -156,9 +181,11 @@ BOOL p_scossl_keysinuse_running()
     return keysinuse_enabled;
 }
 
-void p_scossl_keysinuse_cleanup()
+void p_scossl_keysinuse_teardown()
 {
     int pthreadErr;
+
+    keysinuse_enabled = FALSE;
 
     // Finish logging thread
     if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex) == 0))
@@ -192,17 +219,8 @@ void p_scossl_keysinuse_cleanup()
         prefix_size = 0;
     }
 
-    // Cleanup any elements in the stack in case the logging thread failed
-    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
-    {
-        p_scossl_keysinuse_info_free(sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info));
-    }
-
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
     sk_keysinuse_info_lock = NULL;
-    sk_keysinuse_info = NULL;
-    keysinuse_enabled = FALSE;
 }
 
 //
@@ -348,22 +366,25 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
         {
             if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
             {
-                INT32 ref; // Unused, required for CRYPTO_atomic_add
-
-                keysinuseInfo->logPending = TRUE;
-                // If atomics aren't supported CRYPTO_atomic_add attempts to modify
-                // keysinuseInfo->refCount under lock, or fails if no lock is passed.
-                // We don't pass keysinuseInfo->lock since we already have the lock.
-                if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, NULL))
+                if (sk_keysinuse_info != NULL)
                 {
-                    keysinuseInfo->refCount++;
-                }
-                sk_SCOSSL_PROV_KEYSINUSE_INFO_push(sk_keysinuse_info, keysinuseInfo);
+                    INT32 ref; // Unused, required for CRYPTO_atomic_add
 
-                // First use of this key, wake the logging thread
-                if (keysinuseInfo->lastLogTime == 0)
-                {
-                    wakeLoggingThread = TRUE;
+                    keysinuseInfo->logPending = TRUE;
+                    // If atomics aren't supported CRYPTO_atomic_add attempts to modify
+                    // keysinuseInfo->refCount under lock, or fails if no lock is passed.
+                    // We don't pass keysinuseInfo->lock since we already have the lock.
+                    if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, NULL))
+                    {
+                        keysinuseInfo->refCount++;
+                    }
+                    sk_SCOSSL_PROV_KEYSINUSE_INFO_push(sk_keysinuse_info, keysinuseInfo);
+
+                    // First use of this key, wake the logging thread
+                    if (keysinuseInfo->lastLogTime == 0)
+                    {
+                        wakeLoggingThread = TRUE;
+                    }
                 }
                 CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
             }
@@ -752,6 +773,7 @@ cleanup:
     sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     logging_thread_exit_status = SCOSSL_SUCCESS;
     keysinuse_enabled = FALSE;
+    p_scossl_keysinuse_cleanup();
 
     return NULL;
 }

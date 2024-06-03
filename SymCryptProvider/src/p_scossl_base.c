@@ -273,7 +273,7 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
 #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_cleanup();
+    p_scossl_keysinuse_teardown();
 #endif
     OPENSSL_free(provctx);
 }
