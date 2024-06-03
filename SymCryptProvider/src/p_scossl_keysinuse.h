@@ -14,10 +14,10 @@ extern "C" {
 // with the key context in the key management interface.
 typedef struct
 {
-    time_t firstUse;
-    time_t lastUse;
-    UINT signCounter;
-    UINT decryptCounter;
+    time_t lastLogTime;
+    time_t logTime;
+    UINT32 signCounter;
+    UINT32 decryptCounter;
     // The first 32 bytes of the SHA256 hash of the encoded public key.
     // Use the same encoding rules as the subjectPublicKey field of a certificate
     // (PKCS#1 format for RSA, octet string for ECDSA)
