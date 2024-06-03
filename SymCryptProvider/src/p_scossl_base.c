@@ -399,7 +399,7 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             // Convert file size to off_t in bytes.
             // This is the same behavior as atol but also handles MB, KB, and GB suffixes.
             off_t maxFileSizeBytes = 0;
-            int i;
+            int i = 0;
 
             while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
             {
