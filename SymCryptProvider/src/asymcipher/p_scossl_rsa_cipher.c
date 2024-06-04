@@ -89,7 +89,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
         (keyCtx == NULL && ctx->keyCtx == NULL) ||
         !keyCtx->initialized)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
     }
 

@@ -101,7 +101,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
     {
         keyCtx->libctx = provctx->libctx;
         keyCtx->padding = RSA_PKCS1_PSS_PADDING;
-        keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS
+        keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 #endif
@@ -1155,7 +1155,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         {
             // Only supporting 2 primes
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                                "Unsupported RSA version");
+                             "Unsupported RSA version");
             goto cleanup;
         }
 
@@ -1177,7 +1177,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         if (keyCtx->key == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                "SymCryptRsakeyAllocate failed");
+                             "SymCryptRsakeyAllocate failed");
             goto cleanup;
         }
 
@@ -1191,7 +1191,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                        "SymCryptRsakeySetValue failed", scError);
+                                      "SymCryptRsakeySetValue failed", scError);
             goto cleanup;
         }
     }

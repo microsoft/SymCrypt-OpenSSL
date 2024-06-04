@@ -248,7 +248,8 @@ void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 _Use_decl_annotations_
 void p_scossl_rsa_reset_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
-    if (CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    if (keyCtx->keysinuseLock != NULL &&
+        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
     {
         p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
         keyCtx->keysinuseInfo = NULL;

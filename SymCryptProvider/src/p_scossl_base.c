@@ -406,11 +406,21 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 
             while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
             {
+                maxFileSizeBytesTmp = maxFileSizeBytes;
+
                 maxFileSizeBytes = maxFileSizeBytes * 10 + (confMaxFileSize[i++] - '0');
+
+                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE in case of overflow
+                if (maxFileSizeBytes < maxFileSizeBytesTmp)
+                {
+                    maxFileSizeBytes = SCOSSL_MAX_CONFIGURABLE_FILE_SIZE;
+                    break;
+                }
             }
 
             // Check for KB, MB, or GB suffixes, case insensitive.
-            if (confMaxFileSize[i] != '\0' &&
+            if (maxFileSizeBytes < SCOSSL_MAX_CONFIGURABLE_FILE_SIZE &&
+                confMaxFileSize[i] != '\0' &&
                 (confMaxFileSize[i + 1] == 'B' || confMaxFileSize[i + 1] == 'b'))
             {
                 maxFileSizeBytesTmp = maxFileSizeBytes;
