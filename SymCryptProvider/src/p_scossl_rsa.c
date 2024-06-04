@@ -41,7 +41,7 @@ const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,
     {
         for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
         {
-            if (EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
+            if (mdInt != NULL && EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
             {
                 mdInfo = &p_scossl_rsa_supported_mds[i];
             }
@@ -113,9 +113,7 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_from_params(OSSL_LIB_CTX *libctx, co
 
         // Set defaults based on RFC 8017, A.2.3. This is the same behavior
         // as the default provider.
-        pssRestrictions->mdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
-        pssRestrictions->mgf1MdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
-        pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN;
+        p_scossl_rsa_pss_restrictions_get_defaults(pssRestrictions);
 
         *pPssRestrictions = pssRestrictions;
     }
@@ -164,13 +162,24 @@ cleanup:
 
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(const SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions,
-                                              OSSL_PARAM_BLD *bld)
+                                                      OSSL_PARAM_BLD *bld)
 {
     return OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_RSA_DIGEST, pssRestrictions->mdInfo->ptr, 0) &&
            OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_RSA_MGF1_DIGEST, pssRestrictions->mgf1MdInfo->ptr, 0) &&
            OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_RSA_PSS_SALTLEN, pssRestrictions->cbSaltMin);
 }
 
+_Use_decl_annotations_
+void p_scossl_rsa_pss_restrictions_get_defaults(SCOSSL_RSA_PSS_RESTRICTIONS* pssRestrictions)
+{
+    if (pssRestrictions != NULL)
+    {
+        pssRestrictions->mdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
+        pssRestrictions->mgf1MdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
+        pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN;
+    }
+}  
+  
 #ifdef KEYSINUSE_ENABLED
 // KeyInUse requires the public key encoded in the same format as subjectPublicKey in a certificate.
 // This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.

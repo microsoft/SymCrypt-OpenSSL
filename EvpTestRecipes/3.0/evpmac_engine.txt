@@ -1,0 +1,28 @@
+Title = HMAC tests (from RFC2104 and others)
+
+Title = MD5
+
+Availablein = default
+MAC = HMAC
+Algorithm = MD5
+Key = 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+Input = "Hi There"
+Output = 9294727a3638bb1c13f48ef8158bfc9d
+OutputSize = 16
+BlockSize = 64
+
+Availablein = default
+MAC = HMAC
+Algorithm = MD5
+Key = "Jefe"
+Input = "what do ya want for nothing?"
+Output = 750c783e6ab0b503eaa86e310a5db738
+OutputSize = 16
+
+Availablein = default
+MAC = HMAC
+Algorithm = MD5
+Key = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Input = DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+Output = 56be34521d144c88dbb8c733f0e8b3f6
+BlockSize = 64

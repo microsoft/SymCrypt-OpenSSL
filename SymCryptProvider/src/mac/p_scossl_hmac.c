@@ -82,9 +82,49 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Ino
     return SCOSSL_SUCCESS;
 }
 
+// The MD's nid may not be retrievable from EVP_MD_type(). In that
+// case, we need to check each MD we support with EVP_MD_is_a()
+static int p_scossl_hmac_get_mdnid(_In_ EVP_MD *md)
+{
+    int mdNid = EVP_MD_type(md);
+    if (mdNid == NID_undef)
+    {
+        if (EVP_MD_is_a(md, SN_sha1))
+        {
+            mdNid = NID_sha1;
+        }
+        if (EVP_MD_is_a(md, SN_sha256))
+        {
+            mdNid = NID_sha256;
+        }
+        if (EVP_MD_is_a(md, SN_sha384))
+        {
+            mdNid = NID_sha384;
+        }
+        if (EVP_MD_is_a(md, SN_sha512))
+        {
+            mdNid = NID_sha512;
+        }
+        if (EVP_MD_is_a(md, SN_sha3_256))
+        {
+            mdNid = NID_sha3_256;
+        }
+        if (EVP_MD_is_a(md, SN_sha3_384))
+        {
+            mdNid = NID_sha3_384;
+        }
+        if (EVP_MD_is_a(md, SN_sha3_512))
+        {
+            mdNid = NID_sha3_512;
+        }
+    }
+
+    return mdNid;
+}
+
 static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    char *paramMdName = NULL;
+    char *mdName = NULL;
     char *mdProps = NULL;
     PBYTE pbMacKey = NULL;
     EVP_MD *md = NULL;
@@ -99,7 +139,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
         // mdname is not directly set from parameters. The name is fetched from the
         // provider in case the provider is registered under multiple names for the
         // same digest, or surfaces the digest under a different name.
-        if (!OSSL_PARAM_get_utf8_string(p, &paramMdName, 0))
+        if (!OSSL_PARAM_get_utf8_string(p, &mdName, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
@@ -113,19 +153,19 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
         }
 
         // Get mdname from provider
-        if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
+        if ((md = EVP_MD_fetch(ctx->libctx, mdName, mdProps)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             goto cleanup;
         }
 
-        if (!scossl_mac_set_hmac_md(ctx, md))
+        if (!scossl_mac_set_hmac_md(ctx, p_scossl_hmac_get_mdnid(md)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
             goto cleanup;
         }
 
-        ctx->mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
+        ctx->mdName = OPENSSL_strdup(mdName);
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
@@ -146,7 +186,7 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
 
     ret = SCOSSL_SUCCESS;
 cleanup:
-    OPENSSL_free(paramMdName);
+    OPENSSL_free(mdName);
     OPENSSL_free(mdProps);
     OPENSSL_free(pbMacKey);
     EVP_MD_free(md);

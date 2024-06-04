@@ -5,8 +5,10 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
+#include <openssl/prov_ssl.h>
 
 #include "scossl_helpers.h"
+#include "p_scossl_base.h"
 #include "p_scossl_aes.h"
 
 #ifdef __cplusplus
@@ -31,6 +33,8 @@ static const OSSL_PARAM p_scossl_aes_generic_gettable_ctx_param_types[] = {
 
 static const OSSL_PARAM p_scossl_aes_generic_settable_ctx_param_types[] = {
     OSSL_PARAM_uint(OSSL_CIPHER_PARAM_PADDING, NULL),
+    OSSL_PARAM_uint(OSSL_CIPHER_PARAM_TLS_VERSION, NULL),
+    OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_TLS_MAC_SIZE, NULL),
     OSSL_PARAM_END};
 
 typedef struct
@@ -40,13 +44,18 @@ typedef struct
 
     BYTE iv[SYMCRYPT_AES_BLOCK_SIZE];
     BYTE pbChainingValue[SYMCRYPT_AES_BLOCK_SIZE];
-    INT32 encrypt;
-    INT32 pad;
+    BOOL encrypt;
+    BOOL pad;
 
     // Provider is responsible for buffering
     // incomplete blocks in update calls
     BYTE buf[SYMCRYPT_AES_BLOCK_SIZE];
     SIZE_T cbBuf;
+
+    OSSL_LIB_CTX *libctx;
+    UINT tlsVersion;
+    PBYTE tlsMac;
+    SIZE_T tlsMacSize;
 
     OSSL_FUNC_cipher_cipher_fn *cipher;
 } SCOSSL_AES_CTX;
@@ -55,21 +64,31 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
 
 static void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
 {
+    OPENSSL_free(ctx->tlsMac);
     SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_AES_CTX);
 }
 
 static SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_AES_CTX);
-    if (copy_ctx != NULL)
-    { 
-        memcpy(copy_ctx, ctx, sizeof(SCOSSL_AES_CTX));
-        SymCryptAesKeyCopy(&ctx->key, &copy_ctx->key);
+    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_malloc, SCOSSL_AES_CTX);
+    if (copyCtx != NULL)
+    {
+        *copyCtx = *ctx;
+
+        if (ctx->tlsMac != NULL &&
+            (copyCtx->tlsMac = OPENSSL_memdup(ctx->tlsMac, ctx->tlsMacSize)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            p_scossl_aes_generic_freectx(copyCtx);
+            return NULL;
+        }
+
+        SymCryptAesKeyCopy(&ctx->key, &copyCtx->key);
     }
-    return copy_ctx;
+    return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *ctx, INT32 encrypt,
+static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *ctx, BOOL encrypt,
                                                         _In_reads_bytes_opt_(keylen) const unsigned char *key, size_t keylen,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
@@ -112,7 +131,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_encrypt_init(_Inout_ SCOSSL_AES_CTX *c
                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                        _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, 1, key, keylen, iv, ivlen, params);
+    return p_scossl_aes_generic_init_internal(ctx, TRUE, key, keylen, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *ctx,
@@ -120,7 +139,101 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                        _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
+    return p_scossl_aes_generic_init_internal(ctx, FALSE, key, keylen, iv, ivlen, params);
+}
+
+#define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
+
+// Extracts the MAC from the end of out and saves the result to ctx->tlsMac
+// The mac will later be fetched through p_scossl_aes_generic_get_ctx_params
+// This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c
+// and runs in constant time. In case of bad padding, a random MAC is assigned instead
+static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
+                                           _In_reads_bytes_(buflen) unsigned char *record, _Inout_ SIZE_T *recordLen,
+                                           SIZE_T recordLenPadded,
+                                           SCOSSL_STATUS paddingStatus)
+{
+    // MAC rotation is performed in place
+    BYTE rotatedMacBuf[64 + EVP_MAX_MD_SIZE];
+    PBYTE rotatedMac;
+    BYTE aux1, aux2, aux3, mask;
+    BYTE paddingStatusByte = (BYTE) (paddingStatus & 0xff);
+    // Random mac set in case padding removal failed
+    BYTE randMac[EVP_MAX_MD_SIZE];
+
+    UINT32 macEnd = *record;
+    UINT32 macStart = macEnd - ctx->tlsMacSize;
+    UINT32 inMac = 0;
+
+    UINT32 scanStart = 0;
+    UINT32 rotateOffset = 0;
+    UINT32 i, j;
+
+    OPENSSL_free(ctx->tlsMac);
+    ctx->tlsMac = NULL;
+
+    // Public info, safe to branch
+    // No mac to copy
+    if (ctx->tlsMacSize == 0)
+    {
+        return paddingStatus;
+    }
+
+    *recordLen -= ctx->tlsMacSize;
+
+    // Generate random bytes in case of bad padding
+    if (RAND_bytes_ex(ctx->libctx, randMac, ctx->tlsMacSize, 0) <= 0)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if ((ctx->tlsMac = OPENSSL_malloc(ctx->tlsMacSize)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
+
+    // Public info, safe to branch
+    if (recordLenPadded > ctx->tlsMacSize + 255 + 1)
+    {
+        scanStart = recordLenPadded - (ctx->tlsMacSize + 255 + 1);
+    }
+
+    // Find and extract MAC
+    memset(rotatedMac, 0, ctx->tlsMacSize);
+    for (i = scanStart, j = 0; i < recordLenPadded; i++)
+    {
+        UINT32 macStarted = SYMCRYPT_MASK32_EQ(i, macStart);
+        UINT32 macEnded = SYMCRYPT_MASK32_LT(i, macEnd);
+        BYTE recordByte = record[i];
+
+        inMac = (inMac | macStarted) & macEnded;
+        rotateOffset |= j & macStarted;
+        rotatedMac[j++] |= recordByte & inMac;
+        j &= SYMCRYPT_MASK32_LT(j, ctx->tlsMacSize);
+    }
+
+    // MAC rotation
+    for (i = 0, j = 0; i < ctx->tlsMacSize; i++)
+    {
+        // in case cache-line is 32 bytes, load from both lines and select appropriately
+        aux1 = rotatedMac[rotateOffset & ~0x20];
+        aux2 = rotatedMac[rotateOffset | 0x20];
+        mask = (BYTE) SYMCRYPT_MASK32_EQ(rotateOffset & !0x20, rotateOffset);
+        aux3 = SYMCRYPT_OPENSSL_MASK8_SELECT(mask, aux1, aux2);
+
+
+        ctx->tlsMac[j++] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatusByte, aux3, randMac[i]);
+
+        rotateOffset++;
+        rotateOffset = (rotateOffset & SYMCRYPT_MASK32_LT(rotateOffset, ctx->tlsMacSize));
+    }
+
+    // If we failed, we still succeed, but the MAC is set to some
+    // random value. It's up to the caller to check the MAC.
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
@@ -132,6 +245,82 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
 
     if (inl == 0)
     {
+        return SCOSSL_SUCCESS;
+    }
+
+    if (ctx->tlsVersion > 0)
+    {
+        // Each update call corresponds to a TLS record and is individually padded
+        if (in == NULL ||
+            in != out ||
+            outsize < inl ||
+            !ctx->pad)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+            return SCOSSL_FAILURE;
+        }
+
+        if (ctx->encrypt)
+        {
+            // in == out
+            SymCryptPaddingPkcs7Add(
+                SYMCRYPT_AES_BLOCK_SIZE,
+                in, inl,
+                out, outsize, &inl);
+        }
+
+        if (inl % SYMCRYPT_AES_BLOCK_SIZE != 0 ||
+            !ctx->cipher(ctx, out, outl, outsize, in, inl))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_WRONG_FINAL_BLOCK_LENGTH);
+            return SCOSSL_FAILURE;
+        }
+
+        // Need to remove padding and mac in constant time
+        if (!ctx->encrypt)
+        {
+            SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+            // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
+            SYMCRYPT_UINT32_MAP scErrorMap[1] = {
+                {SYMCRYPT_NO_ERROR, SCOSSL_SUCCESS}};
+
+            switch (ctx->tlsVersion)
+            {
+            // Need to remove explicit IV in addition to pkcs7 padding and mac
+            case TLS1_2_VERSION:
+            case DTLS1_2_VERSION:
+            case TLS1_1_VERSION:
+            case DTLS1_VERSION:
+            case DTLS1_BAD_VER:
+                out += SYMCRYPT_AES_BLOCK_SIZE;
+                *outl -= SYMCRYPT_AES_BLOCK_SIZE;
+                __attribute__ ((fallthrough));
+            case TLS1_VERSION:
+                SIZE_T outlPadded = *outl;
+
+                if (ctx->tlsMacSize > *outl)
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+                    return SCOSSL_FAILURE;
+                }
+                scError = SymCryptPaddingPkcs7Remove(
+                    SYMCRYPT_AES_BLOCK_SIZE,
+                    out, *outl,
+                    out, *outl,
+                    outl);
+
+                return p_scossl_aes_copy_mac(ctx,
+                                             out, outl,
+                                             outlPadded,
+                                             SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1));
+                break;
+            default:
+                ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+                return SCOSSL_FAILURE;
+            }
+        }
+
+        // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
         return SCOSSL_SUCCESS;
     }
 
@@ -179,13 +368,13 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
 
     // Decrypt with padding. Ensure the last block is buffered
     // for the call to cipher_final so padding is removed
-    if (!ctx->encrypt && 
-        ctx->pad && 
-        cbBytesInFullBlocks > 0 && 
+    if (!ctx->encrypt &&
+        ctx->pad &&
+        cbBytesInFullBlocks > 0 &&
         cbBytesInFullBlocks == inl)
     {
         cbBytesInFullBlocks -= SYMCRYPT_AES_BLOCK_SIZE;
-    }   
+    }
 
     // in still contains whole blocks, encrypt available blocks
     if (cbBytesInFullBlocks > 0)
@@ -204,7 +393,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
     // Buffer any remaining data
     if (inl > 0)
     {
-        // Ensure trailing remaining data is 
+        // Ensure trailing remaining data is
         // - less than one block for encryption or unpadded decryption
         // - less than or equal to one block for padded decryption
         if (inl > SYMCRYPT_AES_BLOCK_SIZE ||
@@ -216,7 +405,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
         memcpy(ctx->buf, in, inl);
         ctx->cbBuf += inl;
     }
-    
+
     // Buffer must have some data in it for padded decryption
     if (!ctx->encrypt && ctx->pad && ctx->cbBuf == 0)
     {
@@ -230,6 +419,12 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
 static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize)
 {
+    if (ctx->tlsVersion > 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+        return 0;
+    }
+
     // Unpadded case
     if (!ctx->pad)
     {
@@ -267,10 +462,8 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
 
         SymCryptPaddingPkcs7Add(
             SYMCRYPT_AES_BLOCK_SIZE,
-            ctx->buf,
-            ctx->cbBuf,
-            ctx->buf,
-            SYMCRYPT_AES_BLOCK_SIZE,
+            ctx->buf, ctx->cbBuf,
+            ctx->buf, SYMCRYPT_AES_BLOCK_SIZE,
             &ctx->cbBuf);
     }
 
@@ -293,10 +486,8 @@ static SCOSSL_STATUS p_scossl_aes_generic_final(_Inout_ SCOSSL_AES_CTX *ctx,
     {
         scError = SymCryptPaddingPkcs7Remove(
             SYMCRYPT_AES_BLOCK_SIZE,
-            out,
-            SYMCRYPT_AES_BLOCK_SIZE,
-            out,
-            SYMCRYPT_AES_BLOCK_SIZE,
+            out, SYMCRYPT_AES_BLOCK_SIZE,
+            out, SYMCRYPT_AES_BLOCK_SIZE,
             outl);
     }
     else
@@ -350,42 +541,48 @@ SCOSSL_STATUS p_scossl_aes_generic_get_params(_Inout_ OSSL_PARAM params[],
 
     OSSL_PARAM *p = NULL;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_MODE);
-    if (p != NULL && !OSSL_PARAM_set_uint(p, mode))
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_MODE)) != NULL &&
+        !OSSL_PARAM_set_uint(p, mode))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, keylen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ivlen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ivlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_BLOCK_SIZE);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, block_size))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_BLOCK_SIZE)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, block_size))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD);
-    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_AEAD ? 1 : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD)) != NULL &&
+        !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_AEAD ? 1 : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_CUSTOM_IV);
-    if (p != NULL && !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_CUSTOM_IV ? 1 : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_CUSTOM_IV)) != NULL &&
+        !OSSL_PARAM_set_int(p, flags & SCOSSL_FLAG_CUSTOM_IV ? 1 : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -393,34 +590,43 @@ static SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(_In_ SCOSSL_AES_CTX *ct
 {
     OSSL_PARAM *p = NULL;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SYMCRYPT_AES_BLOCK_SIZE))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, SYMCRYPT_AES_BLOCK_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL &&
         !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, SYMCRYPT_AES_BLOCK_SIZE) &&
         !OSSL_PARAM_set_octet_string(p, &ctx->iv, SYMCRYPT_AES_BLOCK_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL &&
         !OSSL_PARAM_set_octet_ptr(p, &ctx->pbChainingValue, SYMCRYPT_AES_BLOCK_SIZE) &&
         !OSSL_PARAM_set_octet_string(p, &ctx->pbChainingValue, SYMCRYPT_AES_BLOCK_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_TLS_MAC)) != NULL &&
+        !OSSL_PARAM_set_octet_ptr(p, ctx->tlsMac, ctx->tlsMacSize))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -428,8 +634,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
 {
     const OSSL_PARAM *p = NULL;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_PADDING);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_PADDING)) != NULL)
     {
         unsigned int pad;
 
@@ -438,7 +643,45 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-        ctx->pad = pad ? 1 : 0;
+        ctx->pad = pad != 0;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_TLS_VERSION)) != NULL)
+    {
+        UINT tlsVersion;
+        if (!OSSL_PARAM_get_uint(p, &tlsVersion))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (tlsVersion == SSL3_VERSION)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->tlsVersion = tlsVersion;
+    }
+
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_TLS_MAC_SIZE)) != NULL)
+    {
+        SIZE_T tlsMacSize;
+
+        if (!OSSL_PARAM_get_size_t(p, &tlsMacSize))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (ctx->tlsMacSize > EVP_MAX_MD_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->tlsMacSize = tlsMacSize;
     }
 
     return SCOSSL_SUCCESS;
@@ -529,25 +772,29 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
                                            _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    return p_scossl_aes_cfb_cipher_internal(ctx, SYMCRYPT_AES_BLOCK_SIZE, out, outl, outsize, in, inl);                                        
+    return p_scossl_aes_cfb_cipher_internal(ctx, SYMCRYPT_AES_BLOCK_SIZE, out, outl, outsize, in, inl);
 }
 
 static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
                                             _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    return p_scossl_aes_cfb_cipher_internal(ctx, 1, out, outl, outsize, in, inl);                                        
+    return p_scossl_aes_cfb_cipher_internal(ctx, 1, out, outl, outsize, in, inl);
 }
 
 #define IMPLEMENT_SCOSSL_AES_BLOCK_CIPHER(kbits, ivlen, lcmode, UCMODE)                                   \
-    SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx()                                            \
+    SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx(_In_ SCOSSL_PROVCTX *provctx)                \
     {                                                                                                     \
         SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_CTX);                                 \
         if (ctx != NULL)                                                                                  \
         {                                                                                                 \
             ctx->keylen = kbits >> 3;                                                                     \
-            ctx->pad = 1;                                                                                 \
+            ctx->pad = TRUE;                                                                              \
             ctx->cipher = (OSSL_FUNC_cipher_cipher_fn *)&scossl_aes_##lcmode##_cipher;                    \
+            ctx->libctx = provctx->libctx;                                                                \
+            ctx->tlsMac = NULL;                                                                           \
+            ctx->tlsMacSize = 0;                                                                          \
+            ctx->tlsVersion = 0;                                                                          \
         }                                                                                                 \
                                                                                                           \
         return ctx;                                                                                       \

@@ -24,6 +24,7 @@ typedef struct
     BOOL initialized;
     PSYMCRYPT_RSAKEY key;
     UINT padding;
+    UINT keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
 #ifdef KEYSINUSE_ENABLED
@@ -42,6 +43,8 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_from_params(_In_ OSSL_LIB_CTX *libct
 
 SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions,
                                                       _Inout_ OSSL_PARAM_BLD *bld);
+
+void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);  
 
 #ifdef KEYSINUSE_ENABLED
 SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,

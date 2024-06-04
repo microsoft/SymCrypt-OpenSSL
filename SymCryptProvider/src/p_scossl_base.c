@@ -106,10 +106,6 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
 static int scossl_prov_initialized = 0;
 
 static OSSL_FUNC_core_get_params_fn *core_get_params;
-static OSSL_FUNC_CRYPTO_malloc_fn *c_CRYPTO_malloc;
-static OSSL_FUNC_CRYPTO_zalloc_fn *c_CRYPTO_zalloc;
-static OSSL_FUNC_CRYPTO_free_fn *c_CRYPTO_free;
-static OSSL_FUNC_CRYPTO_clear_free_fn *c_CRYPTO_clear_free;
 
 static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("secp192r1", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
@@ -207,13 +203,15 @@ static const OSSL_ALGORITHM p_scossl_mac[] = {
     ALG_TABLE_END};
 
 // KDF
-extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_kbkdf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
-    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
     ALG("HKDF", p_scossl_hkdf_kdf_functions),
+    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
+    ALG("KBKDF", p_scossl_kbkdf_kdf_functions),
     ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
@@ -273,6 +271,7 @@ static int p_scossl_get_status()
 
 static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 {
+    scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
 #ifdef KEYSINUSE_ENABLED
@@ -468,6 +467,21 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     SCOSSL_PROVCTX *p_ctx = NULL;
     OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
+    for (; in->function_id != 0; in++)
+    {
+        switch(in->function_id)
+        {
+        case OSSL_FUNC_CORE_GET_PARAMS:
+            core_get_params = OSSL_FUNC_core_get_params(in);
+            break;
+        case OSSL_FUNC_CORE_GET_LIBCTX:
+            core_get_libctx = OSSL_FUNC_core_get_libctx(in);
+            break;
+        }
+    }
+
+    scossl_setup_logging();
+
     if (!scossl_prov_initialized)
     {
         SYMCRYPT_MODULE_INIT();
@@ -477,39 +491,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
             return SCOSSL_FAILURE;
         }
-        scossl_prov_initialized = 1;
-    }
-
-    scossl_setup_logging();
-
-    for (; in->function_id != 0; in++)
-    {
-        switch(in->function_id)
-        {
-        case OSSL_FUNC_CORE_GET_PARAMS:
-            core_get_params = OSSL_FUNC_core_get_params(in);
-            break;
-        case OSSL_FUNC_CRYPTO_MALLOC:
-            c_CRYPTO_malloc = OSSL_FUNC_CRYPTO_malloc(in);
-            break;
-        case OSSL_FUNC_CRYPTO_ZALLOC:
-            c_CRYPTO_zalloc = OSSL_FUNC_CRYPTO_zalloc(in);
-            break;
-        case OSSL_FUNC_CRYPTO_FREE:
-            c_CRYPTO_free = OSSL_FUNC_CRYPTO_free(in);
-            break;
-        case OSSL_FUNC_CRYPTO_CLEAR_FREE:
-            c_CRYPTO_clear_free = OSSL_FUNC_CRYPTO_clear_free(in);
-            break;
-        case OSSL_FUNC_CORE_GET_LIBCTX:
-            core_get_libctx = OSSL_FUNC_core_get_libctx(in);
-            break;
-        }
-    }
-
-    if (!scossl_prov_initialized)
-    {
-        SYMCRYPT_MODULE_INIT();
         scossl_prov_initialized = 1;
     }
 
@@ -542,25 +523,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     return SCOSSL_SUCCESS;
 }
 
-// Functions from in dispatch table
-void *CRYPTO_malloc(size_t num, const char *file, int line)
-{
-    return c_CRYPTO_malloc(num, file, line);
-}
-void *CRYPTO_zalloc(size_t num, const char *file, int line)
-{
-    return c_CRYPTO_zalloc(num, file, line);
-}
-void CRYPTO_free(void *ptr, const char *file, int line)
-{
-    return c_CRYPTO_free(ptr, file, line);
-}
-void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line)
-{
-    return c_CRYPTO_clear_free(ptr, num, file, line);
-}
-
-#if OPENSSL_VERSION_MINOR == 0
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
 EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
 {
     EVP_MD_CTX *out = EVP_MD_CTX_new();
@@ -571,7 +534,15 @@ EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
     }
     return out;
 }
-#endif
+
+#if OPENSSL_VERSION_PATCH < 4
+int OPENSSL_strcasecmp(const char *s1, const char *s2)
+{
+    return strcasecmp(s1, s2);
+}
+#endif // OPENSSL_VERSION_PATCH < 4
+
+#endif // OPENSSL_VERSION_MINOR == 0
 
 #ifdef __cplusplus
 }

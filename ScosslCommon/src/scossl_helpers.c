@@ -30,7 +30,7 @@ static int _osslERRLogLevel = SCOSSL_LOG_LEVEL_ERROR;
 
 // Lock around writing information to stderr/log file/OpenSSL ERR handling framework to avoid
 // muddled error messages in multi-threaded environment
-static CRYPTO_RWLOCK *_loggingLock;
+static CRYPTO_RWLOCK *_loggingLock = NULL;
 
 static int _scossl_err_library_code = 0;
 
@@ -132,6 +132,7 @@ void scossl_setup_logging()
 void scossl_destroy_logging()
 {
     CRYPTO_THREAD_lock_free(_loggingLock);
+    _loggingLock = NULL;
 }
 
 void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level)

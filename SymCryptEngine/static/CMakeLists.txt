@@ -19,7 +19,6 @@ set(SCOSSL_SOURCES
     ../src/e_scossl_digests.c
     ../src/e_scossl_dsa.c
     ../src/e_scossl_ecc.c
-    ../src/e_scossl_pkey_meths.c
     ../src/e_scossl_rand.c
     ../src/e_scossl_rsa.c
     ../src/e_scossl_rsapss.c
@@ -34,6 +33,9 @@ if (SCOSSL_SSHKDF)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
 endif()
 
+if (${OPENSSL_VERSION} VERSION_EQUAL 1)
+    list(APPEND SCOSSL_SOURCES ../src/e_scossl_pkey_meths.c)
+endif()
 
 add_library(scossl_static STATIC ${SCOSSL_SOURCES})
 add_dependencies(scossl_static scossl_common)

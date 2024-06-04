@@ -94,8 +94,24 @@ SCOSSL_STATUS p_scossl_tls1prf_derive(_In_ SCOSSL_PROV_TLS1_PRF_CTX *ctx,
                                       _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
                                       _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_tls1prf_set_ctx_params(ctx, params) &&
-           scossl_tls1prf_derive(ctx->tls1prfCtx, key, keylen);
+    if (!p_scossl_tls1prf_set_ctx_params(ctx, params))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->tls1prfCtx->cbSeed == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_SEED);
+        return SCOSSL_FAILURE;
+    }
+
+    if (keylen == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        return SCOSSL_FAILURE;
+    }
+
+    return scossl_tls1prf_derive(ctx->tls1prfCtx, key, keylen);
 }
 
 const OSSL_PARAM *p_scossl_tls1prf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)

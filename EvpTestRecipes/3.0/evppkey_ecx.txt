@@ -1,0 +1,91 @@
+#
+# Copyright 2001-2020 The OpenSSL Project Authors. All Rights Reserved.
+#
+# Licensed under the Apache License 2.0 (the "License").  You may not use
+# this file except in compliance with the License.  You can obtain a copy
+# in the file LICENSE in the source distribution or at
+# https://www.openssl.org/source/license.html
+
+# Tests start with one of these keywords
+#       Cipher Decrypt Derive Digest Encoding KDF MAC PBE
+#       PrivPubKeyPair Sign Verify VerifyRecover
+# and continue until a blank line. Lines starting with a pound sign are ignored.
+
+
+# Public key algorithm tests
+
+# Private keys used for PKEY operations.
+
+Title = X25519 test vectors (from RFC7748 6.1)
+
+PrivateKey=Alice-25519
+-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VuBCIEIHcHbQpzGKV9PBbBclGyZkXfTC+H68CZKrF3+6UduSwq
+-----END PRIVATE KEY-----
+
+PublicKey=Alice-25519-PUBLIC
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VuAyEAhSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo=
+-----END PUBLIC KEY-----
+
+PrivPubKeyPair = Alice-25519:Alice-25519-PUBLIC
+
+PrivateKey=Bob-25519
+-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VuBCIEIF2rCH5iSopLeeF/i4OADuZvO7EpJhi2/Rwviyf/iODr
+-----END PRIVATE KEY-----
+
+PublicKey=Bob-25519-PUBLIC
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VuAyEA3p7bfXt9wbTTW2HC7OQ1Nz+DQ8hbeGdNrfx+FG+IK08=
+-----END PUBLIC KEY-----
+
+#Raw  versions of the same keys as above
+
+PrivateKeyRaw=Alice-25519-Raw:X25519:77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a
+
+PublicKeyRaw=Alice-25519-PUBLIC-Raw:X25519:8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a
+
+PrivPubKeyPair = Alice-25519-Raw:Alice-25519-PUBLIC-Raw
+
+PrivateKeyRaw=Bob-25519-Raw:X25519:5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb
+
+PublicKeyRaw=Bob-25519-PUBLIC-Raw:X25519:de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f
+
+PrivPubKeyPair = Bob-25519:Bob-25519-PUBLIC
+
+PrivPubKeyPair = Bob-25519-Raw:Bob-25519-PUBLIC-Raw
+
+Derive=Alice-25519
+PeerKey=Bob-25519-PUBLIC
+SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+
+Derive=Bob-25519
+PeerKey=Alice-25519-PUBLIC
+SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+
+Derive=Alice-25519-Raw
+PeerKey=Bob-25519-PUBLIC-Raw
+SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+
+Derive=Bob-25519-Raw
+PeerKey=Alice-25519-PUBLIC-Raw
+SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+
+# Illegal sign/verify operations with X25519 key
+
+Sign=Alice-25519
+Result = KEYOP_INIT_ERROR
+Reason = operation not supported for this keytype
+
+Verify=Alice-25519
+Result = KEYOP_INIT_ERROR
+Reason = operation not supported for this keytype
+
+Title = Test keypair mismatches
+
+PrivPubKeyPair = Alice-25519:Bob-25519-PUBLIC
+Result = KEYPAIR_MISMATCH
+
+PrivPubKeyPair = Bob-25519:Alice-25519-PUBLIC
+Result = KEYPAIR_MISMATCH

@@ -142,6 +142,27 @@ EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(PCSYMCRYPT_ECURVE pCurve)
     return NULL;
 }
 
+// Gets the security strength of the algorithm in discrete values as
+// specified in "NIST Special Publication 800-57 Part 1 Revision 5"
+// This matches the default OpenSSL behavior.
+_Use_decl_annotations_
+int scossl_ecc_get_curve_security_bits(PCSYMCRYPT_ECURVE curve)
+{
+    // Security strength is estimated as groupOrderBits / 2. For
+    // P192 and x25519, this doesn't match one of the discrete values.
+    if (curve == _hidden_curve_P192)
+    {
+        return 80;
+    }
+    else if (curve == _hidden_curve_X25519)
+    {
+        return 128;
+    }
+
+    return SymCryptEcurveBitsizeofGroupOrder(curve) / 2;
+}
+
+
 _Use_decl_annotations_
 const char *scossl_ecc_get_curve_name(PCSYMCRYPT_ECURVE curve)
 {

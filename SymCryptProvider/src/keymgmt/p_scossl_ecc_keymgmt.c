@@ -14,38 +14,54 @@
 extern "C" {
 #endif
 
-#define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
+#define SCOSSL_X25519_MAX_SIZE (32)
+#define SCOSSL_ECC_DEFAULT_DIGEST SN_sha256
+#define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
 typedef struct
 {
     OSSL_LIB_CTX *libctx;
     PCSYMCRYPT_ECURVE curve;
     BOOL isX25519;
+    point_conversion_form_t conversionFormat;
 } SCOSSL_ECC_KEYGEN_CTX;
 
 // ScOSSL only supports named curves
 static const OSSL_PARAM p_scossl_ecc_keygen_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_ecc_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_uint32(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_DEFAULT_DIGEST, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, NULL, 0),
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_ecc_keymgmt_settable_param_types[] = {
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_ENCODING, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_x25519_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_uint32(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
+    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
-    OSSL_PARAM_END};
-
-static const OSSL_PARAM p_scossl_ecc_keymgmt_settable_param_types[] = {
-    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
     OSSL_PARAM_END};
 
 // We don't need to support setting the group for X25519 import/export
@@ -55,6 +71,21 @@ static const OSSL_PARAM p_scossl_x25519_keymgmt_impexp_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
     OSSL_PARAM_END};
+
+static const OSSL_ITEM p_scossl_ecc_keymgmt_conversion_formats[] = {
+    {POINT_CONVERSION_COMPRESSED,   OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_COMPRESSED},
+    {POINT_CONVERSION_UNCOMPRESSED, OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_UNCOMPRESSED},
+    {POINT_CONVERSION_HYBRID,       OSSL_PKEY_EC_POINT_CONVERSION_FORMAT_HYBRID}};
+
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_encoded_public_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                                 _Out_writes_bytes_(*pcbEncodedKey) PBYTE *ppbEncodedKey, _Out_ SIZE_T *pcbEncodedKey);
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                          _Out_writes_bytes_(*pcbPrivateKey) PBYTE *ppbPrivateKey, _Out_ SIZE_T *pcbPrivateKey);
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key_bn(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                             _Out_ BIGNUM **pbnPrivateKey, _Out_opt_ SIZE_T *pcbPrivateKey);
+
+static const char* p_scossl_ecc_keymgmt_conversion_id_to_name(point_conversion_form_t conversionFormat);
+static point_conversion_form_t p_scossl_ecc_keymgmt_conversion_name_to_id(_In_ const char* conversionFormatName);
 
 // Key Context Management
 //
@@ -70,6 +101,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
     {
         keyCtx->libctx = provctx->libctx;
         keyCtx->includePublic = 1;
+        keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 #endif
@@ -128,6 +160,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
         copyCtx->isX25519 = keyCtx->isX25519;
         copyCtx->libctx = keyCtx->libctx;
         copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
+        copyCtx->conversionFormat = keyCtx->conversionFormat;
 
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {
@@ -260,6 +293,38 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CT
         genCtx->curve = pCurve;
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT)) != NULL)
+    {
+        const char* conversionFormatName;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &conversionFormatName))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if ((genCtx->conversionFormat = p_scossl_ecc_keymgmt_conversion_name_to_id(conversionFormatName)) == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+            return SCOSSL_FAILURE;
+        }
+    }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -309,6 +374,7 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCT
 
     genCtx->libctx = provctx->libctx;
     genCtx->isX25519 = isX25519;
+    genCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
 
     if (!p_scossl_ecc_keygen_set_params(genCtx, params))
     {
@@ -366,6 +432,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
 #endif
+    keyCtx->conversionFormat = genCtx->conversionFormat;
 
     keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve);
     if (keyCtx->key == NULL)
@@ -396,27 +463,44 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
 {
-    PBYTE pbPublicKey = NULL;
-    SIZE_T cbPublicKey;
+    PBYTE pbEncodedKey = NULL;
+    PBYTE  pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
+    BIGNUM *bnPrivateKey = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
-        !OSSL_PARAM_set_uint32(p, scossl_ecdsa_size(keyCtx->curve)))
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
+        if (keyCtx->isX25519)
+        {
+            if (!OSSL_PARAM_set_uint32(p, SCOSSL_X25519_MAX_SIZE))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
+        }
+        // We don't know if the key will be used for ECDSA or ECDH so return
+        // the larger size
+        else if (keyCtx->curve == NULL ||
+                 !OSSL_PARAM_set_uint32(p, scossl_ecdsa_size(keyCtx->curve)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
-        !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve)))
+         (keyCtx->curve == NULL || 
+          !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve))))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL &&
-        !OSSL_PARAM_set_int(p, SymCryptEcurveBitsizeofGroupOrder(keyCtx->curve) / 2))
+         (keyCtx->curve == NULL || 
+          !OSSL_PARAM_set_int(p, scossl_ecc_get_curve_security_bits(keyCtx->curve))))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
@@ -424,13 +508,62 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
-        if (!p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
+        SIZE_T cbEncodedKey;
+        if (!p_scossl_ecc_keymgmt_get_encoded_public_key(keyCtx,
+                                                         &pbEncodedKey, &cbEncodedKey) ||
+            !OSSL_PARAM_set_octet_string(p, pbEncodedKey, cbEncodedKey))
         {
-            // Proper error raised in p_scossl_ecc_get_encoded_public_key
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+    }
 
-        if (!OSSL_PARAM_set_octet_string(p, pbPublicKey, cbPublicKey))
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
+    {
+        const char *curveName;
+
+        if ((curveName = scossl_ecc_get_curve_name(keyCtx->curve)) == NULL ||
+            !OSSL_PARAM_set_utf8_string(p, curveName))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL &&
+        !OSSL_PARAM_set_utf8_string(p, OSSL_PKEY_EC_ENCODING_GROUP))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL)
+    {
+        SIZE_T cbEncodedKey;
+        if (!p_scossl_ecc_keymgmt_get_encoded_public_key(keyCtx,
+                                                         &pbEncodedKey, &cbEncodedKey) ||
+            !OSSL_PARAM_set_octet_string(p, pbEncodedKey, cbEncodedKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL &&
+        keyCtx->initialized &&
+        SymCryptEckeyHasPrivateKey(keyCtx->key))
+    {
+        if (keyCtx->isX25519)
+        {
+            if (!p_scossl_ecc_keymgmt_get_private_key(keyCtx, &pbPrivateKey, &cbPrivateKey) ||
+                !OSSL_PARAM_set_octet_string(p, pbPrivateKey, cbPrivateKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
+        }
+        else if (!p_scossl_ecc_keymgmt_get_private_key_bn(keyCtx, &bnPrivateKey, NULL) ||
+                 !OSSL_PARAM_set_BN(p, bnPrivateKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -440,6 +573,13 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     // General ECDH only
     if (!keyCtx->isX25519)
     {
+        if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DEFAULT_DIGEST)) != NULL &&
+            !OSSL_PARAM_set_utf8_string(p, SCOSSL_ECC_DEFAULT_DIGEST))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+
         // SCOSSL only allows named curves, so these is never true
         if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_DECODED_FROM_EXPLICIT_PARAMS)) != NULL &&
             !OSSL_PARAM_set_int(p, 0))
@@ -454,12 +594,30 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT)) != NULL)
+        {
+            const char* conversionFormatName;
+            if ((conversionFormatName = p_scossl_ecc_keymgmt_conversion_id_to_name(keyCtx->conversionFormat)) == 0)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_IN_ERROR_STATE);
+                return SCOSSL_FAILURE;
+            }
+
+            if (!OSSL_PARAM_set_utf8_string(p, conversionFormatName))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+        }
     }
 
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_free(pbPublicKey);
+    OPENSSL_free(pbEncodedKey);
+    OPENSSL_clear_free(pbPrivateKey, cbPrivateKey);
+    BN_clear_free(bnPrivateKey);
 
     return ret;
 }
@@ -554,6 +712,41 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
         keyCtx->initialized = TRUE;
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            goto cleanup;
+        }
+    }
+
+    if (!keyCtx->isX25519)
+    {
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT)) != NULL)
+        {
+            const char* conversionFormatName;
+            if (!OSSL_PARAM_get_utf8_string_ptr(p, &conversionFormatName))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+
+            if ((keyCtx->conversionFormat = p_scossl_ecc_keymgmt_conversion_name_to_id(conversionFormatName)) == 0)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+                return SCOSSL_FAILURE;
+            }
+        }
+    }
+
     ret = SCOSSL_SUCCESS;
 cleanup:
     OPENSSL_free(encodedPoint);
@@ -591,13 +784,26 @@ static BOOL p_scossl_ecc_keymgmt_has(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int select
         }
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {
-            hasSelection = hasSelection &&
-                        (keyCtx->key != NULL && keyCtx->curve != NULL);
+            hasSelection = hasSelection && (keyCtx->curve != NULL);
         }
     }
     // OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS always considered available
 
     return hasSelection;
+}
+
+// Key checking is handled by SymCrypt, and the curves are valid named curves. This function
+// just needs to check whether the data indicated by selection has been set.
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_validate(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
+{
+    SCOSSL_STATUS success = SCOSSL_SUCCESS;
+
+    if (!p_scossl_ecc_keymgmt_has(keyCtx, selection))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return success;
 }
 
 static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SCOSSL_ECC_KEY_CTX *keyCtx2,
@@ -626,7 +832,23 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx1->initialized)
     {
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+        {
+            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx1->key, pointFormat);
+            if (cbPublicKey != SymCryptEckeySizeofPublicKey(keyCtx2->key, pointFormat))
+            {
+                goto cleanup;
+            }
+
+            if ((pbPublicKey1 = OPENSSL_malloc(cbPublicKey)) == NULL ||
+                (pbPublicKey2 = OPENSSL_malloc(cbPublicKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+        }
+        // Private key only needs to be checked if public key is not
+        else if (SymCryptEckeyHasPrivateKey(keyCtx1->key) && SymCryptEckeyHasPrivateKey(keyCtx2->key))
         {
             cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx1->key);
             if (cbPrivateKey != SymCryptEckeySizeofPrivateKey(keyCtx2->key))
@@ -642,21 +864,11 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
                 goto cleanup;
             }
         }
-
-        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+        // Private key comparison, but one key doesn't have a private key
+        else
         {
-            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx1->key, pointFormat);
-            if (cbPublicKey != SymCryptEckeySizeofPublicKey(keyCtx2->key, pointFormat))
-            {
-                goto cleanup;
-            }
-
-            if ((pbPublicKey1 = OPENSSL_malloc(cbPublicKey)) == NULL ||
-                (pbPublicKey2 = OPENSSL_malloc(cbPublicKey)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ret = FALSE;
+            goto cleanup;
         }
 
         if ((cbPrivateKey | cbPublicKey) == 0)
@@ -732,9 +944,9 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     EC_GROUP *ecGroup = NULL;
     PCSYMCRYPT_ECURVE pCurve;
-    BIGNUM *bnPrivateKey = NULL;
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
+    BIGNUM *bnPrivateKey = NULL;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
     BN_CTX *bnCtx = NULL;
@@ -745,6 +957,23 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0)
     {
         goto cleanup;
+    }
+
+    // Only allow named curves
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_ENCODING)) != NULL)
+    {
+        const char* encoding;
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &encoding))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(encoding, OSSL_PKEY_EC_ENCODING_GROUP) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
     }
 
     ecGroup = EC_GROUP_new_from_params(params, keyCtx->libctx, NULL);
@@ -766,6 +995,22 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
+        }
+
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT)) != NULL)
+        {
+            const char* conversionFormatName;
+            if (!OSSL_PARAM_get_utf8_string_ptr(p, &conversionFormatName))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+
+            if ((keyCtx->conversionFormat = p_scossl_ecc_keymgmt_conversion_name_to_id(conversionFormatName)) == 0)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+                goto cleanup;
+            }
         }
     }
 
@@ -881,11 +1126,9 @@ cleanup:
 static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                                  _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM_BLD *bld = NULL;
     BIGNUM *bnPrivateKey = NULL;
-    PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
@@ -907,6 +1150,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
 
     // Curve is assumed to be a valid named curve if it was loaded by SCOSSL
     if ((curveName = scossl_ecc_get_curve_name(keyCtx->curve)) == NULL ||
+        !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_EC_ENCODING, OSSL_PKEY_EC_ENCODING_GROUP, strlen(OSSL_PKEY_EC_ENCODING_GROUP)) ||
         !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, curveName, strlen(curveName)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -917,43 +1161,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
     {
         if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
         {
-            cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
-            if ((pbPrivateKey = OPENSSL_secure_malloc(cbPrivateKey)) == NULL ||
-                (bnPrivateKey = BN_secure_new()) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-            BN_set_flags(bnPrivateKey, BN_FLG_CONSTTIME);
-        }
-
-        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
-        {
-            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
-            if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-        }
-
-        scError = SymCryptEckeyGetValue(
-            keyCtx->key,
-            pbPrivateKey, cbPrivateKey,
-            pbPublicKey, cbPublicKey,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SYMCRYPT_ECPOINT_FORMAT_XY,
-            0);
-
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            goto cleanup;
-        }
-
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
-        {
-            if (BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivateKey) == NULL ||
+            if (!p_scossl_ecc_keymgmt_get_private_key_bn(keyCtx, &bnPrivateKey, &cbPrivateKey) ||
                 !OSSL_PARAM_BLD_push_BN_pad(bld, OSSL_PKEY_PARAM_PRIV_KEY, bnPrivateKey, cbPrivateKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -961,18 +1169,31 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
             }
         }
 
-        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 &&
-            !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbPublicKey, cbPublicKey))
+        if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
+            if (!p_scossl_ecc_keymgmt_get_encoded_public_key(keyCtx,
+                                                             &pbPublicKey, &cbPublicKey) ||
+                !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbPublicKey, cbPublicKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
         }
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)
     {
-        if (!OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, keyCtx->includePublic) ||
-            (!keyCtx->isX25519 && !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 0)))
+        const char* conversionFormatName;
+
+        if ((conversionFormatName = p_scossl_ecc_keymgmt_conversion_id_to_name(keyCtx->conversionFormat)) == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_IN_ERROR_STATE);
+            goto cleanup;
+        }
+
+        if (!OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 0) ||
+            !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, keyCtx->includePublic) ||
+            !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT, conversionFormatName, strlen(conversionFormatName)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -990,7 +1211,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
 cleanup:
     OSSL_PARAM_BLD_free(bld);
     OSSL_PARAM_free(params);
-    OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
+    BN_clear_free(bnPrivateKey);
     OPENSSL_free(pbPublicKey);
 
     return ret;
@@ -1204,6 +1425,7 @@ const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_settable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_ecc_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_ecc_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_ecc_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_ecc_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_ecc_keymgmt_impexp_types},
@@ -1226,12 +1448,254 @@ const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_ecc_keymgmt_settable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_ecc_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_ecc_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_ecc_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_x25519_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_x25519_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_x25519_keymgmt_import},
     {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))p_scossl_x25519_keymgmt_export},
     {0, NULL}};
+
+//
+// Helpers
+//
+
+// Gets the public key as an encoded octet string
+// For x25519, the encoding rules defined in RFC 7748 are used
+// Otherwise, the encoding rules defined in SECG SEC 1 are used, according to the conversion format of keyCtx
+_Use_decl_annotations_
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_encoded_public_key(SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                                 PBYTE *ppbEncodedKey, SIZE_T *pcbEncodedKey)
+{
+    SYMCRYPT_NUMBER_FORMAT numFormat;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat;
+    PBYTE pbPublicKey, pbPublicKeyStart;
+    SIZE_T cbPublicKey;
+    SYMCRYPT_ERROR scError;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (!keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
+    if (keyCtx->isX25519)
+    {
+        numFormat = SYMCRYPT_NUMBER_FORMAT_LSB_FIRST;
+        pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
+    }
+    else
+    {
+        numFormat = SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+        pointFormat = SYMCRYPT_ECPOINT_FORMAT_XY;
+
+        // Allocate one extra byte for point compression type
+        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + 1;
+    }
+
+    if ((pbPublicKeyStart = OPENSSL_malloc(cbPublicKey)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    pbPublicKey = pbPublicKeyStart;
+
+    if (!keyCtx->isX25519)
+    {
+        pbPublicKey++;
+        cbPublicKey--;
+    }
+
+    scError = SymCryptEckeyGetValue(
+            keyCtx->key,
+            NULL, 0,
+            pbPublicKey, cbPublicKey,
+            numFormat,
+            pointFormat,
+            0);
+
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if (!keyCtx->isX25519)
+    {
+        pbPublicKeyStart[0] = keyCtx->conversionFormat;
+
+        // There are three possible point conversion formats based on SECG SEC 1 2.3.3:
+        // - COMPRESSED: The point is encoded as z||x, where z is 2 if y is even, and 3 if y is odd
+        // - UNCOMPRESSED: The point is encoded as 0x04||x||y
+        // - HYBRID: The point is encoded as z||x||y, where z is 6 if y is even, and 7 if y is odd
+        // Note that the z value for COMPRESSED and HYBRID is only the values above for prime finite
+        // fields.  SymCrypt only supports named, prime finite field curves.
+        if (keyCtx->conversionFormat != POINT_CONVERSION_UNCOMPRESSED)
+        {
+            if (pbPublicKey[cbPublicKey-1] & 1)
+            {
+                pbPublicKeyStart[0]++;
+            }
+
+            if (keyCtx->conversionFormat == POINT_CONVERSION_COMPRESSED)
+            {
+                // We only need the X coordinate, so copy that and the format byte for return.
+                // Copy to pbPublicKey in case OPENSSL_memdup fails so we still free the original buffer
+                if ((pbPublicKey = OPENSSL_memdup(pbPublicKeyStart, (cbPublicKey/2) + 1)) == NULL)
+                {
+                    ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                    goto cleanup;
+                }
+                OPENSSL_free(pbPublicKeyStart);
+                pbPublicKeyStart = pbPublicKey;
+            }
+        }
+
+        cbPublicKey++;
+    }
+
+    *ppbEncodedKey = pbPublicKeyStart;
+    *pcbEncodedKey = cbPublicKey;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (!ret)
+    {
+        OPENSSL_free(pbPublicKeyStart);
+    }
+
+    return ret;
+}
+
+_Use_decl_annotations_
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key(SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                          PBYTE *ppbPrivateKey, SIZE_T *pcbPrivateKey)
+{
+    PBYTE  pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
+    SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_ERROR scError;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
+    if ((pbPrivateKey = OPENSSL_secure_malloc(cbPrivateKey)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    scError = SymCryptEckeyGetValue(
+        keyCtx->key,
+        pbPrivateKey, cbPrivateKey,
+        NULL, 0,
+        numFormat,
+        pointFormat,
+        0);
+
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if (keyCtx->isX25519)
+    {
+        pbPrivateKey[0] = (keyCtx->modifiedPrivateBits & 0x07) | (pbPrivateKey[0] & 0xf8);
+        pbPrivateKey[cbPrivateKey-1] = (keyCtx->modifiedPrivateBits & 0xc0) | (pbPrivateKey[cbPrivateKey-1] & 0x3f);
+    }
+
+    *ppbPrivateKey = pbPrivateKey;
+    *pcbPrivateKey = cbPrivateKey;
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (!ret)
+    {
+        OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
+    }
+
+    return ret;
+}
+
+// General ECC case exports private key as a BIGNUM, while x25519 exports as an octet string
+_Use_decl_annotations_
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key_bn(SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                             BIGNUM **pbnPrivateKey, SIZE_T *pcbPrivateKey)
+{
+    PBYTE  pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
+    BIGNUM *bnPrivateKey = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (!p_scossl_ecc_keymgmt_get_private_key(keyCtx, &pbPrivateKey, &cbPrivateKey))
+    {
+        goto cleanup;
+    }
+
+    if ((bnPrivateKey = BN_secure_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    BN_set_flags(bnPrivateKey, BN_FLG_CONSTTIME);
+
+    if((BN_bin2bn(pbPrivateKey, cbPrivateKey, bnPrivateKey)) == NULL)
+    {
+        goto cleanup;
+    }
+
+    *pbnPrivateKey = bnPrivateKey;
+
+    if (pcbPrivateKey != NULL)
+    {
+        *pcbPrivateKey = cbPrivateKey;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (!ret)
+    {
+        BN_clear_free(bnPrivateKey);
+    }
+    OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
+
+    return ret;
+}
+
+_Use_decl_annotations_
+static const char* p_scossl_ecc_keymgmt_conversion_id_to_name(point_conversion_form_t conversionFormat)
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_ecc_keymgmt_conversion_formats) / sizeof(OSSL_ITEM); i++)
+    {
+        if (p_scossl_ecc_keymgmt_conversion_formats[i].id == conversionFormat)
+        {
+            return p_scossl_ecc_keymgmt_conversion_formats[i].ptr;
+        }
+    }
+
+    return NULL;
+}
+
+_Use_decl_annotations_
+static point_conversion_form_t p_scossl_ecc_keymgmt_conversion_name_to_id(const char* conversionFormatName)
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_ecc_keymgmt_conversion_formats) / sizeof(OSSL_ITEM); i++)
+    {
+        if (OPENSSL_strcasecmp(p_scossl_ecc_keymgmt_conversion_formats[i].ptr, conversionFormatName) == 0)
+        {
+            return p_scossl_ecc_keymgmt_conversion_formats[i].id;
+        }
+    }
+
+    return 0;
+}
 
 #ifdef __cplusplus
 }

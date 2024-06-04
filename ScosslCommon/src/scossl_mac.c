@@ -145,10 +145,8 @@ void scossl_mac_freectx(SCOSSL_MAC_CTX *ctx)
 
 // HMAC
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
+SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
 {
-    int type = EVP_MD_type(md);
-
     if (ctx->macState != NULL)
     {
         SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->macState, OPENSSL_clear_free, ctx->pMac->stateSize);
@@ -161,7 +159,7 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
         ctx->expandedKey = NULL;
     }
 
-    switch (type)
+    switch (mdNid)
     {
     case NID_sha1:
         ctx->pMac = SymCryptHmacSha1Algorithm;
@@ -193,7 +191,7 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, const EVP_MD *md)
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SCOSSL does not support hash algorithm for MAC %d", type);
+                         "SCOSSL does not support hash algorithm for MAC %d", mdNid);
         return SCOSSL_FAILURE;
     }
 

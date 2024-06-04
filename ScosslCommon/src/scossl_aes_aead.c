@@ -12,18 +12,21 @@ extern "C" {
  * AES-GCM Common Functions
  */
 _Use_decl_annotations_
-void scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, const unsigned char *iv)
+SCOSSL_STATUS scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, const unsigned char *iv)
 {
-    ctx->ivlen = SCOSSL_GCM_IV_LENGTH;
-    if (iv)
-    {
-        memcpy(ctx->iv, iv, ctx->ivlen);
-    }
     ctx->operationInProgress = 0;
     ctx->taglen = SCOSSL_GCM_MAX_TAG_LENGTH;
     ctx->tlsAadSet = 0;
     ctx->ivInvocation = 0;
     ctx->useInvocation = 0;
+    ctx->ivlen = SCOSSL_GCM_DEFAULT_IV_LENGTH;
+
+    if (iv != NULL && (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_
@@ -34,18 +37,17 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     ctx->operationInProgress = 0;
-    if (iv)
+    if (iv != NULL)
     {
-        if (ivlen != SCOSSL_GCM_IV_LENGTH)
+        if (!scossl_aes_gcm_set_iv_len(ctx, ivlen) ||
+            (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "SCOSSL only supports %d byte IV for AES-GCM", SCOSSL_GCM_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         ctx->ivlen = ivlen;
-        memcpy(ctx->iv, iv, ivlen);
     }
-    if (key)
+    if (key != NULL)
     {
         scError = SymCryptGcmExpandKey(&ctx->key, SymCryptAesBlockCipher, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
@@ -152,6 +154,13 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
+    if (ctx->iv == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "IV must be set before calling cipher");
+        return SCOSSL_FAILURE;
+    }
+
     if (ctx->tlsAadSet)
     {
         return scossl_aes_gcm_tls(ctx, encrypt, out, outl, in, inl);
@@ -245,6 +254,15 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(SCOSSL_CIPHER_GCM_CTX *ctx,
     {
         return SCOSSL_FAILURE;
     }
+
+    if (ctx->iv == NULL &&
+        (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
+                         "Failed to allocate IV");
+        return SCOSSL_FAILURE;
+    }
+
     // Place invocation field into IV
     SYMCRYPT_STORE_MSBFIRST64(ctx->iv + ctx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN, ctx->ivInvocation);
     if (outsize == 0 || outsize > ctx->ivlen)
@@ -260,6 +278,27 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(SCOSSL_CIPHER_GCM_CTX *ctx,
 }
 
 _Use_decl_annotations_
+SCOSSL_STATUS scossl_aes_gcm_set_iv_len(SCOSSL_CIPHER_GCM_CTX *ctx, size_t ivlen)
+{
+    if (ivlen < SCOSSL_GCM_MIN_IV_LENGTH)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "GCM IV length must be at least 1 byte");
+        return SCOSSL_FAILURE;
+    }
+
+    ctx->ivlen = ivlen;
+
+    if (ctx->iv != NULL)
+    {
+        OPENSSL_free(ctx->iv);
+        ctx->iv = NULL;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+_Use_decl_annotations_
 SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
                                           unsigned char *iv, size_t ivlen)
 {
@@ -269,6 +308,15 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encr
                          "set_iv_fixed only works with TLS IV length");
         return SCOSSL_FAILURE;
     }
+
+    if (ctx->iv == NULL &&
+        (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
+                         "Failed to allocate IV");
+        return SCOSSL_FAILURE;
+    }
+
     if (ivlen == (size_t)-1)
     {
         // Set entire initial IV
@@ -310,6 +358,15 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encryp
     {
         return SCOSSL_FAILURE;
     }
+
+    if (ctx->iv == NULL &&
+        (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
+                         "Failed to allocate IV");
+        return SCOSSL_FAILURE;
+    }
+
     // Place provided invocation field into IV
     memcpy(ctx->iv + ctx->ivlen - ivlen, iv, ivlen);
     // Initialize our invocation counter from the IV

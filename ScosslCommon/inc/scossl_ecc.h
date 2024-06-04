@@ -19,6 +19,7 @@ void scossl_ecc_destroy_ecc_curves();
 PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(_In_ const EC_GROUP *group);
 PCSYMCRYPT_ECURVE scossl_ecc_get_x25519_curve();
 EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(_In_ PCSYMCRYPT_ECURVE pCurve);
+int scossl_ecc_get_curve_security_bits(_In_ PCSYMCRYPT_ECURVE curve);
 
 const char *scossl_ecc_get_curve_name(_In_ PCSYMCRYPT_ECURVE curve);
 SCOSSL_STATUS scossl_ec_point_to_pubkey(_In_ const EC_POINT* ecPoint, _In_ const EC_GROUP *ecGroup, _In_ BN_CTX* bnCtx,
