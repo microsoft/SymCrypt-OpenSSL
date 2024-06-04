@@ -19,6 +19,9 @@ extern "C" {
 #define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
 #define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
+
+// Cap configured file size at 2GB
+#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2 << 30)
 #endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
@@ -399,6 +402,7 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             // Convert file size to off_t in bytes.
             // This is the same behavior as atol but also handles MB, KB, and GB suffixes.
             off_t maxFileSizeBytes = 0;
+            off_t maxFileSizeBytesTmp = 0;
             int i = 0;
 
             while ('0' <= confMaxFileSize[i] && confMaxFileSize[i] <= '9')
@@ -410,6 +414,8 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             if (confMaxFileSize[i] != '\0' &&
                 (confMaxFileSize[i + 1] == 'B' || confMaxFileSize[i + 1] == 'b'))
             {
+                maxFileSizeBytesTmp = maxFileSizeBytes;
+
                 switch (confMaxFileSize[i])
                 {
                 case 'K':
@@ -424,6 +430,12 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                 case 'g':
                     maxFileSizeBytes <<= 30;
                     break;
+                }
+
+                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE in case of overflow
+                if (maxFileSizeBytes < maxFileSizeBytesTmp)
+                {
+                    maxFileSizeBytes = SCOSSL_MAX_CONFIGURABLE_FILE_SIZE;
                 }
             }
 

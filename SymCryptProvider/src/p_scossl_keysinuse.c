@@ -381,7 +381,7 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
                     sk_SCOSSL_PROV_KEYSINUSE_INFO_push(sk_keysinuse_info, keysinuseInfo);
 
                     // First use of this key, wake the logging thread
-                    if (keysinuseInfo->lastLogTime == 0)
+                    if (keysinuseInfo->firstLogTime == 0)
                     {
                         wakeLoggingThread = TRUE;
                     }
@@ -411,7 +411,7 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
             {
                 p_scossl_keysinuse_log_error("Failed to signal logging thread,SYS_%d", pthreadErr);
             }
-           pthread_mutex_unlock(&logging_thread_mutex);
+            pthread_mutex_unlock(&logging_thread_mutex);
         }
         else
         {
@@ -670,6 +670,10 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
                 // attempting to wait again.
                 if (first_use_pending)
                 {
+                    // Another thread may add an event to the stack and set this to TRUE again
+                    // after the logging thread exits this critical seciton. In that case, the
+                    // event will be handled in this iteration, and the next loop will be a no-op.
+                    first_use_pending = FALSE;
                     waitStatus = 0;
                 }
 
@@ -713,8 +717,6 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
         if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
         {
-            first_use_pending = FALSE;
-
             while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
             {
                 pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info);
@@ -737,8 +739,8 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             {
                 now = time(NULL);
 
-                pKeysinuseInfo->lastLogTime = pKeysinuseInfo->logTime == 0 ? now : pKeysinuseInfo->lastLogTime;
-                pKeysinuseInfo->logTime = now;
+                pKeysinuseInfo->firstLogTime = pKeysinuseInfo->lastLogTime == 0 ? now : pKeysinuseInfo->firstLogTime;
+                pKeysinuseInfo->lastLogTime = now;
                 pKeysinuseInfo->logPending = FALSE;
 
                 keysinuseInfoTmp = *pKeysinuseInfo;
@@ -762,8 +764,8 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
                    keysinuseInfoTmp.keyIdentifier,
                    keysinuseInfoTmp.signCounter,
                    keysinuseInfoTmp.decryptCounter,
-                   keysinuseInfoTmp.lastLogTime,
-                   keysinuseInfoTmp.logTime);
+                   keysinuseInfoTmp.firstLogTime,
+                   keysinuseInfoTmp.lastLogTime);
             }
         }
     }

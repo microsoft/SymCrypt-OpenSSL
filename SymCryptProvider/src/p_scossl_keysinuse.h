@@ -14,8 +14,8 @@ extern "C" {
 // with the key context in the key management interface.
 typedef struct
 {
+    time_t firstLogTime;
     time_t lastLogTime;
-    time_t logTime;
     UINT32 signCounter;
     UINT32 decryptCounter;
     // The first 32 bytes of the SHA256 hash of the encoded public key.
