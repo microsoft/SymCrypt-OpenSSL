@@ -196,6 +196,14 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 
         ctx->keyCtx = keyCtx;
         ctx->padding = keyCtx->padding;
+
+#ifdef KEYSINUSE_ENABLED
+        if (p_scossl_keysinuse_running() &&
+            operation == EVP_PKEY_OP_SIGN)
+        {
+            p_scossl_rsa_init_keysinuse(keyCtx);
+        }
+#endif
     }
 
     return p_scossl_rsa_set_ctx_params(ctx, params);
@@ -217,35 +225,54 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
     }
 
+    if (ctx->operation != EVP_PKEY_OP_SIGN)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
     if (sig != NULL && sigsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
+        goto err;
     }
 
     if (ctx->mdInfo == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-        return SCOSSL_FAILURE;
+        goto err;
     }
 
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        break;
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        ret = scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        break;
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
+        goto err;
     }
 
-    return SCOSSL_FAILURE;
+#ifdef KEYSINUSE_ENABLED
+    if (ret && sig != NULL)
+    {
+        p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
+    }
+#endif
+
+err:
+    return ret;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
@@ -255,6 +282,12 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_VERIFY)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 

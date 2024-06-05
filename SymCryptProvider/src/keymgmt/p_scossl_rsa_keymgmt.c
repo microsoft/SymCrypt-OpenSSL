@@ -80,13 +80,16 @@ static const OSSL_PARAM p_scossl_rsa_keymgmt_impexp_param_types[] = {
 // first, then passes that reference to keymgmt_import. Since
 // the size of the SYMPCRYPT_RSAKEY depends on parameters that aren't
 // known until import, no key is actually allocated here.
-static SCOSSL_PROV_RSA_KEY_CTX  *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
+static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *provctx)
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx != NULL)
     {
         keyCtx->padding = RSA_PKCS1_PADDING;
         keyCtx->keyType = EVP_PKEY_RSA;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif        
     }
     return keyCtx;
 }
@@ -98,6 +101,10 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
     {
         keyCtx->libctx = provctx->libctx;
         keyCtx->padding = RSA_PKCS1_PSS_PADDING;
+        keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
+#ifdef KEYSINUSE_ENABLED
+        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+#endif
         keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
     }
     return keyCtx;
@@ -112,6 +119,10 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
     {
         SymCryptRsakeyFree(keyCtx->key);
     }
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_rsa_reset_keysinuse(keyCtx);
+    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
+#endif
     OPENSSL_free(keyCtx->pssRestrictions);
     OPENSSL_free(keyCtx);
 }
@@ -240,7 +251,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
                                               (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0))
         {
             p_scossl_rsa_keymgmt_free_ctx(copyCtx);
-            copyCtx = NULL;
+            return NULL;
         }
     }
 
@@ -250,8 +261,18 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         p_scossl_rsa_keymgmt_free_ctx(copyCtx);
-        copyCtx = NULL;
+        return NULL;
     }
+
+#ifdef KEYSINUSE_ENABLED
+    copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+
+    if (keyCtx->keysinuseInfo != NULL &&
+        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+    {
+        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
+    }
+#endif
 
     return copyCtx;
 }
@@ -419,6 +440,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     keyCtx->padding = genCtx->padding;
     keyCtx->pssRestrictions = genCtx->pssRestrictions;
     genCtx->pssRestrictions = NULL;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+#endif
 
 cleanup:
     if (keyCtx != NULL && !keyCtx->initialized)
@@ -909,7 +933,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *
     return p_scossl_rsa_keymgmt_gettable_param_types;
 }
 
-static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection)
+static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
     BOOL ret = TRUE;
     if (keyCtx->key == NULL)
@@ -923,7 +947,7 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int 
     return ret;
 }
 
-static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx2,
+static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
     BOOL ret = FALSE;
@@ -1032,7 +1056,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_impexp_types(int selection){
         NULL;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     BOOL include_private = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     const OSSL_PARAM *p;
@@ -1135,6 +1159,16 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             goto cleanup;
         }
 
+        if (keyCtx->key != NULL)
+        {
+            SymCryptRsakeyFree(keyCtx->key);
+        }
+
+#ifdef KEYSINUSE_ENABLED
+        // Reset keysinuse in case new key material is overwriting existing
+        p_scossl_rsa_reset_keysinuse(keyCtx);
+#endif
+
         symcryptRsaParam.version = 1;
         symcryptRsaParam.nBitsOfModulus = cbModulus * 8;
         symcryptRsaParam.nPrimes = nPrimes;
@@ -1170,6 +1204,9 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     }
 
     keyCtx->initialized = TRUE;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = TRUE;
+#endif
 
     ret = SCOSSL_SUCCESS;
 
@@ -1182,7 +1219,7 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX  *keyCtx, int selection,
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection,
                                                  _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;

@@ -4,8 +4,10 @@
 
 // Common functions for rsa sign and rsa asym cipher interfaces
 
+#include "scossl_rsa.h"
 #include "p_scossl_rsa.h"
 
+#include <openssl/asn1t.h>
 #include <openssl/core_names.h>
 #include <openssl/evp.h>
 #include <openssl/param_build.h>
@@ -176,7 +178,86 @@ void p_scossl_rsa_pss_restrictions_get_defaults(SCOSSL_RSA_PSS_RESTRICTIONS* pss
         pssRestrictions->mgf1MdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
         pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN;
     }
+}  
+  
+#ifdef KEYSINUSE_ENABLED
+// KeyInUse requires the public key encoded in the same format as subjectPublicKey in a certificate.
+// This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.
+ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
+    ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, n, BIGNUM),
+    ASN1_SIMPLE(SCOSSL_RSA_EXPORT_PARAMS, e, BIGNUM),
+} ASN1_SEQUENCE_END_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
+
+// Generates i2d_SymcryptRsaPublicKey
+IMPLEMENT_ASN1_FUNCTIONS_name(SCOSSL_RSA_EXPORT_PARAMS, SymcryptRsaPublicKey)
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
+                                                  PBYTE *ppbEncodedKey, SIZE_T *pcbEncodedKey)
+{
+    SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
+    PBYTE pbEncodedKey = NULL;
+    int cbEncodedKey;
+    SCOSSL_STATUS  ret = SCOSSL_FAILURE;
+
+    rsaParams = scossl_rsa_new_export_params(FALSE);
+    if (rsaParams == NULL ||
+        !scossl_rsa_export_key(key, rsaParams))
+    {
+        goto cleanup;
+    }
+
+    if ((cbEncodedKey = i2d_SymcryptRsaPublicKey(rsaParams, &pbEncodedKey)) < 0)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    *ppbEncodedKey = pbEncodedKey;
+    *pcbEncodedKey = (SIZE_T) cbEncodedKey;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    scossl_rsa_free_export_params(rsaParams, TRUE);
+
+    return ret;
 }
+
+_Use_decl_annotations_
+void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
+{
+    if (keyCtx->isImported &&
+        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    {
+        if (keyCtx->keysinuseInfo == NULL)
+        {
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
+            {
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+
+            OPENSSL_free(pbPublicKey);
+            CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+        }
+    }
+}
+
+_Use_decl_annotations_
+void p_scossl_rsa_reset_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
+{
+    if (keyCtx->keysinuseLock != NULL &&
+        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    {
+        p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
+        keyCtx->keysinuseInfo = NULL;
+        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+    }
+}
+
+#endif
 
 #ifdef __cplusplus
 }

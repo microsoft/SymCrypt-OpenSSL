@@ -7,3 +7,9 @@
 [symcrypt_prov_sect]
 activate = 1
 identity = symcryptprovider
+keysinuse = keysinuse_sect
+
+[keysinuse_sect]
+enabled = 1
+max_file_size = 5KB
+logging_delay_seconds = 3600

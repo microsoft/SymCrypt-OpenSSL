@@ -3,8 +3,8 @@
 //
 
 #include "scossl_rsa.h"
-#include "p_scossl_base.h"
 #include "p_scossl_rsa.h"
+#include "p_scossl_base.h"
 
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
@@ -21,6 +21,7 @@ typedef struct
 
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
     UINT padding;
+    int operation;
 
     // OAEP Parameters
     const OSSL_ITEM *oaepMdInfo;
@@ -82,9 +83,11 @@ static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPH
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
-                                              _In_ const OSSL_PARAM params[])
+                                              _In_ const OSSL_PARAM params[], int operation)
 {
-    if (keyCtx == NULL)
+    if (ctx == NULL ||
+        (keyCtx == NULL && ctx->keyCtx == NULL) ||
+        !keyCtx->initialized)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
@@ -96,10 +99,45 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
-    ctx->keyCtx = keyCtx;
     ctx->padding = RSA_PKCS1_PADDING;
+    ctx->operation = operation;
+
+    if (keyCtx != NULL)
+    {
+        ctx->keyCtx = keyCtx;
+#ifdef KEYSINUSE_ENABLED
+        if (p_scossl_keysinuse_running() &&
+            operation == EVP_PKEY_OP_DECRYPT &&
+            keyCtx->isImported &&
+            keyCtx->keysinuseInfo == NULL)
+        {
+            PBYTE pbPublicKey;
+            SIZE_T cbPublicKey;
+
+            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
+            {
+                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
+            }
+
+            OPENSSL_free(pbPublicKey);
+        }
+#endif
+    }
 
     return p_scossl_rsa_cipher_set_ctx_params(ctx, params);
+}
+
+
+static SCOSSL_STATUS p_scossl_rsa_encrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
+                                               _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_rsa_cipher_init(ctx, keyCtx, params, EVP_PKEY_OP_ENCRYPT);
+}
+
+static SCOSSL_STATUS p_scossl_rsa_decrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
+                                               _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_rsa_cipher_init(ctx, keyCtx, params, EVP_PKEY_OP_DECRYPT);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
@@ -113,6 +151,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_ENCRYPT)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -156,6 +200,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
+    if (ctx->operation != EVP_PKEY_OP_DECRYPT)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
     // Default to SHA1 for OAEP. Update md in context so this is
     // reflected in getparam
     if (ctx->padding == RSA_PKCS1_OAEP_PADDING)
@@ -178,6 +228,13 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
                              in, inlen,
                              out, &cbResult, outsize);
     *outlen = ret ? (SIZE_T)cbResult : 0;
+
+#ifdef KEYSINUSE_ENABLED
+    if (out != NULL)
+    {
+        p_scossl_keysinuse_on_decrypt(ctx->keyCtx->keysinuseInfo);
+    }
+#endif
 
     if (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING)
     {
@@ -380,7 +437,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
     return SCOSSL_SUCCESS;
 }
 
-const OSSL_PARAM *p_scossl_rsa_cipher_settable_ctx_params(ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_rsa_cipher_settable_ctx_params(ossl_unused void *provctx)
 {
     return p_scossl_rsa_cipher_settable_ctx_param_types;
 }
@@ -389,9 +446,9 @@ const OSSL_DISPATCH p_scossl_rsa_cipher_functions[] = {
     {OSSL_FUNC_ASYM_CIPHER_NEWCTX, (void (*)(void))p_scossl_rsa_cipher_newctx},
     {OSSL_FUNC_ASYM_CIPHER_DUPCTX, (void (*)(void))p_scossl_rsa_cipher_dupctx},
     {OSSL_FUNC_ASYM_CIPHER_FREECTX, (void (*)(void))p_scossl_rsa_cipher_freectx},
-    {OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT, (void (*)(void))p_scossl_rsa_cipher_init},
+    {OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT, (void (*)(void))p_scossl_rsa_encrypt_init},
     {OSSL_FUNC_ASYM_CIPHER_ENCRYPT, (void (*)(void))p_scossl_rsa_cipher_encrypt},
-    {OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT, (void (*)(void))p_scossl_rsa_cipher_init},
+    {OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT, (void (*)(void))p_scossl_rsa_decrypt_init},
     {OSSL_FUNC_ASYM_CIPHER_DECRYPT, (void (*)(void))p_scossl_rsa_cipher_decrypt},
     {OSSL_FUNC_ASYM_CIPHER_GET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_cipher_get_ctx_params},
     {OSSL_FUNC_ASYM_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_cipher_gettable_ctx_params},

@@ -3,6 +3,9 @@
 //
 
 #include "scossl_helpers.h"
+#ifdef KEYSINUSE_ENABLED
+#include "p_scossl_keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,6 +26,12 @@ typedef struct
     UINT padding;
     UINT keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
+
+#ifdef KEYSINUSE_ENABLED
+    BOOL isImported;
+    CRYPTO_RWLOCK *keysinuseLock;
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+#endif
 } SCOSSL_PROV_RSA_KEY_CTX;
 
 const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx,
@@ -35,7 +44,14 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_from_params(_In_ OSSL_LIB_CTX *libct
 SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions,
                                                       _Inout_ OSSL_PARAM_BLD *bld);
 
-void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);
+void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);  
+
+#ifdef KEYSINUSE_ENABLED
+SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,
+                                                  _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+void p_scossl_rsa_init_keysinuse(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx);
+void p_scossl_rsa_reset_keysinuse(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx);
+#endif
 
 #ifdef __cplusplus
 }

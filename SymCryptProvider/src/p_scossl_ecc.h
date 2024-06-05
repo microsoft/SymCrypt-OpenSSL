@@ -3,10 +3,14 @@
 //
 
 #include "scossl_helpers.h"
+#ifdef KEYSINUSE_ENABLED
+#include "p_scossl_keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 typedef struct {
     OSSL_LIB_CTX *libctx;
     BOOL initialized;
@@ -28,7 +32,23 @@ typedef struct {
     // include the public key.
     int includePublic;
     point_conversion_form_t conversionFormat;
+
+#ifdef KEYSINUSE_ENABLED
+    BOOL isImported;
+    CRYPTO_RWLOCK *keysinuseLock;
+    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+#endif
 } SCOSSL_ECC_KEY_CTX;
+
+// Helper function for retrieving the properly formatted encoded public key.
+// The format differs for x25519 keys. Caller is responsible for freeing *ppbEncodedKey.
+SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
+                                                  _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+
+#ifdef KEYSINUSE_ENABLED
+void p_scossl_ecc_init_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
+void p_scossl_ecc_reset_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
+#endif
 
 #ifdef __cplusplus
 }
