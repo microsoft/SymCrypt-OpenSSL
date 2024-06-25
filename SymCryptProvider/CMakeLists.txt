@@ -24,6 +24,7 @@ set(SCOSSL_SOURCES
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_sshkdf.c
+    ./src/kdf/p_scossl_sskdf.c
     ./src/kdf/p_scossl_tls1prf.c
     ./src/keyexch/p_scossl_dh.c
     ./src/keyexch/p_scossl_ecdh.c
