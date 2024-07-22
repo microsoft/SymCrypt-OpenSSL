@@ -283,6 +283,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
             // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
             SYMCRYPT_UINT32_MAP scErrorMap[1] = {
                 {SYMCRYPT_NO_ERROR, SCOSSL_SUCCESS}};
+            SIZE_T outlPadded;
 
             switch (ctx->tlsVersion)
             {
@@ -296,7 +297,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
                 *outl -= SYMCRYPT_AES_BLOCK_SIZE;
                 __attribute__ ((fallthrough));
             case TLS1_VERSION:
-                SIZE_T outlPadded = *outl;
+                outlPadded = *outl;
 
                 if (ctx->tlsMacSize > *outl)
                 {
