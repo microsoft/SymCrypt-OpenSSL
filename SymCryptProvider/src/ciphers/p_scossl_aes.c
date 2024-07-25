@@ -296,24 +296,26 @@ static SCOSSL_STATUS p_scossl_aes_generic_update(_Inout_ SCOSSL_AES_CTX *ctx,
                 *outl -= SYMCRYPT_AES_BLOCK_SIZE;
                 __attribute__ ((fallthrough));
             case TLS1_VERSION:
-                SIZE_T outlPadded = *outl;
-
-                if (ctx->tlsMacSize > *outl)
                 {
-                    ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-                    return SCOSSL_FAILURE;
-                }
-                scError = SymCryptPaddingPkcs7Remove(
-                    SYMCRYPT_AES_BLOCK_SIZE,
-                    out, *outl,
-                    out, *outl,
-                    outl);
+                    SIZE_T outlPadded = *outl;
 
-                return p_scossl_aes_copy_mac(ctx,
-                                             out, outl,
-                                             outlPadded,
-                                             SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1));
-                break;
+                    if (ctx->tlsMacSize > *outl)
+                    {
+                        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+                        return SCOSSL_FAILURE;
+                    }
+                    scError = SymCryptPaddingPkcs7Remove(
+                        SYMCRYPT_AES_BLOCK_SIZE,
+                        out, *outl,
+                        out, *outl,
+                        outl);
+
+                    return p_scossl_aes_copy_mac(ctx,
+                                                out, outl,
+                                                outlPadded,
+                                                SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1));
+                    break;
+                }
             default:
                 ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
                 return SCOSSL_FAILURE;
