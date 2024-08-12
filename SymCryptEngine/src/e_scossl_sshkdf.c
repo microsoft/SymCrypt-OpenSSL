@@ -89,7 +89,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
         case EVP_KDF_CTRL_SET_MD:
             md = va_arg(args, EVP_MD*);
 
-            impl->pHash = e_scossl_get_symcrypt_hash_algorithm(EVP_MD_type(md));
+            impl->pHash = e_scossl_get_symcrypt_hash_algorithm(md);
 
             if(!impl->pHash) {
                 ret = SCOSSL_FAILURE;
