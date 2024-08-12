@@ -214,7 +214,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
     else if (ctx->pHash != NULL)
     {
         scError = SymCryptSskdfHash(
-            ctx->pHash,
+            ctx->pHash, 0,
             ctx->pbSecret, ctx->cbSecret,
             ctx->pbInfo, ctx->cbInfo,
             key, keylen);
