@@ -55,6 +55,13 @@ if (KEYSINUSE_ENABLED)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKEYSINUSE_ENABLED")
 endif()
 
+if (MLKEM_ENABLED)
+    list(APPEND SCOSSL_SOURCES ./src/kem/p_scossl_mlkem.c)
+    list(APPEND SCOSSL_SOURCES ./src/keymgmt/p_scossl_mlkem_keymgmt.c)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMLKEM_ENABLED")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMLKEM_ENABLED")
+endif()
+
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 add_dependencies(scossl_provider scossl_common)
 
