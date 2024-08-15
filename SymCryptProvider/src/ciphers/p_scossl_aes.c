@@ -813,8 +813,9 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ctx, SIZE_T cbShift, PBYTE pbChainingValue,
-                                                      _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ctx, SIZE_T cbShift,
+                                                      _Inout_updates_(SYMCRYPT_AES_BLOCKSIZE) PBYTE pbChainingValue,
+                                                      _Out_writes_bytes_(*outl) unsigned char *out, _Out_opt_ size_t *outl, size_t outsize,
                                                       _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     if (outsize < inl)
@@ -870,6 +871,8 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         // with previous chaining value before continuing.
         cbBufRemaining = SYMCRYPT_MIN(SYMCRYPT_AES_BLOCK_SIZE - ctx->cbBuf, inl);
 
+        // // Save the chaining value for the next call in case inl < cbBufRemaining
+        memcpy(pbChainingValueLast, ctx->pbChainingValue, SYMCRYPT_AES_BLOCK_SIZE);
         memcpy(ctx->buf + ctx->cbBuf, in, cbBufRemaining);
 
         if (p_scossl_aes_cfb_cipher_internal(
@@ -884,7 +887,6 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
 
         memcpy(out, pbPartialBufOut + ctx->cbBuf, cbBufRemaining);
 
-
         // Advance pointers and counters
         out += cbBufRemaining;
         outsize -= cbBufRemaining;
@@ -898,6 +900,10 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
             ctx->cbBuf = 0;
             SymCryptWipeKnownSize(ctx->buf, SYMCRYPT_AES_BLOCK_SIZE);
         }
+        else
+        {
+            memcpy(ctx->pbChainingValue, pbChainingValueLast, SYMCRYPT_AES_BLOCK_SIZE);
+        }
     }
 
     cbInFullBlocks = inl & ~(SYMCRYPT_AES_BLOCK_SIZE-1);
@@ -907,7 +913,7 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     {
         if (ctx->cbBuf != 0)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
             return SCOSSL_FAILURE;
         }
 
@@ -937,11 +943,13 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
             ctx,
             SYMCRYPT_AES_BLOCK_SIZE,
             ctx->pbChainingValue,
-            out, NULL, outsize,
+            pbPartialBufOut, NULL, SYMCRYPT_AES_BLOCK_SIZE,
             ctx->buf, SYMCRYPT_AES_BLOCK_SIZE) != SCOSSL_SUCCESS)
         {
             return SCOSSL_FAILURE;
         }
+
+        memcpy(out, pbPartialBufOut, ctx->cbBuf);
 
         // Since this was a partial block, the next update call will fill the buffer
         // and encrypt/decrypt with the same chaining value

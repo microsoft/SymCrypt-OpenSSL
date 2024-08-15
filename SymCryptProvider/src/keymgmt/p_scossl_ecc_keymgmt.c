@@ -513,7 +513,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_pubkey_point(_In_ SCOSSL_ECC_KEY_C
         if (!OSSL_PARAM_set_BN(paramPubX, bnPubX))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            BN_free(bnPubX);
             goto cleanup;
         }
     }
@@ -529,7 +528,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_pubkey_point(_In_ SCOSSL_ECC_KEY_C
         if (!OSSL_PARAM_set_BN(paramPubY, bnPubY))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            BN_free(bnPubY);
             goto cleanup;
         }
     }
