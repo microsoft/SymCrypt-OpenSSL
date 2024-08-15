@@ -871,7 +871,7 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         // with previous chaining value before continuing.
         cbBufRemaining = SYMCRYPT_MIN(SYMCRYPT_AES_BLOCK_SIZE - ctx->cbBuf, inl);
 
-        // // Save the chaining value for the next call in case inl < cbBufRemaining
+        // Save the chaining value for the next call in case ctx->cbBuf + inl < cbBufRemaining
         memcpy(pbChainingValueLast, ctx->pbChainingValue, SYMCRYPT_AES_BLOCK_SIZE);
         memcpy(ctx->buf + ctx->cbBuf, in, cbBufRemaining);
 
