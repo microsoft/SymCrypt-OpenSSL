@@ -123,7 +123,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,
                                              _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                              _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    if( inl < SYMCRYPT_AES_BLOCK_SIZE )
+    if (inl < SYMCRYPT_AES_BLOCK_SIZE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_INPUT_LENGTH);
         return SCOSSL_FAILURE;

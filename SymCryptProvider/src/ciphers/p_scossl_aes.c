@@ -248,6 +248,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
 
     if (inl == 0)
     {
+        *outl = 0;
         return SCOSSL_SUCCESS;
     }
 
@@ -428,6 +429,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_stream_update(_Inout_ SCOSSL_AES_CTX *
 {
     if (inl == 0)
     {
+        *outl = 0;
         return SCOSSL_SUCCESS;
     }
 
@@ -769,10 +771,7 @@ static SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (outl != NULL)
-    {
-        *outl = inl;
-    }
+    *outl = inl;
 
     if (ctx->encrypt)
     {
@@ -796,10 +795,7 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (outl != NULL)
-    {
-        *outl = inl;
-    }
+    *outl = inl;
 
     if (ctx->encrypt)
     {
@@ -824,10 +820,7 @@ static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ct
         return SCOSSL_FAILURE;
     }
 
-    if (outl != NULL)
-    {
-        *outl = inl;
-    }
+    *outl = inl;
 
     if (ctx->encrypt)
     {
@@ -860,10 +853,7 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     SIZE_T cbInFullBlocks;
     SIZE_T cbInRemaining;
 
-    if (outl != NULL)
-    {
-        *outl = inl;
-    }
+    *outl = inl;
 
     if (ctx->cbBuf > 0)
     {
