@@ -820,7 +820,10 @@ static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ct
         return SCOSSL_FAILURE;
     }
 
-    *outl = inl;
+    if (outl != NULL)
+    {
+        *outl = inl;
+    }
 
     if (ctx->encrypt)
     {
