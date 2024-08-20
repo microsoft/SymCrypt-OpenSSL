@@ -248,7 +248,6 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
 
     if (inl == 0)
     {
-        *outl = 0;
         return SCOSSL_SUCCESS;
     }
 
@@ -762,7 +761,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
 }
 
 static SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
-                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_opt_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     if (outsize < inl)
@@ -771,7 +770,10 @@ static SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    *outl = inl;
+    if (outl != NULL)
+    {
+        *outl = inl;
+    }
 
     if (ctx->encrypt)
     {
@@ -786,7 +788,7 @@ static SCOSSL_STATUS scossl_aes_cbc_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
 }
 
 static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
-                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_opt_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     if (outsize < inl)
@@ -795,7 +797,10 @@ static SCOSSL_STATUS scossl_aes_ecb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    *outl = inl;
+    if (outl != NULL)
+    {
+        *outl = inl;
+    }
 
     if (ctx->encrypt)
     {
@@ -847,7 +852,7 @@ static SCOSSL_STATUS p_scossl_aes_cfb_cipher_internal(_Inout_ SCOSSL_AES_CTX *ct
 // previous call, the remaining space in the buffer is filled and
 // encrypted/decrypted with the previous chaining value before continuing.
 static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
-                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
+                                           _Out_writes_bytes_opt_(*outl) unsigned char *out, _Out_opt_ size_t *outl, size_t outsize,
                                            _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
     BYTE pbPartialBufOut[SYMCRYPT_AES_BLOCK_SIZE];
@@ -856,7 +861,10 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     SIZE_T cbInFullBlocks;
     SIZE_T cbInRemaining;
 
-    *outl = inl;
+    if (outl != NULL)
+    {
+        *outl = inl;
+    }
 
     if (ctx->cbBuf > 0)
     {
