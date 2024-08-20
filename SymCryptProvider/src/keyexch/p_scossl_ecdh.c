@@ -97,24 +97,40 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
                                           _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen,
                                           size_t outlen)
 {
+    PBYTE pbSecret = secret;
+    PBYTE pbSecretBuf = NULL;
+    SIZE_T cbSecretBuf = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SYMCRYPT_NUMBER_FORMAT numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (ctx == NULL || secretlen == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    *secretlen = SymCryptEckeySizeofPublicKey(ctx->keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
+    cbSecretBuf = SymCryptEckeySizeofPublicKey(ctx->keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
     if (secret == NULL)
     {
-        return SCOSSL_SUCCESS;
+        *secretlen = cbSecretBuf;
+        goto cleanup;
+    }
+
+    if (outlen < cbSecretBuf)
+    {
+       if ((pbSecretBuf = OPENSSL_secure_malloc(cbSecretBuf)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbSecret = pbSecretBuf;
     }
 
     scError = SymCryptEcDhSecretAgreement(
@@ -122,15 +138,30 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
         ctx->peerKeyCtx->key,
         numberFormat,
         0,
-        secret,
-        outlen);
+        pbSecret,
+        cbSecretBuf);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    return SCOSSL_SUCCESS;
+    if (outlen < cbSecretBuf)
+    {
+        memcpy(secret, pbSecretBuf, outlen);
+        *secretlen = outlen;
+    }
+    else
+    {
+        *secretlen = cbSecretBuf;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_secure_clear_free(pbSecretBuf, cbSecretBuf);
+
+    return ret;
 }
 
 // This implementation currently does not accept any parameters
