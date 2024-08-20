@@ -9,7 +9,9 @@ extern "C" {
 #endif
 
 typedef struct {
-    BOOL initialized;
+    PSYMCRYPT_MLKEMKEY key;
+    PCSYMCRYPT_MLKEM_PARAMS params;
+    SYMCRYPT_MLKEMKEY_FORMAT format;
 } SCOSSL_MLKEM_KEY_CTX;
 
 #ifdef __cplusplus
