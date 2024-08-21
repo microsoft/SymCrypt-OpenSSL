@@ -252,13 +252,19 @@ static SCOSSL_STATUS p_scossl_dh_plain_derive(_In_ SCOSSL_DH_CTX *ctx,
 
     if (secret != NULL)
     {
+        if (outlen < cbAgreedSecret)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
+
         scError = SymCryptDhSecretAgreement(
             ctx->provKey->keyCtx->dlkey,
             ctx->peerProvKey->keyCtx->dlkey,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0,
             secret,
-            outlen);
+            cbAgreedSecret);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);

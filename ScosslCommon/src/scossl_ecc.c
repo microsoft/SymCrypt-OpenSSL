@@ -515,11 +515,11 @@ cleanup:
 }
 
 // Return the max length of the DER encoded signature
-// 2 * (private key length) + 7 DER encoding header bytes
+// 2 * (private key length) + DER encoding header bytes
 _Use_decl_annotations_
 SIZE_T scossl_ecdsa_size(PCSYMCRYPT_ECURVE curve)
 {
-    return 2*SymCryptEcurveSizeofScalarMultiplier(curve) + 7;
+    return 2*SymCryptEcurveSizeofScalarMultiplier(curve) + 8;
 }
 
 _Use_decl_annotations_
