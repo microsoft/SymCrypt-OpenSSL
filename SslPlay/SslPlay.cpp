@@ -2075,7 +2075,7 @@ end:
 
 
 extern "C" {
-extern EVP_KDF_CTX* scossl_EVP_KDF_CTX_new_id(int id);
+extern EVP_KDF_CTX* e_scossl_EVP_KDF_CTX_new_id(int id);
 }
 
 void TestSshKdf(void)
@@ -2193,7 +2193,7 @@ void TestSshKdf(void)
         {
             PSCOSSL_SSHKDF_TEST_VECTOR ptv = test_vectors[i];
 
-            kdf_ctx = scossl_EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
+            kdf_ctx = e_scossl_EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
 
             if(!kdf_ctx)
             {
