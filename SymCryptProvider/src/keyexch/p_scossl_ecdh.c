@@ -107,19 +107,19 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
     if (ctx == NULL || secretlen == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        goto cleanup;
+        return SCOSSL_FAILURE;
     }
 
     if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-        goto cleanup;
+        return SCOSSL_FAILURE;
     }
 
     cbSecretBuf = SymCryptEckeySizeofPublicKey(ctx->keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
     if (secret == NULL)
     {
         *secretlen = cbSecretBuf;
-        goto cleanup;
+        return SCOSSL_SUCCESS;
     }
 
     if (outlen < cbSecretBuf)
