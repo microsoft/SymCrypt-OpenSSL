@@ -114,7 +114,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const
             "Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
         pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
-        if( !pfn_rsa_meth_priv_dec )
+        if( pfn_rsa_meth_priv_dec )
         {
             ret = pfn_rsa_meth_priv_dec(flen, from, to, rsa, padding);
         }
