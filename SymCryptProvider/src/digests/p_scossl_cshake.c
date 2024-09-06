@@ -67,6 +67,7 @@ typedef struct
 {
     const SCOSSL_CSHAKE_HASH *pHash;
     SCOSSL_CSHAKE_STATE *pState;
+    BOOL updating;
 
     PBYTE pbFunctionNameString;
     SIZE_T cbFunctionNameString;
@@ -80,8 +81,11 @@ static const OSSL_PARAM p_scossl_cshake_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
     OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_FUNCTION_NAME, NULL, 0),
     OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING, NULL, 0),
-    OSSL_PARAM_END
-};
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_cshake_settable_ctx_param_types_updating[] = {
+    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
+    OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
@@ -104,6 +108,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_newctx(const SCOSSL_CSHAKE_HASH *pHash
 
         ctx->pHash = pHash;
         ctx->pState = (SCOSSL_CSHAKE_STATE *)pStateTmp;
+        ctx->updating = FALSE;
         ctx->pbFunctionNameString = NULL;
         ctx->cbFunctionNameString = 0;
         ctx->pbCustomizationString = NULL;
@@ -146,6 +151,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
     if (ctx != NULL)
     {
         copyCtx->pHash = ctx->pHash;
+        copyCtx->updating = ctx->updating;
 
         SCOSSL_COMMON_ALIGNED_ALLOC_EX(
             pStateTmp,
@@ -209,15 +215,7 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    SCOSSL_STATUS ret = p_scossl_cshake_set_ctx_params(ctx, params);
-
-    if (ret == SCOSSL_SUCCESS)
-    {
-        ctx->pHash->initFunc(
-            ctx->pState,
-            ctx->pbFunctionNameString, ctx->cbFunctionNameString,
-            ctx->pbCustomizationString, ctx->cbCustomizationString);
-    }
+    ctx->updating = FALSE;
 
     return p_scossl_cshake_set_ctx_params(ctx, params);
 }
@@ -225,6 +223,18 @@ static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ c
 static SCOSSL_STATUS p_scossl_cshake_update(_Inout_ SCOSSL_CSHAKE_CTX *ctx,
                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
+    // Delay init until first update call in case function name or customization strings
+    // are set by parameters after the init call.
+    if (!ctx->updating)
+    {
+        ctx->pHash->initFunc(
+            ctx->pState,
+            ctx->pbFunctionNameString, ctx->cbFunctionNameString,
+            ctx->pbCustomizationString, ctx->cbCustomizationString);
+
+        ctx->updating = TRUE;
+    }
+
     ctx->pHash->appendFunc(ctx->pState, in, inl);
     return SCOSSL_SUCCESS;
 }
@@ -238,6 +248,7 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOLEA
         return SCOSSL_FAILURE;
     }
 
+    ctx->updating = FALSE;
     ctx->pHash->extractFunc(ctx->pState, out, ctx->xofLen, wipeState);
     *outl = ctx->xofLen;
 
@@ -316,13 +327,25 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
         PCBYTE pbFunctionNameString;
         SIZE_T cbFunctionNameString;
 
+        if (ctx->updating)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_DISABLED);
+            return SCOSSL_FAILURE;
+        }
+
+        OPENSSL_free(ctx->pbFunctionNameString);
+
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbFunctionNameString, &cbFunctionNameString))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((ctx->pbFunctionNameString = OPENSSL_memdup(pbFunctionNameString, cbFunctionNameString)) == NULL)
+        if (cbFunctionNameString == 0)
+        {
+            ctx->pbFunctionNameString = NULL;
+        }
+        else if ((ctx->pbFunctionNameString = OPENSSL_memdup(pbFunctionNameString, cbFunctionNameString)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return SCOSSL_FAILURE;
@@ -336,13 +359,25 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
         PCBYTE pbCustomizationString;
         SIZE_T cbCustomizationString;
 
+        if (ctx->updating)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_DISABLED);
+            return SCOSSL_FAILURE;
+        }
+
+        OPENSSL_free(ctx->pbCustomizationString);
+
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbCustomizationString, &cbCustomizationString))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((ctx->pbCustomizationString = OPENSSL_memdup(pbCustomizationString, cbCustomizationString)) == NULL)
+        if (cbCustomizationString == 0)
+        {
+            ctx->pbCustomizationString = NULL;
+        }
+        else if ((ctx->pbCustomizationString = OPENSSL_memdup(pbCustomizationString, cbCustomizationString)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return SCOSSL_FAILURE;
@@ -361,9 +396,9 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(_In_ SCOSSL_CSHAKE_CTX *ctx, ossl_unused void *provctx)
 {
-    return p_scossl_cshake_settable_ctx_param_types;
+    return ctx->updating ? p_scossl_cshake_settable_ctx_param_types_updating : p_scossl_cshake_settable_ctx_param_types;
 }
 
 const OSSL_DISPATCH p_scossl_cshake_128_functions[] = {

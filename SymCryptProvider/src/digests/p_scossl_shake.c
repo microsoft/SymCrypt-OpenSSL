@@ -13,8 +13,7 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_shake_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
-    OSSL_PARAM_END
-};
+    OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
