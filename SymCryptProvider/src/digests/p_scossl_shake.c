@@ -64,7 +64,8 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)            \
     {                                                                                               \
         return p_scossl_shake_extract(ctx,                                                          \
-            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract, TRUE,                             \
+            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract,                                   \
+            TRUE,                                                                                   \
             out, outl, outlen);                                                                     \
     }                                                                                               \
                                                                                                     \
@@ -73,7 +74,8 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)            \
     {                                                                                               \
         return p_scossl_shake_extract(ctx,                                                          \
-            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract, FALSE,                            \
+            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract,                                   \
+            FALSE,                                                                                  \
             out, outl, outlen);                                                                     \
     }                                                                                               \
                                                                                                     \

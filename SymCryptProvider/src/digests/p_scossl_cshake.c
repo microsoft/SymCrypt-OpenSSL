@@ -50,8 +50,7 @@ static const SCOSSL_CSHAKE_HASH SymCryptCShake128Algorithm = {
     (PSYMCRYPT_HASH_EXTRACT)SymCryptCShake128Extract,
     (PSYMCRYPT_HASH_STATE_COPY_FUNC)SymCryptCShake128StateCopy,
     SYMCRYPT_CSHAKE128_INPUT_BLOCK_SIZE,
-    SYMCRYPT_CSHAKE128_RESULT_SIZE
-};
+    SYMCRYPT_CSHAKE128_RESULT_SIZE};
 
 static const SCOSSL_CSHAKE_HASH SymCryptCShake256Algorithm = {
     SymCryptCShake256,
@@ -60,8 +59,7 @@ static const SCOSSL_CSHAKE_HASH SymCryptCShake256Algorithm = {
     (PSYMCRYPT_HASH_EXTRACT)SymCryptCShake256Extract,
     (PSYMCRYPT_HASH_STATE_COPY_FUNC)SymCryptCShake256StateCopy,
     SYMCRYPT_CSHAKE256_INPUT_BLOCK_SIZE,
-    SYMCRYPT_CSHAKE256_RESULT_SIZE
-};
+    SYMCRYPT_CSHAKE256_RESULT_SIZE};
 
 typedef struct
 {
@@ -92,14 +90,10 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 static SCOSSL_CSHAKE_CTX *p_scossl_cshake_newctx(const SCOSSL_CSHAKE_HASH *pHash)
 {
     SCOSSL_CSHAKE_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_CSHAKE_CTX));
+
     if (ctx != NULL)
     {
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(
-            pStateTmp,
-            OPENSSL_malloc,
-            PVOID,
-            sizeof(SCOSSL_CSHAKE_STATE));
-
+        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, sizeof(SCOSSL_CSHAKE_STATE));
         if (pStateTmp == NULL)
         {
             OPENSSL_free(ctx);
@@ -115,6 +109,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_newctx(const SCOSSL_CSHAKE_HASH *pHash
         ctx->cbCustomizationString = 0;
         ctx->xofLen = pHash->resultSize;
     }
+
     return ctx;
 }
 
@@ -150,15 +145,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
 
     if (ctx != NULL)
     {
-        copyCtx->pHash = ctx->pHash;
-        copyCtx->updating = ctx->updating;
-
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(
-            pStateTmp,
-            OPENSSL_malloc,
-            PVOID,
-            sizeof(SCOSSL_CSHAKE_STATE));
-
+        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, sizeof(SCOSSL_CSHAKE_STATE));
         if (pStateTmp == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -198,6 +185,8 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
         }
         copyCtx->cbCustomizationString = ctx->cbCustomizationString;
 
+        copyCtx->pHash = ctx->pHash;
+        copyCtx->updating = ctx->updating;
         copyCtx->xofLen = ctx->xofLen;
     }
 
@@ -216,6 +205,15 @@ cleanup:
 static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     ctx->updating = FALSE;
+    ctx->xofLen = ctx->pHash->resultSize;
+
+    OPENSSL_free(ctx->pbFunctionNameString);
+    ctx->pbFunctionNameString = NULL;
+    ctx->cbFunctionNameString = 0;
+
+    OPENSSL_free(ctx->pbCustomizationString);
+    ctx->pbCustomizationString = NULL;
+    ctx->pbCustomizationString = 0;
 
     return p_scossl_cshake_set_ctx_params(ctx, params);
 }
@@ -223,8 +221,8 @@ static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ c
 static SCOSSL_STATUS p_scossl_cshake_update(_Inout_ SCOSSL_CSHAKE_CTX *ctx,
                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
-    // Delay init until first update call in case function name or customization strings
-    // are set by parameters after the init call.
+    // Delay init until first update call, in case function name or customization strings
+    // are set by parameter after the init call.
     if (!ctx->updating)
     {
         ctx->pHash->initFunc(
@@ -248,7 +246,6 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOLEA
         return SCOSSL_FAILURE;
     }
 
-    ctx->updating = FALSE;
     ctx->pHash->extractFunc(ctx->pState, out, ctx->xofLen, wipeState);
     *outl = ctx->xofLen;
 
@@ -324,66 +321,38 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME)) != NULL)
     {
-        PCBYTE pbFunctionNameString;
-        SIZE_T cbFunctionNameString;
-
         if (ctx->updating)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_DISABLED);
             return SCOSSL_FAILURE;
         }
 
         OPENSSL_free(ctx->pbFunctionNameString);
+        ctx->pbFunctionNameString = NULL;
 
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbFunctionNameString, &cbFunctionNameString))
+        if (p->data != NULL &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbFunctionNameString, 0, &ctx->cbFunctionNameString))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
-        if (cbFunctionNameString == 0)
-        {
-            ctx->pbFunctionNameString = NULL;
-        }
-        else if ((ctx->pbFunctionNameString = OPENSSL_memdup(pbFunctionNameString, cbFunctionNameString)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return SCOSSL_FAILURE;
-        }
-
-        ctx->cbFunctionNameString = cbFunctionNameString;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING)) != NULL)
     {
-        PCBYTE pbCustomizationString;
-        SIZE_T cbCustomizationString;
-
         if (ctx->updating)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_DISABLED);
             return SCOSSL_FAILURE;
         }
 
         OPENSSL_free(ctx->pbCustomizationString);
+        ctx->pbCustomizationString = NULL;
 
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbCustomizationString, &cbCustomizationString))
+        if (p->data != NULL &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbCustomizationString, 0, &ctx->cbCustomizationString))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
-        if (cbCustomizationString == 0)
-        {
-            ctx->pbCustomizationString = NULL;
-        }
-        else if ((ctx->pbCustomizationString = OPENSSL_memdup(pbCustomizationString, cbCustomizationString)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return SCOSSL_FAILURE;
-        }
-
-        ctx->cbCustomizationString = cbCustomizationString;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&

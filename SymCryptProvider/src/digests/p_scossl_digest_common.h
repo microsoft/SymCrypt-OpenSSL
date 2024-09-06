@@ -34,18 +34,17 @@ SCOSSL_STATUS p_scossl_digest_get_params(_Inout_ OSSL_PARAM params[], size_t siz
 const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_unused void *provctx);
 
 #define SCOSSL_DIGEST_FUNCTIONS_COMMON(alg, dispatch_name, flags)                            \
-    static SCOSSL_DIGEST_CTX *p_scossl_##alg##_newctx(ossl_unused void *prov_ctx)            \
+    static SCOSSL_DIGEST_CTX *p_scossl_##dispatch_name##_newctx(ossl_unused void *prov_ctx)  \
     {                                                                                        \
         SCOSSL_DIGEST_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));                  \
+                                                                                             \
         if (ctx != NULL)                                                                     \
         {                                                                                    \
-            ctx->pHash = SymCrypt##alg##Algorithm;                                           \
             SCOSSL_COMMON_ALIGNED_ALLOC_EX(                                                  \
                 pStateTmp,                                                                   \
                 OPENSSL_malloc,                                                              \
                 PVOID,                                                                       \
                 SymCryptHashStateSize(ctx->pHash));                                          \
-                                                                                             \
             if (pStateTmp == NULL)                                                           \
             {                                                                                \
                 OPENSSL_free(ctx);                                                           \
@@ -53,11 +52,13 @@ const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_un
             }                                                                                \
                                                                                              \
             ctx->pState = pStateTmp;                                                         \
+            ctx->pHash = SymCrypt##alg##Algorithm;                                           \
         }                                                                                    \
+                                                                                             \
         return ctx;                                                                          \
     }                                                                                        \
                                                                                              \
-    static SCOSSL_STATUS p_scossl_##alg##_digest(                                            \
+    static SCOSSL_STATUS p_scossl_##dispatch_name##_digest(                                  \
         ossl_unused void *prov_ctx,                                                          \
         _In_reads_bytes_(inl) const unsigned char *in, size_t inl,                           \
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)     \
@@ -65,22 +66,23 @@ const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_un
         return p_scossl_digest_digest(SymCrypt##alg##Algorithm, in, inl, out, outl, outlen); \
     }                                                                                        \
                                                                                              \
-    static SCOSSL_STATUS p_scossl_##alg##_get_params(_Inout_ OSSL_PARAM params[])            \
+    static SCOSSL_STATUS p_scossl_##dispatch_name##_get_params(_Inout_ OSSL_PARAM params[])  \
     {                                                                                        \
-        return p_scossl_digest_get_params(params,                                            \
+        return p_scossl_digest_get_params(                                                   \
+            params,                                                                          \
             SymCryptHashResultSize(SymCrypt##alg##Algorithm),                                \
             SymCryptHashInputBlockSize(SymCrypt##alg##Algorithm),                            \
             flags);                                                                          \
     }                                                                                        \
                                                                                              \
     const OSSL_DISPATCH p_scossl_##dispatch_name##_functions[] = {                           \
-    {OSSL_FUNC_DIGEST_NEWCTX, (void (*)(void))p_scossl_##alg##_newctx},                      \
+    {OSSL_FUNC_DIGEST_NEWCTX, (void (*)(void))p_scossl_##dispatch_name##_newctx},            \
     {OSSL_FUNC_DIGEST_FREECTX, (void (*)(void))p_scossl_digest_freectx},                     \
     {OSSL_FUNC_DIGEST_DUPCTX, (void (*)(void))p_scossl_digest_dupctx},                       \
-    {OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void))p_scossl_##alg##_get_params},              \
+    {OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void))p_scossl_##dispatch_name##_get_params},    \
     {OSSL_FUNC_DIGEST_GETTABLE_PARAMS, (void (*)(void))p_scossl_digest_gettable_params},     \
     {OSSL_FUNC_DIGEST_UPDATE, (void (*)(void))p_scossl_digest_update},                       \
-    {OSSL_FUNC_DIGEST_DIGEST, (void (*)(void))p_scossl_##alg##_digest},
+    {OSSL_FUNC_DIGEST_DIGEST, (void (*)(void))p_scossl_##dispatch_name##_digest},
 
 #define SCOSSL_DIGEST_FUNCTIONS_END \
     {0, NULL}};

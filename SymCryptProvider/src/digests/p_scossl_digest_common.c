@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-const OSSL_PARAM p_scossl_digest_param_types[] = {
+const OSSL_PARAM p_scossl_digest_gettable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_BLOCK_SIZE, NULL),
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL),
     OSSL_PARAM_int(OSSL_DIGEST_PARAM_XOF, NULL),
@@ -25,7 +25,11 @@ void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->pState, OPENSSL_clear_free, SymCryptHashStateSize(ctx->pHash));
+    if (ctx->pState != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->pState, OPENSSL_clear_free, SymCryptHashStateSize(ctx->pHash));
+    }
+
     OPENSSL_free(ctx);
 }
 
@@ -33,10 +37,10 @@ _Use_decl_annotations_
 SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 {
     SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
+
     if (copyCtx != NULL)
     {
         SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, SymCryptHashStateSize(ctx->pHash));
-
         if (pStateTmp == NULL)
         {
             OPENSSL_free(copyCtx);
@@ -44,8 +48,9 @@ SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
         }
 
         ctx->pHash->stateCopyFunc(ctx->pState, pStateTmp);
-        copyCtx->pHash = ctx->pHash;
         copyCtx->pState = pStateTmp;
+
+        copyCtx->pHash = ctx->pHash;
         copyCtx->xofLen = ctx->xofLen;
     }
 
@@ -90,7 +95,7 @@ SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_
 
 const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
-    return p_scossl_digest_param_types;
+    return p_scossl_digest_gettable_param_types;
 }
 
 _Use_decl_annotations_
