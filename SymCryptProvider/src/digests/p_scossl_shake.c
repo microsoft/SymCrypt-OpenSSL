@@ -11,14 +11,12 @@
 extern "C" {
 #endif
 
-typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_SHAKE_EXTRACT) (PVOID pState, PBYTE pbResult, SIZE_T cbResult, BOOLEAN bWipe);
-
 static const OSSL_PARAM p_scossl_shake_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
     OSSL_PARAM_END
 };
 
-static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ctx, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -46,7 +44,7 @@ static SCOSSL_STATUS p_scossl_shake_init(_Inout_ SCOSSL_DIGEST_CTX *ctx, ossl_un
 }
 
 static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
-                                            PSYMCRYPT_SHAKE_EXTRACT extractFunc, BOOLEAN wipeState,
+                                            PSYMCRYPT_HASH_EXTRACT extractFunc, BOOLEAN wipeState,
                                             _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
     if (outlen < ctx->xofLen)
@@ -67,7 +65,7 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)            \
     {                                                                                               \
         return p_scossl_shake_extract(ctx,                                                          \
-            (PSYMCRYPT_SHAKE_EXTRACT)SymCryptShake##bits##Extract, TRUE,                            \
+            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract, TRUE,                             \
             out, outl, outlen);                                                                     \
     }                                                                                               \
                                                                                                     \
@@ -76,7 +74,7 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)            \
     {                                                                                               \
         return p_scossl_shake_extract(ctx,                                                          \
-            (PSYMCRYPT_SHAKE_EXTRACT)SymCryptShake##bits##Extract, FALSE,                           \
+            (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract, FALSE,                            \
             out, outl, outlen);                                                                     \
     }                                                                                               \
                                                                                                     \

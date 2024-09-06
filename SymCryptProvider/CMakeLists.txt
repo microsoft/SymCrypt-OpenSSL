@@ -24,6 +24,7 @@ set(SCOSSL_SOURCES
     ./src/digests/p_scossl_digest_common.c
     ./src/digests/p_scossl_digest_generic.c
     ./src/digests/p_scossl_shake.c
+    ./src/digests/p_scossl_cshake.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_sshkdf.c

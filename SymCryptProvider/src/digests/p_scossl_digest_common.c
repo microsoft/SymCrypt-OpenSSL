@@ -20,29 +20,6 @@ const OSSL_PARAM p_scossl_digest_param_types[] = {
     OSSL_PARAM_END};
 
 _Use_decl_annotations_
-SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
-{
-    SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
-    if (copyCtx != NULL)
-    {
-        copyCtx->pHash = ctx->pHash;
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, SymCryptHashStateSize(ctx->pHash));
-
-        if (pStateTmp == NULL)
-        {
-            OPENSSL_free(copyCtx);
-            return NULL;
-        }
-
-        ctx->pHash->stateCopyFunc(ctx->pState, pStateTmp);
-        copyCtx->pState = pStateTmp;
-        copyCtx->xofLen = ctx->xofLen;
-    }
-
-    return copyCtx;
-}
-
-_Use_decl_annotations_
 void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
 {
     if (ctx == NULL)
@@ -52,9 +29,27 @@ void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
     OPENSSL_free(ctx);
 }
 
-const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_unused void *provctx)
+_Use_decl_annotations_
+SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 {
-    return p_scossl_digest_param_types;
+    SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
+    if (copyCtx != NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, SymCryptHashStateSize(ctx->pHash));
+
+        if (pStateTmp == NULL)
+        {
+            OPENSSL_free(copyCtx);
+            return NULL;
+        }
+
+        ctx->pHash->stateCopyFunc(ctx->pState, pStateTmp);
+        copyCtx->pHash = ctx->pHash;
+        copyCtx->pState = pStateTmp;
+        copyCtx->xofLen = ctx->xofLen;
+    }
+
+    return copyCtx;
 }
 
 _Use_decl_annotations_
@@ -91,6 +86,11 @@ SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_
     }
 
     return SCOSSL_SUCCESS;
+}
+
+const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_digest_param_types;
 }
 
 _Use_decl_annotations_
