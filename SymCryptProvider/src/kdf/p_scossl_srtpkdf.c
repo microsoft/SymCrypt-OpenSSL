@@ -19,6 +19,8 @@ extern "C" {
 
 typedef struct
 {
+    // pKey is immediately expanded into expandedKey. It is only kept
+    // in the context for duplication and initialization checks.
     PBYTE pKey;
     SIZE_T cbKey;
     SYMCRYPT_SRTPKDF_EXPANDED_KEY expandedKey;
@@ -112,13 +114,56 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_srtpkdf_reset(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
 {
-    return SCOSSL_FAILURE;
+    SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
+    OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
+    ctx->pKey = NULL;
+    ctx->cbKey = 0;
+    ctx->isSaltSet = FALSE;
+    ctx->uKeyDerivationRate = 0;
+    ctx->uIndex = 0;
+    ctx->uIndexWidth = 0;
+    ctx->label = 0;
+
+    return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
                                              _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
                                              _In_ const OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
+
+    if (p_scossl_srtpkdf_set_ctx_params(ctx, params) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->pKey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->isSaltSet)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_SALT);
+        return SCOSSL_FAILURE;
+    }
+
+    scError = SymCryptSrtpKdfDerive(
+        &ctx->expandedKey,
+        ctx->pbSalt, SCOSSL_SRTP_KDF_SALT_SIZE,
+        ctx->uKeyDerivationRate,
+        ctx->uIndex, ctx->uIndexWidth,
+        ctx->label,
+        key, keylen);
+
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        return SCOSSL_FAILURE;
+    }
+
     return SCOSSL_FAILURE;
 }
 
