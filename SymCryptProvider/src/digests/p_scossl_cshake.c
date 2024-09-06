@@ -94,7 +94,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_newctx(const SCOSSL_CSHAKE_HASH *pHash
             pStateTmp,
             OPENSSL_malloc,
             PVOID,
-            sizeof(SCOSSL_CSHAKE_HASH));
+            sizeof(SCOSSL_CSHAKE_STATE));
 
         if (pStateTmp == NULL)
         {
@@ -151,11 +151,11 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
             pStateTmp,
             OPENSSL_malloc,
             PVOID,
-            sizeof(SCOSSL_CSHAKE_HASH));
+            sizeof(SCOSSL_CSHAKE_STATE));
 
         if (pStateTmp == NULL)
         {
-            OPENSSL_free(ctx);
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
@@ -173,7 +173,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
         }
         else
         {
-            copyCtx->pbCustomizationString = NULL;
+            copyCtx->pbFunctionNameString = NULL;
         }
         copyCtx->cbFunctionNameString = ctx->cbFunctionNameString;
 
@@ -204,7 +204,7 @@ cleanup:
         copyCtx = NULL;
     }
 
-    return ctx;
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[])
