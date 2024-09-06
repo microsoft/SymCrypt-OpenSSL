@@ -258,11 +258,13 @@ static SCOSSL_STATUS p_scossl_cshake_final(_In_ SCOSSL_CSHAKE_CTX *ctx,
     return p_scossl_cshake_extract(ctx, TRUE, out, outl, outlen);
 }
 
+#ifdef OSSL_FUNC_DIGEST_SQUEEZE
 static SCOSSL_STATUS p_scossl_cshake_squeeze(_In_ SCOSSL_CSHAKE_CTX *ctx,
                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
     return p_scossl_cshake_extract(ctx, FALSE, out, outl, outlen);
 }
+#endif
 
 static SCOSSL_STATUS p_scossl_cshake_digest(_In_ const SCOSSL_CSHAKE_HASH *pHash,
                                             _In_reads_bytes_(inl) const unsigned char *in, size_t inl,
@@ -370,6 +372,13 @@ static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(_In_ SCOSSL_CSHAKE_
     return ctx->updating ? p_scossl_cshake_settable_ctx_param_types_updating : p_scossl_cshake_settable_ctx_param_types;
 }
 
+#ifdef OSSL_FUNC_DIGEST_SQUEEZE
+#define SCOSSL_DIGEST_CSHAKE_SQUEEZE \
+    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void))p_scossl_cshake_squeeze},
+#else
+#define SCOSSL_DIGEST_CSHAKE_SQUEEZE
+#endif
+
 const OSSL_DISPATCH p_scossl_cshake_128_functions[] = {
     {OSSL_FUNC_DIGEST_NEWCTX, (void (*)(void)) p_scossl_cshake_128_newctx},
     {OSSL_FUNC_DIGEST_FREECTX, (void (*)(void)) p_scossl_cshake_freectx},
@@ -377,12 +386,14 @@ const OSSL_DISPATCH p_scossl_cshake_128_functions[] = {
     {OSSL_FUNC_DIGEST_INIT, (void (*)(void)) p_scossl_cshake_init},
     {OSSL_FUNC_DIGEST_UPDATE, (void (*)(void)) p_scossl_cshake_update},
     {OSSL_FUNC_DIGEST_FINAL, (void (*)(void)) p_scossl_cshake_final},
-    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void)) p_scossl_cshake_squeeze},
     {OSSL_FUNC_DIGEST_DIGEST, (void (*)(void)) p_scossl_cshake_128_digest},
     {OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void)) p_scossl_cshake_128_get_params},
     {OSSL_FUNC_DIGEST_GETTABLE_PARAMS, (void (*)(void)) p_scossl_digest_gettable_params},
     {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void)) p_scossl_cshake_set_ctx_params},
     {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void)) p_scossl_cshake_settable_ctx_params},
+#ifdef OSSL_FUNC_DIGEST_SQUEEZE
+    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void))p_scossl_cshake_squeeze},
+#endif
     {0, NULL}};
 
 const OSSL_DISPATCH p_scossl_cshake_256_functions[] = {
@@ -392,12 +403,14 @@ const OSSL_DISPATCH p_scossl_cshake_256_functions[] = {
     {OSSL_FUNC_DIGEST_INIT, (void (*)(void)) p_scossl_cshake_init},
     {OSSL_FUNC_DIGEST_UPDATE, (void (*)(void)) p_scossl_cshake_update},
     {OSSL_FUNC_DIGEST_FINAL, (void (*)(void)) p_scossl_cshake_final},
-    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void)) p_scossl_cshake_squeeze},
     {OSSL_FUNC_DIGEST_DIGEST, (void (*)(void)) p_scossl_cshake_256_digest},
     {OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void)) p_scossl_cshake_256_get_params},
     {OSSL_FUNC_DIGEST_GETTABLE_PARAMS, (void (*)(void)) p_scossl_digest_gettable_params},
     {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void)) p_scossl_cshake_set_ctx_params},
     {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void)) p_scossl_cshake_settable_ctx_params},
+#ifdef OSSL_FUNC_DIGEST_SQUEEZE
+    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void))p_scossl_cshake_squeeze},
+#endif
     {0, NULL}};
 
 #ifdef __cplusplus

@@ -58,6 +58,13 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
+#ifdef OSSL_FUNC_DIGEST_SQUEEZE
+#define SCOSSL_DIGEST_SHAKE_SQUEEZE(bits) \
+    {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void))p_scossl_shake_##bits##_squeeze},
+#else
+#define SCOSSL_DIGEST_SHAKE_SQUEEZE(bits)
+#endif
+
 #define IMPLEMENT_SCOSSL_SHAKE(bits)                                                                \
     static SCOSSL_STATUS p_scossl_shake_##bits##_final(                                             \
         _In_ SCOSSL_DIGEST_CTX *ctx,                                                                \
@@ -84,7 +91,7 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_shake_settable_ctx_params}, \
         {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_shake_init},                               \
         {OSSL_FUNC_DIGEST_FINAL, (void (*)(void))p_scossl_shake_##bits##_final},                    \
-        {OSSL_FUNC_DIGEST_SQUEEZE, (void (*)(void))p_scossl_shake_##bits##_squeeze},                \
+        SCOSSL_DIGEST_SHAKE_SQUEEZE(bits)                                                           \
         SCOSSL_DIGEST_FUNCTIONS_END
 
 //SHAKE
