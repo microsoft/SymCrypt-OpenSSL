@@ -17,6 +17,10 @@ extern "C" {
 #define SCOSSL_KDF_PARAM_SRTP_INDEX "index"
 #define SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH "index-width"
 
+#define SCOSSL_SRTP_LABEL_ENCRYPTION "encryption"
+#define SCOSSL_SRTP_LABEL_AUTHENTICATION "authentication"
+#define SCOSSL_SRTP_LABEL_SALTING "salting"
+
 typedef struct
 {
     // pKey is immediately expanded into expandedKey. It is only kept
@@ -28,10 +32,10 @@ typedef struct
     BYTE pbSalt[SCOSSL_SRTP_KDF_SALT_SIZE];
     BOOL isSaltSet;
 
-    UINT32 uKeyDerivationRate;
+    BYTE label;
     UINT64 uIndex;
     UINT32 uIndexWidth;
-    BYTE label;
+    UINT32 uKeyDerivationRate;
 } SCOSSL_PROV_SRTPKDF_CTX;
 
 static const OSSL_PARAM p_scossl_srtpkdf_gettable_ctx_param_types[] = {
@@ -41,10 +45,10 @@ static const OSSL_PARAM p_scossl_srtpkdf_gettable_ctx_param_types[] = {
 static const OSSL_PARAM p_scossl_srtpkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
-    OSSL_PARAM_uint(SCOSSL_KDF_PARAM_SRTP_RATE, NULL),
-    OSSL_PARAM_uint(SCOSSL_KDF_PARAM_SRTP_INDEX, NULL),
-    OSSL_PARAM_uint(SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH, NULL),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_LABEL, NULL, 0),
+    OSSL_PARAM_uint64(SCOSSL_KDF_PARAM_SRTP_INDEX, NULL),
+    OSSL_PARAM_uint32(SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH, NULL),
+    OSSL_PARAM_uint32(SCOSSL_KDF_PARAM_SRTP_RATE, NULL),
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, const _In_ OSSL_PARAM params[]);
@@ -177,9 +181,16 @@ static const OSSL_PARAM *p_scossl_srtpkdf_settable_ctx_params(ossl_unused void *
     return p_scossl_srtpkdf_settable_ctx_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(ossl_unused void *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, SIZE_MAX))
+    {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            return SCOSSL_FAILURE;
+    }
 
     return SCOSSL_SUCCESS;
 }
@@ -187,6 +198,143 @@ static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(_In_ SCOSSL_PROV_SRTPKDF_CT
 static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
+    {
+        PBYTE pbKey;
+        SIZE_T cbKey;
+
+        OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
+        ctx->cbKey = 0;
+        SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
+
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbKey, &cbKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        switch (cbKey)
+        {
+            case 16:
+            case 24:
+            case 32:
+                break;
+            default:
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+                return SCOSSL_FAILURE;
+        }
+
+        if ((ctx->pKey = OPENSSL_secure_malloc(cbKey)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+
+        memcpy(ctx->pKey, pbKey, cbKey);
+        ctx->cbKey = cbKey;
+
+        if (SymCryptSrtpKdfExpandKey(&ctx->expandedKey, ctx->pKey, ctx->cbKey) != SYMCRYPT_NO_ERROR)
+        {
+            OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
+            ctx->pKey = NULL;
+            ctx->cbKey = 0;
+
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SALT)) != NULL)
+    {
+        PBYTE pbSalt;
+        SIZE_T cbSalt;
+
+        ctx->isSaltSet = FALSE;
+
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbSalt, &cbSalt))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (cbSalt != SCOSSL_SRTP_KDF_SALT_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
+            return SCOSSL_FAILURE;
+        }
+
+        memcpy(ctx->pbSalt, pbSalt, cbSalt);
+        ctx->isSaltSet = TRUE;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_LABEL)) != NULL)
+    {
+        const char *pbLabel;
+
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &pbLabel))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_ENCRYPTION))
+        {
+            ctx->label = SYMCRYPT_SRTP_ENCRYPTION_KEY;
+        }
+        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_AUTHENTICATION))
+        {
+            ctx->label = SYMCRYPT_SRTP_AUTHENTICATION_KEY;
+        }
+        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_SALTING))
+        {
+            ctx->label = SYMCRYPT_SRTP_SALTING_KEY;
+        }
+        else
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, SCOSSL_KDF_PARAM_SRTP_INDEX)) != NULL &&
+        !OSSL_PARAM_get_uint64(p, &ctx->uIndex))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH)) != NULL)
+    {
+        if (!OSSL_PARAM_get_uint32(p, &ctx->uIndexWidth))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (ctx->uIndexWidth > 64)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+            return SCOSSL_FAILURE;
+        }
+
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, SCOSSL_KDF_PARAM_SRTP_RATE)) != NULL)
+    {
+        if (!OSSL_PARAM_get_uint32(p, &ctx->uKeyDerivationRate))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if(ctx->uKeyDerivationRate > (1 << 24)  ||
+           (ctx->uKeyDerivationRate & (ctx->uKeyDerivationRate - 1)) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+            return SCOSSL_FAILURE;
+        }
+    }
 
     return SCOSSL_SUCCESS;
 }
