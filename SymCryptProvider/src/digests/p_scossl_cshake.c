@@ -5,14 +5,12 @@
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+#include "scossl_provider.h"
 #include "p_scossl_digest_common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define SCOSSL_DIGEST_PARAM_FUNCTION_NAME "function-name"
-#define SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING "customization-string"
 
 typedef union
 {
