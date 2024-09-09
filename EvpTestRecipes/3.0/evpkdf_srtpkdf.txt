@@ -5,7 +5,11 @@
 # Tests taken from SymCrypt test vectors
 # https://github.com/microsoft/SymCrypt/blob/main/unittest/kat_kdf.dat
 
-Title = SRTPKDF tests
+Title = SRTPKDF tests with 128-bit keys
+
+#
+# 128-bit keys
+#
 
 KDF = SRTPKDF
 Ctrl.key = hexkey:c4809f6d369888728e26adb532129890
@@ -56,30 +60,6 @@ Ctrl.label = label:salting
 Output = 109be6ef148b7739694622aafd0c
 
 KDF = SRTPKDF
-Ctrl.key = hexkey:c33cb967d908392523640640fe67f040
-Ctrl.salt = hexsalt:0fc9327235cefa49720c9d7adb18
-Ctrl.rate = hexrate:0002
-Ctrl.index = hexindex:acf9a0ff1c59
-Ctrl.label = label:encryption
-Output = 35f54ff478d60a00a153372d0f4a6e99
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:c33cb967d908392523640640fe67f040
-Ctrl.salt = hexsalt:0fc9327235cefa49720c9d7adb18
-Ctrl.rate = hexrate:0002
-Ctrl.index = hexindex:acf9a0ff1c59
-Ctrl.label = label:authentication
-Output = eebb1b7babba4401d4f1681b485a1fe49513c131
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:c33cb967d908392523640640fe67f040
-Ctrl.salt = hexsalt:0fc9327235cefa49720c9d7adb18
-Ctrl.rate = hexrate:0002
-Ctrl.index = hexindex:acf9a0ff1c59
-Ctrl.label = label:salting
-Output = c7f9efb40f4db33d3d07d672ee92
-
-KDF = SRTPKDF
 Ctrl.key = hexkey:d58e7cb4c06263d17fdbb0aa3885d31f
 Ctrl.salt = hexsalt:9e763afcfc2c14eca04074859909
 Ctrl.rate = hexrate:0004
@@ -102,30 +82,6 @@ Ctrl.rate = hexrate:0004
 Ctrl.index = hexindex:263a9ccff381
 Ctrl.label = label:salting
 Output = b108020b6c63f598cd83dd563295
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:6ae51d0927ac243dc62a71dff42a9559
-Ctrl.salt = hexsalt:1a2f1ea9cf67520ed8af35baebb5
-Ctrl.rate = hexrate:0008
-Ctrl.index = hexindex:d9d776775068
-Ctrl.label = label:encryption
-Output = b03f59b4be309218828534c09490f92c
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:6ae51d0927ac243dc62a71dff42a9559
-Ctrl.salt = hexsalt:1a2f1ea9cf67520ed8af35baebb5
-Ctrl.rate = hexrate:0008
-Ctrl.index = hexindex:d9d776775068
-Ctrl.label = label:authentication
-Output = 8835aeff29512c1ad6afee7a682bcbeaaff6bc49
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:6ae51d0927ac243dc62a71dff42a9559
-Ctrl.salt = hexsalt:1a2f1ea9cf67520ed8af35baebb5
-Ctrl.rate = hexrate:0008
-Ctrl.index = hexindex:d9d776775068
-Ctrl.label = label:salting
-Output = 837540de40e06a4cc48e0fe1c4ea
 
 KDF = SRTPKDF
 Ctrl.key = hexkey:1e751670f9c780ccc86341cf22a18a51
@@ -152,78 +108,6 @@ Ctrl.label = label:salting
 Output = 38074b13036dafdeceaa3b98f33f
 
 KDF = SRTPKDF
-Ctrl.key = hexkey:677baeb81c7daab17e0b80c36c085f40
-Ctrl.salt = hexsalt:4d06fe947108561762ffed0847d7
-Ctrl.rate = hexrate:0020
-Ctrl.index = hexindex:bbdb63456817
-Ctrl.label = label:encryption
-Output = eafc7aecbd49f423d7692c30f54798e2
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:677baeb81c7daab17e0b80c36c085f40
-Ctrl.salt = hexsalt:4d06fe947108561762ffed0847d7
-Ctrl.rate = hexrate:0020
-Ctrl.index = hexindex:bbdb63456817
-Ctrl.label = label:authentication
-Output = b927856bd9953bfa2beac6e92362aff5b3cac66c
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:677baeb81c7daab17e0b80c36c085f40
-Ctrl.salt = hexsalt:4d06fe947108561762ffed0847d7
-Ctrl.rate = hexrate:0020
-Ctrl.index = hexindex:bbdb63456817
-Ctrl.label = label:salting
-Output = 72270d2cedb1e593d9e09b4d9062
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:0bd56b00c5b00c3f67c82f533417f65c
-Ctrl.salt = hexsalt:553861be9acec59ffca70d44d5d0
-Ctrl.rate = hexrate:0040
-Ctrl.index = hexindex:4ff7968c0dfd
-Ctrl.label = label:encryption
-Output = b64f496214e4cbac28fecde32c590eb1
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:0bd56b00c5b00c3f67c82f533417f65c
-Ctrl.salt = hexsalt:553861be9acec59ffca70d44d5d0
-Ctrl.rate = hexrate:0040
-Ctrl.index = hexindex:4ff7968c0dfd
-Ctrl.label = label:authentication
-Output = 0f8fe2f9809f57c3e00d56d61af140a570b23a97
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:0bd56b00c5b00c3f67c82f533417f65c
-Ctrl.salt = hexsalt:553861be9acec59ffca70d44d5d0
-Ctrl.rate = hexrate:0040
-Ctrl.index = hexindex:4ff7968c0dfd
-Ctrl.label = label:salting
-Output = 5f25ba4fdc956ef936c83c844fc8
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:85aa006349dc51eba945d7d99ea42ac9
-Ctrl.salt = hexsalt:e11e877c62d975ee473f1343e2d2
-Ctrl.rate = hexrate:0080
-Ctrl.index = hexindex:f7ca7eab7157
-Ctrl.label = label:encryption
-Output = ae66bd7653bb6da67bd4d9c09dab07b2
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:85aa006349dc51eba945d7d99ea42ac9
-Ctrl.salt = hexsalt:e11e877c62d975ee473f1343e2d2
-Ctrl.rate = hexrate:0080
-Ctrl.index = hexindex:f7ca7eab7157
-Ctrl.label = label:authentication
-Output = e51453bfc79e89e274159e3c22907fed1b6a296e
-
-KDF = SRTPKDF
-Ctrl.key = hexkey:85aa006349dc51eba945d7d99ea42ac9
-Ctrl.salt = hexsalt:e11e877c62d975ee473f1343e2d2
-Ctrl.rate = hexrate:0080
-Ctrl.index = hexindex:f7ca7eab7157
-Ctrl.label = label:salting
-Output = 111bc33332bc94a931f2f4cc9d57
-
-KDF = SRTPKDF
 Ctrl.key = hexkey:36b4decb2e512376e0277e3ec8f65404
 Ctrl.salt = hexsalt:7326f43fc0d9c6e32f927d461276
 Ctrl.rate = hexrate:0100
@@ -246,3 +130,670 @@ Ctrl.rate = hexrate:0100
 Ctrl.index = hexindex:4473b22db260
 Ctrl.label = label:salting
 Output = ccd731f63bf3898a5b7bb58b4c3f
+
+#
+# 192-bit keys
+#
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:ae8cdcdefcbd
+Ctrl.label = label:encryption
+Output = 76c8ef187a7e35b02e5f4b7936d5f966f1f9b55b59c3796f
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:ae8cdcdefcbd
+Ctrl.label = label:authentication
+Output = cdfc18b63cb691937db756b761282e9d35c4b371
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:ae8cdcdefcbd
+Ctrl.label = label:salting
+Output = 4ef784fb0a1a828161fd9cd966d2
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:d7878f33b176
+Ctrl.label = label:encryption
+Output = 2cc83e54b23389b371650f516165e493074eb347ba2d6060
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:d7878f33b176
+Ctrl.label = label:authentication
+Output = 2e80e48255a2be6de046ccc175786e78d1d14708
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:d7878f33b176
+Ctrl.label = label:salting
+Output = e0c1e6af1e8d8cfee56070b5e6ea
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:bcbbf9046a4e
+Ctrl.label = label:encryption
+Output = 4e0ad890c6b28d4516b01dd06b008883b60f6eec9bd3258d
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:bcbbf9046a4e
+Ctrl.label = label:authentication
+Output = 0dc9abe7ad5e5c6e72a342d29cbd857efcfdfbbd
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:bcbbf9046a4e
+Ctrl.label = label:salting
+Output = fd1dc7d5ef8de008df242264e17a
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e8a7f6fef66f
+Ctrl.label = label:encryption
+Output = c57ebd8f72e9c818bd1385d2f6ee6c063886e5f997204851
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e8a7f6fef66f
+Ctrl.label = label:authentication
+Output = bbf7d6d5a944d2c8ed3df7cbed675a3d0f17e05e
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e8a7f6fef66f
+Ctrl.label = label:salting
+Output = fe5166bd6d82617c10ff81ba910d
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:484a47b3a3a9
+Ctrl.label = label:encryption
+Output = cc4e338d5852d5203cc0f95f71a6c30f2673d6c36e0e6c9e
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:484a47b3a3a9
+Ctrl.label = label:authentication
+Output = f84753c8a23b5d5e0e13309f3d4fa0ea333838fe
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:484a47b3a3a9
+Ctrl.label = label:salting
+Output = df8462939e55f88000efd6d85fdd
+
+#
+# 256-bit keys
+#
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:a31b4054eff2
+Ctrl.label = label:encryption
+Output = df4bf89f2669868b2ac482f7e25867a0f814437ac29a0e6cfce53dde8306e022
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:a31b4054eff2
+Ctrl.label = label:authentication
+Output = 1cd6b9e242c63bee044aa64ad3f8fbde84772218
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:a31b4054eff2
+Ctrl.label = label:salting
+Output = 7fbf73784dc9237bd3f3d3316279
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:b64c6d6fe260
+Ctrl.label = label:encryption
+Output = d53cd2802d3141a3545b1568420bc7b83d9cb44df0accfb09356fc34774418fb
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:b64c6d6fe260
+Ctrl.label = label:authentication
+Output = d3eb2c4272966e98f586dfc405960430726b7490
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:b64c6d6fe260
+Ctrl.label = label:salting
+Output = 50e52e5e8938420d40b5b1917428
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:00ec280191fe
+Ctrl.label = label:encryption
+Output = 3049952daea86181569f8d79e3e0b61ffcf4f1d4a1db9c74789a31560c5abe87
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:00ec280191fe
+Ctrl.label = label:authentication
+Output = c0f3e07e00091849296f494a72fbd010f2bcb373
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:00ec280191fe
+Ctrl.label = label:salting
+Output = 839a6ffc443196831d37cd6bbeb0
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e6b90621c51e
+Ctrl.label = label:encryption
+Output = cb3dc37beba69450e9e196129684afbbfa161a9957cb349eef230306d443bd98
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e6b90621c51e
+Ctrl.label = label:authentication
+Output = 1ee83ea02b566078f98623a0fa3df865087ee526
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:e6b90621c51e
+Ctrl.label = label:salting
+Output = 0bd7111d65ff5b6c9a86476edf98
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:446fd593ebbc
+Ctrl.label = label:encryption
+Output = d2c2e6eb48cccde44f242f4fbf40bdb4269cc861f60cfabf01ec89d41fce601e
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:446fd593ebbc
+Ctrl.label = label:authentication
+Output = 93120f64a96315f806fad428f9e37bf0ac1645d9
+
+KDF = SRTPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:446fd593ebbc
+Ctrl.label = label:salting
+Output = c729f805c7f90d8c252c28366339
+
+Title = SRTCPKDF Tests
+
+#
+# 128-bit keys
+#
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:c4809f6d369888728e26adb532129890
+Ctrl.salt = hexsalt:0e23006c6c044f5662400e9d1bd6
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:56f3f197
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = ab5be0b456235dcf77d5086929bafb38
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:c4809f6d369888728e26adb532129890
+Ctrl.salt = hexsalt:0e23006c6c044f5662400e9d1bd6
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:56f3f197
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = c52fde0b80b0f0bad8d15645cb86e7c7c3d8770e
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:c4809f6d369888728e26adb532129890
+Ctrl.salt = hexsalt:0e23006c6c044f5662400e9d1bd6
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:56f3f197
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = deb5f85f81336a965ed32bb7ede8
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:ed7a0c0ccff1d84a824e91b01fa457a4
+Ctrl.salt = hexsalt:c62625901085724166e934a0a998
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:63bda774
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 20e5f1dfc13620704e44e06ec8ff4f19
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:ed7a0c0ccff1d84a824e91b01fa457a4
+Ctrl.salt = hexsalt:c62625901085724166e934a0a998
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:63bda774
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = dcb3bc06d10e31dcb4c9085f3f12fd37d3bf6b79
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:ed7a0c0ccff1d84a824e91b01fa457a4
+Ctrl.salt = hexsalt:c62625901085724166e934a0a998
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:63bda774
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 77ac07862fc1469b9cb3cabd2953
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:d58e7cb4c06263d17fdbb0aa3885d31f
+Ctrl.salt = hexsalt:9e763afcfc2c14eca04074859909
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:3cb74c22
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 273436d15d5b6faa47480458c9866431
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:d58e7cb4c06263d17fdbb0aa3885d31f
+Ctrl.salt = hexsalt:9e763afcfc2c14eca04074859909
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:3cb74c22
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = 8685025362645821bc596e8696643efc0f2a557b
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:d58e7cb4c06263d17fdbb0aa3885d31f
+Ctrl.salt = hexsalt:9e763afcfc2c14eca04074859909
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:3cb74c22
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 5030fe733511e8769095b9c20847
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1e751670f9c780ccc86341cf22a18a51
+Ctrl.salt = hexsalt:e24662bdcb4cbf87f2d4982812cb
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:15cbdbce
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 00b6a233d666be1ecf4a36d74b0facd3
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1e751670f9c780ccc86341cf22a18a51
+Ctrl.salt = hexsalt:e24662bdcb4cbf87f2d4982812cb
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:15cbdbce
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = 25a184d1a11aadd5294d1ff80a06d4ff8a906479
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1e751670f9c780ccc86341cf22a18a51
+Ctrl.salt = hexsalt:e24662bdcb4cbf87f2d4982812cb
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:15cbdbce
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 50790a02f19e02185625520a05ea
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:36b4decb2e512376e0277e3ec8f65404
+Ctrl.salt = hexsalt:7326f43fc0d9c6e32f927d461276
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:4a7daa85
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 349971fe1293ae8c4ae984e493536388
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:36b4decb2e512376e0277e3ec8f65404
+Ctrl.salt = hexsalt:7326f43fc0d9c6e32f927d461276
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:4a7daa85
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = a4535e0a9cf2ce13ef7a13ee0aefba170518e3ed
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:36b4decb2e512376e0277e3ec8f65404
+Ctrl.salt = hexsalt:7326f43fc0d9c6e32f927d461276
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:4a7daa85
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = e1294f61303c4d465f5c813c38b6
+
+#
+# 192-bit keys
+#
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:6c27d06a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = bddd5f1db61ec6f44c972acab90d45e719dea0d81c488c4f
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:6c27d06a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = df529f45b9b9b5c292a6370ad9bb2ca32e0c7125
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:821887f549224516b43a5143b44c0c313d3b875bb424fb9f
+Ctrl.salt = hexsalt:dc55558b17a5f686b3b61457eaf1
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:6c27d06a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 59ba69e85aebf54bed880701bb73
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:40bfd4a9
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 940f55ce58d81665f0fa46400cdab1119e69a0934ed7f284
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:40bfd4a9
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = f5416fc265c5b3efbb22c8fc6b0014b2f33b8e29
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:bb045b1f53c6932c2ba688f5e3f22470e17d7dec8a934df2
+Ctrl.salt = hexsalt:e722ab92fc7c89b6538af93cb952
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:40bfd4a9
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 35b74243f00101b468a1288037f0
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:35ee7a0c
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 7b8b5c13f06c514b8b6e46037d2b25a018ea121836630bb2
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:35ee7a0c
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = edca06b2960549c79c4d0035c6b26834314ffac6
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:9badd0dc464e5ccdea19c3109eb3f5cac8d2cd5631192422
+Ctrl.salt = hexsalt:8188bf9fdd6548bb830dc76f15f5
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:35ee7a0c
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 6b596060f350d8ad38c009a77833
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:182bbd4e
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = d7225430248b2e34ff13031fa459c094918b18816f0571ca
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:182bbd4e
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = d2c967cbb42b22042b05b0dc3158d023e6b25455
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:1196c07ae52d03b04bf75d547b96c6d70a3c02d9f644ebe6
+Ctrl.salt = hexsalt:99b0aa35b8da911773dfed876a5b
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:182bbd4e
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = ea296abd9cc4b2ee98c9f95b82ca
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:35346163
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = e4fcdc49d3f1e28f8c820f11b9dfc88ce57b52315d6be70a
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:35346163
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = c3fc7ff575202fa5adf11ac8866c5c541a401568
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:e8f1bd2758a2c1a5125535ba078eadcb13820e617f3f61d5
+Ctrl.salt = hexsalt:e38616047c35e721692f02037bad
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:35346163
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = c91931d19e5e1ca6e09e74d1eb59
+
+#
+# 256-bit keys
+#
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:134c512a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 432f07576604aceb727c0bb9841f55d90373947b3ba947432a44e6baad8490a6
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:134c512a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = 0b3467e5302099ab3e8eb1444204107318975f88
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:a263d11aa2dcb2d59b52d6cc77bddb82798179cda98ad2ff70e83d184e9ef4a0
+Ctrl.salt = hexsalt:883778c508eb03c45b29e8c0cbfe
+Ctrl.rate = hexrate:0000
+Ctrl.index = hexindex:134c512a
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 6c931c470e15144708855e777219
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:078dda65
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 88f8622ec62fb38f45cf5bf1722227614ceaf9aac45ccd0fcf7bee5e8c8a9693
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:078dda65
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = e5fc7089b7600bfade47cb87523d7507bbb7b911
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:0a63c14fce7739192b6f163137efa5bf10e6e29e2cdf9773b1e317555bb9046c
+Ctrl.salt = hexsalt:fe072b1035be7abb71d60b83f30d
+Ctrl.rate = hexrate:0001
+Ctrl.index = hexindex:078dda65
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = b2f46398c2247e6decde309bd624
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:28cd01dd
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 0ee88cc715406812da290f73c59ec91d09f8985e90110bd86a8a26dd6aeeec80
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:28cd01dd
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = dd712f54fb10ca4521b872d24a6377235f0b5ffa
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:f6794568e5cad251474aece1ab6145a90d3a98c662bb1c4bbad1d31f669acf2c
+Ctrl.salt = hexsalt:cb7aa5c5bbdd593fb3b6cabb598f
+Ctrl.rate = hexrate:0004
+Ctrl.index = hexindex:28cd01dd
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 62ea2009a3c0078bb03aa75b7db3
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:30ccc4b2
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = f0b6e212f626144bf2b7adc8fa27ab5e50b12d7fda0e6df40148b526b99a2c30
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:30ccc4b2
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = a2761396992285cc0f9e6406d2449d925e59e6ac
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:7749c496897803ee7cc3d01159bc1ddb2f1b4c2e7362c5b17e76ebe75f0cddfe
+Ctrl.salt = hexsalt:9c768fdeaf437cc51649b4c9f74a
+Ctrl.rate = hexrate:0010
+Ctrl.index = hexindex:30ccc4b2
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 980216f35e59f2db0c084b471519
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:6ee63014
+Ctrl.index-width = index-width:32
+Ctrl.label = label:encryption
+Output = 89a64f9f44581cab9b1b4c8f19797128f7f460cdda01a0cd3c52abd962b69f20
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:6ee63014
+Ctrl.index-width = index-width:32
+Ctrl.label = label:authentication
+Output = 493454b85a88b0567c94788aa8081cf3c55a1217
+
+KDF = SRTCPKDF
+Ctrl.key = hexkey:4b26fadc0a9be823dcd6abc82c043975a603f00587b8753460baf0502eee66bb
+Ctrl.salt = hexsalt:9974a300332884fbfa03718ce0e0
+Ctrl.rate = hexrate:0100
+Ctrl.index = hexindex:6ee63014
+Ctrl.index-width = index-width:32
+Ctrl.label = label:salting
+Output = 5c4e98d3296e009b4538096d72e4
