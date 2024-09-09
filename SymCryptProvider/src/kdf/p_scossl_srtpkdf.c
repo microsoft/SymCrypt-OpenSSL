@@ -17,9 +17,11 @@ extern "C" {
 typedef struct
 {
     BOOL isSrtcp;
-    // pKey is immediately expanded into expandedKey. It is only kept
-    // in the context for duplication and initialization checks.
-    PBYTE pKey;
+
+    // pbKey is immediately expanded into expandedKey. It is only kept
+    // in the context for duplication and initialization checks. This
+    // must be cleared when the context is freed.
+    PBYTE pbKey;
     SIZE_T cbKey;
     SYMCRYPT_SRTPKDF_EXPANDED_KEY expandedKey;
 
@@ -45,7 +47,7 @@ static const OSSL_PARAM p_scossl_srtpkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_uint32(SCOSSL_KDF_PARAM_SRTP_RATE, NULL),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, const _In_ OSSL_PARAM params[]);
+static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_newctx(ossl_unused void *provctx)
 {
@@ -70,7 +72,7 @@ static void p_scossl_srtpkdf_freectx(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
         return;
 
     SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
-    OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
+    OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
     OPENSSL_free(ctx);
 }
 
@@ -81,18 +83,18 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
 
     if (copyCtx != NULL)
     {
-        if (ctx->pKey != NULL)
+        if (ctx->pbKey != NULL)
         {
-            if ((copyCtx->pKey = OPENSSL_secure_malloc(ctx->cbKey)) == NULL)
+            if ((copyCtx->pbKey = OPENSSL_secure_malloc(ctx->cbKey)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
 
-            memcpy(copyCtx->pKey, ctx->pKey, ctx->cbKey);
+            memcpy(copyCtx->pbKey, ctx->pbKey, ctx->cbKey);
             copyCtx->cbKey = ctx->cbKey;
 
-            if (SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pKey, copyCtx->cbKey) != SYMCRYPT_NO_ERROR)
+            if (SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pbKey, copyCtx->cbKey) != SYMCRYPT_NO_ERROR)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
                 goto cleanup;
@@ -100,7 +102,7 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
         }
         else
         {
-            copyCtx->pKey = NULL;
+            copyCtx->pbKey = NULL;
             copyCtx->cbKey = 0;
         }
 
@@ -132,8 +134,9 @@ cleanup:
 static SCOSSL_STATUS p_scossl_srtpkdf_reset(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
 {
     SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
-    OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
-    ctx->pKey = NULL;
+    OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
+
+    ctx->pbKey = NULL;
     ctx->cbKey = 0;
     ctx->isSaltSet = FALSE;
     ctx->uKeyDerivationRate = 0;
@@ -155,7 +158,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->pKey == NULL)
+    if (ctx->pbKey == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
@@ -201,14 +204,14 @@ static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(ossl_unused void *ctx, _Ino
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, SIZE_MAX))
     {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
     }
 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -217,7 +220,8 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
         PBYTE pbKey;
         SIZE_T cbKey;
 
-        OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
+        OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
+        ctx->pbKey = NULL;
         ctx->cbKey = 0;
         SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
 
@@ -238,19 +242,19 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
                 return SCOSSL_FAILURE;
         }
 
-        if ((ctx->pKey = OPENSSL_secure_malloc(cbKey)) == NULL)
+        if ((ctx->pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return SCOSSL_FAILURE;
         }
 
-        memcpy(ctx->pKey, pbKey, cbKey);
+        memcpy(ctx->pbKey, pbKey, cbKey);
         ctx->cbKey = cbKey;
 
-        if (SymCryptSrtpKdfExpandKey(&ctx->expandedKey, ctx->pKey, ctx->cbKey) != SYMCRYPT_NO_ERROR)
+        if (SymCryptSrtpKdfExpandKey(&ctx->expandedKey, ctx->pbKey, ctx->cbKey) != SYMCRYPT_NO_ERROR)
         {
-            OPENSSL_secure_clear_free(ctx->pKey, ctx->cbKey);
-            ctx->pKey = NULL;
+            OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
+            ctx->pbKey = NULL;
             ctx->cbKey = 0;
 
             ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -336,7 +340,6 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
             return SCOSSL_FAILURE;
         }
-
     }
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_KDF_PARAM_SRTP_RATE)) != NULL)
