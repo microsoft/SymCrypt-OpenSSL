@@ -47,7 +47,7 @@ static const OSSL_PARAM p_scossl_srtpkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_LABEL, NULL, 0),
     OSSL_PARAM_uint64(SCOSSL_KDF_PARAM_SRTP_INDEX, NULL),
-    OSSL_PARAM_uint32(SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH, NULL),
+    OSSL_PARAM_uint64(SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH, NULL),
     OSSL_PARAM_uint32(SCOSSL_KDF_PARAM_SRTP_RATE, NULL),
     OSSL_PARAM_END};
 
@@ -85,6 +85,12 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
 
             memcpy(copyCtx->pKey, ctx->pKey, ctx->cbKey);
             copyCtx->cbKey = ctx->cbKey;
+
+            if (SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pKey, copyCtx->cbKey) != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                goto cleanup;
+            }
         }
         else
         {
@@ -168,7 +174,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    return SCOSSL_FAILURE;
+    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_PARAM *p_scossl_srtpkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -278,15 +284,15 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
             return SCOSSL_FAILURE;
         }
 
-        if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_ENCRYPTION))
+        if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_ENCRYPTION) == 0)
         {
             ctx->label = SYMCRYPT_SRTP_ENCRYPTION_KEY;
         }
-        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_AUTHENTICATION))
+        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_AUTHENTICATION) == 0)
         {
             ctx->label = SYMCRYPT_SRTP_AUTHENTICATION_KEY;
         }
-        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_SALTING))
+        else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_SALTING) == 0)
         {
             ctx->label = SYMCRYPT_SRTP_SALTING_KEY;
         }
