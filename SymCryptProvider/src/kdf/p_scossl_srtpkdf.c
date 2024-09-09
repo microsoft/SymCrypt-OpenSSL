@@ -6,20 +6,13 @@
 #include <openssl/proverr.h>
 
 #include "scossl_helpers.h"
+#include "scossl_provider.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define SCOSSL_SRTP_KDF_SALT_SIZE (112 / 8)
-
-#define SCOSSL_KDF_PARAM_SRTP_RATE "rate"
-#define SCOSSL_KDF_PARAM_SRTP_INDEX "index"
-#define SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH "index-width"
-
-#define SCOSSL_SRTP_LABEL_ENCRYPTION "encryption"
-#define SCOSSL_SRTP_LABEL_AUTHENTICATION "authentication"
-#define SCOSSL_SRTP_LABEL_SALTING "salting"
 
 typedef struct
 {
