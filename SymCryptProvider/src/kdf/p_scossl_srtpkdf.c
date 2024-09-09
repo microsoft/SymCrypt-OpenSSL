@@ -23,6 +23,7 @@ extern "C" {
 
 typedef struct
 {
+    BOOL isSrtcp;
     // pKey is immediately expanded into expandedKey. It is only kept
     // in the context for duplication and initialization checks.
     PBYTE pKey;
@@ -56,6 +57,18 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
 static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_newctx(ossl_unused void *provctx)
 {
     return OPENSSL_zalloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
+}
+
+static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtcpkdf_newctx(ossl_unused void *provctx)
+{
+    SCOSSL_PROV_SRTPKDF_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
+
+    if (ctx != NULL)
+    {
+        ctx->isSrtcp = TRUE;
+    }
+
+    return ctx;
 }
 
 static void p_scossl_srtpkdf_freectx(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
@@ -103,6 +116,7 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
             memcpy(copyCtx->pbSalt, ctx->pbSalt, SCOSSL_SRTP_KDF_SALT_SIZE);
         }
 
+        copyCtx->isSrtcp = ctx->isSrtcp;
         copyCtx->isSaltSet = ctx->isSaltSet;
         copyCtx->uKeyDerivationRate = ctx->uKeyDerivationRate;
         copyCtx->uIndex = ctx->uIndex;
@@ -286,15 +300,21 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
 
         if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_ENCRYPTION) == 0)
         {
-            ctx->label = SYMCRYPT_SRTP_ENCRYPTION_KEY;
+            ctx->label = ctx->isSrtcp ?
+                SYMCRYPT_SRTCP_ENCRYPTION_KEY :
+                SYMCRYPT_SRTP_ENCRYPTION_KEY;
         }
         else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_AUTHENTICATION) == 0)
         {
-            ctx->label = SYMCRYPT_SRTP_AUTHENTICATION_KEY;
+            ctx->label = ctx->isSrtcp ?
+                SYMCRYPT_SRTCP_AUTHENTICATION_KEY :
+                SYMCRYPT_SRTP_AUTHENTICATION_KEY;
         }
         else if (OPENSSL_strcasecmp(pbLabel, SCOSSL_SRTP_LABEL_SALTING) == 0)
         {
-            ctx->label = SYMCRYPT_SRTP_SALTING_KEY;
+            ctx->label = ctx->isSrtcp ?
+                SYMCRYPT_SRTCP_SALTING_KEY :
+                SYMCRYPT_SRTP_SALTING_KEY;
         }
         else
         {
@@ -347,6 +367,18 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
 
 const OSSL_DISPATCH p_scossl_srtpkdf_kdf_functions[] = {
     {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))p_scossl_srtpkdf_newctx},
+    {OSSL_FUNC_KDF_FREECTX, (void (*)(void))p_scossl_srtpkdf_freectx},
+    {OSSL_FUNC_KDF_DUPCTX, (void (*)(void))p_scossl_srtpkdf_dupctx},
+    {OSSL_FUNC_KDF_RESET, (void (*)(void))p_scossl_srtpkdf_reset},
+    {OSSL_FUNC_KDF_DERIVE, (void (*)(void))p_scossl_srtpkdf_derive},
+    {OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_srtpkdf_gettable_ctx_params},
+    {OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_srtpkdf_settable_ctx_params},
+    {OSSL_FUNC_KDF_GET_CTX_PARAMS, (void (*)(void))p_scossl_srtpkdf_get_ctx_params},
+    {OSSL_FUNC_KDF_SET_CTX_PARAMS, (void (*)(void))p_scossl_srtpkdf_set_ctx_params},
+    {0, NULL}};
+
+const OSSL_DISPATCH p_scossl_srtcpkdf_kdf_functions[] = {
+    {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))p_scossl_srtcpkdf_newctx},
     {OSSL_FUNC_KDF_FREECTX, (void (*)(void))p_scossl_srtpkdf_freectx},
     {OSSL_FUNC_KDF_DUPCTX, (void (*)(void))p_scossl_srtpkdf_dupctx},
     {OSSL_FUNC_KDF_RESET, (void (*)(void))p_scossl_srtpkdf_reset},
