@@ -215,7 +215,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_init(_Out_ EVP_MD_CTX *ctx)
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -229,7 +229,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_update(_Inout_ EVP_MD_CTX *ctx, _In_rea
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -242,7 +242,7 @@ static SCOSSL_STATUS e_scossl_digest_md5_final(_Inout_ EVP_MD_CTX *ctx, _Out_wri
     PSYMCRYPT_MD5_STATE state = (PSYMCRYPT_MD5_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -271,7 +271,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_init(_Out_ EVP_MD_CTX *ctx)
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -285,7 +285,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_update(_Inout_ EVP_MD_CTX *ctx, _In_re
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -298,7 +298,7 @@ static SCOSSL_STATUS e_scossl_digest_sha1_final(_Inout_ EVP_MD_CTX *ctx, _Out_wr
     PSYMCRYPT_SHA1_STATE state = (PSYMCRYPT_SHA1_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -328,7 +328,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_init(_Out_ EVP_MD_CTX *ctx)
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -342,7 +342,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_update(_Inout_ EVP_MD_CTX *ctx, _In_
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -355,7 +355,7 @@ static SCOSSL_STATUS e_scossl_digest_sha256_final(_Inout_ EVP_MD_CTX *ctx, _Out_
     PSYMCRYPT_SHA256_STATE state = (PSYMCRYPT_SHA256_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -384,7 +384,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_init(_Out_ EVP_MD_CTX *ctx)
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -398,7 +398,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_update(_Inout_ EVP_MD_CTX *ctx, _In_
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -411,7 +411,7 @@ static SCOSSL_STATUS e_scossl_digest_sha384_final(_Inout_ EVP_MD_CTX *ctx, _Out_
     PSYMCRYPT_SHA384_STATE state = (PSYMCRYPT_SHA384_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -440,7 +440,7 @@ static SCOSSL_STATUS e_scossl_digest_sha512_init(_Out_ EVP_MD_CTX *ctx)
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -454,7 +454,7 @@ static SCOSSL_STATUS e_scossl_digest_sha512_update(_Inout_ EVP_MD_CTX *ctx, _In_
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 
@@ -467,7 +467,7 @@ static SCOSSL_STATUS e_scossl_digest_sha512_final(_Inout_ EVP_MD_CTX *ctx, _Out_
     PSYMCRYPT_SHA512_STATE state = (PSYMCRYPT_SHA512_STATE) SCOSSL_ALIGN_UP(EVP_MD_CTX_md_data(ctx));
     if( state == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DIGESTS, SCOSSL_ERR_R_MISSING_CTX_DATA, "No MD Data Present");
         return SCOSSL_FAILURE;
     }
 

@@ -17,8 +17,8 @@ SCOSSL_STATUS e_scossl_tls1prf_init(EVP_PKEY_CTX *ctx)
     SCOSSL_TLS1_PRF_CTX *key_context = NULL;
     if ((key_context = scossl_tls1prf_newctx()) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_INIT, ERR_R_MALLOC_FAILURE,
-                         "OPENSSL_zalloc return NULL");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_TLS1PRF_INIT, ERR_R_MALLOC_FAILURE,
+            "OPENSSL_zalloc return NULL");
         return SCOSSL_FAILURE;
     }
     EVP_PKEY_CTX_set_data(ctx, key_context);
@@ -74,8 +74,8 @@ SCOSSL_STATUS e_scossl_tls1prf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p
             return SCOSSL_SUCCESS;
         return scossl_tls1prf_append_seed(key_context, p2, p1);
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SymCrypt Engine does not support ctrl type (%d)", type);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_TLS1PRF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SymCrypt Engine does not support ctrl type (%d)", type);
         return SCOSSL_UNSUPPORTED;
     }
 }

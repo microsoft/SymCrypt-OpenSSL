@@ -100,7 +100,7 @@ PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
     case NID_secp521r1:
         return _hidden_curve_P521;
     default:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ECC_GROUP_TO_SYMCRYPT_CURVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SCOSSL does not yet support this group (nid %d).", groupNid);
     }
 
@@ -207,14 +207,14 @@ SCOSSL_STATUS scossl_ec_point_to_pubkey(const EC_POINT* ecPoint, const EC_GROUP 
     if (((ecPubX = BN_new()) == NULL) ||
         ((ecPubY = BN_new()) == NULL))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_POINT_TO_PUBKEY, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         goto cleanup;
     }
 
     if (!EC_POINT_get_affine_coordinates(ecGroup, ecPoint, ecPubX, ecPubY, bnCtx))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_POINT_TO_PUBKEY, ERR_R_OPERATION_FAIL,
             "EC_POINT_get_affine_coordinates failed.");
         goto cleanup;
     }
@@ -222,7 +222,7 @@ SCOSSL_STATUS scossl_ec_point_to_pubkey(const EC_POINT* ecPoint, const EC_GROUP 
     if (((SIZE_T) BN_bn2binpad(ecPubX, pbPublicKey, cbPublicKey/2) != cbPublicKey/2) ||
         ((SIZE_T) BN_bn2binpad(ecPubY, pbPublicKey + (cbPublicKey/2), cbPublicKey/2) != cbPublicKey/2))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_POINT_TO_PUBKEY, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad did not write expected number of public key bytes.");
         goto cleanup;
     }
@@ -248,7 +248,7 @@ static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_rea
     if (pbDerField[0] != expectedTag)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "pbDerField[0] != 0x%x", expectedTag);
+            "pbDerField[0] != 0x%x", expectedTag);
         goto cleanup;
     }
 
@@ -268,14 +268,14 @@ static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_rea
             else
             {
                 SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, ERR_R_PASSED_INVALID_ARGUMENT,
-                                 "Der element length field is not minimal");
+                    "Der element length field is not minimal");
                 goto cleanup;
             }
         }
         else
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, ERR_R_PASSED_INVALID_ARGUMENT,
-                             "Unexpected length field encoding. pbDerField[1] == 0x%x", cbContent);
+                "Unexpected length field encoding. pbDerField[1] == 0x%x", cbContent);
             goto cleanup;
         }
     }
@@ -283,8 +283,8 @@ static SCOSSL_STATUS scossl_ecdsa_der_check_tag_and_get_value_and_length(_In_rea
     if (pbContent + cbContent > pbDerField + cbDerField)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Decoded content length does not fit in derField buffer. pbDerField [0x%lx, 0x%lx), pbContent [0x%lx, 0x%lx)",
-                         pbDerField, pbDerField + cbDerField, pbContent, pbContent + cbContent);
+            "Decoded content length does not fit in derField buffer. pbDerField [0x%lx, 0x%lx), pbContent [0x%lx, 0x%lx)",
+            pbDerField, pbDerField + cbDerField, pbContent, pbContent + cbContent);
         goto cleanup;
     }
 
@@ -319,10 +319,10 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         (cbSymCryptSignature % 2 == 1))
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Incorrect size: cbDerSignature %d should be in range [%d, %d]\n"
-                         "                cbSymCryptSignature %d should be even integer in range [%d, %d]",
-                         cbDerSignature, SCOSSL_ECDSA_MIN_DER_SIGNATURE_LEN, SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN,
-                         cbSymCryptSignature, SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN, SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN);
+            "Incorrect size: cbDerSignature %d should be in range [%d, %d]\n"
+            "                cbSymCryptSignature %d should be even integer in range [%d, %d]",
+            cbDerSignature, SCOSSL_ECDSA_MIN_DER_SIGNATURE_LEN, SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN,
+            cbSymCryptSignature, SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN, SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN);
         goto cleanup;
     }
 
@@ -335,9 +335,9 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
     if (pbSeq + cbSeq != pbDerSignature + cbDerSignature)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Sequence length field (0x%x) does not match cbDerSignature (0x%x)", cbSeq, cbDerSignature);
+            "Sequence length field (0x%x) does not match cbDerSignature (0x%x)", cbSeq, cbDerSignature);
         SCOSSL_LOG_BYTES_DEBUG(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                               "pbDerSignature", pbDerSignature, cbDerSignature);
+            "pbDerSignature", pbDerSignature, cbDerSignature);
         goto cleanup;
     }
 
@@ -350,9 +350,9 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
     if (cbR > cbSeq - 3)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "cbR = pbSeq[1] > cbSeq - 3");
+            "cbR = pbSeq[1] > cbSeq - 3");
         SCOSSL_LOG_BYTES_DEBUG(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                               "pbDerSignature", pbDerSignature, cbDerSignature);
+            "pbDerSignature", pbDerSignature, cbDerSignature);
         goto cleanup;
     }
 
@@ -367,9 +367,9 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         ((cbR > 1) && (pbR[0] == 0x00) && ((pbR[1] & 0x80) != 0x80))) // R is non-zero, and has a redundant leading 0 byte
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "pbR is not strict DER encoded non-negative integer");
+            "pbR is not strict DER encoded non-negative integer");
         SCOSSL_LOG_BYTES_DEBUG(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                               "pbR", pbR, cbR);
+            "pbR", pbR, cbR);
         goto cleanup;
     }
     // Trim leading 0 from R
@@ -383,9 +383,9 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         ((cbS > 1) && (pbS[0] == 0x00) && ((pbS[1] & 0x80) != 0x80))) // S is non-zero, and has a redundant leading 0 byte
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "pbS is not strict DER encoded non-negative integer");
+            "pbS is not strict DER encoded non-negative integer");
         SCOSSL_LOG_BYTES_DEBUG(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                               "pbS", pbS, cbS);
+            "pbS", pbS, cbS);
         goto cleanup;
     }
     // Trim leading 0 from S
@@ -398,7 +398,7 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
     if ((cbSymCryptSignature < 2 * cbR) || (cbSymCryptSignature < 2 * cbS))
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "cbR (%d) or cbS (%d) too big for cbSymCryptSignature (%d)", cbR, cbS, cbSymCryptSignature);
+            "cbR (%d) or cbS (%d) too big for cbSymCryptSignature (%d)", cbR, cbS, cbSymCryptSignature);
         goto cleanup;
     }
 
@@ -534,7 +534,7 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return SCOSSL_FAILURE;
     }
@@ -549,14 +549,14 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
         cbSymCryptSig);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEcDsaSign failed", scError);
         return SCOSSL_FAILURE;
     }
 
     if (!scossl_ecdsa_apply_der(buf, cbSymCryptSig, pbSignature, pcbSignature))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_SIGN, ERR_R_OPERATION_FAIL,
             "scossl_ecdsa_apply_der failed");
         return SCOSSL_FAILURE;
     }
@@ -576,14 +576,14 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return SCOSSL_FAILURE;
     }
 
     if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, ERR_R_OPERATION_FAIL,
             "scossl_ecdsa_remove_der failed");
         return SCOSSL_FAILURE;
     }
@@ -600,7 +600,7 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     {
         if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                 "SymCryptEcDsaVerify returned unexpected error", scError);
         }
         return SCOSSL_FAILURE;

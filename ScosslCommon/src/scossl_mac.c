@@ -190,8 +190,8 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
         ctx->pMacEx = &SymCryptHmacSha3_512Ex;
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SCOSSL does not support hash algorithm for MAC %d", mdNid);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_SET_HMAC_MD, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SCOSSL does not support hash algorithm for MAC %d", mdNid);
         return SCOSSL_FAILURE;
     }
 

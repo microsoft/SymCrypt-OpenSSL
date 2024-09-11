@@ -82,7 +82,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
     if (ctx->pbSecret == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Secret");
+            "Missing Secret");
         return SCOSSL_FAILURE;
     }
 
@@ -90,7 +90,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
     {
         // Special case to use TlsPrf1_1 to handle md5_sha1
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
+            "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
 
         scError = SymCryptTlsPrf1_1(
             ctx->pbSecret, ctx->cbSecret,
@@ -103,7 +103,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
         if (ctx->pHmac == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, ERR_R_INTERNAL_ERROR,
-                             "Missing Digest");
+                "Missing Digest");
             return SCOSSL_FAILURE;
         }
 
@@ -118,7 +118,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                  "SymCryptTlsPrf1_x failed", scError);
+            "SymCryptTlsPrf1_x failed", scError);
         return SCOSSL_FAILURE;
     }
 

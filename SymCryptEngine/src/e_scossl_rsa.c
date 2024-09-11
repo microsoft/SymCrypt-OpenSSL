@@ -35,7 +35,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const 
 
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_PUB_ENC, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         goto cleanup;
     }
@@ -60,7 +60,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_pub_enc(int flen, _In_reads_bytes_(flen) const 
         scossl_rsa_encrypt(keyCtx->key, padding, NID_sha1, NULL, 0, from, flen, to, &ret, -1);
         break;
     default:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
         pfn_rsa_meth_pub_enc = RSA_meth_get_pub_enc(ossl_rsa_meth);
@@ -85,7 +85,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const
 
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_PRIV_DEC, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         goto cleanup;
     }
@@ -110,7 +110,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_priv_dec(int flen, _In_reads_bytes_(flen) const
         scossl_rsa_decrypt(keyCtx->key, padding, NID_sha1, NULL, 0, from, flen, to, &ret, -1);
         break;
     default:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_PRIV_DEC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "Unsupported Padding: %d. Forwarding to OpenSSL. Size: %d.", padding, flen);
         ossl_rsa_meth = RSA_PKCS1_OpenSSL();
         pfn_rsa_meth_priv_dec = RSA_meth_get_priv_dec(ossl_rsa_meth);
@@ -128,7 +128,7 @@ cleanup:
 SCOSSL_RETURNLENGTH e_scossl_rsa_priv_enc(int flen, _In_reads_bytes_(flen) const unsigned char* from,
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa, int padding)
 {
-    SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PRIV_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+    SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_PRIV_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
         "RSA private encrypt equivalent not FIPS certifiable. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_priv_enc pfn_rsa_meth_priv_enc = NULL;
@@ -145,7 +145,7 @@ SCOSSL_RETURNLENGTH e_scossl_rsa_pub_dec(int flen, _In_reads_bytes_(flen) const 
     _Out_writes_bytes_(RSA_size(rsa)) unsigned char* to, _In_ RSA* rsa,
     int padding)
 {
-    SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_DEC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+    SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_PUB_DEC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
         "RSA public decrypt equivalent not found in SymCrypt. Forwarding to OpenSSL. Size: %d.", flen);
     const RSA_METHOD *ossl_rsa_meth = RSA_PKCS1_OpenSSL(); // Use default implementation
     PFN_RSA_meth_pub_dec pfn_rsa_meth_pub_dec = NULL;
@@ -168,7 +168,7 @@ SCOSSL_STATUS e_scossl_rsa_sign(int type, _In_reads_bytes_(m_length) const unsig
 
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         return SCOSSL_FAILURE;
     }
@@ -194,7 +194,7 @@ SCOSSL_STATUS e_scossl_rsa_verify(int dtype, _In_reads_bytes_(m_length) const un
 
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         return SCOSSL_FAILURE;
     }
@@ -221,7 +221,7 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
 
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         goto cleanup;
     }
@@ -237,26 +237,26 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if( keyCtx->key == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
     if( BN_bn2binpad(e, (PBYTE) &pubExp64, sizeof(pubExp64)) != sizeof(pubExp64) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
         goto cleanup;
     }
     if( SymCryptLoadMsbFirstUint64((PBYTE) &pubExp64, sizeof(pubExp64), &pubExp64) != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
     scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptRsakeyGenerate failed", scError);
         goto cleanup;
     }
@@ -320,7 +320,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
     if( RSA_get_version((RSA*) rsa) != RSA_ASN1_VERSION_DEFAULT )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "Unsupported RSA version");
         goto cleanup;
     }
@@ -330,7 +330,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
 
     if( rsa_n == NULL || rsa_e == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, ERR_R_PASSED_NULL_PARAMETER,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, ERR_R_PASSED_NULL_PARAMETER,
             "Not enough Parameters");
         goto cleanup;
     }
@@ -355,7 +355,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc failed");
         goto cleanup;
     }
@@ -364,13 +364,13 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
 
     if( BN_bn2binpad(rsa_e, (PBYTE) &pubExp64, sizeof(pubExp64)) != sizeof(pubExp64) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad failed - Probably Public Exponent larger than maximum supported size (8 bytes)");
         goto cleanup;
     }
     if( SymCryptLoadMsbFirstUint64((PBYTE) &pubExp64, sizeof(pubExp64), &pubExp64) != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
@@ -395,7 +395,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
     if( nPrimes != 0 && nPrimes != 2 )
     {
         // Currently only support normal two-prime RSA with SymCrypt Engine
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "Unsupported RSA version");
         goto cleanup;
     }
@@ -407,7 +407,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
     keyCtx->key = SymCryptRsakeyAllocate(&SymcryptRsaParam, 0);
     if( keyCtx->key == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
@@ -425,7 +425,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
                    keyCtx->key);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptRsakeySetValue failed", scError);
         goto cleanup;
     }
@@ -437,7 +437,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
 cleanup:
     if( ret != SCOSSL_SUCCESS )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, ERR_R_OPERATION_FAIL,
             "e_scossl_initialize_rsa_key failed.");
         e_scossl_rsa_free_key_context(keyCtx);
     }
@@ -484,14 +484,14 @@ SCOSSL_STATUS e_scossl_rsa_init(_Inout_ RSA *rsa)
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
     if( !keyCtx )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_INIT, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_INIT, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc failed");
         return SCOSSL_FAILURE;
     }
 
     if( RSA_set_ex_data(rsa, e_scossl_rsa_idx, keyCtx) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_INIT, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSA_INIT, ERR_R_OPERATION_FAIL,
             "RSA_set_ex_data failed");
         OPENSSL_free(keyCtx);
         return SCOSSL_FAILURE;

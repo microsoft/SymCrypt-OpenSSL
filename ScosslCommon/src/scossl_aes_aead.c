@@ -74,25 +74,25 @@ static SCOSSL_STATUS scossl_aes_gcm_tls(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT3
     if (in != out)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-GCM TLS does not support out-of-place operation");
+            "AES-GCM TLS does not support out-of-place operation");
         goto cleanup;
     }
     if (inl < EVP_GCM_TLS_EXPLICIT_IV_LEN + EVP_GCM_TLS_TAG_LEN)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-GCM TLS buffer too small");
+            "AES-GCM TLS buffer too small");
         goto cleanup;
     }
     if (ctx->operationInProgress)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-GCM TLS operation cannot be multi-stage");
+            "AES-GCM TLS operation cannot be multi-stage");
         goto cleanup;
     }
     if (ctx->taglen != EVP_GCM_TLS_TAG_LEN)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-GCM TLS taglen must be %d", EVP_GCM_TLS_TAG_LEN);
+            "AES-GCM TLS taglen must be %d", EVP_GCM_TLS_TAG_LEN);
         goto cleanup;
     }
 
@@ -106,7 +106,7 @@ static SCOSSL_STATUS scossl_aes_gcm_tls(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, INT3
         if (scossl_aes_gcm_iv_gen(ctx, out, EVP_GCM_TLS_EXPLICIT_IV_LEN) != SCOSSL_SUCCESS)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_TLS, ERR_R_INTERNAL_ERROR,
-                             "AES-GCM TLS failed to generate IV");
+                "AES-GCM TLS failed to generate IV");
             goto cleanup;
         }
 
@@ -156,8 +156,8 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
 
     if (ctx->iv == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "IV must be set before calling cipher");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
+            "IV must be set before calling cipher");
         return SCOSSL_FAILURE;
     }
 
@@ -258,8 +258,8 @@ SCOSSL_STATUS scossl_aes_gcm_iv_gen(SCOSSL_CIPHER_GCM_CTX *ctx,
     if (ctx->iv == NULL &&
         (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
-                         "Failed to allocate IV");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_IV_GEN, ERR_R_MALLOC_FAILURE,
+            "Failed to allocate IV");
         return SCOSSL_FAILURE;
     }
 
@@ -282,8 +282,8 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_len(SCOSSL_CIPHER_GCM_CTX *ctx, size_t ivlen
 {
     if (ivlen < SCOSSL_GCM_MIN_IV_LENGTH)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "GCM IV length must be at least 1 byte");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_IV_LEN, ERR_R_PASSED_INVALID_ARGUMENT,
+            "GCM IV length must be at least 1 byte");
         return SCOSSL_FAILURE;
     }
 
@@ -304,16 +304,16 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encr
 {
     if (ctx->ivlen != EVP_GCM_TLS_IV_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "set_iv_fixed only works with TLS IV length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_IV_FIXED, ERR_R_PASSED_INVALID_ARGUMENT,
+            "set_iv_fixed only works with TLS IV length");
         return SCOSSL_FAILURE;
     }
 
     if (ctx->iv == NULL &&
         (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
-                         "Failed to allocate IV");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_IV_FIXED, ERR_R_MALLOC_FAILURE,
+            "Failed to allocate IV");
         return SCOSSL_FAILURE;
     }
 
@@ -328,8 +328,8 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encr
     }
     if (ivlen > 4)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "set_iv_fixed incorrect length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_IV_FIXED, ERR_R_PASSED_INVALID_ARGUMENT,
+            "set_iv_fixed incorrect length");
         return SCOSSL_FAILURE;
     }
     // Set first up to 4B of IV
@@ -362,8 +362,8 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_inv(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encryp
     if (ctx->iv == NULL &&
         (ctx->iv = OPENSSL_zalloc(ctx->ivlen)) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
-                         "Failed to allocate IV");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_IV_INV, ERR_R_MALLOC_FAILURE,
+            "Failed to allocate IV");
         return SCOSSL_FAILURE;
     }
 
@@ -385,8 +385,8 @@ UINT16 scossl_aes_gcm_set_tls1_aad(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
 
     if (aadlen != EVP_AEAD_TLS1_AAD_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "tls1_aad only works with TLS1 AAD length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_TLS1_AAD, ERR_R_PASSED_INVALID_ARGUMENT,
+            "tls1_aad only works with TLS1 AAD length");
         return SCOSSL_FAILURE;
     }
     memcpy(ctx->tlsAad, aad, EVP_AEAD_TLS1_AAD_LEN);
@@ -406,8 +406,8 @@ UINT16 scossl_aes_gcm_set_tls1_aad(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
     tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(ctx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
     if (tls_buffer_len < min_tls_buffer_len)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "tls_buffer_len too short");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_SET_TLS1_AAD, ERR_R_PASSED_INVALID_ARGUMENT,
+            "tls_buffer_len too short");
         return SCOSSL_FAILURE;
     }
     tls_buffer_len -= min_tls_buffer_len;
@@ -478,19 +478,19 @@ static SCOSSL_STATUS scossl_aes_ccm_tls(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, INT3
     if (in != out)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-CCM TLS does not support out-of-place operation");
+            "AES-CCM TLS does not support out-of-place operation");
         goto cleanup;
     }
     if (inl < (SIZE_T)EVP_CCM_TLS_EXPLICIT_IV_LEN + ctx->taglen)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-CCM TLS buffer too small");
+            "AES-CCM TLS buffer too small");
         goto cleanup;
     }
     if (ctx->ccmStage != SCOSSL_CCM_STAGE_INIT)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_TLS, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "AES-CCM TLS operation cannot be multi-stage");
+            "AES-CCM TLS operation cannot be multi-stage");
         goto cleanup;
     }
     if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
@@ -591,7 +591,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
         else
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
-                             "Data provided to CCM after CCM operation is complete");
+                "Data provided to CCM after CCM operation is complete");
             return SCOSSL_FAILURE;
         }
     }
@@ -600,7 +600,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
         if (in != NULL && out == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
-                             "AAD provided to CCM before cbData has been set");
+                "AAD provided to CCM before cbData has been set");
             return SCOSSL_FAILURE;
         }
 
@@ -711,9 +711,9 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_len(SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen
 {
     if (ivlen < SCOSSL_CCM_MIN_IV_LENGTH || ivlen > SCOSSL_CCM_MAX_IV_LENGTH)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "SCOSSL only supports [%d-%d] byte IVs for AES-CCM",
-                         SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_IV_LEN, ERR_R_PASSED_INVALID_ARGUMENT,
+            "SCOSSL only supports [%d-%d] byte IVs for AES-CCM",
+            SCOSSL_CCM_MIN_IV_LENGTH, SCOSSL_CCM_MAX_IV_LENGTH);
         return SCOSSL_FAILURE;
     }
 
@@ -727,8 +727,8 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
 {
     if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "set_iv_fixed only works with TLS IV length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_IV_LEN, ERR_R_PASSED_INVALID_ARGUMENT,
+            "set_iv_fixed only works with TLS IV length");
         return SCOSSL_FAILURE;
     }
     if (ivlen == (size_t)-1)
@@ -738,8 +738,8 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
     }
     if (ivlen != ctx->ivlen - EVP_CCM_TLS_EXPLICIT_IV_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "set_iv_fixed incorrect length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_IV_FIXED, ERR_R_PASSED_INVALID_ARGUMENT,
+            "set_iv_fixed incorrect length");
         return SCOSSL_FAILURE;
     }
     // Set first 4B of IV
@@ -763,14 +763,14 @@ UINT16 scossl_aes_ccm_set_tls1_aad(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
     UINT16 min_tls_buffer_len = 0;
     if (aadlen != EVP_AEAD_TLS1_AAD_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "tls1_aad only works with TLS1 AAD length");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_TLS1_AAD, ERR_R_PASSED_INVALID_ARGUMENT,
+            "tls1_aad only works with TLS1 AAD length");
         return SCOSSL_FAILURE;
     }
     if (ctx->taglen != EVP_CCM_TLS_TAG_LEN && ctx->taglen != EVP_CCM8_TLS_TAG_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Invalid taglen for TLS");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_TLS1_AAD, ERR_R_PASSED_INVALID_ARGUMENT,
+            "Invalid taglen for TLS");
         return SCOSSL_FAILURE;
     }
     memcpy(ctx->tlsAad, aad, EVP_AEAD_TLS1_AAD_LEN);
@@ -790,8 +790,8 @@ UINT16 scossl_aes_ccm_set_tls1_aad(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
     tls_buffer_len = SYMCRYPT_LOAD_MSBFIRST16(ctx->tlsAad + EVP_AEAD_TLS1_AAD_LEN - 2);
     if (tls_buffer_len < min_tls_buffer_len)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "tls_buffer_len too short");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_TLS1_AAD, ERR_R_PASSED_INVALID_ARGUMENT,
+            "tls_buffer_len too short");
         return SCOSSL_FAILURE;
     }
     tls_buffer_len -= min_tls_buffer_len;

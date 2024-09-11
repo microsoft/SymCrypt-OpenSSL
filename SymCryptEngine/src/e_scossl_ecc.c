@@ -91,7 +91,7 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
     pKeyCtx->key = SymCryptEckeyAllocate(pCurve);
     if( pKeyCtx->key == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyAllocate returned NULL.");
         goto cleanup;
     }
@@ -103,7 +103,7 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL.");
         goto cleanup;
     }
@@ -111,7 +111,7 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
     scError = SymCryptEckeySetRandom( SYMCRYPT_FLAG_ECKEY_ECDH, pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeySetRandom failed", scError);
         goto cleanup;
     }
@@ -128,14 +128,14 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
         0 );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_CTX_new returned NULL.");
         goto cleanup;
     }
@@ -145,14 +145,14 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
         ((ec_pub_x = BN_new()) == NULL) ||
         ((ec_pub_y = BN_new()) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         goto cleanup;
     }
 
     if( (ec_pubkey = EC_POINT_new(ecgroup)) == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "EC_POINT_new returned NULL.");
         goto cleanup;
     }
@@ -161,28 +161,28 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
         (BN_bin2bn(pbPublicKey, cbPublicKey/2, ec_pub_x) == NULL) ||
         (BN_bin2bn(pbPublicKey + (cbPublicKey/2), cbPublicKey/2, ec_pub_y) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_bin2bn failed.");
         goto cleanup;
     }
 
     if( EC_KEY_set_private_key(eckey, ec_privkey) == 0)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_KEY_set_private_key failed.");
         goto cleanup;
     }
 
     if( EC_POINT_set_affine_coordinates(ecgroup, ec_pubkey, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_POINT_set_affine_coordinates failed.");
         goto cleanup;
 
     }
     if( EC_KEY_set_public_key(eckey, ec_pubkey) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_KEY_set_public_key failed.");
         goto cleanup;
     }
@@ -236,7 +236,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
     pKeyCtx->key = SymCryptEckeyAllocate(pCurve);
     if( pKeyCtx->key == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyAllocate returned NULL.");
         goto cleanup;
     }
@@ -249,7 +249,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
 
     if( ec_pubkey == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_KEY_get0_public_key returned NULL.");
         goto cleanup;
     }
@@ -261,7 +261,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
 
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_CTX_new returned NULL.");
         goto cleanup;
     }
@@ -270,14 +270,14 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
     if( ((ec_pub_x = BN_new()) == NULL) ||
         ((ec_pub_y = BN_new()) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         goto cleanup;
     }
 
     if( EC_POINT_get_affine_coordinates(ecgroup, ec_pubkey, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "EC_POINT_get_affine_coordinates failed.");
         goto cleanup;
     }
@@ -286,7 +286,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL.");
         goto cleanup;
     }
@@ -296,7 +296,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
         pbPrivateKey = pbData;
         if( (SIZE_T) BN_bn2binpad(ec_privkey, pbPrivateKey, cbPrivateKey) != cbPrivateKey )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
                 "BN_bn2binpad did not write expected number of private key bytes.");
             goto cleanup;
         }
@@ -306,7 +306,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
     if( ((SIZE_T) BN_bn2binpad(ec_pub_x, pbPublicKey, cbPublicKey/2) != cbPublicKey/2) ||
         ((SIZE_T) BN_bn2binpad(ec_pub_y, pbPublicKey + (cbPublicKey/2), cbPublicKey/2) != cbPublicKey/2) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad did not write expected number of public key bytes.");
         goto cleanup;
     }
@@ -320,7 +320,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
         pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeySetValue failed", scError);
         goto cleanup;
     }
@@ -374,14 +374,14 @@ SCOSSL_STATUS e_scossl_get_ecc_context_ex(_Inout_ EC_KEY* eckey, _Out_ SCOSSL_EC
         SCOSSL_ECC_KEY_CONTEXT *keyCtx = OPENSSL_zalloc(sizeof(*keyCtx));
         if( !keyCtx )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_ECC_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
                 "OPENSSL_zalloc failed");
             return SCOSSL_FAILURE;
         }
 
         if( EC_KEY_set_ex_data(eckey, e_scossl_eckey_idx, keyCtx) == 0)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_ECC_CONTEXT_EX, ERR_R_OPERATION_FAIL,
                 "EC_KEY_set_ex_data failed");
             OPENSSL_free(keyCtx);
             return SCOSSL_FAILURE;
@@ -434,7 +434,7 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
@@ -449,7 +449,7 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
@@ -457,7 +457,7 @@ SCOSSL_STATUS e_scossl_eckey_sign(int type,
     // SymCrypt does not support taking kinv or r parameters. Fallback to OpenSSL.
     if( kinv != NULL || r != NULL )
     {
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_ECKEY_SIGN, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SymCrypt engine does not yet support explicit setting kinv or r parameters. Falling back to OpenSSL");
         ossl_eckey_method = EC_KEY_OpenSSL();
         PFN_eckey_sign pfn_eckey_sign = NULL;
@@ -481,12 +481,12 @@ SCOSSL_STATUS e_scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in,
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SETUP, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
     case SCOSSL_SUCCESS:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SETUP, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SymCrypt engine does not yet support explicit getting kinv or r parameters. Falling back to OpenSSL");
         EC_KEY_METHOD_get_sign(ossl_eckey_method, NULL, &pfn_eckey_sign_setup, NULL);
         if( !pfn_eckey_sign_setup )
@@ -495,7 +495,7 @@ SCOSSL_STATUS e_scossl_eckey_sign_setup(_In_ EC_KEY* eckey, _In_ BN_CTX* ctx_in,
         }
         return pfn_eckey_sign_setup(eckey, ctx_in, kinvp, rp);
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SETUP, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SETUP, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
@@ -517,7 +517,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return NULL;
     case SCOSSL_FALLBACK:
@@ -532,7 +532,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return NULL;
     }
@@ -540,7 +540,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     scError = SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return NULL;
     }
@@ -556,7 +556,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
         cbSymCryptSig);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEcDsaSign failed", scError);
         return NULL;
     }
@@ -564,7 +564,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     returnSignature = ECDSA_SIG_new();
     if( returnSignature == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, ERR_R_MALLOC_FAILURE,
             "ECDSA_SIG_new returned NULL.");
         return NULL;
     }
@@ -574,7 +574,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     {
         BN_free(r);
         BN_free(s);
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         return NULL;
     }
@@ -582,7 +582,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     if( (BN_bin2bn(buf, cbSymCryptSig/2, r) == NULL) ||
         (BN_bin2bn(buf + cbSymCryptSig/2, cbSymCryptSig/2, s) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, ERR_R_OPERATION_FAIL,
             "BN_bin2bn failed.");
         BN_free(r);
         BN_free(s);
@@ -615,7 +615,7 @@ SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const u
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
@@ -630,7 +630,7 @@ SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const u
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
@@ -653,7 +653,7 @@ SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigne
     switch( e_scossl_get_ecc_context(eckey, &keyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
@@ -668,7 +668,7 @@ SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigne
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return SCOSSL_FAILURE;
     }
@@ -691,7 +691,7 @@ SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigne
     {
         if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_VERIFY_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
                 "SymCryptEcDsaVerify returned unexpected error", scError);
         }
         return SCOSSL_FAILURE;
@@ -708,7 +708,7 @@ SCOSSL_STATUS e_scossl_eckey_keygen(_Inout_ EC_KEY *key)
     switch( e_scossl_get_ecc_context_ex(key, &keyCtx, TRUE) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_KEYGEN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_KEYGEN, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context_ex failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
@@ -723,7 +723,7 @@ SCOSSL_STATUS e_scossl_eckey_keygen(_Inout_ EC_KEY *key)
     case SCOSSL_SUCCESS:
         return SCOSSL_SUCCESS;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_KEYGEN, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_KEYGEN, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context_ex value");
         return SCOSSL_FAILURE;
     }
@@ -751,7 +751,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     switch( e_scossl_get_ecc_context((EC_KEY*)ecdh, &keyCtx) ) // removing const cast as code path in this instance will not alter ecdh. TODO: refactor e_scossl_get_ecc_context
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "e_scossl_get_ecc_context failed.");
         return -1;
     case SCOSSL_FALLBACK:
@@ -766,7 +766,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_ecc_context value");
         return -1;
     }
@@ -774,7 +774,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     ecgroup = EC_KEY_get0_group(ecdh);
     if( ecgroup == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "EC_KEY_get0_group returned NULL.");
         goto cleanup;
     }
@@ -783,14 +783,14 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     pkPublic = SymCryptEckeyAllocate(keyCtx->key->pCurve);
     if( pkPublic == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeyAllocate returned NULL.");
         goto cleanup;
     }
 
     if( (bn_ctx = BN_CTX_new()) == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "BN_CTX_new returned NULL.");
         goto cleanup;
     }
@@ -799,14 +799,14 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     if( ((ec_pub_x = BN_new()) == NULL) ||
         ((ec_pub_y = BN_new()) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         goto cleanup;
     }
 
     if( EC_POINT_get_affine_coordinates(ecgroup, pub_key, ec_pub_x, ec_pub_y, bn_ctx) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "EC_POINT_get_affine_coordinates failed.");
         goto cleanup;
     }
@@ -814,7 +814,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     if( (BN_bn2binpad(ec_pub_x, buf, cbPublicKey/2) != (int) cbPublicKey/2) ||
         (BN_bn2binpad(ec_pub_y, buf + (cbPublicKey/2), cbPublicKey/2) != (int) cbPublicKey/2) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "BN_bn2binpad did not write expected number of public key bytes.");
         goto cleanup;
     }
@@ -828,7 +828,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEckeySetValue failed", scError);
         goto cleanup;
     }
@@ -837,7 +837,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
     *psec = OPENSSL_zalloc(*pseclen);
     if( *psec == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc failed");
         goto cleanup;
     }
@@ -851,7 +851,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
         *pseclen );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptEcDhSecretAgreement failed", scError);
         goto cleanup;
     }
