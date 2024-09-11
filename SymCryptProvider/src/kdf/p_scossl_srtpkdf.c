@@ -335,10 +335,15 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
             return SCOSSL_FAILURE;
         }
 
-        if (ctx->uIndexWidth > 64)
+        switch (ctx->uIndexWidth)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
-            return SCOSSL_FAILURE;
+            case 0:
+            case 32:
+            case 48:
+                break;
+            default:
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+                return SCOSSL_FAILURE;
         }
     }
 
