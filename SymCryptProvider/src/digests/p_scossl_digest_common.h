@@ -40,6 +40,8 @@ const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_un
                                                                                              \
         if (ctx != NULL)                                                                     \
         {                                                                                    \
+            ctx->pHash = SymCrypt##alg##Algorithm;                                           \
+                                                                                             \
             SCOSSL_COMMON_ALIGNED_ALLOC_EX(                                                  \
                 pStateTmp,                                                                   \
                 OPENSSL_malloc,                                                              \
@@ -52,7 +54,6 @@ const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_un
             }                                                                                \
                                                                                              \
             ctx->pState = pStateTmp;                                                         \
-            ctx->pHash = SymCrypt##alg##Algorithm;                                           \
         }                                                                                    \
                                                                                              \
         return ctx;                                                                          \

@@ -62,7 +62,7 @@ static const SCOSSL_CSHAKE_HASH SymCryptCShake256Algorithm = {
 typedef struct
 {
     const SCOSSL_CSHAKE_HASH *pHash;
-    SCOSSL_CSHAKE_STATE *pState;
+    SCOSSL_CSHAKE_STATE state;
     BOOL updating;
 
     PBYTE pbFunctionNameString;
@@ -87,24 +87,11 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 
 static SCOSSL_CSHAKE_CTX *p_scossl_cshake_newctx(const SCOSSL_CSHAKE_HASH *pHash)
 {
-    SCOSSL_CSHAKE_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_CSHAKE_CTX));
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_CSHAKE_CTX);
 
     if (ctx != NULL)
     {
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, sizeof(SCOSSL_CSHAKE_STATE));
-        if (pStateTmp == NULL)
-        {
-            OPENSSL_free(ctx);
-            return NULL;
-        }
-
         ctx->pHash = pHash;
-        ctx->pState = (SCOSSL_CSHAKE_STATE *)pStateTmp;
-        ctx->updating = FALSE;
-        ctx->pbFunctionNameString = NULL;
-        ctx->cbFunctionNameString = 0;
-        ctx->pbCustomizationString = NULL;
-        ctx->cbCustomizationString = 0;
         ctx->xofLen = pHash->resultSize;
     }
 
@@ -126,33 +113,19 @@ static void p_scossl_cshake_freectx(_Inout_ SCOSSL_CSHAKE_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    if (ctx->pState != NULL)
-    {
-        SCOSSL_COMMON_ALIGNED_FREE(ctx->pState, OPENSSL_clear_free, SCOSSL_CSHAKE_HASH);
-    }
-
     OPENSSL_free(ctx->pbFunctionNameString);
     OPENSSL_free(ctx->pbCustomizationString);
-    OPENSSL_free(ctx);
+    SCOSSL_COMMON_ALIGNED_FREE(ctx, OPENSSL_clear_free, SCOSSL_CSHAKE_CTX);
 }
 
 static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
-    SCOSSL_CSHAKE_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_CSHAKE_CTX));
+
+    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_malloc, SCOSSL_CSHAKE_CTX);
 
     if (ctx != NULL)
     {
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(pStateTmp, OPENSSL_malloc, PVOID, sizeof(SCOSSL_CSHAKE_STATE));
-        if (pStateTmp == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
-        ctx->pHash->stateCopyFunc(ctx->pState, pStateTmp);
-        copyCtx->pState = (SCOSSL_CSHAKE_STATE *)pStateTmp;
-
         if (ctx->pbFunctionNameString != NULL)
         {
             copyCtx->pbFunctionNameString = OPENSSL_memdup(ctx->pbFunctionNameString, ctx->cbFunctionNameString);
@@ -182,6 +155,8 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
             copyCtx->pbCustomizationString = NULL;
         }
         copyCtx->cbCustomizationString = ctx->cbCustomizationString;
+
+        ctx->pHash->stateCopyFunc(&ctx->state, &copyCtx->state);
 
         copyCtx->pHash = ctx->pHash;
         copyCtx->updating = ctx->updating;
@@ -224,14 +199,14 @@ static SCOSSL_STATUS p_scossl_cshake_update(_Inout_ SCOSSL_CSHAKE_CTX *ctx,
     if (!ctx->updating)
     {
         ctx->pHash->initFunc(
-            ctx->pState,
+            &ctx->state,
             ctx->pbFunctionNameString, ctx->cbFunctionNameString,
             ctx->pbCustomizationString, ctx->cbCustomizationString);
 
         ctx->updating = TRUE;
     }
 
-    ctx->pHash->appendFunc(ctx->pState, in, inl);
+    ctx->pHash->appendFunc(&ctx->state, in, inl);
     return SCOSSL_SUCCESS;
 }
 
@@ -244,7 +219,7 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOLEA
         return SCOSSL_FAILURE;
     }
 
-    ctx->pHash->extractFunc(ctx->pState, out, ctx->xofLen, wipeState);
+    ctx->pHash->extractFunc(&ctx->state, out, ctx->xofLen, wipeState);
     *outl = ctx->xofLen;
 
     return SCOSSL_SUCCESS;
