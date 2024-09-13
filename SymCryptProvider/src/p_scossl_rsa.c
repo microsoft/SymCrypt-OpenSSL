@@ -209,7 +209,6 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
 
     if ((cbEncodedKey = i2d_SymcryptRsaPublicKey(rsaParams, &pbEncodedKey)) < 0)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
     }
 

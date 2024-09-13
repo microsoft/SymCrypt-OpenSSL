@@ -71,6 +71,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
     ctx->encrypt = encrypt;
 
     if (key != NULL)
@@ -80,10 +81,12 @@ static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             return SCOSSL_FAILURE;
         }
-        SYMCRYPT_ERROR scError = SymCryptXtsAesExpandKeyEx(&ctx->key, key, keylen, 0);
+
+        scError = SymCryptXtsAesExpandKeyEx(&ctx->key, key, keylen, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptXtsAesExpandKeyEx failed", scError);
             return SCOSSL_FAILURE;
         }
     }

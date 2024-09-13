@@ -219,7 +219,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
                 0);
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_DUP_CTX, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                    "SymCryptEckeyGetValue failed", scError);
                 goto cleanup;
             }
 
@@ -239,7 +240,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_DUP_CTX, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                    "SymCryptEckeySetValue failed", scError);
                 goto cleanup;
             }
 
@@ -447,7 +449,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     scError = SymCryptEckeySetRandom(SYMCRYPT_FLAG_ECKEY_ECDH, keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeySetRandom failed", scError);
         goto cleanup;
     }
 
@@ -498,7 +501,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_pubkey_point(_In_ SCOSSL_ECC_KEY_C
         0 );
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PUBKEY_POINT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -789,7 +793,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_SET_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -900,6 +905,7 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
     PBYTE pbPublicKey2 = NULL;
     SIZE_T cbPrivateKey = 0;
     SIZE_T cbPublicKey = 0;
+    SYMCRYPT_ERROR scError;
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx1->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
 
     if (keyCtx1->initialized != keyCtx2->initialized ||
@@ -961,22 +967,31 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
             goto cleanup;
         }
 
-        if (SymCryptEckeyGetValue(
-                keyCtx1->key,
-                pbPrivateKey1, cbPrivateKey,
-                pbPublicKey1, cbPublicKey,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                pointFormat,
-                0) != SYMCRYPT_NO_ERROR ||
-            SymCryptEckeyGetValue(
-                keyCtx2->key,
-                pbPrivateKey2, cbPrivateKey,
-                pbPublicKey2, cbPublicKey,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                pointFormat,
-                0) != SYMCRYPT_NO_ERROR)
+        scError = SymCryptEckeyGetValue(
+            keyCtx1->key,
+            pbPrivateKey1, cbPrivateKey,
+            pbPublicKey1, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            pointFormat,
+            0);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_MATCH, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEckeyGetValue failed", scError);
+            goto cleanup;
+        }
+
+        scError = SymCryptEckeyGetValue(
+            keyCtx2->key,
+            pbPrivateKey2, cbPrivateKey,
+            pbPublicKey2, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            pointFormat,
+            0);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_MATCH, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEckeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1182,7 +1197,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_IMPORT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -1370,7 +1386,8 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_X25519_KEYMGMT_IMPORT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -1434,7 +1451,8 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *key
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_X25519_KEYMGMT_EXPORT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1571,7 +1589,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key(SCOSSL_ECC_KEY_CTX *ke
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PRIVATE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 

@@ -121,18 +121,25 @@ static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ SCOSSL_KMAC_CTX *ctx,
                                         _In_reads_bytes_opt_(keylen) unsigned char *key, size_t keylen,
                                         _In_ const OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
+
     if (!p_scossl_kmac_set_ctx_params(ctx, params))
     {
         return SCOSSL_FAILURE;
     }
 
-    if (key != NULL &&
-        ctx->pMacEx->expandKeyExFunc(
+    if (key != NULL)
+    {
+        scError = ctx->pMacEx->expandKeyExFunc(
             &ctx->expandedKey,
             key, keylen,
-            ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
-    {
-        return SCOSSL_FAILURE;
+            ctx->customizationString, ctx->cbCustomizationString);
+
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_INIT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptKmacXXXExpandKeyEx failed", scError);
+        }
     }
 
     ctx->pMac->initFunc(&ctx->macState, &ctx->expandedKey);
@@ -206,6 +213,7 @@ static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ SCOSSL_KMAC_CTX *ctx, _In
 
 static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_XOF)) != NULL &&
@@ -259,12 +267,20 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, 
     {
         PCBYTE pbMacKey;
         SIZE_T cbMacKey;
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey) ||
-            ctx->pMacEx->expandKeyExFunc(&ctx->expandedKey,
-                                         pbMacKey, cbMacKey,
-                                         ctx->customizationString, ctx->cbCustomizationString) != SYMCRYPT_NO_ERROR)
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbMacKey, &cbMacKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        scError = ctx->pMacEx->expandKeyExFunc(
+            &ctx->expandedKey,
+            pbMacKey, cbMacKey,
+            ctx->customizationString, ctx->cbCustomizationString);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptKmacXXXExpandKeyEx failed", scError);
             return SCOSSL_FAILURE;
         }
 

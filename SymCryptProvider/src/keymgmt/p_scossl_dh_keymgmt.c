@@ -379,7 +379,8 @@ static SCOSSL_STATUS p_scossl_dh_params_to_group(_In_ OSSL_LIB_CTX *libCtx, _In_
             pDlGroupTmp);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_PARAMS_TO_GROUP, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlgroupSetValue failed", scError);
             goto cleanup;
         }
 
@@ -633,7 +634,9 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
         {
             SymCryptDlkeyFree(ctx->keyCtx->dlkey);
             ctx->keyCtx->dlkey = NULL;
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_SET_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeySetValue failed", scError);
             return SCOSSL_FAILURE;
         }
 
@@ -650,6 +653,7 @@ static const OSSL_PARAM *p_scossl_dh_keymgmt_gettable_params(ossl_unused void *p
 
 static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SYMCRYPT_DLGROUP *pDlGroup, _Inout_ OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     PBYTE  pbPrimeP = NULL;
     PBYTE  pbPrimeQ = NULL;
@@ -712,17 +716,20 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SYMCRYPT_DLGROUP *p
         pbCur += cbGenG;
         pbSeed = cbSeed == 0 ? NULL : pbCur;
 
-        if (SymCryptDlgroupGetValue(
-                pDlGroup,
-                pbPrimeP, cbPrimeP,
-                pbPrimeQ, cbPrimeQ,
-                pbGenG, cbGenG,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                NULL,
-                pbSeed, cbSeed,
-                NULL) != SYMCRYPT_NO_ERROR)
+        scError = SymCryptDlgroupGetValue(
+            pDlGroup,
+            pbPrimeP, cbPrimeP,
+            pbPrimeQ, cbPrimeQ,
+            pbGenG, cbGenG,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            NULL,
+            pbSeed, cbSeed,
+            NULL);
+
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_FFC_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlgroupGetValue failed", scError);
             goto cleanup;
         }
     }
@@ -804,6 +811,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
     SIZE_T cbData = 0;
     BIGNUM *bnPrivKey = NULL;
     BIGNUM *bnPubKey = NULL;
+    SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *paramEncodedKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
     OSSL_PARAM *paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
@@ -847,14 +855,16 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
         pbPrivateKey = cbPrivateKey == 0 ? NULL : pbData;
         pbPublicKey = cbPublicKey == 0 ? NULL : pbData + cbPrivateKey;
 
-        if (SymCryptDlkeyGetValue(
-                keyCtx->dlkey,
-                pbPrivateKey, cbPrivateKey,
-                pbPublicKey, cbPublicKey,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0) != SYMCRYPT_NO_ERROR)
+        scError = SymCryptDlkeyGetValue(
+            keyCtx->dlkey,
+            pbPrivateKey, cbPrivateKey,
+            pbPublicKey, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_KEY_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1008,6 +1018,7 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
     PBYTE  pbPublicKey1 = NULL;
     PBYTE  pbPublicKey2 = NULL;
     SIZE_T cbPublicKey = 0;
+    SYMCRYPT_ERROR scError;
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
@@ -1057,20 +1068,29 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
         pbPublicKey2 = cbPublicKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;
         pbPrivateKey2 = cbPrivateKey == 0 ? NULL : pbData + cbPublicKey + cbPrivateKey;
 
-        if (SymCryptDlkeyGetValue(
+        scError = SymCryptDlkeyGetValue(
                 ctx1->keyCtx->dlkey,
                 pbPrivateKey1, cbPrivateKey,
                 pbPublicKey1, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0) != SYMCRYPT_NO_ERROR ||
-            SymCryptDlkeyGetValue(
+                0);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeyGetValue failed", scError);
+            goto cleanup;
+        }
+
+        scError = SymCryptDlkeyGetValue(
                 ctx2->keyCtx->dlkey,
                 pbPrivateKey2, cbPrivateKey,
                 pbPublicKey2, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0) != SYMCRYPT_NO_ERROR)
+                0);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1333,7 +1353,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         &genCounter);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            "SymCryptDlgroupGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1406,14 +1427,16 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         pbPrivateKey = includePrivate ? pbData : NULL;
         pbPublicKey = includePublic ? pbData + cbPrivateKey : NULL;
 
-        if (SymCryptDlkeyGetValue(
-                ctx->keyCtx->dlkey,
-                pbPrivateKey, cbPrivateKey,
-                pbPublicKey, cbPublicKey,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0) != SYMCRYPT_NO_ERROR)
+        scError = SymCryptDlkeyGetValue(
+            ctx->keyCtx->dlkey,
+            pbPrivateKey, cbPrivateKey,
+            pbPublicKey, cbPublicKey,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                "SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
