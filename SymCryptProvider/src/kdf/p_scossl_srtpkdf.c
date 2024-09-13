@@ -51,7 +51,14 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
 
 static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_newctx(ossl_unused void *provctx)
 {
-    return OPENSSL_zalloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
+    SCOSSL_PROV_SRTPKDF_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
+
+    if (ctx != NULL)
+    {
+        ctx->label = (BYTE)-1;
+    }
+
+    return ctx;
 }
 
 static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtcpkdf_newctx(ossl_unused void *provctx)
@@ -60,6 +67,7 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtcpkdf_newctx(ossl_unused void *provc
 
     if (ctx != NULL)
     {
+        ctx->label = (BYTE)-1;
         ctx->isSrtcp = TRUE;
     }
 
@@ -142,7 +150,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_reset(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx
     ctx->uKeyDerivationRate = 0;
     ctx->uIndex = 0;
     ctx->uIndexWidth = 0;
-    ctx->label = 0;
+    ctx->label = (BYTE)-1;
 
     return SCOSSL_SUCCESS;
 }
@@ -167,6 +175,12 @@ static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
     if (!ctx->isSaltSet)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_SALT);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->label == (BYTE)-1)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_TYPE);
         return SCOSSL_FAILURE;
     }
 
