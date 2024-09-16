@@ -14,6 +14,8 @@ extern "C" {
 
 #define SCOSSL_SRTP_KDF_SALT_SIZE (112 / 8)
 
+#define SCOSSL_SRTP_LABEL_NOT_SET (BYTE)-1
+
 typedef struct
 {
     BOOL isSrtcp;
@@ -55,7 +57,7 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_newctx(ossl_unused void *provct
 
     if (ctx != NULL)
     {
-        ctx->label = (BYTE)-1;
+        ctx->label = SCOSSL_SRTP_LABEL_NOT_SET;
     }
 
     return ctx;
@@ -67,7 +69,7 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtcpkdf_newctx(ossl_unused void *provc
 
     if (ctx != NULL)
     {
-        ctx->label = (BYTE)-1;
+        ctx->label = SCOSSL_SRTP_LABEL_NOT_SET;
         ctx->isSrtcp = TRUE;
     }
 
@@ -150,7 +152,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_reset(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx
     ctx->uKeyDerivationRate = 0;
     ctx->uIndex = 0;
     ctx->uIndexWidth = 0;
-    ctx->label = (BYTE)-1;
+    ctx->label = SCOSSL_SRTP_LABEL_NOT_SET;
 
     return SCOSSL_SUCCESS;
 }
@@ -178,7 +180,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->label == (BYTE)-1)
+    if (ctx->label == SCOSSL_SRTP_LABEL_NOT_SET)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_TYPE);
         return SCOSSL_FAILURE;
