@@ -62,7 +62,7 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, 0), "scossl_ecdsa_der_check_tag_and_get_value_and_length"},
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_REMOVE_DER, 0), "scossl_ecdsa_remove_der"},
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_SIGN, 0), "scossl_ecdsa_sign"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_VERIFY, 0), "SCOSSL_ERR_F_ECDSA_VERIFY"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_VERIFY, 0), "scossl_ecdsa_verify"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, 0), "scossl_get_symcrypt_hash_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, 0), "scossl_get_symcrypt_hmac_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_DERIVE, 0), "scossl_hkdf_derive"},
