@@ -75,7 +75,7 @@ typedef struct
 
 static const OSSL_PARAM p_scossl_cshake_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
-    OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_FUNCTION_NAME, NULL, 0),
+    OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING, NULL, 0),
     OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING, NULL, 0),
     OSSL_PARAM_END};
 
@@ -294,7 +294,7 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 {
     const OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING)) != NULL)
     {
         if (ctx->updating)
         {

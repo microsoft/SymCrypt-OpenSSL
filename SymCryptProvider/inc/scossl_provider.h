@@ -15,7 +15,7 @@ extern "C" {
 // Digest parameters
 //
 
-#define SCOSSL_DIGEST_PARAM_FUNCTION_NAME "function-name"
+#define SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING "function-name-string"
 #define SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING "customization-string"
 
 #ifdef __cplusplus
