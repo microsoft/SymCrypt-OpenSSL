@@ -200,15 +200,22 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
     int cbEncodedKey;
     SCOSSL_STATUS  ret = SCOSSL_FAILURE;
 
+    // KeysInUse related errors shouldn't surface to caller
+    ERR_set_mark();
+
     rsaParams = scossl_rsa_new_export_params(FALSE);
     if (rsaParams == NULL ||
         !scossl_rsa_export_key(key, rsaParams))
     {
+        SCOSSL_LOG_DEBUG(SCOSSL_ERR_F_PROV_RSA_GET_ENCODED_PUBLIC_KEY, SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+            "scossl_rsa_export_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
         goto cleanup;
     }
 
     if ((cbEncodedKey = i2d_SymcryptRsaPublicKey(rsaParams, &pbEncodedKey)) < 0)
     {
+        SCOSSL_LOG_DEBUG(SCOSSL_ERR_F_PROV_RSA_GET_ENCODED_PUBLIC_KEY, SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+            "i2d_SymcryptRsaPublicKey failed: %s", ERR_error_string(ERR_get_error(), NULL));
         goto cleanup;
     }
 
@@ -218,6 +225,8 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
 
 cleanup:
     scossl_rsa_free_export_params(rsaParams, TRUE);
+
+    ERR_pop_to_mark();
 
     return ret;
 }
