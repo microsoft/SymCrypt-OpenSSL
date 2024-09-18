@@ -175,7 +175,7 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
     if (pkcs1Params == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-            "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
+            "Unsupported hash algorithm: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 

@@ -727,7 +727,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
 {
     if (ctx->ivlen != EVP_CCM_TLS_IV_LEN)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_IV_LEN, ERR_R_PASSED_INVALID_ARGUMENT,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_SET_IV_FIXED, ERR_R_PASSED_INVALID_ARGUMENT,
             "set_iv_fixed only works with TLS IV length");
         return SCOSSL_FAILURE;
     }
