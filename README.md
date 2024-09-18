@@ -42,9 +42,8 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
 
 ## Known cases where SCOSSL will fail rather than fallback to default OpenSSL
 
-1. Use of an AES-GCM IV which is not 12-bytes (96-bits)
-2. Use of unsupported digests in RSA signatures, TLS PRF, and HMAC
-3. Use of multi-prime (more than 2-prime) RSA
+1. Use of unsupported digests in RSA signatures, TLS PRF, and HMAC
+2. Use of multi-prime (more than 2-prime) RSA
 
 ## Versioning and Servicing
 

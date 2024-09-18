@@ -242,6 +242,16 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         return NULL;
     }
 
+#ifdef KEYSINUSE_ENABLED
+    copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+
+    if (keyCtx->keysinuseInfo == NULL ||
+        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+    {
+        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
+    }
+#endif
+
     copyCtx->initialized = keyCtx->initialized;
     copyCtx->padding = keyCtx->padding;
 
@@ -263,16 +273,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         p_scossl_rsa_keymgmt_free_ctx(copyCtx);
         return NULL;
     }
-
-#ifdef KEYSINUSE_ENABLED
-    copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-
-    if (keyCtx->keysinuseInfo != NULL &&
-        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
-    {
-        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
-    }
-#endif
 
     return copyCtx;
 }
@@ -442,6 +442,8 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     genCtx->pssRestrictions = NULL;
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
+    keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+    keyCtx->keysinuseInfo = NULL;
 #endif
 
 cleanup:
@@ -592,6 +594,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
     OSSL_PARAM *paramPublicExponent;
     UINT64 publicExponent;
     PUINT64 pPublicExponent = NULL;
+    BYTE pbLePublicExponent[8];
     UINT32 nPublicExponent = 0;
     BIGNUM *bnPublicExponent = NULL;
 
@@ -691,7 +694,15 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
 
     if (paramPublicExponent != NULL)
     {
-        if (BN_set_word(bnPublicExponent, publicExponent) == 0 ||
+        scError = SymCryptStoreLsbFirstUint64(publicExponent, pbLePublicExponent, sizeof(pbLePublicExponent));
+
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
+        }
+
+        if (BN_lebin2bn(pbLePublicExponent, sizeof(pbLePublicExponent), bnPublicExponent) == NULL ||
             !OSSL_PARAM_set_BN(paramPublicExponent, bnPublicExponent))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

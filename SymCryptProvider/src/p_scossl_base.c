@@ -383,6 +383,9 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
         OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confLoggingDelay, 0),
         OSSL_PARAM_END};
 
+    // Config related errors shouldn't surface to caller
+    ERR_set_mark();
+
     if (core_get_params(handle, keysinuseParams) &&
         confEnabled != NULL)
     {
@@ -460,6 +463,8 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 
         p_scossl_keysinuse_init();
     }
+
+    ERR_pop_to_mark();
 }
 #endif
 
