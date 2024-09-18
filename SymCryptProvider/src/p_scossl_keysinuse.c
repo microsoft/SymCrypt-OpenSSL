@@ -124,6 +124,9 @@ static void p_scossl_keysinuse_init_once()
         if ((procPath = OPENSSL_malloc(cbProcPath)) != NULL &&
             (cbProcPathUsed = readlink(symlinkPath, procPath, cbProcPath)) == -1)
         {
+            SCOSSL_LOG_DEBUG(SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE, SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+                "Failed to get process path from /proc/%d/exe", pid, errno);
+
             OPENSSL_free(procPath);
             procPath = NULL;
             cbProcPathUsed = 0;
@@ -136,6 +139,9 @@ static void p_scossl_keysinuse_init_once()
     if ((prefix = OPENSSL_malloc(prefix_size + 1)) == NULL ||
         snprintf(prefix, prefix_size + 1, "%ld,%.*s", initTime, cbProcPathUsed, procPath) < 0)
     {
+        SCOSSL_LOG_DEBUG(SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE, SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+            "Failed to generate logging prefix", pid, errno);
+
         OPENSSL_free(prefix);
         prefix = (char*)default_prefix;
     }

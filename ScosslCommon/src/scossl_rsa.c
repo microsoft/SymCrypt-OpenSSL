@@ -287,7 +287,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (mdnid == NID_md5)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5 which is not FIPS compliant");
+            "Using hash algorithm MD5 which is not FIPS compliant");
     }
     else if (mdnid == NID_sha1)
     {

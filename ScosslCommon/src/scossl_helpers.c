@@ -149,6 +149,7 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_ECDH_DERIVE, 0), "p_scossl_ecdh_derive"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KBKDF_DERIVE, 0), "p_scossl_kbkdf_derive"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KBKDF_KMAC_DERIVE, 0), "p_scossl_kbkdf_kmac_derive"},
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE, 0), "p_scossl_keysinuse_init_once"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KMAC_INIT, 0), "p_scossl_kmac_init"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS, 0), "p_scossl_kmac_set_ctx_params"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYGEN, 0), "p_scossl_rsa_keygen"},
@@ -171,6 +172,7 @@ static ERR_STRING_DATA SCOSSL_ERR_reason_strings[] = {
     {ERR_PACK(0, 0, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM), "Algorithm not FIPS certifiable"},
     {ERR_PACK(0, 0, SCOSSL_ERR_R_OPENSSL_FALLBACK), "SCOSSL falling back to OpenSSL"},
     {ERR_PACK(0, 0, SCOSSL_ERR_R_SYMCRYPT_FAILURE), "SCOSSL triggered SymCrypt failure"},
+    {ERR_PACK(0, 0, SCOSSL_ERR_R_KEYSINUSE_FAILURE), "KeysInUse failure"},
     {0, NULL}
 };
 
