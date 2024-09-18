@@ -122,7 +122,7 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_malloc, SCOSSL_CSHAKE_CTX);
+    SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_CSHAKE_CTX);
 
     if (ctx != NULL)
     {
@@ -178,15 +178,6 @@ cleanup:
 static SCOSSL_STATUS p_scossl_cshake_init(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     ctx->updating = FALSE;
-    ctx->xofLen = ctx->pHash->resultSize;
-
-    OPENSSL_free(ctx->pbFunctionNameString);
-    ctx->pbFunctionNameString = NULL;
-    ctx->cbFunctionNameString = 0;
-
-    OPENSSL_free(ctx->pbCustomizationString);
-    ctx->pbCustomizationString = NULL;
-    ctx->pbCustomizationString = 0;
 
     return p_scossl_cshake_set_ctx_params(ctx, params);
 }
@@ -221,6 +212,7 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOLEA
 
     ctx->pHash->extractFunc(&ctx->state, out, ctx->xofLen, wipeState);
     *outl = ctx->xofLen;
+    ctx->updating = wipeState;
 
     return SCOSSL_SUCCESS;
 }
@@ -258,6 +250,7 @@ static SCOSSL_STATUS p_scossl_cshake_digest(_In_ const SCOSSL_CSHAKE_HASH *pHash
         out, cbResult);
 
     *outl = cbResult;
+
     return SCOSSL_SUCCESS;
 }
 
