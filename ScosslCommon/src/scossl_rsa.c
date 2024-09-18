@@ -495,6 +495,9 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         }
         break;
     case RSA_NO_PADDING:
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using no padding for RSA encryption which is not FIPS compliant");
+
         if (cbSrc != cbModulus)
         {
             goto cleanup;
@@ -622,6 +625,9 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         }
         break;
     case RSA_NO_PADDING:
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using no padding for RSA decryption which is not FIPS compliant");
+
         scError = SymCryptRsaRawDecrypt(
             key,
             pbSrc,
