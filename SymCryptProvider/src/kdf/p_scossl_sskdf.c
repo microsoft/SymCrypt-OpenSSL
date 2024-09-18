@@ -75,8 +75,7 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    SCOSSL_PROV_SSKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
-
+    SCOSSL_PROV_SSKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
     if (copyCtx != NULL)
     {
         if (ctx->pbSecret != NULL)
@@ -89,39 +88,20 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
 
             memcpy(copyCtx->pbSecret, ctx->pbSecret, ctx->cbSecret);
         }
-        else
-        {
-            copyCtx->pbSecret = NULL;
-        }
-        copyCtx->cbSecret = ctx->cbSecret;
 
-        if (ctx->pbInfo != NULL)
+        if (ctx->pbInfo != NULL &&
+            (copyCtx->pbInfo = OPENSSL_memdup(ctx->pbInfo, ctx->cbInfo)) == NULL)
         {
-            if ((copyCtx->pbInfo = OPENSSL_memdup(ctx->pbInfo, ctx->cbInfo)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
         }
-        else
-        {
-            copyCtx->pbInfo = NULL;
-        }
-        copyCtx->cbInfo = ctx->cbInfo;
 
-        if (ctx->pbSalt != NULL)
+        if (ctx->pbSalt != NULL &&
+            (copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
         {
-            if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
         }
-        else
-        {
-            copyCtx->pbSalt = NULL;
-        }
-        copyCtx->cbSalt = ctx->cbSalt;
 
         if (ctx->mac != NULL && !EVP_MAC_up_ref(ctx->mac))
         {
@@ -130,6 +110,9 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
         }
 
         copyCtx->libCtx = ctx->libCtx;
+        copyCtx->cbSecret = ctx->cbSecret;
+        copyCtx->cbSalt = ctx->cbSalt;
+        copyCtx->cbInfo = ctx->cbInfo;
         copyCtx->isSaltExpanded = ctx->isSaltExpanded;
         copyCtx->expandedSalt = ctx->expandedSalt;
         copyCtx->mac = ctx->mac;
