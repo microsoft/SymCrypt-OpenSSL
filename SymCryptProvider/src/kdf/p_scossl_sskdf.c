@@ -45,9 +45,7 @@ static const OSSL_PARAM p_scossl_sskdf_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_KDF_PARAM_MAC_SIZE, NULL),
     OSSL_PARAM_END};
 
-
 SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, _In_ const OSSL_PARAM params[]);
-SCOSSL_STATUS p_scossl_sskdf_reset(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx);
 
 SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -66,7 +64,10 @@ void p_scossl_sskdf_freectx(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    p_scossl_sskdf_reset(ctx);
+    OPENSSL_secure_clear_free(ctx->pbSecret, ctx->cbSecret);
+    OPENSSL_free(ctx->pbSalt);
+    OPENSSL_free(ctx->pbInfo);
+    EVP_MAC_free(ctx->mac);
     OPENSSL_free(ctx);
 }
 
@@ -74,7 +75,8 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    SCOSSL_PROV_SSKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
+    SCOSSL_PROV_SSKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
+
     if (copyCtx != NULL)
     {
         if (ctx->pbSecret != NULL)
@@ -87,20 +89,39 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
 
             memcpy(copyCtx->pbSecret, ctx->pbSecret, ctx->cbSecret);
         }
-
-        if (ctx->pbInfo != NULL &&
-            (copyCtx->pbInfo = OPENSSL_memdup(ctx->pbInfo, ctx->cbInfo)) == NULL)
+        else
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
+            copyCtx->pbSecret = NULL;
         }
+        copyCtx->cbSecret = ctx->cbSecret;
 
-        if (ctx->pbSalt != NULL &&
-            (copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
+        if (ctx->pbInfo != NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
+            if ((copyCtx->pbInfo = OPENSSL_memdup(ctx->pbInfo, ctx->cbInfo)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
         }
+        else
+        {
+            copyCtx->pbInfo = NULL;
+        }
+        copyCtx->cbInfo = ctx->cbInfo;
+
+        if (ctx->pbSalt != NULL)
+        {
+            if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+        }
+        else
+        {
+            copyCtx->pbSalt = NULL;
+        }
+        copyCtx->cbSalt = ctx->cbSalt;
 
         if (ctx->mac != NULL && !EVP_MAC_up_ref(ctx->mac))
         {
@@ -109,9 +130,6 @@ SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
         }
 
         copyCtx->libCtx = ctx->libCtx;
-        copyCtx->cbSecret = ctx->cbSecret;
-        copyCtx->cbSalt = ctx->cbSalt;
-        copyCtx->cbInfo = ctx->cbInfo;
         copyCtx->isSaltExpanded = ctx->isSaltExpanded;
         copyCtx->expandedSalt = ctx->expandedSalt;
         copyCtx->mac = ctx->mac;
@@ -134,11 +152,16 @@ cleanup:
 
 SCOSSL_STATUS p_scossl_sskdf_reset(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx)
 {
+    OSSL_LIB_CTX *libCtx = ctx->libCtx;
+
     OPENSSL_secure_clear_free(ctx->pbSecret, ctx->cbSecret);
     OPENSSL_free(ctx->pbSalt);
     OPENSSL_free(ctx->pbInfo);
     EVP_MAC_free(ctx->mac);
     OPENSSL_cleanse(ctx, sizeof(SCOSSL_PROV_SSKDF_CTX));
+
+    ctx->libCtx = libCtx;
+
     return SCOSSL_SUCCESS;
 }
 
@@ -277,9 +300,9 @@ SCOSSL_STATUS p_scossl_sskdf_get_ctx_params(_In_ SCOSSL_PROV_SSKDF_CTX *ctx, _In
 
 SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    const OSSL_PARAM *p;
     const char *propq = NULL;
     EVP_MD *md = NULL;
-    const OSSL_PARAM *p;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SECRET)) != NULL ||
