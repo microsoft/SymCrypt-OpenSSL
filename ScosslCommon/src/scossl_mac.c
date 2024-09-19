@@ -273,6 +273,8 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
             SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
             if (expandedKey == NULL)
             {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_INTERNAL_ERROR,
+                    "Failed to aligned allocated expanded key");
                 return SCOSSL_FAILURE;
             }
 
@@ -283,7 +285,7 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_MAC_INIT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_MAC_INIT,
                 "SymCryptMacExpandKey failed", scError);
             return SCOSSL_FAILURE;
         }

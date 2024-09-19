@@ -69,7 +69,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_GET_ENCODED_PUBLIC_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_GET_ENCODED_PUBLIC_KEY,
                 "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }

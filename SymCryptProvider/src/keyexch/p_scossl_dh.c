@@ -196,16 +196,16 @@ static SCOSSL_STATUS p_scossl_dh_X9_42_derive(_In_ SCOSSL_DH_CTX *ctx,
             cbAgreedSecret);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_X9_42_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_X9_42_DERIVE,
                 "SymCryptDhSecretAgreement failed", scError);
-
             goto cleanup;
         }
 
         if ((kdf = EVP_KDF_fetch(ctx->libCtx, OSSL_KDF_NAME_X942KDF_ASN1, NULL)) == NULL ||
             (kdfCtx = EVP_KDF_CTX_new(kdf)) == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_DH_X9_42_DERIVE, ERR_R_INTERNAL_ERROR,
+                "Failed to create X9.42 KDF context");
             goto cleanup;
         }
 
@@ -269,7 +269,7 @@ static SCOSSL_STATUS p_scossl_dh_plain_derive(_In_ SCOSSL_DH_CTX *ctx,
             cbAgreedSecret);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_PLAIN_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_PLAIN_DERIVE,
                 "SymCryptDhSecretAgreement failed", scError);
             return SCOSSL_FAILURE;
         }

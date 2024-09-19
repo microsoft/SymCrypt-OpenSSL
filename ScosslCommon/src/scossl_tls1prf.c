@@ -117,7 +117,7 @@ SCOSSL_STATUS scossl_tls1prf_derive(SCOSSL_TLS1_PRF_CTX *ctx,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_TLS1PRF_DERIVE,
             "SymCryptTlsPrf1_x failed", scError);
         return SCOSSL_FAILURE;
     }

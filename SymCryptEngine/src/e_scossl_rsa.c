@@ -256,7 +256,7 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN,
             "SymCryptRsakeyGenerate failed", scError);
         goto cleanup;
     }
@@ -425,7 +425,7 @@ SCOSSL_STATUS e_scossl_initialize_rsa_key(_In_ const RSA* rsa, _Out_ SCOSSL_RSA_
                    keyCtx->key);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY,
             "SymCryptRsakeySetValue failed", scError);
         goto cleanup;
     }

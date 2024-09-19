@@ -180,9 +180,11 @@ typedef enum {
     SCOSSL_ERR_F_ENG_TLS1PRF_CTRL,
     SCOSSL_ERR_F_ENG_TLS1PRF_INIT,
     // SymCryptProvider
+    SCOSSL_ERR_F_PROV_AES_CFB_CIPHER,
     SCOSSL_ERR_F_PROV_AES_GENERIC_INIT_INTERNAL,
     SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL,
     SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT,
+    SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_PARAMS,
     SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_FFC_PARAMS,
     SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_KEY_PARAMS,
     SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH,
@@ -205,6 +207,8 @@ typedef enum {
     SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE,
     SCOSSL_ERR_F_PROV_KMAC_INIT,
     SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS,
+    SCOSSL_ERR_F_PROV_RSA_CIPHER_ENCRYPT,
+    SCOSSL_ERR_F_PROV_RSA_CIPHER_DECRYPT,
     SCOSSL_ERR_F_PROV_RSA_GET_ENCODED_PUBLIC_KEY,
     SCOSSL_ERR_F_PROV_RSA_KEYGEN,
     SCOSSL_ERR_F_PROV_RSA_KEYMGMT_DUP_KEYDATA,
@@ -212,6 +216,7 @@ typedef enum {
     SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_KEYDATA,
     SCOSSL_ERR_F_PROV_RSA_KEYMGMT_IMPORT,
     SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
+    SCOSSL_ERR_F_PROV_RSA_PSS_PARAMS_TO_ASN1_SEQUENCE,
     SCOSSL_ERR_F_PROV_X25519_KEYMGMT_EXPORT,
     SCOSSL_ERR_F_PROV_X25519_KEYMGMT_IMPORT,
     SCOSSL_ERR_F_ENUM_END
@@ -247,19 +252,9 @@ void _scossl_log_bytes(
     int len,
     const char *format, ...);
 
-void _scossl_log_bignum(
-    int trace_level,
-    SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
-    const char *file,
-    int line,
-    char *description,
-    BIGNUM *bn);
-
 void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
     char *description,
@@ -279,26 +274,18 @@ void _scossl_log_SYMCRYPT_ERROR(
     #define SCOSSL_LOG_BYTES_INFO(func_code, reason_code, description, s, len) \
         _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
 
-    #define SCOSSL_LOG_BIGNUM_DEBUG(func_code, reason_code, description, bn) \
-        _scossl_log_bignum(SCOSSL_LOG_LEVEL_DEBUG, func_code, reason_code, __FILE__, __LINE__, description, bn)
+    #define SCOSSL_LOG_SYMCRYPT_DEBUG(func_code, description, scError) \
+        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_DEBUG, func_code, __FILE__, __LINE__, description, scError)
 
-    #define SCOSSL_LOG_BIGNUM_INFO(func_code, reason_code, description, s, len) \
-        _scossl_log_bignum(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, description, bn)
-
-    #define SCOSSL_LOG_SYMCRYPT_DEBUG(func_code, reason_code, description, scError) \
-        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_DEBUG, func_code, reason_code, __FILE__, __LINE__, description, scError)
-
-    #define SCOSSL_LOG_SYMCRYPT_INFO(func_code, reason_code, description, scError) \
-        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_INFO, func_code, reason_code, __FILE__, __LINE__, description, scError)
+    #define SCOSSL_LOG_SYMCRYPT_INFO(func_code, description, scError) \
+        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_INFO, func_code, __FILE__, __LINE__, description, scError)
 #else
     #define SCOSSL_LOG_DEBUG(func_code, reason_code, ...)
     #define SCOSSL_LOG_INFO(func_code, reason_code, ...)
     #define SCOSSL_LOG_BYTES_DEBUG(func_code, reason_code, description, s, len)
     #define SCOSSL_LOG_BYTES_INFO(func_code, reason_code, description, s, len)
-    #define SCOSSL_LOG_BIGNUM_DEBUG(func_code, reason_code, description, bn)
-    #define SCOSSL_LOG_BIGNUM_INFO(func_code, reason_code, description, s, len)
-    #define SCOSSL_LOG_SYMCRYPT_DEBUG(func_code, reason_code, description, scError)
-    #define SCOSSL_LOG_SYMCRYPT_INFO(func_code, reason_code, description, scError)
+    #define SCOSSL_LOG_SYMCRYPT_DEBUG(func_code, description, scError)
+    #define SCOSSL_LOG_SYMCRYPT_INFO(func_code, description, scError)
 #endif
 
 #define SCOSSL_LOG_ERROR(func_code, reason_code, ...) \
@@ -307,11 +294,8 @@ void _scossl_log_SYMCRYPT_ERROR(
 #define SCOSSL_LOG_BYTES_ERROR(func_code, reason_code, description, s, len) \
     _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
 
-#define SCOSSL_LOG_BIGNUM_ERROR(func_code, reason_code, description, s, len) \
-    _scossl_log_bignum(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, description, bn)
-
-#define SCOSSL_LOG_SYMCRYPT_ERROR(func_code, reason_code, description, scError) \
-    _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, func_code, reason_code, __FILE__, __LINE__, description, scError)
+#define SCOSSL_LOG_SYMCRYPT_ERROR(func_code, description, scError) \
+    _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, func_code, __FILE__, __LINE__, description, scError)
 
 //
 // Common helper functions

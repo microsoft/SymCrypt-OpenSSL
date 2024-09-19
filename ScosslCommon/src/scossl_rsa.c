@@ -152,7 +152,7 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_SIGN,
             "SymCryptRsaPkcs1Sign failed", scError);
         goto cleanup;
     }
@@ -217,7 +217,7 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
     }
     else if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_VERIFY,
             "SymCryptRsaPkcs1verify returned unexpected error", scError);
     }
 
@@ -313,7 +313,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
         &cbResult);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN,
             "SymCryptRsaPssSign failed", scError);
         goto cleanup;
     }
@@ -406,7 +406,7 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     }
     else if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY,
             "SymCryptRsaPssVerify returned unexpected error", scError);
     }
 
@@ -456,7 +456,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
                 "SymCryptRsaPkcs1Encrypt failed", scError);
             goto cleanup;
         }
@@ -489,7 +489,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
                 "SymCryptRsaOaepEncrypt failed", scError);
             goto cleanup;
         }
@@ -513,7 +513,7 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         cbResult = cbModulus;
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
                 "SymCryptRsaRawEncrypt failed", scError);
             goto cleanup;
         }
@@ -619,7 +619,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
                 "SymCryptRsaOaepDecrypt failed", scError);
             goto cleanup;
         }
@@ -639,7 +639,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         cbResult = cbModulus;
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
                 "SymCryptRsaRawDecrypt failed", scError);
             goto cleanup;
         }
@@ -820,7 +820,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                    0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY,
             "SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
@@ -847,7 +847,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                         0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY,
                 "SymCryptRsakeyGetCrtValue failed", scError);
             goto cleanup;
         }

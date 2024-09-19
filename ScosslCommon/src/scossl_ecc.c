@@ -534,7 +534,7 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return SCOSSL_FAILURE;
     }
@@ -549,7 +549,7 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
         cbSymCryptSig);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_SIGN,
             "SymCryptEcDsaSign failed", scError);
         return SCOSSL_FAILURE;
     }
@@ -576,7 +576,7 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     scError = SymCryptEckeyExtendKeyUsage(key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return SCOSSL_FAILURE;
     }
@@ -600,7 +600,7 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     {
         if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY,
                 "SymCryptEcDsaVerify returned unexpected error", scError);
         }
         return SCOSSL_FAILURE;

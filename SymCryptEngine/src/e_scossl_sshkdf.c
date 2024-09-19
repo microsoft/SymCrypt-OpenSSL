@@ -67,7 +67,7 @@ static PCSYMCRYPT_HASH e_scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
         return SymCryptSha384Algorithm;
     if (type == NID_sha512)
         return SymCryptSha512Algorithm;
- 
+
     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
         "SymCrypt engine does not support hash algorithm %d", type);
 
@@ -263,7 +263,7 @@ SCOSSL_STATUS e_scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, siz
                             out, out_len);
 
     if(scError != SYMCRYPT_NO_ERROR) {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_DERIVE,
             "SymCryptSshKdf failed", scError);
         ret = SCOSSL_FAILURE;
     }

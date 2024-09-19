@@ -170,7 +170,8 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 
             if (ctx->oaepMdInfo == NULL)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_RSA_CIPHER_ENCRYPT, ERR_R_INTERNAL_ERROR,
+                    "p_scossl_rsa_get_supported_md returned NULL for default digest");
                 return SCOSSL_FAILURE;
             }
         }
@@ -216,7 +217,8 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 
             if (ctx->oaepMdInfo == NULL)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_RSA_CIPHER_DECRYPT, ERR_R_INTERNAL_ERROR,
+                    "p_scossl_rsa_get_supported_md returned NULL for default digest");
                 return SCOSSL_FAILURE;
             }
         }

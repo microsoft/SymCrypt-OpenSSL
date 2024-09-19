@@ -41,7 +41,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
 static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_newctx_internal(size_t keylen)
 {
     SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
-    if (ctx != NULL)    
+    if (ctx != NULL)
     {
         ctx->keylen = keylen;
     }
@@ -85,7 +85,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *
         scError = SymCryptXtsAesExpandKeyEx(&ctx->key, key, keylen, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL,
                 "SymCryptXtsAesExpandKeyEx failed", scError);
             return SCOSSL_FAILURE;
         }
@@ -163,7 +163,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,
     }
 
     *outl = inl;
-    
+
     return SCOSSL_SUCCESS;
 }
 

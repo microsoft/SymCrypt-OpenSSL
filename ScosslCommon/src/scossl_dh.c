@@ -185,7 +185,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR,
                 "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
@@ -256,7 +256,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         ctx->dlkey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR,
             "SymCryptDlkeySetValue failed", scError);
         goto cleanup;
     }
@@ -299,7 +299,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR,
                 "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
@@ -308,7 +308,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
     scError = SymCryptDlkeyGenerate(SYMCRYPT_FLAG_DLKEY_DH, ctx->dlkey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR,
             "SymCryptDlkeyGenerate failed", scError);
         goto cleanup;
     }

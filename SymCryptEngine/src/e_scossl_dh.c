@@ -68,7 +68,7 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
         0 );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR,
             "SymCryptDlkeyGetValue failed", scError);
         goto cleanup;
     }
@@ -173,7 +173,7 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
             0 );
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR,
                 "SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
@@ -395,7 +395,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY,
             "SymCryptDlkeySetValue failed", scError);
         goto cleanup;
     }
@@ -409,7 +409,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
         cbPublicKey );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY,
             "SymCryptDhSecretAgreement failed", scError);
         goto cleanup;
     }

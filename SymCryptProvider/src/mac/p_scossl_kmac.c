@@ -137,8 +137,9 @@ static SCOSSL_STATUS p_scossl_kmac_init(_Inout_ SCOSSL_KMAC_CTX *ctx,
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_INIT, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_INIT,
                 "SymCryptKmacXXXExpandKeyEx failed", scError);
+            return SCOSSL_FAILURE;
         }
     }
 
@@ -279,7 +280,7 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, 
             ctx->customizationString, ctx->cbCustomizationString);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS,
                 "SymCryptKmacXXXExpandKeyEx failed", scError);
             return SCOSSL_FAILURE;
         }

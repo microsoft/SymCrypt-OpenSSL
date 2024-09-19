@@ -111,7 +111,7 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
     scError = SymCryptEckeySetRandom( SYMCRYPT_FLAG_ECKEY_ECDH, pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR,
             "SymCryptEckeySetRandom failed", scError);
         goto cleanup;
     }
@@ -128,7 +128,7 @@ SCOSSL_STATUS e_scossl_ecc_generate_keypair(_Inout_ SCOSSL_ECC_KEY_CONTEXT* pKey
         0 );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR,
             "SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
@@ -320,7 +320,7 @@ SCOSSL_STATUS e_scossl_ecc_import_keypair(_In_ const EC_KEY* eckey, _In_ const E
         pKeyCtx->key );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR,
             "SymCryptEckeySetValue failed", scError);
         goto cleanup;
     }
@@ -540,7 +540,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     scError = SymCryptEckeyExtendKeyUsage(keyCtx->key, SYMCRYPT_FLAG_ECKEY_ECDSA);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG,
             "SymCryptEckeyExtendKeyUsage failed", scError);
         return NULL;
     }
@@ -556,7 +556,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
         cbSymCryptSig);
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG,
             "SymCryptEcDsaSign failed", scError);
         return NULL;
     }
@@ -691,7 +691,7 @@ SCOSSL_STATUS e_scossl_eckey_verify_sig(_In_reads_bytes_(dgst_len) const unsigne
     {
         if( scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG,
                 "SymCryptEcDsaVerify returned unexpected error", scError);
         }
         return SCOSSL_FAILURE;
@@ -828,7 +828,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY,
             "SymCryptEckeySetValue failed", scError);
         goto cleanup;
     }
@@ -851,7 +851,7 @@ SCOSSL_RETURNLENGTH e_scossl_eckey_compute_key(_Out_writes_bytes_(*pseclen) unsi
         *pseclen );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY,
             "SymCryptEcDhSecretAgreement failed", scError);
         goto cleanup;
     }

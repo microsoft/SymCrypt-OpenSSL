@@ -100,7 +100,7 @@ SCOSSL_STATUS scossl_sshkdf_derive(SCOSSL_SSHKDF_CTX *ctx,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE,
             "SymCryptSshKdf failed", scError);
         return SCOSSL_FAILURE;
     }

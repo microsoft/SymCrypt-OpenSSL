@@ -17,6 +17,18 @@ extern "C" {
 #define SCOSSL_LOG_LEVEL_PREFIX_INFO        "INFO"
 #define SCOSSL_LOG_LEVEL_PREFIX_DEBUG       "DEBUG"
 
+// ERR_put_error is deprecated in 3.0+. We replace the functionality with the equivalent
+// function calls in OpenSSL 3.0+.
+#if OPENSSL_API_LEVEL >= 30000
+    #define SCOSSL_put_error(lib, func, reason, file, line) \
+        (ERR_new(),                                         \
+         ERR_set_debug((file), (line), (func)),             \
+         ERR_set_error((lib), (reason), NULL))
+#else
+    #define SCOSSL_put_error(lib, func, reason, file, line) \
+        ERR_put_error((lib), (func), (reason), (file), (line))
+#endif
+
 // Level of tracing that is output to stderr / log file
 static int _traceLogLevel = SCOSSL_LOG_LEVEL_OFF;
 static char *_traceLogFilename = NULL;
@@ -128,9 +140,11 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_ENG_TLS1PRF_CTRL, 0), "e_scossl_tls1prf_ctrl"},
     {ERR_PACK(0, SCOSSL_ERR_F_ENG_TLS1PRF_INIT, 0), "e_scossl_tls1prf_init"},
     // SymCryptProvider
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_AES_CFB_CIPHER, 0), "p_scossl_aes_cfb_cipher"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_AES_GENERIC_INIT_INTERNAL, 0), "p_scossl_aes_generic_init_internal"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL, 0), "p_scossl_aes_xts_init_internal"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT, 0), "p_scossl_dh_keymgmt_export"},
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_PARAMS, 0), "p_scossl_dh_keymgmt_get_params"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_FFC_PARAMS, 0), "p_scossl_dh_keymgmt_get_ffc_params"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_KEY_PARAMS, 0), "p_scossl_dh_keymgmt_get_key_params"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH, 0), "p_scossl_dh_keymgmt_match"},
@@ -153,6 +167,8 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE, 0), "p_scossl_keysinuse_init_once"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KMAC_INIT, 0), "p_scossl_kmac_init"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS, 0), "p_scossl_kmac_set_ctx_params"},
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_CIPHER_ENCRYPT, 0), "p_scossl_rsa_cipher_encrypt"},
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_CIPHER_DECRYPT, 0), "p_scossl_rsa_cipher_decrypt"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_GET_ENCODED_PUBLIC_KEY, 0), "p_scossl_rsa_get_encoded_public_key"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYGEN, 0), "p_scossl_rsa_keygen"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYMGMT_DUP_KEYDATA, 0), "p_scossl_rsa_keymgmt_dup_keydata"},
@@ -160,6 +176,7 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_KEYDATA, 0), "p_scossl_rsa_keymgmt_get_keydata"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYMGMT_IMPORT, 0), "p_scossl_rsa_keymgmt_import"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH, 0), "p_scossl_rsa_keymgmt_match"},
+    {ERR_PACK(0, SCOSSL_ERR_F_PROV_RSA_PSS_PARAMS_TO_ASN1_SEQUENCE, 0), "p_scossl_rsa_pss_params_to_asn1_sequence"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_X25519_KEYMGMT_EXPORT, 0), "p_scossl_x25519_keymgmt_export"},
     {ERR_PACK(0, SCOSSL_ERR_F_PROV_X25519_KEYMGMT_IMPORT, 0), "p_scossl_x25519_keymgmt_import"},
     {0, NULL}
@@ -293,7 +310,7 @@ static void _scossl_log_bytes_valist(
         if( _osslERRLogLevel >= trace_level )
         {
             // Log an OpenSSL error, so calling applications can handle the log appropriately
-            ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
+            SCOSSL_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
             // Add error string indicating the error details as error data
             ERR_add_error_data(1, paraBuf);
         }
@@ -343,53 +360,9 @@ void _scossl_log(
     va_end(args);
 }
 
-void _scossl_log_bignum(
-    int trace_level,
-    SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
-    const char *file,
-    int line,
-    char *description,
-    BIGNUM *bn)
-{
-    unsigned char *string = NULL;
-    int length = 0;
-
-    if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
-    {
-        return;
-    }
-
-    if( bn == NULL )
-    {
-        return;
-    }
-
-    length = BN_num_bytes(bn);
-    if( length < 0 )
-    {
-        return;
-    }
-
-    string = (unsigned char *)OPENSSL_zalloc(length);
-    if( string == NULL )
-    {
-        return;
-    }
-
-    if( BN_bn2bin(bn, string) < 0 )
-    {
-        return;
-    }
-
-    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, (const char*) string, length, description);
-    OPENSSL_free(string);
-}
-
 void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
     char *description,
@@ -460,7 +433,7 @@ void _scossl_log_SYMCRYPT_ERROR(
             scErrorString = "UNKNOWN SYMCRYPT_ERROR";
             break;
     }
-    _scossl_log(trace_level, func_code, reason_code, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
+    _scossl_log(trace_level, func_code, SCOSSL_ERR_R_SYMCRYPT_FAILURE, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
 }
 
 BOOL scossl_is_md_supported(int mdnid)
