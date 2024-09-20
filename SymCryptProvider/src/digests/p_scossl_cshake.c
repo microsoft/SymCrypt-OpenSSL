@@ -210,6 +210,18 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOLEA
         return SCOSSL_FAILURE;
     }
 
+    // Delay init until first update call, in case function name or customization strings
+    // are set by parameter after the init call.
+    if (!ctx->updating)
+    {
+        ctx->pHash->initFunc(
+            &ctx->state,
+            ctx->pbFunctionNameString, ctx->cbFunctionNameString,
+            ctx->pbCustomizationString, ctx->cbCustomizationString);
+
+        ctx->updating = TRUE;
+    }
+
     ctx->pHash->extractFunc(&ctx->state, out, ctx->xofLen, wipeState);
     *outl = ctx->xofLen;
     ctx->updating = wipeState;
