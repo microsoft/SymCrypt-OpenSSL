@@ -43,7 +43,7 @@ typedef _Return_type_success_(return >= 0) int SCOSSL_RETURNLENGTH; // For funct
 // pointer before using it with SymCrypt.
 //
 // In the SCOSSL provider, it is our responsibility to perform the allocation and free ourselves.
-// Here we allocate SYMCRYPT_ALIGN_VALUE extra bytes, and store the offset into our allocation in the byte before the aligned 
+// Here we allocate SYMCRYPT_ALIGN_VALUE extra bytes, and store the offset into our allocation in the byte before the aligned
 // pointer we use in SymCrypt. On free, we look at the byte before the aligned pointer we have been using, to determine the start
 // of the allocation and free it correctly.
 //
@@ -179,46 +179,6 @@ typedef enum {
     SCOSSL_ERR_F_ENG_SSHKDF_NEW,
     SCOSSL_ERR_F_ENG_TLS1PRF_CTRL,
     SCOSSL_ERR_F_ENG_TLS1PRF_INIT,
-    // SymCryptProvider
-    SCOSSL_ERR_F_PROV_AES_CFB_CIPHER,
-    SCOSSL_ERR_F_PROV_AES_GENERIC_INIT_INTERNAL,
-    SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_PARAMS,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_FFC_PARAMS,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_KEY_PARAMS,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH,
-    SCOSSL_ERR_F_PROV_DH_KEYMGMT_SET_PARAMS,
-    SCOSSL_ERR_F_PROV_DH_PARAMS_TO_GROUP,
-    SCOSSL_ERR_F_PROV_DH_PLAIN_DERIVE,
-    SCOSSL_ERR_F_PROV_DH_X9_42_DERIVE,
-    SCOSSL_ERR_F_PROV_ECC_GET_ENCODED_PUBLIC_KEY,
-    SCOSSL_ERR_F_PROV_ECC_INIT_KEYSINUSE,
-    SCOSSL_ERR_F_PROV_ECC_KEYGEN,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_DUP_CTX,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PRIVATE_KEY,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PUBKEY_POINT,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_IMPORT,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_MATCH,
-    SCOSSL_ERR_F_PROV_ECC_KEYMGMT_SET_PARAMS,
-    SCOSSL_ERR_F_PROV_ECDH_DERIVE,
-    SCOSSL_ERR_F_PROV_KBKDF_DERIVE,
-    SCOSSL_ERR_F_PROV_KBKDF_KMAC_DERIVE,
-    SCOSSL_ERR_F_PROV_KEYSINUSE_INIT_ONCE,
-    SCOSSL_ERR_F_PROV_KMAC_INIT,
-    SCOSSL_ERR_F_PROV_KMAC_SET_CTX_PARAMS,
-    SCOSSL_ERR_F_PROV_RSA_CIPHER_ENCRYPT,
-    SCOSSL_ERR_F_PROV_RSA_CIPHER_DECRYPT,
-    SCOSSL_ERR_F_PROV_RSA_GET_ENCODED_PUBLIC_KEY,
-    SCOSSL_ERR_F_PROV_RSA_KEYGEN,
-    SCOSSL_ERR_F_PROV_RSA_KEYMGMT_DUP_KEYDATA,
-    SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_CRT_KEYDATA,
-    SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_KEYDATA,
-    SCOSSL_ERR_F_PROV_RSA_KEYMGMT_IMPORT,
-    SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
-    SCOSSL_ERR_F_PROV_RSA_PSS_PARAMS_TO_ASN1_SEQUENCE,
-    SCOSSL_ERR_F_PROV_X25519_KEYMGMT_EXPORT,
-    SCOSSL_ERR_F_PROV_X25519_KEYMGMT_IMPORT,
     SCOSSL_ERR_F_ENUM_END
 } SCOSSL_ERR_FUNC;
 
@@ -296,6 +256,46 @@ void _scossl_log_SYMCRYPT_ERROR(
 
 #define SCOSSL_LOG_SYMCRYPT_ERROR(func_code, description, scError) \
     _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, func_code, __FILE__, __LINE__, description, scError)
+
+#if OPENSSL_API_LEVEL >= 30000
+        // Enable debug and info messages in debug builds, but compile them out in release builds
+    #if DBG
+        #define SCOSSL_PROV_LOG_DEBUG(reason_code, ...) \
+            _scossl_log(SCOSSL_LOG_LEVEL_DEBUG, 0, reason_code, __FILE__, __LINE__, __VA_ARGS__)
+
+        #define SCOSSL_PROV_LOG_INFO(reason_code, ...) \
+            _scossl_log(SCOSSL_LOG_LEVEL_INFO, 0, reason_code, __FILE__, __LINE__, __VA_ARGS__)
+
+        #define SCOSSL_PROV_LOG_BYTES_DEBUG(reason_code, description, s, len) \
+            _scossl_log_bytes(SCOSSL_LOG_LEVEL_DEBUG, 0, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
+
+        #define SCOSSL_PROV_LOG_BYTES_INFO(reason_code, description, s, len) \
+            _scossl_log_bytes(SCOSSL_LOG_LEVEL_INFO, 0, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
+
+        #define SCOSSL_PROV_LOG_SYMCRYPT_DEBUG(description, scError) \
+            _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_DEBUG, 0, __FILE__, __LINE__, description, scError)
+
+        #define SCOSSL_PROV_LOG_SYMCRYPT_INFO(description, scError) \
+            _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_INFO, 0, __FILE__, __LINE__, description, scError)
+    #else
+        #define SCOSSL_PROV_LOG_DEBUG(reason_code, ...)
+        #define SCOSSL_PROV_LOG_INFO(reason_code, ...)
+        #define SCOSSL_PROV_LOG_BYTES_DEBUG(reason_code, description, s, len)
+        #define SCOSSL_PROV_LOG_BYTES_INFO(reason_code, description, s, len)
+        #define SCOSSL_PROV_LOG_SYMCRYPT_DEBUG(description, scError)
+        #define SCOSSL_PROV_LOG_SYMCRYPT_INFO(description, scError)
+    #endif
+
+    #define SCOSSL_PROV_LOG_ERROR(reason_code, ...) \
+        _scossl_log(SCOSSL_LOG_LEVEL_ERROR, 0, reason_code, __FILE__, __LINE__, __VA_ARGS__)
+
+    #define SCOSSL_PROV_LOG_BYTES_ERROR(reason_code, description, s, len) \
+        _scossl_log_bytes(SCOSSL_LOG_LEVEL_ERROR, 0, reason_code, __FILE__, __LINE__, (const char*) s, len, description)
+
+    #define SCOSSL_PROV_LOG_SYMCRYPT_ERROR(description, scError) \
+        _scossl_log_SYMCRYPT_ERROR(SCOSSL_LOG_LEVEL_ERROR, 0, __FILE__, __LINE__, description, scError)
+
+#endif
 
 //
 // Common helper functions

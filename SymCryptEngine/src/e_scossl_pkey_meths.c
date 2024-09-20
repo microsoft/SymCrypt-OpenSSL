@@ -236,7 +236,7 @@ SCOSSL_STATUS e_scossl_pkey_methods_init_static()
         (e_scossl_pkey_rsa_pss() == NULL) ||
         (e_scossl_pkey_tls1_prf() == NULL) ||
         (e_scossl_pkey_hkdf() == NULL) ||
-        (e_scossl_pkey_hmac() == NULL) 
+        (e_scossl_pkey_hmac() == NULL)
         )
     {
         return SCOSSL_FAILURE;

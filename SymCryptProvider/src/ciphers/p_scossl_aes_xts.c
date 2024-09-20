@@ -85,8 +85,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_init_internal(_Inout_ SCOSSL_AES_XTS_CTX *
         scError = SymCryptXtsAesExpandKeyEx(&ctx->key, key, keylen, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_AES_XTS_INIT_INTERNAL,
-                "SymCryptXtsAesExpandKeyEx failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptXtsAesExpandKeyEx failed", scError);
             return SCOSSL_FAILURE;
         }
     }

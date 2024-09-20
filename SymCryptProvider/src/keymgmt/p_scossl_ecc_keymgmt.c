@@ -219,8 +219,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
                 0);
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_DUP_CTX,
-                    "SymCryptEckeyGetValue failed", scError);
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
                 goto cleanup;
             }
 
@@ -240,8 +239,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_DUP_CTX,
-                    "SymCryptEckeySetValue failed", scError);
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
                 goto cleanup;
             }
 
@@ -449,8 +447,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     scError = SymCryptEckeySetRandom(SYMCRYPT_FLAG_ECKEY_ECDH, keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYGEN,
-            "SymCryptEckeySetRandom failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetRandom failed", scError);
         goto cleanup;
     }
 
@@ -501,8 +498,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_pubkey_point(_In_ SCOSSL_ECC_KEY_C
         0 );
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PUBKEY_POINT,
-            "SymCryptEckeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -793,8 +789,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_SET_PARAMS,
-                "SymCryptEckeySetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -976,8 +971,7 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
             0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_MATCH,
-                "SymCryptEckeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -990,8 +984,7 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
             0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_MATCH,
-                "SymCryptEckeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1197,8 +1190,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_IMPORT,
-                "SymCryptEckeySetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -1386,8 +1378,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_X25519_KEYMGMT_IMPORT,
-                "SymCryptEckeySetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
@@ -1451,8 +1442,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *key
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_X25519_KEYMGMT_EXPORT,
-            "SymCryptEckeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1589,8 +1579,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_private_key(SCOSSL_ECC_KEY_CTX *ke
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_ECC_KEYMGMT_GET_PRIVATE_KEY,
-            "SymCryptEckeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 

@@ -188,8 +188,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fro
                 0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_DUP_KEYDATA,
-            "SymCryptRsakeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -215,8 +214,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_dup_keydata(_In_ PCSYMCRYPT_RSAKEY fro
         *toKey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_DUP_KEYDATA,
-            "SymCryptRsakeySetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeySetValue failed", scError);
         goto cleanup;
     }
 
@@ -426,8 +424,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
     if (keyCtx->key == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYGEN, ERR_R_INTERNAL_ERROR,
-            "SymCryptRsakeyAllocate failed");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
 
@@ -435,8 +432,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     scError = SymCryptRsakeyGenerate(keyCtx->key, pPubExp64, genCtx->nPubExp, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYGEN,
-            "SymCryptRsakeyGenerate failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGenerate failed", scError);
         goto cleanup;
     }
 
@@ -681,8 +677,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_KEYDATA,
-            "SymCryptRsakeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -703,8 +698,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_keydata(_In_ SCOSSL_PROV_RSA_KEY_C
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_KEYDATA,
-                "SymCryptStoreLsbFirstUint64 failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptStoreLsbFirstUint64 failed", scError);
             goto cleanup;
         }
 
@@ -842,8 +836,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_crt_keydata(_In_ SCOSSL_PROV_RSA_K
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_GET_CRT_KEYDATA,
-            "SymCryptRsakeyGetCrtValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
         goto cleanup;
     }
 
@@ -1000,8 +993,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
-            "SymCryptRsakeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1014,8 +1006,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
-            "SymCryptRsakeyGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1049,8 +1040,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
             0);
         if (scError != SYMCRYPT_NO_ERROR)
             {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
-                "SymCryptRsakeyGetCrtValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
             goto cleanup;
         }
 
@@ -1063,8 +1053,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
             0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_MATCH,
-                "SymCryptRsakeyGetCrtValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
             goto cleanup;
         }
 
@@ -1224,8 +1213,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_RSA_KEYMGMT_IMPORT,
-                "SymCryptRsakeySetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeySetValue failed", scError);
             goto cleanup;
         }
     }

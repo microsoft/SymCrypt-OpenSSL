@@ -379,8 +379,7 @@ static SCOSSL_STATUS p_scossl_dh_params_to_group(_In_ OSSL_LIB_CTX *libCtx, _In_
             pDlGroupTmp);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_PARAMS_TO_GROUP,
-                "SymCryptDlgroupSetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlgroupSetValue failed", scError);
             goto cleanup;
         }
 
@@ -635,8 +634,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
             SymCryptDlkeyFree(ctx->keyCtx->dlkey);
             ctx->keyCtx->dlkey = NULL;
 
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_SET_PARAMS,
-                "SymCryptDlkeySetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlkeySetValue failed", scError);
             return SCOSSL_FAILURE;
         }
 
@@ -728,8 +726,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_ffc_params(_In_ SYMCRYPT_DLGROUP *p
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_FFC_PARAMS,
-                "SymCryptDlgroupGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlgroupGetValue failed", scError);
             goto cleanup;
         }
     }
@@ -863,8 +860,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_key_params(_In_ SCOSSL_DH_KEY_CTX *
             0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_KEY_PARAMS,
-                "SymCryptDlkeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -965,8 +961,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
         int dlGroupNid = scossl_dh_get_group_nid(SymCryptDlkeyGetGroup(ctx->keyCtx->dlkey));
         if (dlGroupNid == 0)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_GET_PARAMS, ERR_R_INTERNAL_ERROR,
-                "Failed to get NID for previously set group in DH key context");
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get NID for previously set group in DH key context");
             return SCOSSL_FAILURE;
         }
 
@@ -1077,8 +1072,7 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
                 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH,
-                "SymCryptDlkeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1090,8 +1084,7 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
                 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_MATCH,
-                "SymCryptDlkeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
@@ -1312,8 +1305,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
 
     if (cbPrimeP == 0)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT, ERR_R_INTERNAL_ERROR,
-            "SymCryptDlgroupGetSizes returned 0 for prime P size");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptDlgroupGetSizes returned 0 for prime P size");
         goto cleanup;
     }
 
@@ -1355,8 +1347,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         &genCounter);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT,
-            "SymCryptDlgroupGetValue failed", scError);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlgroupGetValue failed", scError);
         goto cleanup;
     }
 
@@ -1437,8 +1428,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
             0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_PROV_DH_KEYMGMT_EXPORT,
-                "SymCryptDlkeyGetValue failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 

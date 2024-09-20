@@ -765,8 +765,7 @@ static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIG
 
         if (cbSalt < 0)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_PROV_RSA_PSS_PARAMS_TO_ASN1_SEQUENCE, ERR_R_INTERNAL_ERROR,
-                "Invalid salt length in key context");
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Invalid salt length in key context");
             goto cleanup;
         }
     }
