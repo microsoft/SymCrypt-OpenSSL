@@ -218,7 +218,7 @@ static SCOSSL_STATUS p_scossl_mlkem_get_ctx_params(ossl_unused void *ctx, ossl_u
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_DISPATCH p_scossl_mlkem_functions[] = {
+const OSSL_DISPATCH p_scossl_mlkem_functions[] = {
     {OSSL_FUNC_KEM_NEWCTX, (void (*)(void))p_scossl_mlkem_newctx},
     {OSSL_FUNC_KEM_FREECTX, (void (*)(void))p_scossl_mlkem_freectx},
     {OSSL_FUNC_KEM_DUPCTX, (void (*)(void))p_scossl_mlkem_dupctx},
