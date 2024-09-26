@@ -10,7 +10,7 @@ extern "C" {
 
 typedef struct {
     PSYMCRYPT_MLKEMKEY key;
-    PCSYMCRYPT_MLKEM_PARAMS params;
+    SYMCRYPT_MLKEM_PARAMS params;
     SYMCRYPT_MLKEMKEY_FORMAT format;
 } SCOSSL_MLKEM_KEY_CTX;
 
