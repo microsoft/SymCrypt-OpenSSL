@@ -12,12 +12,12 @@
 extern "C" {
 #endif
 
-#define SCOSSL_MLKEM_PARAM_NAME_512 "MK-KEM-512"
-#define SCOSSL_MLKEM_PARAM_NAME_768 "ML-KEM-768"
-#define SCOSSL_MLKEM_PARAM_NAME_1024 "ML-KEM-1024"
+#define SCOSSL_MLKEM_PARAM_NAME_512 "mlkem512"
+#define SCOSSL_MLKEM_PARAM_NAME_768 "mlkem768"
+#define SCOSSL_MLKEM_PARAM_NAME_1024 "mlkem1024"
 
 typedef struct {
-    PCSYMCRYPT_MLKEM_PARAMS params;
+    SYMCRYPT_MLKEM_PARAMS params;
 } SCOSSL_MLKEM_KEYGEN_CTX;
 
 #define SCOSSL_MLKEM_PKEY_PARAMETER_TYPES                                 \
@@ -64,8 +64,8 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_bytes(_In_ const SCOSSL_MLKE
                                                           SYMCRYPT_MLKEMKEY_FORMAT format,
                                                           _Out_writes_bytes_(*cbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
 
-static PCSYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(_In_ const char *name);
-static const char * p_scossl_mlkem_keymgmt_params_to_name(_In_ const PCSYMCRYPT_MLKEM_PARAMS name);
+static SYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(_In_ const char *name);
+static const char * p_scossl_mlkem_keymgmt_params_to_name(_In_ const SYMCRYPT_MLKEM_PARAMS name);
 static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx);
 
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx)
@@ -103,12 +103,12 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
         }
         else
         {
-            copyCtx->params = NULL;
+            copyCtx->params = SYMCRYPT_MLKEM_PARAMS_NULL;
         }
 
         if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->key != NULL)
         {
-            if (copyCtx->params == NULL)
+            if (copyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
                 goto cleanup;
@@ -185,13 +185,13 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
     {
         const char *name;
 
-        if (!OSSL_PARAM_get_utf8_ptr(p, &name))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &name))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((genCtx->params = p_scossl_mlkem_keymgmt_params_from_name(name)) == NULL)
+        if ((genCtx->params = p_scossl_mlkem_keymgmt_params_from_name(name)) == SYMCRYPT_MLKEM_PARAMS_NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
             return SCOSSL_FAILURE;
@@ -218,7 +218,7 @@ static SCOSSL_MLKEM_KEYGEN_CTX *p_scossl_mlkem_keygen_init(ossl_unused void *pro
 
     if (genCtx != NULL)
     {
-        genCtx->params = SymCryptMlKemParamsDraft203MlKem768;
+        genCtx->params = SYMCRYPT_MLKEM_PARAMS_MLKEM768;
 
         if (p_scossl_mlkem_keygen_set_params(genCtx, params) != SCOSSL_SUCCESS)
         {
@@ -239,7 +239,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
         return SCOSSL_FAILURE;
     }
 
-    if (tmplCtx->params == NULL)
+    if (tmplCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
         return SCOSSL_FAILURE;
@@ -299,6 +299,12 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_In_ SCOSSL_MLKEM_KEY_CTX
     {
         PCBYTE pbKey;
         SIZE_T cbKey;
+
+        if (keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+            return SCOSSL_FAILURE;
+        }
 
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbKey, &cbKey))
         {
@@ -435,31 +441,23 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL)
+    if (keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
-        if (keyCtx->params == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
-            return SCOSSL_FAILURE;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        return SCOSSL_FAILURE;
+    }
 
-        if (!OSSL_PARAM_set_int(p, p_scossl_mlkem_keymgmt_get_security_bits(keyCtx)))
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
-        }
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL &&
+        !OSSL_PARAM_set_int(p, p_scossl_mlkem_keymgmt_get_security_bits(keyCtx)))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL)
     {
         SIZE_T cbSize;
         SYMCRYPT_MLKEMKEY_FORMAT format = keyCtx->format;
-
-        if (keyCtx->params == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
-            return SCOSSL_FAILURE;
-        }
 
         // Default to larger size if key data is not set (and therefore format is unknown)
         if (format == SYMCRYPT_MLKEMKEY_FORMAT_NULL)
@@ -482,19 +480,11 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
         }
     }
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL &&
+        !OSSL_PARAM_set_utf8_string(p, p_scossl_mlkem_keymgmt_params_to_name(keyCtx->params)))
     {
-        if (keyCtx->params == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
-            return SCOSSL_FAILURE;
-        }
-
-        if (!OSSL_PARAM_set_utf8_string(p, p_scossl_mlkem_keymgmt_params_to_name(keyCtx->params)))
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
-        }
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        return SCOSSL_FAILURE;
     }
 
     return p_scossl_mlkem_keymgmt_get_key_params(keyCtx, params);
@@ -509,13 +499,13 @@ static BOOL p_scossl_mlkem_keymgmt_has(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int se
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0 &&
-        keyCtx->params != NULL)
+        keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         return FALSE;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 &&
-        keyCtx->key != NULL)
+        keyCtx->key == NULL)
     {
         return FALSE;
     }
@@ -659,13 +649,13 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX 
     {
         const char *name;
 
-        if (!OSSL_PARAM_get_utf8_ptr(p, &name))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &name))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((keyCtx->params = p_scossl_mlkem_keymgmt_params_from_name(name)) == NULL)
+        if ((keyCtx->params = p_scossl_mlkem_keymgmt_params_from_name(name)) == SYMCRYPT_MLKEM_PARAMS_NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
             return SCOSSL_FAILURE;
@@ -749,7 +739,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *ke
         goto cleanup;
     }
 
-    if (keyCtx->params == NULL)
+    if (keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
         goto cleanup;
@@ -868,7 +858,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_bytes(const SCOSSL_MLKEM_KEY
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-    if (keyCtx->key == NULL || keyCtx->params == NULL)
+    if (keyCtx->key == NULL || keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
@@ -913,38 +903,38 @@ cleanup:
 }
 
 _Use_decl_annotations_
-static PCSYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(const char *name)
+static SYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(const char *name)
 {
     if (OPENSSL_strcasecmp(name, SCOSSL_MLKEM_PARAM_NAME_512) == 0)
     {
-        return SymCryptMlKemParamsDraft203MlKem512;
+        return SYMCRYPT_MLKEM_PARAMS_MLKEM512;
     }
     else if (OPENSSL_strcasecmp(name, SCOSSL_MLKEM_PARAM_NAME_768) == 0)
     {
-        return SymCryptMlKemParamsDraft203MlKem768;
+        return SYMCRYPT_MLKEM_PARAMS_MLKEM512;
     }
     else if (OPENSSL_strcasecmp(name, SCOSSL_MLKEM_PARAM_NAME_1024) == 0)
     {
-        return SymCryptMlKemParamsDraft203MlKem1024;
+        return SYMCRYPT_MLKEM_PARAMS_MLKEM512;
     }
 
-    return NULL;
+    return SYMCRYPT_MLKEM_PARAMS_NULL;
 }
 
 _Use_decl_annotations_
-static const char *p_scossl_mlkem_keymgmt_params_to_name(const PCSYMCRYPT_MLKEM_PARAMS params)
+static const char *p_scossl_mlkem_keymgmt_params_to_name(const SYMCRYPT_MLKEM_PARAMS params)
 {
-    if (params == SymCryptMlKemParamsDraft203MlKem512)
+    switch (params)
     {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
         return SCOSSL_MLKEM_PARAM_NAME_512;
-    }
-    else if (params == SymCryptMlKemParamsDraft203MlKem768)
-    {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
         return SCOSSL_MLKEM_PARAM_NAME_768;
-    }
-    else if (params == SymCryptMlKemParamsDraft203MlKem1024)
-    {
-        return SCOSSL_MLKEM_PARAM_NAME_1024;
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
+        return SCOSSL_MLKEM_PARAM_NAME_1024;\
+    default:
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        break;
     }
 
     return "";
@@ -953,17 +943,17 @@ static const char *p_scossl_mlkem_keymgmt_params_to_name(const PCSYMCRYPT_MLKEM_
 _Use_decl_annotations_
 static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
-    if (keyCtx->params == SymCryptMlKemParamsDraft203MlKem512)
+    switch(keyCtx->params)
     {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
         return 128;
-    }
-    else if (keyCtx->params == SymCryptMlKemParamsDraft203MlKem768)
-    {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
         return 192;
-    }
-    else if (keyCtx->params == SymCryptMlKemParamsDraft203MlKem1024)
-    {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
         return 256;
+    default:
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        break;
     }
 
     return 0;
