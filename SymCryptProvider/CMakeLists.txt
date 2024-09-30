@@ -65,7 +65,9 @@ target_link_libraries(scossl_provider PRIVATE scossl_common)
 target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
-set(OPENSSL_PROVIDERS CACHE PATH "Path to OpenSSL providers" "${CMAKE_INSTALL_LIBDIR}/ossl-modules")
+if (NOT DEFINED OPENSSL_PROVIDERS)
+   set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
+endif()
 
 # Install the engine to the OpenSSL modules directory
 # NB: this won't work if the distro has a custom modules directory that doesn't match
