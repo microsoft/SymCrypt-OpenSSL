@@ -9,7 +9,7 @@
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
 #include "p_scossl_keysinuse.h"
-#include "p_scossl_base.h"
+#include "p_scossl_bio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +35,15 @@ extern "C" {
 #define OSSL_TLS_GROUP_ID_ffdhe4096        0x0102
 
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
+#define ALG_DECODER(algNames, name, decoderType) {       \
+    algNames,                                            \
+    "provider="P_SCOSSL_NAME                             \
+    ",fips=yes"                                          \
+    ",input=der"                                         \
+    ",structure="#decoderType,                           \
+    p_scossl_der_to_##name##_##decoderType##_functions,  \
+    NULL}
+
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 typedef struct {
@@ -236,7 +245,7 @@ static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsapss_keymgmt_functions),
     ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
     ALG("X25519:1.3.101.110", p_scossl_x25519_keymgmt_functions),
-    ALG("MLKEM", p_scossl_mlkem_keymgmt_functions),
+    ALG("MLKEM:mlkem512:mlkem768:mlkem1024", p_scossl_mlkem_keymgmt_functions),
     ALG_TABLE_END};
 
 // Key exchange
@@ -271,6 +280,23 @@ extern const OSSL_DISPATCH p_scossl_mlkem_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kem[] = {
     ALG("MLKEM", p_scossl_mlkem_functions),
+    ALG_TABLE_END};
+
+// Decoders
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_SubjectPublicKeyInfo_functions[];
+
+static const OSSL_ALGORITHM p_scossl_decoder[] = {
+    ALG_DECODER("mlkem512:1.3.6.1.4.1.22554.5.6.1", mlkem512, PrivateKeyInfo),
+    ALG_DECODER("mlkem512:1.3.6.1.4.1.22554.5.6.1", mlkem512, SubjectPublicKeyInfo),
+    ALG_DECODER("mlkem768", mlkem768, PrivateKeyInfo),
+    ALG_DECODER("mlkem768", mlkem768, SubjectPublicKeyInfo),
+    ALG_DECODER("mlkem1024", mlkem1024, PrivateKeyInfo),
+    ALG_DECODER("mlkem1024", mlkem1024, SubjectPublicKeyInfo),
     ALG_TABLE_END};
 
 static int p_scossl_get_status()
@@ -352,6 +378,8 @@ static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx,
         return p_scossl_asym_cipher;
     case OSSL_OP_KEM:
         return p_scossl_kem;
+    case OSSL_OP_DECODER:
+        return p_scossl_decoder;
     }
 
     return NULL;
@@ -493,15 +521,15 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     SCOSSL_PROVCTX *p_ctx = NULL;
     OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
-    for (; in->function_id != 0; in++)
+    for (const OSSL_DISPATCH *coreFns = in; coreFns->function_id != 0; coreFns++)
     {
-        switch(in->function_id)
+        switch(coreFns->function_id)
         {
         case OSSL_FUNC_CORE_GET_PARAMS:
-            core_get_params = OSSL_FUNC_core_get_params(in);
+            core_get_params = OSSL_FUNC_core_get_params(coreFns);
             break;
         case OSSL_FUNC_CORE_GET_LIBCTX:
-            core_get_libctx = OSSL_FUNC_core_get_libctx(in);
+            core_get_libctx = OSSL_FUNC_core_get_libctx(coreFns);
             break;
         }
     }
@@ -529,6 +557,13 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     if (p_ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    p_scossl_set_core_bio(in);
+    if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
+    {
+        OPENSSL_free(p_ctx);
         return SCOSSL_FAILURE;
     }
 

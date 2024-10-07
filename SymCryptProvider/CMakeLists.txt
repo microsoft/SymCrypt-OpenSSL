@@ -18,9 +18,11 @@ find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
     ./src/asymcipher/p_scossl_rsa_cipher.c
+    ./src/decoder/p_scossl_der_to_key.c
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     ./src/ciphers/p_scossl_aes_xts.c
+    ./src/kem/p_scossl_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_sshkdf.c
@@ -29,6 +31,7 @@ set(SCOSSL_SOURCES
     ./src/keyexch/p_scossl_ecdh.c
     ./src/keymgmt/p_scossl_dh_keymgmt.c
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
+    ./src/keymgmt/p_scossl_mlkem_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/mac/p_scossl_cmac.c
     ./src/mac/p_scossl_hmac.c
@@ -36,6 +39,7 @@ set(SCOSSL_SOURCES
     ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_digests.c
+    ./src/p_scossl_bio.c
     ./src/p_scossl_ecc.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_rsa.c
@@ -46,13 +50,6 @@ if (KEYSINUSE_ENABLED)
     list(APPEND SCOSSL_SOURCES ./src/p_scossl_keysinuse.c)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DKEYSINUSE_ENABLED")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKEYSINUSE_ENABLED")
-endif()
-
-if (MLKEM_ENABLED)
-    list(APPEND SCOSSL_SOURCES ./src/kem/p_scossl_mlkem.c)
-    list(APPEND SCOSSL_SOURCES ./src/keymgmt/p_scossl_mlkem_keymgmt.c)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMLKEM_ENABLED")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMLKEM_ENABLED")
 endif()
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
