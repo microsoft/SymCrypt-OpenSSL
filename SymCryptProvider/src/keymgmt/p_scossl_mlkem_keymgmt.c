@@ -285,6 +285,19 @@ cleanup:
     return keyCtx;
 }
 
+static const SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_load(const void *reference, size_t reference_size)
+{
+    SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
+
+    if (reference_size == sizeof(keyCtx))
+    {
+        keyCtx = *(SCOSSL_MLKEM_KEY_CTX **)reference;
+        *(SCOSSL_MLKEM_KEY_CTX **)reference = NULL;
+    }
+
+    return keyCtx;
+}
+
 static const OSSL_PARAM *p_scossl_mlkem_keymgmt_settable_params(ossl_unused void *provCtx)
 {
     return p_scossl_mlkem_keymgmt_settable_param_types;
@@ -511,7 +524,7 @@ static BOOL p_scossl_mlkem_keymgmt_has(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int se
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
-        keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+        keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
     {
         return FALSE;
     }
@@ -832,6 +845,7 @@ const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_mlkem_keygen_init},
     {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_mlkem_keygen_set_template},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_mlkem_keygen},
+    {OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))p_scossl_mlkem_keymgmt_load},
     {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_settable_params},
     {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_gettable_params},
