@@ -132,6 +132,10 @@ extern const OSSL_DISPATCH p_scossl_sha512_functions[];
 extern const OSSL_DISPATCH p_scossl_sha3_256_functions[];
 extern const OSSL_DISPATCH p_scossl_sha3_384_functions[];
 extern const OSSL_DISPATCH p_scossl_sha3_512_functions[];
+extern const OSSL_DISPATCH p_scossl_shake_128_functions[];
+extern const OSSL_DISPATCH p_scossl_shake_256_functions[];
+extern const OSSL_DISPATCH p_scossl_cshake_128_functions[];
+extern const OSSL_DISPATCH p_scossl_cshake_256_functions[];
 
 static const OSSL_ALGORITHM p_scossl_digest[] = {
     ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", p_scossl_md5_functions),
@@ -142,6 +146,10 @@ static const OSSL_ALGORITHM p_scossl_digest[] = {
     ALG("SHA3-256:2.16.840.1.101.3.4.2.8", p_scossl_sha3_256_functions),
     ALG("SHA3-384:2.16.840.1.101.3.4.2.9", p_scossl_sha3_384_functions),
     ALG("SHA3-512:2.16.840.1.101.3.4.2.10", p_scossl_sha3_512_functions),
+    ALG("SHAKE-128:SHAKE128:2.16.840.1.101.3.4.2.11", p_scossl_shake_128_functions),
+    ALG("SHAKE-256:SHAKE256:2.16.840.1.101.3.4.2.12", p_scossl_shake_256_functions),
+    ALG("CSHAKE-128:CSHAKE128", p_scossl_cshake_128_functions),
+    ALG("CSHAKE-256:CSHAKE256", p_scossl_cshake_256_functions),
     ALG_TABLE_END};
 
 // Cipher

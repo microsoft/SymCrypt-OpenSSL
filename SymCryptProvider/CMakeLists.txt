@@ -21,6 +21,10 @@ set(SCOSSL_SOURCES
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     ./src/ciphers/p_scossl_aes_xts.c
+    ./src/digests/p_scossl_digest_common.c
+    ./src/digests/p_scossl_digest_generic.c
+    ./src/digests/p_scossl_shake.c
+    ./src/digests/p_scossl_cshake.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_srtpkdf.c
@@ -37,7 +41,6 @@ set(SCOSSL_SOURCES
     ./src/mac/p_scossl_kmac.c
     ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
-    ./src/p_scossl_digests.c
     ./src/p_scossl_ecc.c
     ./src/p_scossl_rand.c
     ./src/p_scossl_rsa.c
