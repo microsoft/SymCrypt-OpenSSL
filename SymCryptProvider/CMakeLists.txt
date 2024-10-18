@@ -18,10 +18,13 @@ find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
     ./src/asymcipher/p_scossl_rsa_cipher.c
-    ./src/decoder/p_scossl_der_to_key.c
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     ./src/ciphers/p_scossl_aes_xts.c
+    ./src/decoder/p_scossl_decode_common.c
+    ./src/decoder/p_scossl_decode_mlkem.c
+    ./src/encoder/p_scossl_encode_common.c
+    ./src/encoder/p_scossl_encode_mlkem.c
     ./src/kem/p_scossl_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
