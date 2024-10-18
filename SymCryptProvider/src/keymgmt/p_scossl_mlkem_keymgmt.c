@@ -3,6 +3,7 @@
 //
 
 #include "kem/p_scossl_mlkem.h"
+#include "keymgmt/p_scossl_mlkem_keymgmt.h"
 
 #include <openssl/core_names.h>
 #include <openssl/param_build.h>
@@ -60,20 +61,16 @@ static const OSSL_PARAM *p_scossl_mlkem_impexp_types[] = {
     p_scossl_mlkem_pkey_types,
     p_scossl_mlkem_all_types};
 
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_bytes(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                          SYMCRYPT_MLKEMKEY_FORMAT format,
-                                                          _Out_writes_bytes_(*cbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
-
 static SYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(_In_ const char *name);
 static const char * p_scossl_mlkem_keymgmt_params_to_name(_In_ const SYMCRYPT_MLKEM_PARAMS name);
 static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx);
 
-static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx)
+SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx)
 {
     return OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));;
 }
 
-static void p_scossl_mlkem_keymgmt_free_key_ctx(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx)
+void p_scossl_mlkem_keymgmt_free_key_ctx(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
@@ -645,7 +642,7 @@ static const OSSL_PARAM *p_scossl_mlkem_keymgmt_impexp_types(int selection)
     return p_scossl_mlkem_impexp_types[idx];
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     PCBYTE pbKey;
@@ -736,8 +733,8 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
-                                                   _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
+                                            _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     const char *mlkemParamsName;
     PBYTE pbKey = NULL;
@@ -863,9 +860,9 @@ const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[] = {
 //
 
 _Use_decl_annotations_
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_bytes(const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                          SYMCRYPT_MLKEMKEY_FORMAT format,
-                                                          PBYTE *ppbKey, SIZE_T *pcbKey)
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_bytes(const SCOSSL_MLKEM_KEY_CTX *keyCtx,
+                                                   SYMCRYPT_MLKEMKEY_FORMAT format,
+                                                   PBYTE *ppbKey, SIZE_T *pcbKey)
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
@@ -972,7 +969,6 @@ static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_
 
     return 0;
 }
-
 
 #ifdef __cplusplus
 }
