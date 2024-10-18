@@ -145,7 +145,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_kmac_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptKmacXXXExpandKey failed", scError);
         goto cleanup;
     }
 
@@ -204,7 +204,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_derive(_In_ SCOSSL_PROV_KBKDF_CTX *ctx,
         key, keylen);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSp800_108 failed", scError);
         return SCOSSL_FAILURE;
     }
 

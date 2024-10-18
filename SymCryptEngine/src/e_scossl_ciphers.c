@@ -640,7 +640,7 @@ SCOSSL_RETURNLENGTH e_scossl_aes_xts_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ u
     {
         if( (inl % SYMCRYPT_AES_BLOCK_SIZE) != 0 )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_XTS_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_AES_XTS_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
                 "Data length (%d) is not a multiple of the AES block size. SymCrypt does not support this size", inl);
             return -1;
         }
@@ -688,7 +688,7 @@ static SCOSSL_STATUS e_scossl_aes_xts_ctrl(_In_ EVP_CIPHER_CTX *ctx, int type, o
         // set EVP_CIPH_CUSTOM_COPY flag on all our AES ciphers
         // We must explicitly copy the AES key struct using SymCrypt as the AES key structure contains pointers
         // to itself, so a plain memcpy will maintain pointers to the source context
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_XTS_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_AES_XTS_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "No copy method currently implemented");
         // We need a SymCryptXtsKeyCopy function for this as we don't have explicit control over the AES key
         // struct here
@@ -765,8 +765,8 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
 
         if (cipherCtx->iv != NULL && (dstCtx->iv = OPENSSL_memdup(cipherCtx->iv, cipherCtx->ivlen)) == NULL)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
-                             "Failed to copy IV");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_AES_GCM_CTRL, ERR_R_MALLOC_FAILURE,
+                "Failed to copy IV");
             return SCOSSL_FAILURE;
         }
 
@@ -785,7 +785,7 @@ static int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_AEAD_TLS1_AAD:
         return scossl_aes_gcm_set_tls1_aad(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_AES_GCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "SymCrypt Engine does not support control type (%d)", type);
         return SCOSSL_FAILURE;
     }
@@ -861,7 +861,7 @@ static int e_scossl_aes_ccm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg,
     case EVP_CTRL_AEAD_TLS1_AAD:
         return scossl_aes_ccm_set_tls1_aad(cipherCtx, EVP_CIPHER_CTX_encrypting(ctx), ptr, arg);
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_AES_CCM_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "SymCrypt Engine does not support control type (%d)", type);
         return SCOSSL_FAILURE;
     }

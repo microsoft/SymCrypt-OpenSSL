@@ -176,7 +176,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
     if (ctx->dlkey == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                         "SymCryptDlkeyAllocate returned NULL.");
+            "SymCryptDlkeyAllocate returned NULL.");
         goto cleanup;
     }
 
@@ -185,7 +185,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR,
                 "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
@@ -205,7 +205,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
     if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
-                        "OPENSSL_zalloc returned NULL.");
+            "OPENSSL_zalloc returned NULL.");
         goto cleanup;
     }
 
@@ -215,7 +215,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         if ((SIZE_T)BN_bn2binpad(privateKey, pbPrivateKey, cbPrivateKey) != cbPrivateKey)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
-                            "BN_bn2binpad did not write expected number of private key bytes.");
+                "BN_bn2binpad did not write expected number of private key bytes.");
             goto cleanup;
         }
     }
@@ -230,7 +230,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         if ((SIZE_T)BN_bn2binpad(publicKey, pbPublicKey, cbPublicKey) != cbPublicKey)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
-                            "BN_bn2binpad did not write expected number of public key bytes.");
+                "BN_bn2binpad did not write expected number of public key bytes.");
             goto cleanup;
         }
     }
@@ -244,7 +244,7 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
     if (skipGroupValidation)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Importing DH key in non-FIPS group.");
+            "Importing DH key in non-FIPS group.");
         flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
     }
 
@@ -256,8 +256,8 @@ SCOSSL_STATUS scossl_dh_import_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv,
         ctx->dlkey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                "SymCryptDlkeySetValue failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR,
+            "SymCryptDlkeySetValue failed", scError);
         goto cleanup;
     }
 
@@ -290,7 +290,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
     if (ctx->dlkey == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                         "SymCryptDlkeyAllocate returned NULL.");
+            "SymCryptDlkeyAllocate returned NULL.");
         goto cleanup;
     }
 
@@ -299,8 +299,8 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
         scError = SymCryptDlkeySetPrivateKeyLength(ctx->dlkey, nBitsPriv, 0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptDlkeySetPrivateKeyLength failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR,
+                "SymCryptDlkeySetPrivateKeyLength failed", scError);
             goto cleanup;
         }
     }
@@ -308,8 +308,8 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
     scError = SymCryptDlkeyGenerate(SYMCRYPT_FLAG_DLKEY_DH, ctx->dlkey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                "SymCryptDlkeyGenerate failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR,
+            "SymCryptDlkeyGenerate failed", scError);
         goto cleanup;
     }
 
@@ -501,7 +501,7 @@ SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
 
     if (*ppDlGroup == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GET_GROUP_BY_NID, ERR_R_INTERNAL_ERROR,
             "_hidden_dlgroup_* is NULL.");
         return SCOSSL_FAILURE;
     }

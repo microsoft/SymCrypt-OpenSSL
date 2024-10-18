@@ -16,7 +16,7 @@ SCOSSL_STATUS e_scossl_hkdf_init(EVP_PKEY_CTX *ctx)
 {
     SCOSSL_HKDF_CTX *e_scossl_hkdf_context;
     if ((e_scossl_hkdf_context = scossl_hkdf_newctx()) == NULL) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_INIT, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HKDF_INIT, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL");
         return SCOSSL_FAILURE;
     }
@@ -77,7 +77,7 @@ SCOSSL_STATUS e_scossl_hkdf_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
             return SCOSSL_SUCCESS;
         return scossl_hkdf_append_info(e_scossl_hkdf_context, p2, p1);
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HKDF_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "SymCrypt Engine does not support ctrl type (%d)", type);
         return SCOSSL_UNSUPPORTED;
     }
@@ -198,15 +198,15 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
 
     if (e_scossl_hkdf_context->md == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Digest");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
     if (e_scossl_hkdf_context->pbKey == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Key");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Key");
         return SCOSSL_FAILURE;
     }
 
@@ -221,8 +221,8 @@ SCOSSL_STATUS e_scossl_hkdf_derive(EVP_PKEY_CTX *ctx,
         return scossl_hkdf_derive(e_scossl_hkdf_context, key, *keylen);
     }
 
-    SCOSSL_LOG_INFO(SCOSSL_ERR_F_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                    "SymCrypt engine does not support Hmac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
+    SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_HKDF_DERIVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+        "SymCrypt engine does not support Hmac algorithm %d - falling back to OpenSSL", EVP_MD_type(e_scossl_hkdf_context->md));
 
     switch (e_scossl_hkdf_context->mode)
     {

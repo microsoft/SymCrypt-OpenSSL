@@ -23,13 +23,13 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
             "Failed to get messageDigest");
         return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
             "Failed to get mgf1Digest");
         return SCOSSL_UNSUPPORTED;
     }
@@ -37,7 +37,7 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "messageDigest and mgf1Digest do not match");
         return SCOSSL_UNSUPPORTED;
     }
@@ -45,14 +45,14 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "Failed to get RSA key from ctx");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, ERR_R_OPERATION_FAIL,
             "Failed to get cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
@@ -60,7 +60,7 @@ SCOSSL_STATUS e_scossl_rsapss_sign(_Inout_ EVP_PKEY_CTX *ctx, _Out_writes_opt_(*
     keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_SIGN, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         return SCOSSL_FAILURE;
     }
@@ -88,13 +88,13 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
 
     if( EVP_PKEY_CTX_get_signature_md(ctx, &messageDigest) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
             "Failed to get messageDigest");
         return SCOSSL_UNSUPPORTED;
     }
     if( EVP_PKEY_CTX_get_rsa_mgf1_md(ctx, &mgf1Digest) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
             "Failed to get mgf1Digest");
         return SCOSSL_UNSUPPORTED;
     }
@@ -102,7 +102,7 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
 
     if( type != EVP_MD_type(mgf1Digest) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "messageDigest and mgf1Digest do not match");
         return SCOSSL_UNSUPPORTED;
     }
@@ -110,14 +110,14 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
     if( ((pkey = EVP_PKEY_CTX_get0_pkey(ctx)) == NULL) ||
         ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "Failed to get RSA key from ctx");
         return SCOSSL_UNSUPPORTED;
     }
 
     if( EVP_PKEY_CTX_get_rsa_pss_saltlen(ctx, &cbSalt) <= 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, ERR_R_OPERATION_FAIL,
             "Failed to get cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
@@ -125,7 +125,7 @@ SCOSSL_STATUS e_scossl_rsapss_verify(_Inout_ EVP_PKEY_CTX *ctx, _In_reads_bytes_
     keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     if( keyCtx == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, SCOSSL_ERR_R_MISSING_CTX_DATA,
             "SymCrypt Context Not Found.");
         return SCOSSL_FAILURE;
     }
