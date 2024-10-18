@@ -85,7 +85,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if (!PKCS8_pkey_set0(p8Info, p8Obj, 0, V_ASN1_UNDEF, NULL, pbDer, cbKey)) // TODO params?
+    if (!PKCS8_pkey_set0(p8Info, p8Obj, 0, V_ASN1_UNDEF, NULL, pbDer, cbDer))
     {
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
@@ -97,13 +97,13 @@ cleanup:
     if (status != SCOSSL_SUCCESS)
     {
         PKCS8_PRIV_KEY_INFO_free(p8Info);
+        OPENSSL_free(pbDer);
         p8Info = NULL;
     }
 
     ASN1_OCTET_STRING_free(p8Data);
     ASN1_OBJECT_free(p8Obj);
     OPENSSL_secure_clear_free(pbKey, cbKey);
-    OPENSSL_free(pbDer);
 
     return p8Info;
 }

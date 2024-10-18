@@ -12,7 +12,7 @@ extern "C" {
 #define select_PrivateKeyInfo OSSL_KEYMGMT_SELECT_PRIVATE_KEY
 #define select_SubjectPublicKeyInfo OSSL_KEYMGMT_SELECT_PUBLIC_KEY
 
-typedef PVOID (*PSCOSSL_DECODE_INTERNAL_FN) (_In_ PCVOID desc, _In_ BIO *bio);
+typedef PVOID (*PSCOSSL_DECODE_INTERNAL_FN) (_In_ BIO *bio);
 
 typedef struct
 {
@@ -21,9 +21,6 @@ typedef struct
 
     PSCOSSL_DECODE_INTERNAL_FN decodeInternal;
     OSSL_FUNC_keymgmt_free_fn *freeKeyCtx;
-
-    // Contains type-specific key parameters (e.g. ML-KEM params, EC curve, etc.)
-    UINT64 keyParams;
 } SCOSSL_DECODE_KEYTYPE_DESC;
 
 typedef struct
@@ -35,7 +32,7 @@ typedef struct
 
 typedef struct
 {
-    X509_ALGOR algorithm;
+    X509_ALGOR *algorithm;
     ASN1_BIT_STRING *subjectPublicKey;
 } SUBJECT_PUBKEY_INFO;
 

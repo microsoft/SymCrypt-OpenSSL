@@ -96,7 +96,7 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
 
     if ((bio = p_scossl_bio_new_from_core_bio(ctx->provctx, in)) != NULL)
     {
-        keyCtx = ctx->desc->decodeInternal(ctx->desc, bio);
+        keyCtx = ctx->desc->decodeInternal(bio);
     }
 
     if (keyCtx != NULL)
