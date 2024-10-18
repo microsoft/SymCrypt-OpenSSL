@@ -327,20 +327,12 @@ static const OSSL_ALGORITHM p_scossl_kem[] = {
     ALG_TABLE_END};
 
 // Decoders
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_PrivateKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_SubjectPublicKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_PrivateKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_SubjectPublicKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_PrivateKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem_SubjectPublicKeyInfo_functions[];
 
 static const OSSL_ALGORITHM p_scossl_decoder[] = {
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512, mlkem512, PrivateKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512, mlkem512, SubjectPublicKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768, mlkem768, PrivateKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768, mlkem768, SubjectPublicKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024, mlkem1024, PrivateKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024, mlkem1024, SubjectPublicKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, PrivateKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, SubjectPublicKeyInfo),
     ALG_TABLE_END};
 
 // Encoders
@@ -382,6 +374,7 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
+    BIO_meth_free(provctx->coreBioMeth);
 #ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_teardown();
 #endif
