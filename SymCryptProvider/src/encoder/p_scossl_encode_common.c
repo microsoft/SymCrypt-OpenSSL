@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define KEY_TO_TEXT_PRINT_WIDTH 15
+
 static const OSSL_PARAM p_scossl_encode_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_ENCODER_PARAM_CIPHER, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_ENCODER_PARAM_PROPERTIES, NULL, 0),
@@ -124,7 +126,7 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
 
     if (ctx->encodeInternal == NULL ||
         keyAbstract != NULL ||
-        (selection & ctx->selection) == 0)
+        (ctx->outFormat != SCOSSL_ENCODE_TEXT && ((selection & ctx->selection) == 0)))
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
         return SCOSSL_FAILURE;
@@ -133,9 +135,10 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
     if ((bio = p_scossl_bio_new_from_core_bio(ctx->provctx, out)) != NULL)
     {
         ret = ctx->encodeInternal(
-            ctx, keyCtx,
+            ctx, bio,
+            keyCtx,
+            selection,
             passphraseCb, passphraseCbArgs,
-            bio,
             ctx->outFormat == SCOSSL_ENCODE_PEM);
     }
 
@@ -143,6 +146,34 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
 
     return ret;
 }
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_encode_write_key_bytes(PCBYTE pbKey, SIZE_T cbKey, BIO *out)
+{
+    for(SIZE_T i = 0; i < cbKey; i++)
+    {
+        if (i % KEY_TO_TEXT_PRINT_WIDTH == 0)
+        {
+            if (BIO_printf(out, "\n    ") <= 0)
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+
+        if (BIO_printf(out, "%02x%s", pbKey[i], (i < cbKey - 1) ? ":" : "") <= 0)
+        {
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if (BIO_printf(out, "\n") <= 0)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 
 #ifdef __cplusplus
 }

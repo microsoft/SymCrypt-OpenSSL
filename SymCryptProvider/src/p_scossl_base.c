@@ -59,6 +59,13 @@ extern "C" {
     p_scossl_##name##_to_##encoderType##_##format##_functions,        \
     NULL}
 
+#define ALG_TEXT_ENCODER(algNames, name) { \
+    algNames,                              \
+    "provider="P_SCOSSL_NAME               \
+    ",fips=yes,output=text",               \
+    p_scossl_##name##_to_text_functions,   \
+    NULL}
+
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 typedef struct {
@@ -342,6 +349,7 @@ extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_der_functio
 extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_pem_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_der_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_pem_functions[];
+extern const OSSL_DISPATCH p_scossl_mlkem_to_text_functions[];
 
 static const OSSL_ALGORITHM p_scossl_encoder[] = {
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, der),
@@ -350,6 +358,7 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, pem),
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, der),
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, pem),
+    ALG_TEXT_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem),
     ALG_TABLE_END};
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
