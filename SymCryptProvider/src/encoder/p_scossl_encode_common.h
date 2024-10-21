@@ -19,10 +19,11 @@ typedef enum {
     SCOSSL_ENCODE_TEXT
 } SCOSSL_ENCODE_OUT_FORMAT;
 
-typedef SCOSSL_STATUS (*PSCOSSL_ENCODE_INTERNAL_FN) (_In_ PVOID ctx,
+typedef SCOSSL_STATUS (*PSCOSSL_ENCODE_INTERNAL_FN) (_In_ PVOID ctx, _Inout_ BIO *out,
                                                      _In_ PCVOID keyCtx,
+                                                     int selection,
                                                      _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs,
-                                                     _Inout_ BIO *out, BOOL encodeToPem);
+                                                     BOOL encodeToPem);
 
 typedef struct
 {
@@ -48,13 +49,13 @@ const OSSL_PARAM *p_scossl_encode_settable_ctx_params(ossl_unused void *provctx)
 
 BOOL p_scossl_encode_does_selection(int supportedSelection, int selection);
 
-SCOSSL_STATUS p_scossl_encode(_In_ SCOSSL_ENCODE_CTX *ctx, _Out_ OSSL_CORE_BIO *coreOut,
+SCOSSL_STATUS p_scossl_encode(_In_ SCOSSL_ENCODE_CTX *ctx, _In_ OSSL_CORE_BIO *coreOut,
                               _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
                               _In_ const OSSL_PARAM keyAbstract[],
                               int selection,
                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs);
 
-
+SCOSSL_STATUS p_scossl_encode_write_key_bytes(_In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey, _Inout_ BIO *out);
 
 #ifdef __cplusplus
 }

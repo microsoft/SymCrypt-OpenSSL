@@ -922,11 +922,11 @@ static SYMCRYPT_MLKEM_PARAMS p_scossl_mlkem_keymgmt_params_from_name(const char 
     }
     else if (OPENSSL_strcasecmp(name, SCOSSL_MLKEM_PARAM_NAME_768) == 0)
     {
-        return SYMCRYPT_MLKEM_PARAMS_MLKEM512;
+        return SYMCRYPT_MLKEM_PARAMS_MLKEM768;
     }
     else if (OPENSSL_strcasecmp(name, SCOSSL_MLKEM_PARAM_NAME_1024) == 0)
     {
-        return SYMCRYPT_MLKEM_PARAMS_MLKEM512;
+        return SYMCRYPT_MLKEM_PARAMS_MLKEM1024;
     }
 
     return SYMCRYPT_MLKEM_PARAMS_NULL;
