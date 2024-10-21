@@ -89,12 +89,9 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
     {
         selection = ctx->desc->selection;
     }
-    else if ((selection & ctx->desc->selection) == 0)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
-    }
 
-    if ((bio = p_scossl_bio_new_from_core_bio(ctx->provctx, in)) != NULL)
+    if ((selection & ctx->desc->selection) != 0 &&
+        (bio = p_scossl_bio_new_from_core_bio(ctx->provctx, in)) != NULL)
     {
         keyCtx = ctx->desc->decodeInternal(bio);
     }
