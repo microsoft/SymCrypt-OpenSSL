@@ -8,6 +8,7 @@
 
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
+#include "scossl_provider.h"
 #include "p_scossl_bio.h"
 #include "p_scossl_keysinuse.h"
 #include "p_scossl_names.h"
@@ -365,7 +366,9 @@ static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
     if (OBJ_create(SCOSSL_OID_MLKEM512, SCOSSL_SN_MLKEM512, SCOSSL_SN_MLKEM512) == NID_undef ||
         OBJ_create(SCOSSL_OID_MLKEM768, SCOSSL_SN_MLKEM768, SCOSSL_SN_MLKEM768) == NID_undef ||
-        OBJ_create(SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_SN_MLKEM1024) == NID_undef)
+        OBJ_create(SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_SN_MLKEM1024) == NID_undef ||
+        OBJ_create(NULL, SCOSSL_SN_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768) == NID_undef ||
+        OBJ_create(NULL, SCOSSL_SN_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768) == NID_undef)
     {
         return SCOSSL_FAILURE;
     }

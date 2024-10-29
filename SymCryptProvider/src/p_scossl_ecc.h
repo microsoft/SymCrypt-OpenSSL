@@ -40,6 +40,10 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
+SIZE_T p_scossl_ecc_get_key_size(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
+SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                           _Out_writes_bytes_(*pcbPrivateKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+
 // Helper function for retrieving the properly formatted encoded public key.
 // The format differs for x25519 keys. Caller is responsible for freeing *ppbEncodedKey.
 SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
