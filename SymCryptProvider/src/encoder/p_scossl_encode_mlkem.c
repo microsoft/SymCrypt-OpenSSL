@@ -84,7 +84,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_key_bytes(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -145,7 +145,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_key_bytes(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -362,7 +362,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
     if (printDecapsulationKey)
     {
         // Try to get the private seed. Otherwise this key was encoded using the whole decapsulation key.
-        if (p_scossl_mlkem_keymgmt_get_key_bytes(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey))
+        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey))
         {
             if (BIO_printf(out, "MLKEM Decapsulation-Key (512 bit private seed encoding):\n") <= 0)
             {
@@ -379,7 +379,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         }
 
         OPENSSL_secure_clear_free(pbKey, cbKey);
-        if (!p_scossl_mlkem_keymgmt_get_key_bytes(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY, &pbKey, &cbKey))
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY, &pbKey, &cbKey))
         {
             goto cleanup;
         }
@@ -400,7 +400,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
     if (printEncapsulationKey)
     {
         OPENSSL_secure_clear_free(pbKey, cbKey);
-        if (!p_scossl_mlkem_keymgmt_get_key_bytes(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey))
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey))
         {
             goto cleanup;
         }
