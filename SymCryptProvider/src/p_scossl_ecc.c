@@ -21,6 +21,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
     SYMCRYPT_ECPOINT_FORMAT pointFormat;
     PBYTE pbPublicKey, pbPublicKeyStart;
     SIZE_T cbPublicKey;
+    BOOL freePublicKey = FALSE;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -45,10 +46,24 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
         cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + 1;
     }
 
-    if ((pbPublicKeyStart = OPENSSL_malloc(cbPublicKey)) == NULL)
+    if (ppbEncodedKey == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
+        *pcbEncodedKey = cbPublicKey;
+        return SCOSSL_SUCCESS;
+    }
+    else if (*ppbEncodedKey == NULL)
+    {
+        if ((pbPublicKeyStart = OPENSSL_malloc(cbPublicKey)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        freePublicKey = TRUE;
+    }
+    else
+    {
+        pbPublicKeyStart = *ppbEncodedKey;
     }
 
     pbPublicKey = pbPublicKeyStart;
@@ -99,7 +114,11 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
                 }
-                OPENSSL_free(pbPublicKeyStart);
+
+                if (freePublicKey)
+                {
+                    OPENSSL_free(pbPublicKeyStart);
+                }
                 pbPublicKeyStart = pbPublicKey;
             }
         }
@@ -112,12 +131,31 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    if (!ret)
+    if (!ret && freePublicKey)
     {
         OPENSSL_free(pbPublicKeyStart);
     }
 
     return ret;
+}
+
+SCOSSL_STATUS p_scossl_ecc_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                           _Out_writes_bytes_(*pcbPrivateKey) PBYTE *ppbPrivateKey, _Out_ SIZE_T *pcbPrivateKey)
+{
+    return SCOSSL_FAILURE;
+}
+
+SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                           _Out_writes_bytes_(*pcbPrivateKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey)
+{
+    if (selection == OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+    {
+        return p_scossl_ecc_get_encoded_public_key(keyCtx, ppbKey, pcbKey);
+    }
+    else
+    {
+        return p_scossl_ecc_get_private_key(keyCtx, ppbKey, pcbKey);
+    }
 }
 
 #ifdef KEYSINUSE_ENABLED

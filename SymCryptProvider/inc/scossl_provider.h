@@ -14,14 +14,12 @@ extern "C" {
 //
 // Digest parameters
 //
-
 #define SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING "function-name-string"
 #define SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING "customization-string"
   
 //
 // KDF parameters
 //
-
 #define SCOSSL_KDF_PARAM_SRTP_RATE "rate"
 #define SCOSSL_KDF_PARAM_SRTP_INDEX "index"
 #define SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH "index-width"
@@ -29,10 +27,39 @@ extern "C" {
 //
 // SRTP labels
 //
-
 #define SCOSSL_SRTP_LABEL_ENCRYPTION "encryption"
 #define SCOSSL_SRTP_LABEL_AUTHENTICATION "authentication"
 #define SCOSSL_SRTP_LABEL_SALTING "salting"
+
+//
+// Hybrid PQ parameters
+//
+#define SCOSSL_PKEY_PARAM_CLASSIC_PRIV_KEY              "classic-priv"
+#define SCOSSL_PKEY_PARAM_CLASSIC_PUB_KEY               "classic-pub"
+#define SCOSSL_PKEY_PARAM_CLASSIC_ENCODED_PUBLIC_KEY    "classic-encoded-pub-key"
+
+//
+// Extended algorithms not found in default OpenSSL implementation
+//
+
+#define SCOSSL_SN_MLKEM512      "mlkem512"
+#define SCOSSL_OID_MLKEM512     "2.16.840.1.101.3.4.4.1"
+
+#define SCOSSL_SN_MLKEM768      "mlkem768"
+#define SCOSSL_OID_MLKEM768     "2.16.840.1.101.3.4.4.2"
+
+#define SCOSSL_SN_MLKEM1024     "mlkem1024"
+#define SCOSSL_OID_MLKEM1024    "2.16.840.1.101.3.4.4.3"
+
+#define SCOSSL_SN_P256_MLKEM768     SN_X9_62_prime256v1 SCOSSL_SN_MLKEM768
+#define SCOSSL_OID_P256_MLKEM768    "2.16.840.1.101.3.4.4.4"
+
+#define SCOSSL_SN_X25519_MLKEM768    SN_X25519 SCOSSL_SN_MLKEM768
+#define SCOSSL_OID_X25519_MLKEM768   "2.16.840.1.101.3.4.4.3"
+
+// Hybrid PQ group names
+#define SCOSSL_MLKEM_PARAM_NAME_P256_MLKEM768    SN_secp256r1 SCOSSL_MLKEM_PARAM_NAME_768
+#define SCOSSL_MLKEM_PARAM_NAME_X25519_MLKEM768  SN_X25519 SCOSSL_MLKEM_PARAM_NAME_768
 
 #ifdef __cplusplus
 }

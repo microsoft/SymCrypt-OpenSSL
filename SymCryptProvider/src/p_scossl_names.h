@@ -9,19 +9,6 @@ extern "C" {
 #endif
 
 //
-// Extended algorithms not found in default OpenSSL implementation
-//
-
-#define SCOSSL_SN_MLKEM512 "mlkem512"
-#define SCOSSL_OID_MLKEM512 "2.16.840.1.101.3.4.4.1"
-
-#define SCOSSL_SN_MLKEM768 "mlkem768"
-#define SCOSSL_OID_MLKEM768 "2.16.840.1.101.3.4.4.2"
-
-#define SCOSSL_SN_MLKEM1024 "mlkem1024"
-#define SCOSSL_OID_MLKEM1024 "2.16.840.1.101.3.4.4.3"
-
-//
 // Provider algorithm names
 //
 
