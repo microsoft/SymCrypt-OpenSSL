@@ -97,7 +97,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    scError = SymCryptMlKemSizeofCiphertextFromParams(ctx->keyCtx->params, &cbCipherText);
+    scError = SymCryptMlKemSizeofCiphertextFromParams(ctx->keyCtx->mlkemParams, &cbCipherText);
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -162,7 +162,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    scError = SymCryptMlKemSizeofCiphertextFromParams(ctx->keyCtx->params, &cbCipherText);
+    scError = SymCryptMlKemSizeofCiphertextFromParams(ctx->keyCtx->mlkemParams, &cbCipherText);
 
     if (scError != SYMCRYPT_NO_ERROR)
     {

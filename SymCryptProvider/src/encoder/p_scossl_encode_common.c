@@ -116,12 +116,12 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
                               OSSL_PASSPHRASE_CALLBACK *passphraseCb, void *passphraseCbArgs)
 {
     BIO *bio = NULL;
-    SCOSSL_STATUS ret;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if (ctx->encodeInternal == NULL ||
@@ -129,7 +129,7 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
         (ctx->outFormat != SCOSSL_ENCODE_TEXT && ((selection & ctx->selection) == 0)))
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
     if ((bio = p_scossl_bio_new_from_core_bio(ctx->provctx, out)) != NULL)
@@ -142,6 +142,7 @@ SCOSSL_STATUS p_scossl_encode(SCOSSL_ENCODE_CTX *ctx, OSSL_CORE_BIO *out,
             ctx->outFormat == SCOSSL_ENCODE_PEM);
     }
 
+cleanup:
     BIO_free(bio);
 
     return ret;

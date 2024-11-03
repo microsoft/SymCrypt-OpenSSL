@@ -10,7 +10,6 @@ extern "C" {
 #endif
 
 typedef struct {
-    OSSL_FUNC_keymgmt_gen_set_params_fn *setParams;
     OSSL_FUNC_keymgmt_gen_cleanup_fn *genCleanup;
     OSSL_FUNC_keymgmt_gen_init_fn *genInit;
     OSSL_FUNC_keymgmt_gen_set_template_fn *setTemplate;
@@ -35,7 +34,6 @@ typedef struct {
     OSSL_FUNC_keyexch_set_peer_fn *setPeer;
     OSSL_FUNC_keyexch_derive_fn *derive;
 } SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS;
-
 
 typedef struct {
     const char *groupName;

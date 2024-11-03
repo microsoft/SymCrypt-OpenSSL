@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_names.h"
+#include "scossl_provider.h"
 #include "decoder/p_scossl_decode_common.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
 
@@ -76,16 +76,16 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ BIO *bio)
         goto cleanup;
     }
 
-    keyCtx->params = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(alg->algorithm));
+    keyCtx->mlkemParams = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(alg->algorithm));
     keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
 
-    if (keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
+    if (keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
         goto cleanup;
     }
 
-    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->params)) == NULL)
+    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -145,16 +145,16 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ BIO *bi
         goto cleanup;
     }
 
-    keyCtx->params = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(subjPubKeyInfo->algorithm->algorithm));
+    keyCtx->mlkemParams = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(subjPubKeyInfo->algorithm->algorithm));
     keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
 
-    if (keyCtx->params == SYMCRYPT_MLKEM_PARAMS_NULL)
+    if (keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
         goto cleanup;
     }
 
-    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->params)) == NULL)
+    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
