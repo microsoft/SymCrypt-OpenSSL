@@ -76,7 +76,6 @@ static const char *p_scossl_mlkem_keymgmt_params_from_name(_In_ const char *grou
                                                            _Out_ SYMCRYPT_MLKEM_PARAMS *mlkemParams,
                                                            _Out_ const char **classicGroupName,
                                                            _Out_ SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS **classicKeymgmt);
-static const char *p_scossl_mlkem_keymgmt_get_group_name(_In_ const SCOSSL_MLKEM_KEY_CTX keyCtx);
 static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx);
 
 SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx)
@@ -106,20 +105,16 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
-    SYMCRYPT_MLKEMKEY_FORMAT format;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    SCOSSL_MLKEM_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_KEY_CTX));
+    SCOSSL_MLKEM_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));
 
     if (copyCtx != NULL)
     {
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {
+            copyCtx->groupName = keyCtx->groupName;
             copyCtx->mlkemParams = keyCtx->mlkemParams;
-        }
-        else
-        {
-            copyCtx->mlkemParams = SYMCRYPT_MLKEM_PARAMS_NULL;
         }
 
         if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->key != NULL)
@@ -130,49 +125,35 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
                 goto cleanup;
             }
 
-            if ((copyCtx->key = SymCryptMlKemkeyAllocate(copyCtx->mlkemParams)) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-
-            if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
-            {
-                format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
-            }
-            else
-            {
-                format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
-            }
-
-            ret = p_scossl_mlkem_keymgmt_get_encoded_key(
-                keyCtx,
-                format,
-                &pbKey, &cbKey);
-
-            if (ret != SCOSSL_SUCCESS)
-            {
-                goto cleanup;
-            }
-
-            scError = SymCryptMlKemkeySetValue(
-                pbKey, cbKey,
-                format,
-                0,
-                copyCtx->key);
-
+            scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, keyCtx->format, &cbKey);
             if (scError != SYMCRYPT_NO_ERROR)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
                 goto cleanup;
             }
 
-            copyCtx->format = format;
-        }
-        else
-        {
-            copyCtx->key = NULL;
-            copyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
+            if ((copyCtx->key = SymCryptMlKemkeyAllocate(copyCtx->mlkemParams)) == NULL ||
+                (pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            scError = SymCryptMlKemkeyGetValue(keyCtx->key, pbKey, cbKey, keyCtx->format, 0);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                goto cleanup;
+            }
+
+            scError = SymCryptMlKemkeySetValue(pbKey, cbKey, keyCtx->format, 0, copyCtx->key);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                goto cleanup;
+            }
+
+            copyCtx->format = keyCtx->format;
         }
 
         if (keyCtx->classicKeyCtx != NULL)
@@ -205,7 +186,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
     const OSSL_PARAM *p;
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
-        int classicGroupNid;
         const char *name;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &name))
@@ -215,7 +195,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
         }
 
         genCtx->groupName = p_scossl_mlkem_keymgmt_params_from_name(name, &genCtx->mlkemParams, &genCtx->classicGroupName, &genCtx->classicKeyMgmt);
-
         if (genCtx->groupName == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
@@ -226,7 +205,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
     return SCOSSL_SUCCESS;;
 }
 
-static const OSSL_PARAM *p_scossl_mlkem_keygen_settable_params(_In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, ossl_unused void *provCtx)
+static const OSSL_PARAM *p_scossl_mlkem_keygen_settable_params(ossl_unused void *genCtx, ossl_unused void *provCtx)
 {
     return p_scossl_mlkem_keygen_settable_param_types;
 }
@@ -295,8 +274,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
 
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ OSSL_CALLBACK *cb, _In_ void *cbarg)
 {
-    EVP_PKEY_CTX *classicGenCtx;
-    int pkeyId;
     BOOL success = FALSE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_MLKEM_KEY_CTX *keyCtx;
@@ -318,7 +295,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
     if (genCtx->classicGroupName != NULL)
     {
         OSSL_PARAM classicParams[2] = {
-            OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, genCtx->classicGroupName, 0),
+            OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)genCtx->classicGroupName, strlen(genCtx->classicGroupName)),
             OSSL_PARAM_END};
 
         genCtx->classicKeygenCtx = genCtx->classicKeyMgmt->genInit(genCtx->provCtx, 0, classicParams);
@@ -375,17 +352,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_In_ SCOSSL_MLKEM_KEY_CTX
     {
         PCBYTE pbKey;
         SIZE_T cbKey;
-        PCBYTE pbMlKemKey;
-        SIZE_T cbMlKemKey;
-        PCBYTE pbClassicKey;
-        SIZE_T cbClassicKey;
-        SYMCRYPT_ERROR scError;
-
-        if (keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
-            return SCOSSL_FAILURE;
-        }
 
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbKey, &cbKey))
         {
@@ -393,62 +359,10 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_In_ SCOSSL_MLKEM_KEY_CTX
             return SCOSSL_FAILURE;
         }
 
-        if (keyCtx->classicKeyCtx != NULL)
+        if (p_scossl_mlkem_keymgmt_set_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, pbKey, cbKey) != SCOSSL_SUCCESS)
         {
-            scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &cbMlKemKey);
-            if (scError != SYMCRYPT_NO_ERROR ||
-                cbKey < cbMlKemKey)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-                return SCOSSL_FAILURE;
-            }
-
-            cbClassicKey = cbKey - cbMlKemKey;
-            pbClassicKey = pbKey;
-            pbMlKemKey = pbClassicKey + cbClassicKey;
-
-            OSSL_PARAM classicParams[2] = {
-                OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, pbClassicKey, cbClassicKey),
-                OSSL_PARAM_END};
-
-            if (keyCtx->classicKeyMgmt->setParams(keyCtx->classicKeyCtx, classicParams) != SCOSSL_SUCCESS)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-                return SCOSSL_FAILURE;
-            }
-        }
-        else
-        {
-            pbMlKemKey = pbKey;
-            cbMlKemKey = cbKey;
-        }
-
-        if (keyCtx->key != NULL)
-        {
-            SymCryptMlKemkeyFree(keyCtx->key);
-        }
-
-        if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return SCOSSL_FAILURE;
         }
-
-        scError = SymCryptMlKemkeySetValue(
-            pbMlKemKey, cbMlKemKey,
-            SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
-            0,
-            keyCtx->key);
-
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            SymCryptMlKemkeyFree(keyCtx->key);
-            keyCtx->key = NULL;
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            return SCOSSL_FAILURE;
-        }
-
-        keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
     }
 
     return SCOSSL_SUCCESS;
@@ -487,7 +401,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_params(_In_ SCOSSL_MLKEM_KEY
     {
         scError = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
             &pbMlKemKey, &cbMlKemKey);
 
         if (scError != SYMCRYPT_NO_ERROR)
@@ -525,7 +439,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_params(_In_ SCOSSL_MLKEM_KEY
 
         scError = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
             &pbKey, &cbKey);
 
         if (scError != SYMCRYPT_NO_ERROR)
@@ -536,7 +450,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_params(_In_ SCOSSL_MLKEM_KEY
 
         if (keyCtx->classicKeyCtx != NULL)
         {
-            classic_params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, &pbClassicKey, &cbClassicKey);
+            classic_params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, &pbClassicKey, cbClassicKey);
             if (keyCtx->classicKeyMgmt->getParams(keyCtx->classicKeyCtx, classic_params) != SCOSSL_SUCCESS)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -544,7 +458,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_params(_In_ SCOSSL_MLKEM_KEY
             }
 
             cbKey = cbMlKemKey + cbClassicKey;
-            if (pbKey = OPENSSL_malloc(cbKey) == NULL)
+            if ((pbKey = OPENSSL_malloc(cbKey)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
@@ -635,7 +549,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, p_scossl_mlkem_keymgmt_params_to_name(keyCtx->mlkemParams)))
+        !OSSL_PARAM_set_utf8_string(p, keyCtx->groupName != NULL ? keyCtx->groupName : ""))
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         return SCOSSL_FAILURE;
@@ -643,7 +557,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
 
     return p_scossl_mlkem_keymgmt_get_key_params(keyCtx, params);
 }
-
 
 static BOOL p_scossl_mlkem_keymgmt_has(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection)
 {
@@ -707,7 +620,7 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
 
                 success = p_scossl_mlkem_keymgmt_get_encoded_key(
                     keyCtx1,
-                    SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
+                    OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
                     &pbKey1, &cbKey1);
                 if (!success)
                 {
@@ -716,7 +629,7 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
 
                 success = p_scossl_mlkem_keymgmt_get_encoded_key(
                     keyCtx2,
-                    SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
+                    OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
                     &pbKey2, &cbKey2);
                 if (!success)
                 {
@@ -734,7 +647,7 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
             {
                 success = p_scossl_mlkem_keymgmt_get_encoded_key(
                     keyCtx1,
-                    SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
+                    OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
                     &pbKey1, &cbKey1);
                 if (!success)
                 {
@@ -743,7 +656,7 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
 
                 success = p_scossl_mlkem_keymgmt_get_encoded_key(
                     keyCtx2,
-                    SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
+                    OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
                     &pbKey2, &cbKey2);
                 if (!success)
                 {
@@ -791,7 +704,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
     const OSSL_PARAM *p;
     PCBYTE pbKey;
     SIZE_T cbKey;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    const char *classicGroupName = NULL;
 
     // Domain parameters are required for import
     if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0)
@@ -801,18 +714,32 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
-        const char *name;
+        const char *groupName;
 
-        if (!OSSL_PARAM_get_utf8_string_ptr(p, &name))
+        if (!OSSL_PARAM_get_utf8_string_ptr(p, &groupName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if ((keyCtx->mlkemParams = p_scossl_mlkem_keymgmt_params_from_name(name)) == SYMCRYPT_MLKEM_PARAMS_NULL)
+        keyCtx->groupName = p_scossl_mlkem_keymgmt_params_from_name(groupName, &keyCtx->mlkemParams, &classicGroupName, &keyCtx->classicKeyMgmt);
+
+        if (keyCtx->groupName == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
             return SCOSSL_FAILURE;
+        }
+
+        if (classicGroupName != NULL)
+        {
+            OSSL_PARAM classicParams[2] = {
+                OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)classicGroupName, strlen(classicGroupName)),
+                OSSL_PARAM_END};
+
+            if (keyCtx->classicKeyMgmt->import(keyCtx->classicKeyCtx, selection, classicParams) != SCOSSL_SUCCESS)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
     }
 
@@ -832,8 +759,6 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
-
-            keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
         }
         else
         {
@@ -849,27 +774,10 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
-
-            keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
         }
 
-        if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
+        if (p_scossl_mlkem_keymgmt_set_encoded_key(keyCtx, selection, pbKey, cbKey) != SCOSSL_SUCCESS)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return SCOSSL_FAILURE;
-        }
-
-        scError = SymCryptMlKemkeySetValue(
-            pbKey, cbKey,
-            keyCtx->format,
-            0,
-            keyCtx->key);
-
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            SymCryptMlKemkeyFree(keyCtx->key);
-            keyCtx->key = NULL;
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
             return SCOSSL_FAILURE;
         }
     }
@@ -912,8 +820,8 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
         goto cleanup;
     }
 
-    mlkemParamsName = p_scossl_mlkem_keymgmt_params_to_name(keyCtx->mlkemParams);
-    if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, mlkemParamsName, sizeof(mlkemParamsName)))
+    mlkemParamsName = keyCtx->groupName != NULL ? keyCtx->groupName : "";
+    if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, mlkemParamsName, strlen(mlkemParamsName)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
@@ -923,7 +831,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
     {
         ret = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
             &pbKey, &cbKey);
 
         if (ret != SCOSSL_SUCCESS)
@@ -931,7 +839,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
             goto cleanup;
         }
 
-        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbKey, cbKey))
+        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbKey, cbKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
@@ -951,7 +859,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
 
         ret = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
             &pbKey, &cbKey);
 
         if (ret != SCOSSL_SUCCESS)
@@ -1002,10 +910,8 @@ const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[] = {
 //
 // Helper functions
 //
-
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                     SYMCRYPT_MLKEMKEY_FORMAT format,
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
                                                      PBYTE *ppbKey, SIZE_T *pcbKey)
 {
     PBYTE pbKey = NULL;
@@ -1014,8 +920,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
     SIZE_T cbMlKemKey = 0;
     PBYTE pbClassicKey = NULL;
     SIZE_T cbClassicKey = 0;
-    int classicSelection = (format == SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY ?
-        OSSL_KEYMGMT_SELECT_PRIVATE_KEY : OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
+    SYMCRYPT_MLKEMKEY_FORMAT format;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -1025,12 +930,36 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         return SCOSSL_FAILURE;
     }
 
-    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, format, &cbKey);
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_NULL ||
+            keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+            return SCOSSL_FAILURE;
+        }
+
+        format = keyCtx->format;
+    }
+    else
+    {
+        format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
+    }
+
+    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, format, &cbMlKemKey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
     }
+
+    if (keyCtx->classicKeyCtx != NULL &&
+        (cbClassicKey = p_scossl_ecc_get_encoded_key_size(keyCtx->classicKeyCtx, selection)) == 0)
+    {
+        goto cleanup;
+    }
+
+    cbKey = cbMlKemKey + cbClassicKey;
 
     // Always using OPENSSL_secure_malloc so caller doesn't have to worry about
     // calling separate free functions for encapsulation and decapsulation keys
@@ -1040,15 +969,16 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    // Copy the private key in first if it exists.
+    pbClassicKey = pbKey;
+    pbMlKemKey = pbKey + cbClassicKey;
+
     if (keyCtx->classicKeyCtx != NULL &&
-        p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, classicSelection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
+        p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, selection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
 
-    scError = SymCryptMlKemkeyGetValue(keyCtx->key, pbKey, cbKey, format, 0);
-
+    scError = SymCryptMlKemkeyGetValue(keyCtx->key, pbMlKemKey, cbMlKemKey, format, 0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
@@ -1067,6 +997,92 @@ cleanup:
     }
 
     return SCOSSL_SUCCESS;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
+                                                     PCBYTE pbKey, SIZE_T cbKey)
+{
+    PCBYTE pbMlKemKey = NULL;
+    SIZE_T cbMlKemKey = 0;
+    PCBYTE pbClassicKey = NULL;
+    SIZE_T cbClassicKey = 0;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (keyCtx->key == NULL || keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        goto cleanup;
+    }
+
+    if (keyCtx->classicKeyCtx != NULL &&
+        (cbClassicKey = p_scossl_ecc_get_encoded_key_size(keyCtx->classicKeyCtx, selection)) == 0)
+    {
+        goto cleanup;
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        keyCtx->format = cbKey - cbClassicKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
+    }
+    else
+    {
+        keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
+    }
+
+    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, keyCtx->format, &cbMlKemKey);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if (cbKey != cbClassicKey + cbMlKemKey)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        goto cleanup;
+    }
+
+    pbClassicKey = pbKey;
+    pbMlKemKey = pbKey + cbClassicKey;
+
+    if (keyCtx->classicKeyCtx != NULL)
+    {
+        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        {
+            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, selection, NULL, 0, pbClassicKey, cbClassicKey);
+        }
+        else
+        {
+            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, selection, pbClassicKey, cbClassicKey, NULL, 0);
+        }
+
+        if (ret != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+    }
+
+    scError = SymCryptMlKemkeySetValue(pbMlKemKey, cbMlKemKey, keyCtx->format, 0, keyCtx->key);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+
+    if (ret != SCOSSL_SUCCESS)
+    {
+        SymCryptMlKemkeyFree(keyCtx->key);
+        keyCtx->key = NULL;
+        keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
+    }
+
+    return ret;
 }
 
 // This function checks if groupName matches a supported MLKEM or MLKEM hybrid group name.
@@ -1115,25 +1131,6 @@ static const char* p_scossl_mlkem_keymgmt_params_from_name(const char *groupName
     }
 
     return NULL;
-}
-
-_Use_decl_annotations_
-static const char *p_scossl_mlkem_keymgmt_get_group_name(const SCOSSL_MLKEM_KEY_CTX keyCtx)
-{
-    switch (keyCtx->mlkemParams)
-    {
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
-        return SCOSSL_SN_MLKEM512;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
-        return SCOSSL_SN_MLKEM768;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
-        return SCOSSL_SN_MLKEM1024;
-    default:
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
-        break;
-    }
-
-    return "";
 }
 
 _Use_decl_annotations_

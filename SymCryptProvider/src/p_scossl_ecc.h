@@ -40,14 +40,13 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
-SIZE_T p_scossl_ecc_get_key_size(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
+SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
-                                           _Out_writes_bytes_(*pcbPrivateKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
-
-// Helper function for retrieving the properly formatted encoded public key.
-// The format differs for x25519 keys. Caller is responsible for freeing *ppbEncodedKey.
-SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                  _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+                                           _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+                                           
+SCOSSL_STATUS p_scossl_ecc_set_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                           _In_reads_bytes_opt_(cbEncodedPublicKey) PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
+                                           _In_reads_bytes_opt_(cbPrivateKey) PCBYTE pbPrivateKey, SIZE_T cbPrivateKey);
 
 #ifdef KEYSINUSE_ENABLED
 void p_scossl_ecc_init_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
