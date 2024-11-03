@@ -2,7 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_names.h"
+#include "scossl_provider.h"
 #include "encoder/p_scossl_encode_common.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
 
@@ -37,7 +37,7 @@ static ASN1_OBJECT *p_scossl_encode_get_mlkem_oid(_In_ const SCOSSL_MLKEM_KEY_CT
 {
     int nid = NID_undef;
 
-    switch (keyCtx->params)
+    switch (keyCtx->mlkemParams)
     {
     case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
         nid = OBJ_sn2nid(SCOSSL_SN_MLKEM512);
@@ -331,9 +331,9 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
     BOOL printPrivateSeed = FALSE;
     BOOL printDecapsulationKey = FALSE;
     BOOL printEncapsulationKey = FALSE;
-    const char *paramName = p_scossl_encode_mlkem_params_to_name(keyCtx->params);
+    const char *paramName = p_scossl_encode_mlkem_params_to_name(keyCtx->mlkemParams);
     PBYTE pbKey = NULL;
-    SIZE_T cbKey;
+    SIZE_T cbKey = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (keyCtx->key == NULL ||

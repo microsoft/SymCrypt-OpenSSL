@@ -15,9 +15,11 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
 SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
                                             _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg);
 
-SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                     SYMCRYPT_MLKEMKEY_FORMAT format,
-                                                     _Out_writes_bytes_(*cbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
+                                                     _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
+                                                     _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
+
 
 #ifdef __cplusplus
 }
