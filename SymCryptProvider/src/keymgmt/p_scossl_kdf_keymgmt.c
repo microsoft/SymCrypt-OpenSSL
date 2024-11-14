@@ -7,7 +7,7 @@
 // provider kdf interface. Some callers may still be using the EVP_PKEY API
 // for HKDF and TLS1-PRF. The implementations in keyexch/p_scossl_kdf_keyexch
 // provide HKDF and TLS1-PRF for the EVP_PKEY API. This keymgmt interface is
-// mostly empty but necessary for algorithms exposed through the EVP_PKEY API.
+// mostly empty but necessary to expose both KDFs through the EVP_PKEY API.
 
 #include "scossl_helpers.h"
 

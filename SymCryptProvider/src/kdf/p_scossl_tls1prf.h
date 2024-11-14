@@ -34,7 +34,6 @@ const OSSL_PARAM *p_scossl_tls1prf_settable_ctx_params(ossl_unused void *ctx, os
 SCOSSL_STATUS p_scossl_tls1prf_get_ctx_params(_In_ SCOSSL_PROV_TLS1_PRF_CTX *ctx, _Inout_ OSSL_PARAM params[]);
 SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
-
 #ifdef __cplusplus
 }
 #endif

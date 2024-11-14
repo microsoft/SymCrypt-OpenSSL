@@ -32,7 +32,6 @@ const OSSL_PARAM *p_scossl_hkdf_settable_ctx_params(ossl_unused void *ctx, ossl_
 SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[]);
 SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, const _In_ OSSL_PARAM params[]);
 
-
 #ifdef __cplusplus
 }
 #endif
