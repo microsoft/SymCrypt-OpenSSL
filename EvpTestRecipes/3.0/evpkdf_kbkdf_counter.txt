@@ -14,6 +14,17 @@ Output = cf4bfe4f85a10bad
 
 KDF = KBKDF
 Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA224
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = 6ba2131f742df49b
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
 Ctrl.digest = digest:SHA256
 Ctrl.mac = mac:HMAC
 Ctrl.use-l = use-l:1
@@ -44,3 +55,71 @@ Ctrl.salt = salt:Label
 Ctrl.hexkey = hexkey:0001020304050607
 Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
 Output = db3a18d96c4ad41e
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA512-224
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = 433fb6029801ccf5
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA512-256
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = 31117cf3b4622835
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA3-224
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = 843c04b2542d8ca4
+
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA3-256
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = d4c72c668a1de0b9
+
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA3-384
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = f6392bd50ae4361b
+
+KDF = KBKDF
+Ctrl.mode = mode:COUNTER
+Ctrl.digest = digest:SHA3-512
+Ctrl.mac = mac:HMAC
+Ctrl.use-l = use-l:1
+Ctrl.use-separator = use-separator:1
+Ctrl.salt = salt:Label
+Ctrl.hexkey = hexkey:0001020304050607
+Ctrl.hexinfo = hexinfo:101112131415161718191a1b1c1d1e1f
+Output = 5a0d0630a248121f
