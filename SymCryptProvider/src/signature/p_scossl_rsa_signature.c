@@ -879,6 +879,9 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             case NID_sha1:
                 algNid = NID_sha1WithRSAEncryption;
                 break;
+            case NID_sha224:
+                algNid = NID_sha224WithRSAEncryption;
+                break;
             case NID_sha256:
                 algNid = NID_sha256WithRSAEncryption;
                 break;
@@ -887,6 +890,15 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                 break;
             case NID_sha512:
                 algNid = NID_sha512WithRSAEncryption;
+                break;
+            case NID_sha512_224:
+                algNid = NID_sha512_224WithRSAEncryption;
+                break;
+            case NID_sha512_256:
+                algNid = NID_sha512_256WithRSAEncryption;
+                break;
+            case NID_sha3_224:
+                algNid = NID_RSA_SHA3_224;
                 break;
             case NID_sha3_256:
                 algNid = NID_RSA_SHA3_256;

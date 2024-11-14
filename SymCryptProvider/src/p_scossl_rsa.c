@@ -21,13 +21,17 @@ extern "C" {
 #define SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN (20)
 
 static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
-    {NID_sha1,     OSSL_DIGEST_NAME_SHA1}, // Default
-    {NID_sha256,   OSSL_DIGEST_NAME_SHA2_256},
-    {NID_sha384,   OSSL_DIGEST_NAME_SHA2_384},
-    {NID_sha512,   OSSL_DIGEST_NAME_SHA2_512},
-    {NID_sha3_256, OSSL_DIGEST_NAME_SHA3_256},
-    {NID_sha3_384, OSSL_DIGEST_NAME_SHA3_384},
-    {NID_sha3_512, OSSL_DIGEST_NAME_SHA3_512}};
+    {NID_sha1,          OSSL_DIGEST_NAME_SHA1}, // Default
+    {NID_sha224,        OSSL_DIGEST_NAME_SHA2_224},
+    {NID_sha256,        OSSL_DIGEST_NAME_SHA2_256},
+    {NID_sha384,        OSSL_DIGEST_NAME_SHA2_384},
+    {NID_sha512,        OSSL_DIGEST_NAME_SHA2_512},
+    {NID_sha512_224,    OSSL_DIGEST_NAME_SHA2_512_224},
+    {NID_sha512_256,    OSSL_DIGEST_NAME_SHA2_512_256},
+    {NID_sha3_224,      OSSL_DIGEST_NAME_SHA3_224},
+    {NID_sha3_256,      OSSL_DIGEST_NAME_SHA3_256},
+    {NID_sha3_384,      OSSL_DIGEST_NAME_SHA3_384},
+    {NID_sha3_512,      OSSL_DIGEST_NAME_SHA3_512}};
 
 _Use_decl_annotations_
 const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,

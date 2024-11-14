@@ -430,6 +430,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
         case NID_sha1:
             algNid = NID_ecdsa_with_SHA1;
             break;
+        case NID_sha224:
+            algNid = NID_ecdsa_with_SHA224;
+            break;
         case NID_sha256:
             algNid = NID_ecdsa_with_SHA256;
             break;
@@ -438,6 +441,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
             break;
         case NID_sha512:
             algNid = NID_ecdsa_with_SHA512;
+            break;
+        case NID_sha3_224:
+            algNid = NID_ecdsa_with_SHA3_224;
             break;
         case NID_sha3_256:
             algNid = NID_ecdsa_with_SHA3_256;
