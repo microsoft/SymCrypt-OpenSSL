@@ -225,6 +225,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
@@ -254,10 +255,16 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, mdnid, tbs, tbslen, sig, siglen);
         break;
     case RSA_PKCS1_PSS_PADDING:
-        ret = scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        if (mdnid == NID_undef)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            goto err;
+        }
+
+        ret = scossl_rsapss_sign(ctx->keyCtx->key, mdnid, ctx->cbSalt, tbs, tbslen, sig, siglen);
         break;
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
@@ -279,6 +286,8 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
@@ -300,9 +309,15 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_verify(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        if (mdnid == NID_undef)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            return SCOSSL_FAILURE;
+        }
+
+        return scossl_rsapss_verify(ctx->keyCtx->key, mdnid, ctx->cbSalt, tbs, tbslen, sig, siglen);
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }

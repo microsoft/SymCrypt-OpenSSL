@@ -28,6 +28,7 @@ typedef struct
     UINT32         flags;
 } SCOSSL_RSA_PKCS1_PARAMS;
 
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_empty_params    = {NULL, 0, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5sha1_params  = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params      = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params     = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
@@ -42,6 +43,8 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
 {
     switch (mdnid)
     {
+    case NID_undef:
+        return &scossl_rsa_pkcs1_empty_params;
     case NID_md5_sha1:
         return &scossl_rsa_pkcs1_md5sha1_params;
     case NID_md5:
