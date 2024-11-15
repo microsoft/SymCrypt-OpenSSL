@@ -1076,6 +1076,8 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     UINT64 pubExp64;
     PBYTE pbModulus = NULL;
     SIZE_T cbModulus = SCOSSL_RSA_DEFAULT_BITS / 8;
+    PBYTE pbPrivateExponent = NULL;
+    SIZE_T cbPrivateExponent = 0;
     PBYTE ppbPrimes[2] = {0};
     SIZE_T pcbPrimes[2] = {0};
     SIZE_T nPrimes = 0;
@@ -1160,6 +1162,27 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
                 }
                 nPrimes++;
             }
+
+            // Only try to import private key from private exponent if primes are not provided
+            // This is slower and only provided for compatibility purposes
+            if (nPrimes == 0 &&
+                (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_D)) != NULL)
+            {
+                cbPrivateExponent = p->data_size;
+
+                pbPrivateExponent = OPENSSL_zalloc(cbPrivateExponent);
+                if(pbPrivateExponent == NULL)
+                {
+                    ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                    goto cleanup;
+                }
+                if (!OSSL_PARAM_get_BN(p, &bn) ||
+                    !BN_bn2bin(bn, pbPrivateExponent))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+            }
         }
 
         if (nPrimes != 0 && nPrimes != 2)
@@ -1192,18 +1215,37 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             goto cleanup;
         }
 
-        scError = SymCryptRsakeySetValue(
-            pbModulus, cbModulus,
-            &pubExp64, 1,
-            (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
-            keyCtx->key);
-        if (scError != SYMCRYPT_NO_ERROR)
+        if (pbPrivateExponent != NULL)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsakeySetValue failed", scError);
-            goto cleanup;
+            scError = SymCryptRsakeySetValueFromPrivateExponent(
+                pbModulus, cbModulus,
+                pubExp64,
+                pbPrivateExponent, cbPrivateExponent,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0,
+                keyCtx->key);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                        "SymCryptRsakeySetValueFromPrivateExponent failed", scError);
+                goto cleanup;
+            }
+        }
+        else
+        {
+            scError = SymCryptRsakeySetValue(
+                pbModulus, cbModulus,
+                &pubExp64, 1,
+                (PCBYTE *)ppbPrimes, (SIZE_T *)pcbPrimes, nPrimes,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
+                keyCtx->key);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_INITIALIZE_RSA_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+                                        "SymCryptRsakeySetValue failed", scError);
+                goto cleanup;
+            }
         }
     }
 
