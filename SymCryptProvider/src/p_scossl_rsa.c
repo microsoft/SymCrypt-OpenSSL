@@ -21,7 +21,8 @@ extern "C" {
 #define SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN (20)
 
 static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
-    {NID_sha1,          OSSL_DIGEST_NAME_SHA1}, // Default
+    {NID_sha1,          OSSL_DIGEST_NAME_SHA1},     // Default
+    {NID_md5_sha1,      OSSL_DIGEST_NAME_MD5_SHA1},
     {NID_sha224,        OSSL_DIGEST_NAME_SHA2_224},
     {NID_sha256,        OSSL_DIGEST_NAME_SHA2_256},
     {NID_sha384,        OSSL_DIGEST_NAME_SHA2_384},
@@ -34,7 +35,7 @@ static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
     {NID_sha3_512,      OSSL_DIGEST_NAME_SHA3_512}};
 
 _Use_decl_annotations_
-const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,
+const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx, UINT padding,
                                                const char *mdname, const char *propq,
                                                EVP_MD **md)
 {
@@ -43,7 +44,7 @@ const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,
 
     if ((mdInt = EVP_MD_fetch(libctx, mdname, propq)) != NULL)
     {
-        for (size_t i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
+        for (SIZE_T i = 0; i < sizeof(p_scossl_rsa_supported_mds) / sizeof(OSSL_ITEM); i++)
         {
             if (mdInt != NULL && EVP_MD_is_a(mdInt, p_scossl_rsa_supported_mds[i].ptr))
             {
@@ -52,7 +53,15 @@ const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx,
         }
     }
 
-    if (md != NULL)
+    if (padding != RSA_PKCS1_PADDING &&
+        mdInfo != NULL &&
+        mdInfo->id == NID_md5_sha1)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED);
+        mdInfo = NULL;
+    }
+
+    if (mdInfo != NULL && md != NULL)
     {
         *md = mdInt;
     }
@@ -76,7 +85,7 @@ static const OSSL_ITEM *p_scossl_rsa_pss_param_to_mdinfo(_In_ OSSL_LIB_CTX *libc
         return NULL;
     }
 
-    mdInfo = p_scossl_rsa_get_supported_md(libctx, mdName, mdProps, NULL);
+    mdInfo = p_scossl_rsa_get_supported_md(libctx, RSA_PKCS1_PSS_PADDING, mdName, mdProps, NULL);
     if (mdInfo == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);

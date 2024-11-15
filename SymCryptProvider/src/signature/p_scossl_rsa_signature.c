@@ -329,7 +329,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
         }
 
         EVP_MD *md;
-        const OSSL_ITEM *mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdname, NULL, &md);
+        const OSSL_ITEM *mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdname, NULL, &md);
 
         if (mdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && mdInfo->id != ctx->mgf1MdInfo->id))
@@ -456,7 +456,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, &md);
         if (mdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && mdInfo->id != ctx->mgf1MdInfo->id))
         {
@@ -525,6 +525,15 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
              padding != RSA_PKCS1_PSS_PADDING))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_ILLEGAL_OR_UNSUPPORTED_PADDING_MODE);
+            return SCOSSL_FAILURE;
+        }
+
+        // MD5+SHA1 is only allowed for RSA_PKCS1_PADDING
+        if (padding != RSA_PKCS1_PADDING &&
+            ctx->mdInfo != NULL &&
+            ctx->mdInfo->id == NID_md5_sha1)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED);
             return SCOSSL_FAILURE;
         }
 
@@ -656,7 +665,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, &md);
         if (mgf1MdInfo == NULL ||
             (ctx->mdInfo != NULL && mgf1MdInfo->id != ctx->mdInfo->id))
         {
