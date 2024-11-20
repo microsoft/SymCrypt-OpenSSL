@@ -246,12 +246,6 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         goto err;
     }
 
-    if (ctx->mdInfo == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-        goto err;
-    }
-
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
@@ -297,12 +291,6 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (ctx->operation != EVP_PKEY_OP_VERIFY)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->mdInfo == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
