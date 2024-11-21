@@ -1205,7 +1205,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
 
         symcryptRsaParam.version = 1;
         symcryptRsaParam.nBitsOfModulus = cbModulus * 8;
-        symcryptRsaParam.nPrimes = nPrimes;
+        symcryptRsaParam.nPrimes = pbPrivateExponent == NULL ? nPrimes : 2;
         symcryptRsaParam.nPubExp = 1;
         keyCtx->key = SymCryptRsakeyAllocate(&symcryptRsaParam, 0);
         if (keyCtx->key == NULL)
@@ -1222,7 +1222,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
                 pubExp64,
                 pbPrivateExponent, cbPrivateExponent,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0,
+                SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT,
                 keyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
