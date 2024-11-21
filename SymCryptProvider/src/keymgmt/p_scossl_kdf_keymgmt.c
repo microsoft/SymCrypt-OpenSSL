@@ -17,20 +17,14 @@
 extern "C" {
 #endif
 
-typedef BYTE SCOSSL_KDF_KEYMGMT_CTX;
+static const BYTE dummy_kdf_keymgmt_ctx = 0;
 
-SCOSSL_KDF_KEYMGMT_CTX *p_scossl_kdf_keymgmt_new_ctx(ossl_unused void *provctx)
+const BYTE *p_scossl_kdf_keymgmt_new_ctx(ossl_unused void *provctx)
 {
-    return OPENSSL_malloc(sizeof(SCOSSL_KDF_KEYMGMT_CTX));
+    return &dummy_kdf_keymgmt_ctx;
 }
 
-void p_scossl_kdf_keymgmt_free_ctx(SCOSSL_KDF_KEYMGMT_CTX *keyCtx)
-{
-    if (keyCtx == NULL)
-        return;
-
-    OPENSSL_free(keyCtx);
-}
+void p_scossl_kdf_keymgmt_free_ctx(ossl_unused void *keyCtx){}
 
 static BOOL p_scossl_kdf_keymgmt_has(ossl_unused const void *keydata, ossl_unused int selection)
 {
