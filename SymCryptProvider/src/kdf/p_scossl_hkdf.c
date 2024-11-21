@@ -2,23 +2,13 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_hkdf.h"
-#include "p_scossl_base.h"
+#include "kdf/p_scossl_hkdf.h"
 
 #include <openssl/proverr.h>
-
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct
-{
-    // Needed for fetching md
-    OSSL_LIB_CTX *libctx;
-
-    SCOSSL_HKDF_CTX *hkdfCtx;
-} SCOSSL_PROV_HKDF_CTX;
 
 #define HKDF_MODE_EXTRACT_AND_EXPAND "EXTRACT_AND_EXPAND"
 #define HKDF_MODE_EXTRACT_ONLY       "EXTRACT_ONLY"
@@ -44,9 +34,7 @@ static const OSSL_PARAM p_scossl_hkdf_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, const _In_ OSSL_PARAM params[]);
-
-static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
+SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_PROV_HKDF_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
     if (ctx != NULL)
@@ -63,7 +51,7 @@ static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
     return ctx;
 }
 
-static void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
+void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
     if (ctx != NULL)
     {
@@ -74,7 +62,7 @@ static void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
     OPENSSL_free(ctx);
 }
 
-static SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx)
+SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
     SCOSSL_PROV_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
     if (copyCtx != NULL)
@@ -99,9 +87,9 @@ static SCOSSL_STATUS p_scossl_hkdf_reset(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
     return scossl_hkdf_reset(ctx->hkdfCtx);
 }
 
-static SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
-                                          _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
-                                          _In_ const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
+                                   _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
+                                   _In_ const OSSL_PARAM params[])
 {
     if (!p_scossl_hkdf_set_ctx_params(ctx, params))
     {
@@ -123,17 +111,17 @@ static SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
     return scossl_hkdf_derive(ctx->hkdfCtx, key, keylen);
 }
 
-static const OSSL_PARAM *p_scossl_hkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+const OSSL_PARAM *p_scossl_hkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     return p_scossl_hkdf_gettable_ctx_param_types;
 }
 
-static const OSSL_PARAM *p_scossl_hkdf_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+const OSSL_PARAM *p_scossl_hkdf_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     return p_scossl_hkdf_settable_ctx_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
 
@@ -225,7 +213,7 @@ static SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, const _In_ OSSL_PARAM params[])
 {
     PCBYTE pbInfo;
     SIZE_T cbInfo;
