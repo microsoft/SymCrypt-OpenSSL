@@ -463,9 +463,9 @@ PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
     case NID_sha512:
         return SymCryptSha512Algorithm;
     case NID_sha512_224:
-        return SymCryptSha512Algorithm;
+        return SymCryptSha512_224Algorithm;
     case NID_sha512_256:
-        return SymCryptSha512Algorithm;
+        return SymCryptSha512_256Algorithm;
     case NID_sha3_224:
         return SymCryptSha3_224Algorithm;
     case NID_sha3_256:
