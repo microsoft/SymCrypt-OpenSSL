@@ -69,7 +69,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(const SCOSSL_ECC_KEY_CTX *keyC
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
         goto cleanup;
     }
 
@@ -134,10 +134,20 @@ void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
             PBYTE pbPublicKey;
             SIZE_T cbPublicKey;
 
+            // KeysInUse related errors shouldn't surface to caller
+            ERR_set_mark();
+
             if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
             {
                 keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
             }
+            else
+            {
+                SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+                    "p_scossl_ecc_get_encoded_public_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
+            }
+
+            ERR_pop_to_mark();
 
             OPENSSL_free(pbPublicKey);
         }

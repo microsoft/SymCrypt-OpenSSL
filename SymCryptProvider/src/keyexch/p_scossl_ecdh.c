@@ -142,7 +142,7 @@ static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
         cbSecretBuf);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEcDhSecretAgreement failed", scError);
         goto cleanup;
     }
 

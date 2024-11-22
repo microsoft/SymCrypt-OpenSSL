@@ -1049,6 +1049,10 @@ void TestRsaEvp(int modulus, uint32_t exponent)
 
     // MD5+PKCS1 is not supported by the provider
 #if OPENSSL_VERSION_MAJOR == 1
+    // Test engine fallback
+    TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_NO_IMPLICIT_REJECT_PADDING", RSA_PKCS1_NO_IMPLICIT_REJECT_PADDING, 0, "EVP_sha256", EVP_sha256(), 32);
+    printf("%s", SeparatorLine);
+
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_MD5", EVP_md5(), 16);
 #endif
     TestRsaSignVerify(privateKey, publicKey, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING, 0, "EVP_sha1", EVP_sha1(), 20);

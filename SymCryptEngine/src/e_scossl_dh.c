@@ -52,7 +52,7 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     pbData = OPENSSL_zalloc(cbData);
     if( pbData == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc returned NULL.");
         goto cleanup;
     }
@@ -68,7 +68,7 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
         0 );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR,
             "SymCryptDlkeyGetValue failed", scError);
         goto cleanup;
     }
@@ -76,7 +76,7 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     if( ((dh_privkey = BN_secure_new()) == NULL) ||
         ((dh_pubkey = BN_new()) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         goto cleanup;
     }
@@ -84,14 +84,14 @@ SCOSSL_STATUS e_scossl_dh_generate_keypair(
     if( (BN_bin2bn(pbPrivateKey, cbPrivateKey, dh_privkey) == NULL) ||
         (BN_bin2bn(pbPublicKey, cbPublicKey, dh_pubkey) == NULL) )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "BN_bin2bn failed.");
         goto cleanup;
     }
 
     if( DH_set0_key(dh, dh_pubkey, dh_privkey) == 0 )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, ERR_R_OPERATION_FAIL,
             "DH_set0_key failed.");
         goto cleanup;
     }
@@ -143,7 +143,7 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
 
     if( dh_pubkey == NULL && dh_privkey == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, ERR_R_INTERNAL_ERROR,
             "DH_get0_key returned NULL for public and private key.");
         goto cleanup;
     }
@@ -160,8 +160,8 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
         cbPublicKey = SymCryptDlkeySizeofPublicKey(pKeyCtx->dlkey);
         if( (pbPublicKey = OPENSSL_zalloc(cbPublicKey)) == NULL )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
-                            "OPENSSL_zalloc returned NULL.");
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+                "OPENSSL_zalloc returned NULL.");
             goto cleanup;
         }
 
@@ -173,28 +173,28 @@ SCOSSL_STATUS e_scossl_dh_import_keypair(
             0 );
         if( scError != SYMCRYPT_NO_ERROR )
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR,
                 "SymCryptDlkeyGetValue failed", scError);
             goto cleanup;
         }
 
         if( (generated_dh_pubkey = BN_new()) == NULL )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, ERR_R_MALLOC_FAILURE,
                 "BN_new returned NULL.");
             goto cleanup;
         }
 
         if( BN_bin2bn(pbPublicKey, cbPublicKey, generated_dh_pubkey) == NULL )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
                 "BN_bin2bn failed.");
             goto cleanup;
         }
 
         if( DH_set0_key(dh, generated_dh_pubkey, NULL) == 0 )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, ERR_R_OPERATION_FAIL,
                 "DH_set0_key failed.");
             goto cleanup;
         }
@@ -252,7 +252,7 @@ SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX
     {
         if (status == SCOSSL_FALLBACK)
         {
-            SCOSSL_LOG_INFO(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+            SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_GET_DH_CONTEXT_EX, SCOSSL_ERR_R_OPENSSL_FALLBACK,
                 "SymCrypt engine does not support this DH dlgroup - falling back to OpenSSL.");
         }
         return status;
@@ -265,14 +265,14 @@ SCOSSL_STATUS e_scossl_get_dh_context_ex(_Inout_ DH* dh, _Out_ SCOSSL_DH_KEY_CTX
         SCOSSL_DH_KEY_CTX* pKeyCtx = scossl_dh_new_key_ctx();
         if( !pKeyCtx )
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_DH_CONTEXT_EX, ERR_R_MALLOC_FAILURE,
                 "OPENSSL_zalloc failed");
             return SCOSSL_FAILURE;
         }
 
         if( DH_set_ex_data(dh, e_scossl_dh_idx, pKeyCtx) == 0)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_DH_CONTEXT_EX, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_DH_CONTEXT_EX, ERR_R_OPERATION_FAIL,
                 "DH_set_ex_data failed");
             OPENSSL_free(pKeyCtx);
             return SCOSSL_FAILURE;
@@ -316,7 +316,7 @@ SCOSSL_STATUS e_scossl_dh_generate_key(_Inout_ DH* dh)
     switch( e_scossl_get_dh_context_ex(dh, &pKeyCtx, TRUE) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEY, ERR_R_OPERATION_FAIL,
             "e_scossl_get_dh_context_ex failed.");
         return SCOSSL_FAILURE;
     case SCOSSL_FALLBACK:
@@ -329,7 +329,7 @@ SCOSSL_STATUS e_scossl_dh_generate_key(_Inout_ DH* dh)
     case SCOSSL_SUCCESS:
         return SCOSSL_SUCCESS;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEY, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_GENERATE_KEY, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_dh_context_ex value");
         return SCOSSL_FAILURE;
     }
@@ -352,7 +352,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
     switch( e_scossl_get_dh_context(dh, &pKeyCtx) )
     {
     case SCOSSL_FAILURE:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, ERR_R_OPERATION_FAIL,
             "e_scossl_get_dh_context failed.");
         return res;
     case SCOSSL_FALLBACK:
@@ -365,7 +365,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
     case SCOSSL_SUCCESS:
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
             "Unexpected e_scossl_get_dh_context_ex value");
         return res;
     }
@@ -375,14 +375,14 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
     pkPublic = SymCryptDlkeyAllocate(pKeyCtx->dlkey->pDlgroup);
     if( pkPublic == NULL )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
             "SymCryptDlkeyAllocate returned NULL.");
         goto cleanup;
     }
 
     if( (SIZE_T) BN_bn2binpad(pub_key, buf, cbPublicKey) != cbPublicKey )
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, ERR_R_INTERNAL_ERROR,
             "BN_bn2binpad did not write expected number of public key bytes.");
         goto cleanup;
     }
@@ -395,7 +395,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
         pkPublic );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY,
             "SymCryptDlkeySetValue failed", scError);
         goto cleanup;
     }
@@ -409,7 +409,7 @@ SCOSSL_RETURNLENGTH e_scossl_dh_compute_key(_Out_writes_bytes_(DH_size(dh)) unsi
         cbPublicKey );
     if( scError != SYMCRYPT_NO_ERROR )
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_COMPUTE_KEY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY,
             "SymCryptDhSecretAgreement failed", scError);
         goto cleanup;
     }

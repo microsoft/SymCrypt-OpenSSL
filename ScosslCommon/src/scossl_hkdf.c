@@ -97,14 +97,14 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
     if (ctx->md == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Digest");
+            "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
     if (ctx->pbKey == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Key");
+            "Missing Key");
         return SCOSSL_FAILURE;
     }
 
@@ -160,7 +160,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
         break;
     default:
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Invalid Mode: %d", ctx->mode);
+            "Invalid Mode: %d", ctx->mode);
         return SCOSSL_FAILURE;
     }
 

@@ -111,8 +111,8 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
     pkcs1Params = scossl_get_rsa_pkcs1_params(mdnid);
     if (pkcs1Params == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_PKCS1_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 
@@ -120,16 +120,16 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
     switch (mdnid)
     {
     case NID_md5_sha1:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
         break;
     case NID_md5:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm MD5 which is not FIPS compliant");
         break;
     case NID_sha1:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm SHA1 which is not FIPS compliant");
         break;
     }
 
@@ -152,8 +152,8 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                  "SymCryptRsaPkcs1Sign failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_SIGN,
+            "SymCryptRsaPkcs1Sign failed", scError);
         goto cleanup;
     }
 
@@ -174,24 +174,24 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
 
     if (pkcs1Params == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "Unsupported hash algorithm: %s. Size: %d.", OBJ_nid2sn(mdnid), cbHashValue);
         goto cleanup;
     }
 
     switch (mdnid)
     {
     case NID_md5_sha1:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
         break;
     case NID_md5:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm MD5 which is not FIPS compliant");
         break;
     case NID_sha1:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm SHA1 which is not FIPS compliant");
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PKCS1_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using hash algorithm SHA1 which is not FIPS compliant");
         break;
     }
 
@@ -217,8 +217,8 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
     }
     else if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                  "SymCryptRsaPkcs1verify returned unexpected error", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PKCS1_VERIFY,
+            "SymCryptRsaPkcs1verify returned unexpected error", scError);
     }
 
 cleanup:
@@ -240,7 +240,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+            "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
         goto cleanup;
     }
 
@@ -263,7 +263,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (cbSalt < 0 || cbSalt > cbSaltMax)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Invalid cbSalt");
+            "Invalid cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -271,7 +271,7 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (pcbSignature == NULL)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, ERR_R_PASSED_NULL_PARAMETER,
-                         "pcbSignature is NULL");
+            "pcbSignature is NULL");
         goto cleanup;
     }
 
@@ -287,12 +287,12 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (mdnid == NID_md5)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5 which is not FIPS compliant");
+            "Using hash algorithm MD5 which is not FIPS compliant");
     }
     else if (mdnid == NID_sha1)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm SHA1 which is not FIPS compliant");
+            "Using hash algorithm SHA1 which is not FIPS compliant");
     }
 
     if (cbHashValue != expectedHashLength)
@@ -313,8 +313,8 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
         &cbResult);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                  "SymCryptRsaPssSign failed", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN,
+            "SymCryptRsaPssSign failed", scError);
         goto cleanup;
     }
 
@@ -338,8 +338,8 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
 
     if (scosslHashAlgo == NULL || expectedHashLength == (SIZE_T)-1)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_SIGN, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "Unknown type: %d. Size: %d.", mdnid, cbHashValue);
         goto cleanup;
     }
 
@@ -368,7 +368,7 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (cbSalt < 0 || cbSalt > cbSaltMax)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, ERR_R_PASSED_INVALID_ARGUMENT,
-                         "Invalid cbSalt");
+            "Invalid cbSalt");
         return SCOSSL_UNSUPPORTED;
     }
 
@@ -381,12 +381,12 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     if (mdnid == NID_md5)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm MD5 which is not FIPS compliant");
+            "Using hash algorithm MD5 which is not FIPS compliant");
     }
     else if (mdnid == NID_sha1)
     {
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
-                        "Using hash algorithm SHA1 which is not FIPS compliant");
+            "Using hash algorithm SHA1 which is not FIPS compliant");
     }
 
     scError = SymCryptRsaPssVerify(
@@ -406,8 +406,8 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     }
     else if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                  "SymCryptRsaPssVerify returned unexpected error", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY,
+            "SymCryptRsaPssVerify returned unexpected error", scError);
     }
 
 cleanup:
@@ -456,8 +456,8 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaPkcs1Encrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                "SymCryptRsaPkcs1Encrypt failed", scError);
             goto cleanup;
         }
         break;
@@ -470,8 +470,8 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
         if (!scosslHashAlgo)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "Unknown type: %d.", mdnid);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                "Unknown type: %d.", mdnid);
             goto cleanup;
         }
 
@@ -489,12 +489,15 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaOaepEncrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                "SymCryptRsaOaepEncrypt failed", scError);
             goto cleanup;
         }
         break;
     case RSA_NO_PADDING:
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using no padding for RSA encryption which is not FIPS compliant");
+
         if (cbSrc != cbModulus)
         {
             goto cleanup;
@@ -510,14 +513,14 @@ SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         cbResult = cbModulus;
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaRawEncrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                "SymCryptRsaRawEncrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                        "Unsupported Padding: %d.", padding);
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+            "Unsupported Padding: %d.", padding);
         break;
     }
 
@@ -597,8 +600,8 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(mdnid);
         if (!scosslHashAlgo)
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSAPSS_VERIFY, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                             "Unknown type: %d.", mdnid);
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_DECRYPT, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+                "Unknown type: %d.", mdnid);
             goto cleanup;
         }
 
@@ -616,12 +619,15 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaOaepDecrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
+                "SymCryptRsaOaepDecrypt failed", scError);
             goto cleanup;
         }
         break;
     case RSA_NO_PADDING:
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Using no padding for RSA decryption which is not FIPS compliant");
+
         scError = SymCryptRsaRawDecrypt(
             key,
             pbSrc,
@@ -633,14 +639,14 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
         cbResult = cbModulus;
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_PRIV_DEC, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
-                                      "SymCryptRsaRawDecrypt failed", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
+                "SymCryptRsaRawDecrypt failed", scError);
             goto cleanup;
         }
         break;
     default:
-        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_PUB_ENC, SCOSSL_ERR_R_OPENSSL_FALLBACK,
-                        "Unsupported Padding: %d.", padding);
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_DECRYPT, SCOSSL_ERR_R_OPENSSL_FALLBACK,
+            "Unsupported Padding: %d.", padding);
         break;
     }
 
@@ -659,7 +665,7 @@ SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
        ((rsaParams->n = BN_new()) == NULL) ||
        ((rsaParams->e = BN_new()) == NULL))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_NEW_EXPORT_PARAMS, ERR_R_MALLOC_FAILURE,
             "BN_new returned NULL.");
         scossl_rsa_free_export_params(rsaParams, TRUE);
         rsaParams = NULL;
@@ -675,7 +681,7 @@ SCOSSL_RSA_EXPORT_PARAMS *scossl_rsa_new_export_params(BOOL includePrivate)
             ((rsaParams->privateParams->iqmp = BN_secure_new()) == NULL) ||
             ((rsaParams->privateParams->d    = BN_secure_new()) == NULL))
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_NEW_EXPORT_PARAMS, ERR_R_MALLOC_FAILURE,
                 "BN_new returned NULL.");
             scossl_rsa_free_export_params(rsaParams, TRUE);
             rsaParams = NULL;
@@ -770,7 +776,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
     pbData = OPENSSL_zalloc(cbData);
     if (pbData == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc failed");
         goto cleanup;
     }
@@ -814,7 +820,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                    0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY,
             "SymCryptRsakeyGetValue failed", scError);
         goto cleanup;
     }
@@ -825,7 +831,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
     if (BN_lebin2bn(pbModulus, cbModulus, rsaParams->n) == NULL ||
         BN_lebin2bn(pbPubExp64, 8, rsaParams->e) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY, ERR_R_OPERATION_FAIL,
             "BN_bin2bn failed.");
         goto cleanup;
     }
@@ -841,7 +847,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
                         0);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY,
                 "SymCryptRsakeyGetCrtValue failed", scError);
             goto cleanup;
         }
@@ -853,7 +859,7 @@ SCOSSL_STATUS scossl_rsa_export_key(PCSYMCRYPT_RSAKEY key, SCOSSL_RSA_EXPORT_PAR
             (BN_lebin2bn(pbCrtCoefficient, cbPrime1, rsaParams->privateParams->iqmp)   == NULL) ||
             (BN_lebin2bn(pbPrivateExponent, cbPrivateExponent, rsaParams->privateParams->d) == NULL))
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_KEYGEN, ERR_R_OPERATION_FAIL,
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_RSA_EXPORT_KEY, ERR_R_OPERATION_FAIL,
                 "BN_bin2bn failed.");
             goto cleanup;
         }
