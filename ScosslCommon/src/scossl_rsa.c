@@ -20,7 +20,7 @@ typedef struct
     UINT32         flags;
 } SCOSSL_RSA_PKCS1_PARAMS;
 
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5sha1_params    = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_empty_params      = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params        = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params       = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
 static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha224_params     = {SymCryptSha224OidList, SYMCRYPT_SHA224_OID_COUNT, 0};
@@ -38,8 +38,9 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
 {
     switch (mdnid)
     {
+    case NID_undef:
     case NID_md5_sha1:
-        return &scossl_rsa_pkcs1_md5sha1_params;
+        return &scossl_rsa_pkcs1_empty_params;
     case NID_md5:
         return &scossl_rsa_pkcs1_md5_params;
     case NID_sha1:
@@ -142,7 +143,9 @@ SCOSSL_STATUS scossl_rsa_pkcs1_sign(PSYMCRYPT_RSAKEY key, int mdnid,
         break;
     }
 
-    if (pbSignature != NULL && cbHashValue != scossl_get_expected_hash_length(mdnid))
+    if (pbSignature != NULL &&
+        mdnid != NID_undef &&
+        cbHashValue != scossl_get_expected_hash_length(mdnid))
     {
         goto cleanup;
     }
@@ -204,7 +207,8 @@ SCOSSL_STATUS scossl_rsa_pkcs1_verify(PSYMCRYPT_RSAKEY key, int mdnid,
         break;
     }
 
-    if (cbHashValue != scossl_get_expected_hash_length(mdnid))
+    if (mdnid != NID_undef &&
+        cbHashValue != scossl_get_expected_hash_length(mdnid))
     {
         goto cleanup;
     }

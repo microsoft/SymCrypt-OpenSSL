@@ -509,7 +509,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ void **provctx)
 {
     SCOSSL_PROVCTX *p_ctx = NULL;
-    OSSL_FUNC_core_get_libctx_fn *core_get_libctx = NULL;
 
     for (; in->function_id != 0; in++)
     {
@@ -517,9 +516,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         {
         case OSSL_FUNC_CORE_GET_PARAMS:
             core_get_params = OSSL_FUNC_core_get_params(in);
-            break;
-        case OSSL_FUNC_CORE_GET_LIBCTX:
-            core_get_libctx = OSSL_FUNC_core_get_libctx(in);
             break;
         }
     }
@@ -538,11 +534,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         scossl_prov_initialized = 1;
     }
 
-    if (core_get_libctx == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
-
     p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
     if (p_ctx == NULL)
     {
@@ -551,7 +542,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     }
 
     p_ctx->handle = handle;
-    p_ctx->libctx = (OSSL_LIB_CTX *)core_get_libctx(handle);
+    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
     *provctx = p_ctx;
 
     *out = p_scossl_base_dispatch;
