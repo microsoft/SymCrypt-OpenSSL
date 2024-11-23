@@ -13,14 +13,6 @@ extern "C" {
 // The minimum OAEP padding is 2*hashlen + 2, and the minimum hashlen is SHA1 - with 20B hash => minimum 42B of padding
 #define SCOSSL_MIN_OAEP_PADDING  (42)
 
-// Hash digest lengths
-#define SCOSSL_MD5_DIGEST_LENGTH      (16)
-#define SCOSSL_SHA1_DIGEST_LENGTH     (20)
-#define SCOSSL_MD5_SHA1_DIGEST_LENGTH (SCOSSL_MD5_DIGEST_LENGTH + SCOSSL_SHA1_DIGEST_LENGTH) // 36
-#define SCOSSL_SHA256_DIGEST_LENGTH   (32)
-#define SCOSSL_SHA384_DIGEST_LENGTH   (48)
-#define SCOSSL_SHA512_DIGEST_LENGTH   (64)
-
 typedef struct
 {
     PCSYMCRYPT_OID pHashOIDs;
@@ -28,15 +20,19 @@ typedef struct
     UINT32         flags;
 } SCOSSL_RSA_PKCS1_PARAMS;
 
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5sha1_params  = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params      = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params     = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params   = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha384_params   = {SymCryptSha384OidList, SYMCRYPT_SHA384_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_params   = {SymCryptSha512OidList, SYMCRYPT_SHA512_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_256_params = {SymCryptSha3_256OidList, SYMCRYPT_SHA3_256_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_384_params = {SymCryptSha3_384OidList, SYMCRYPT_SHA3_384_OID_COUNT, 0};
-static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_512_params = {SymCryptSha3_512OidList, SYMCRYPT_SHA3_512_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5sha1_params    = {NULL, 0, SYMCRYPT_FLAG_RSA_PKCS1_NO_ASN1};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_md5_params        = {SymCryptMd5OidList, SYMCRYPT_MD5_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha1_params       = {SymCryptSha1OidList, SYMCRYPT_SHA1_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha224_params     = {SymCryptSha224OidList, SYMCRYPT_SHA224_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha256_params     = {SymCryptSha256OidList, SYMCRYPT_SHA256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha384_params     = {SymCryptSha384OidList, SYMCRYPT_SHA384_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_params     = {SymCryptSha512OidList, SYMCRYPT_SHA512_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_224_params = {SymCryptSha512_224OidList, SYMCRYPT_SHA512_224_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha512_256_params = {SymCryptSha512_256OidList, SYMCRYPT_SHA512_256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_224_params   = {SymCryptSha3_224OidList, SYMCRYPT_SHA3_224_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_256_params   = {SymCryptSha3_256OidList, SYMCRYPT_SHA3_256_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_384_params   = {SymCryptSha3_384OidList, SYMCRYPT_SHA3_384_OID_COUNT, 0};
+static const SCOSSL_RSA_PKCS1_PARAMS scossl_rsa_pkcs1_sha3_512_params   = {SymCryptSha3_512OidList, SYMCRYPT_SHA3_512_OID_COUNT, 0};
 
 static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
 {
@@ -48,12 +44,20 @@ static const SCOSSL_RSA_PKCS1_PARAMS *scossl_get_rsa_pkcs1_params(int mdnid)
         return &scossl_rsa_pkcs1_md5_params;
     case NID_sha1:
         return &scossl_rsa_pkcs1_sha1_params;
+    case NID_sha224:
+        return &scossl_rsa_pkcs1_sha224_params;
     case NID_sha256:
         return &scossl_rsa_pkcs1_sha256_params;
     case NID_sha384:
         return &scossl_rsa_pkcs1_sha384_params;
     case NID_sha512:
         return &scossl_rsa_pkcs1_sha512_params;
+    case NID_sha512_224:
+        return &scossl_rsa_pkcs1_sha512_224_params;
+    case NID_sha512_256:
+        return &scossl_rsa_pkcs1_sha512_256_params;
+    case NID_sha3_224:
+        return &scossl_rsa_pkcs1_sha3_224_params;
     case NID_sha3_256:
         return &scossl_rsa_pkcs1_sha3_256_params;
     case NID_sha3_384:
@@ -69,20 +73,25 @@ SIZE_T scossl_get_expected_hash_length(int mdnid)
     switch (mdnid)
     {
     case NID_md5_sha1:
-        return SCOSSL_MD5_SHA1_DIGEST_LENGTH;
+        return SYMCRYPT_MD5_RESULT_SIZE + SYMCRYPT_SHA1_RESULT_SIZE;
     case NID_md5:
-        return SCOSSL_MD5_DIGEST_LENGTH;
+        return SYMCRYPT_MD5_RESULT_SIZE;
     case NID_sha1:
-        return SCOSSL_SHA1_DIGEST_LENGTH;
+        return SYMCRYPT_SHA1_RESULT_SIZE;
+    case NID_sha224:
+    case NID_sha512_224:
+    case NID_sha3_224:
+        return SYMCRYPT_SHA224_RESULT_SIZE;
     case NID_sha256:
+    case NID_sha512_256:
     case NID_sha3_256:
-        return SCOSSL_SHA256_DIGEST_LENGTH;
+        return SYMCRYPT_SHA256_RESULT_SIZE;
     case NID_sha384:
     case NID_sha3_384:
-        return SCOSSL_SHA384_DIGEST_LENGTH;
+        return SYMCRYPT_SHA384_RESULT_SIZE;
     case NID_sha512:
     case NID_sha3_512:
-        return SCOSSL_SHA512_DIGEST_LENGTH;
+        return SYMCRYPT_SHA512_RESULT_SIZE;
     }
     return -1;
 }
