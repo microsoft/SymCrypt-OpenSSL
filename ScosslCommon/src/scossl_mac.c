@@ -14,6 +14,12 @@ static const SCOSSL_MAC_EX SymCryptHmacSha1Ex = {
     SYMCRYPT_HMAC_SHA1_INPUT_BLOCK_SIZE
 };
 
+static const SCOSSL_MAC_EX SymCryptHmacSha224Ex = {
+    (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha224KeyCopy,
+    (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha224StateCopy,
+    SYMCRYPT_HMAC_SHA224_INPUT_BLOCK_SIZE
+};
+
 static const SCOSSL_MAC_EX SymCryptHmacSha256Ex = {
     (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha256KeyCopy,
     (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha256StateCopy,
@@ -30,6 +36,24 @@ static const SCOSSL_MAC_EX SymCryptHmacSha512Ex = {
     (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha512KeyCopy,
     (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha512StateCopy,
     SYMCRYPT_HMAC_SHA512_INPUT_BLOCK_SIZE
+};
+
+static const SCOSSL_MAC_EX SymCryptHmacSha512_224Ex = {
+    (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha512_224KeyCopy,
+    (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha512_224StateCopy,
+    SYMCRYPT_HMAC_SHA512_224_INPUT_BLOCK_SIZE
+};
+
+static const SCOSSL_MAC_EX SymCryptHmacSha512_256Ex = {
+    (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha512_256KeyCopy,
+    (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha512_256StateCopy,
+    SYMCRYPT_HMAC_SHA512_256_INPUT_BLOCK_SIZE
+};
+
+static const SCOSSL_MAC_EX SymCryptHmacSha3_224Ex = {
+    (PSYMCRYPT_MAC_KEY_COPY)SymCryptHmacSha3_224KeyCopy,
+    (PSYMCRYPT_MAC_STATE_COPY)SymCryptHmacSha3_224StateCopy,
+    SYMCRYPT_HMAC_SHA3_224_INPUT_BLOCK_SIZE
 };
 
 static const SCOSSL_MAC_EX SymCryptHmacSha3_256Ex = {
@@ -165,6 +189,10 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
         ctx->pMac = SymCryptHmacSha1Algorithm;
         ctx->pMacEx = &SymCryptHmacSha1Ex;
         break;
+    case NID_sha224:
+        ctx->pMac = SymCryptHmacSha224Algorithm;
+        ctx->pMacEx = &SymCryptHmacSha224Ex;
+        break;
     case NID_sha256:
         ctx->pMac = SymCryptHmacSha256Algorithm;
         ctx->pMacEx = &SymCryptHmacSha256Ex;
@@ -176,6 +204,18 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
     case NID_sha512:
         ctx->pMac = SymCryptHmacSha512Algorithm;
         ctx->pMacEx = &SymCryptHmacSha512Ex;
+        break;
+    case NID_sha512_224:
+        ctx->pMac = SymCryptHmacSha512_224Algorithm;
+        ctx->pMacEx = &SymCryptHmacSha512_224Ex;
+        break;
+    case NID_sha512_256:
+        ctx->pMac = SymCryptHmacSha512_256Algorithm;
+        ctx->pMacEx = &SymCryptHmacSha512_256Ex;
+        break;
+    case NID_sha3_224:
+        ctx->pMac = SymCryptHmacSha3_224Algorithm;
+        ctx->pMacEx = &SymCryptHmacSha3_224Ex;
         break;
     case NID_sha3_256:
         ctx->pMac = SymCryptHmacSha3_256Algorithm;

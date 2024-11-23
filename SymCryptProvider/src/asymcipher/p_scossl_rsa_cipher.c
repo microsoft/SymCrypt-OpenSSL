@@ -166,7 +166,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     {
         if (ctx->oaepMdInfo == NULL)
         {
-            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
 
             if (ctx->oaepMdInfo == NULL)
             {
@@ -212,7 +212,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     {
         if (ctx->oaepMdInfo == NULL)
         {
-            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
+            ctx->oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, SCOSSL_DEFAULT_OAEP_DIGEST, NULL, NULL);
 
             if (ctx->oaepMdInfo == NULL)
             {
@@ -376,7 +376,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, NULL);
+        oaepMdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, NULL);
         if (oaepMdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && oaepMdInfo->id != ctx->mgf1MdInfo->id))
         {
@@ -406,7 +406,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, NULL);
+        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, NULL);
         if (mgf1MdInfo == NULL ||
             (ctx->oaepMdInfo != NULL && mgf1MdInfo->id != ctx->oaepMdInfo->id))
         {

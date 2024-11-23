@@ -33,8 +33,10 @@ set(SCOSSL_SOURCES
     ./src/kdf/p_scossl_tls1prf.c
     ./src/keyexch/p_scossl_dh.c
     ./src/keyexch/p_scossl_ecdh.c
+    ./src/keyexch/p_scossl_kdf_keyexch.c
     ./src/keymgmt/p_scossl_dh_keymgmt.c
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
+    ./src/keymgmt/p_scossl_kdf_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/mac/p_scossl_cmac.c
     ./src/mac/p_scossl_hmac.c
