@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13.0)
 
 project(SymCrypt-OpenSSL
-    VERSION 1.6.0
+    VERSION 1.6.1
     DESCRIPTION "The SymCrypt engine for OpenSSL (SCOSSL)"
     HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
@@ -12,7 +12,7 @@ if (SYMCRYPT_ROOT_DIR)
 else()
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
-        pkg_check_modules(SYMCRYPT REQUIRED symcrypt>=103.5.0)
+        pkg_check_modules(SYMCRYPT REQUIRED symcrypt>=103.6.0)
         message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
         include_directories(${SYMCRYPT_INCLUDE_DIRS})
     else()
