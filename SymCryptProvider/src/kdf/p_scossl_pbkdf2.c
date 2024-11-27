@@ -4,18 +4,34 @@
 
 #include "scossl_helpers.h"
 
+#include <openssl/core_names.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct {
+    PBYTE pbSalt;
+    SIZE_T cbSalt;
+    PBYTE pbPassword;
+    SIZE_T cbPassword;
 
+    SYMCRYPT_PBKDF2_EXPANDED_KEY expandedKey;
+
+    BOOL checkInputSizes;
 } SCOSSL_PROV_PBKDF2_CTX;
 
 static const OSSL_PARAM p_scossl_pbkdf2_gettable_ctx_param_types[] = {
+    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_pbkdf2_settable_ctx_param_types[] = {
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_PASSWORD, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
+    OSSL_PARAM_uint64(OSSL_KDF_PARAM_ITER, NULL),
+    OSSL_PARAM_int(OSSL_KDF_PARAM_PKCS5, NULL),
     OSSL_PARAM_END};
 
 SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx, _In_ const OSSL_PARAM params[]);
