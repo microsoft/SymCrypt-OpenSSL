@@ -10,7 +10,8 @@
 extern "C" {
 #endif
 
-// Constants SP800-132 and checked by the OpenSSL PBKDF2 implementation
+// Constants defined SP800-132 that should be checked
+// unless the OSSL_KDF_PARAM_PKCS5 paremeter gets set
 #define SCOSSL_PBKDF2_MIN_KEY_LEN_BITS  (112)
 #define SCOSSL_PBKDF2_MIN_ITERATIONS (1000)
 #define SCOSSL_PBKDF2_MIN_SALT_LEN   (128 / 8)
@@ -48,19 +49,14 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
 
 SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_newctx(SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_PROV_PBKDF2_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_PROV_PBKDF2_CTX));
+    SCOSSL_PROV_PBKDF2_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_PBKDF2_CTX));
 
     if (ctx != NULL)
     {
         ctx->libctx = provctx->libctx;
-        ctx->pbPassword = NULL;
-        ctx->cbPassword = 0;
-        ctx->pbSalt = NULL;
-        ctx->cbSalt = 0;
-        ctx->pMac = NULL;
-        ctx->initialized = FALSE;
+        ctx->pMac = SymCryptHmacSha1Algorithm;
         ctx->iterationCount = PKCS5_DEFAULT_ITER;
-        ctx->checkMinSizes = FALSE;
+        ctx->checkMinSizes = TRUE;
     }
 
     return ctx;
@@ -84,17 +80,10 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
     SCOSSL_PROV_PBKDF2_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_PBKDF2_CTX));
     if (copyCtx != NULL)
     {
+        copyCtx->libctx = ctx->libctx;
         copyCtx->pMac = ctx->pMac;
         copyCtx->iterationCount = ctx->iterationCount;
         copyCtx->checkMinSizes = ctx->checkMinSizes;
-        copyCtx->cbSalt = ctx->cbSalt;
-
-        copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt);
-        if (ctx->pbSalt != NULL && copyCtx->pbSalt == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;            
-        }
 
         if (ctx->pbPassword != NULL)
         {
@@ -106,7 +95,6 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
 
             memcpy(copyCtx->pbPassword, ctx->pbPassword, ctx->cbPassword);
             copyCtx->cbPassword = ctx->cbPassword;
-            copyCtx->initialized = ctx->initialized;
 
             if (copyCtx->pMac != NULL)
             {
@@ -122,13 +110,20 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
             {
                 copyCtx->initialized = FALSE;
             }
-
         }
         else
         {
             copyCtx->pbPassword = NULL;
             copyCtx->cbPassword = 0;
         }
+
+        if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL &&
+            ctx->pbSalt != NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;            
+        }
+        copyCtx->cbSalt = ctx->cbSalt;
     }
 
     status = SCOSSL_SUCCESS;
@@ -153,6 +148,7 @@ SCOSSL_STATUS p_scossl_pbkdf2_reset(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx)
     ctx->cbPassword = 0;
     ctx->pbSalt = NULL;
     ctx->cbSalt = 0;
+    ctx->pMac = SymCryptHmacSha1Algorithm;
     ctx->initialized = FALSE;
     ctx->iterationCount = PKCS5_DEFAULT_ITER;
 
@@ -249,11 +245,13 @@ SCOSSL_STATUS p_scossl_pbkdf2_get_ctx_params(ossl_unused void *ctx, _Inout_ OSSL
 SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     EVP_MD *md = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PASSWORD)) != NULL)
     {
         OPENSSL_secure_clear_free(ctx->pbPassword, ctx->cbPassword);
+        ctx->pbPassword = NULL;
         ctx->cbPassword = 0;
 
         if (p->data_size != 0)
@@ -293,7 +291,8 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
-        const char *mdName, *mdProps;
+        const char *mdName;
+        const char *mdProps = NULL;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
         {
@@ -301,9 +300,7 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
             goto cleanup;
         }
 
-        mdProps = NULL;
-        p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES);
-        if (p != NULL &&
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PROPERTIES)) != NULL &&
             !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -340,11 +337,12 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
         ctx->checkMinSizes = pkcs5 == 0;
     }
 
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     EVP_MD_free(md);
 
-    return SCOSSL_SUCCESS;
+    return ret;
 }
 
 const OSSL_DISPATCH p_scossl_pbkdf2_kdf_functions[] = {
