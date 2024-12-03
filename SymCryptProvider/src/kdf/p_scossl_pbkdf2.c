@@ -39,8 +39,8 @@ static const OSSL_PARAM p_scossl_pbkdf2_gettable_ctx_param_types[] = {
 static const OSSL_PARAM p_scossl_pbkdf2_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_PASSWORD, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
     OSSL_PARAM_uint64(OSSL_KDF_PARAM_ITER, NULL),
     OSSL_PARAM_int(OSSL_KDF_PARAM_PKCS5, NULL),
     OSSL_PARAM_END};
