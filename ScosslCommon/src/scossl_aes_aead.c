@@ -176,7 +176,7 @@ SCOSSL_STATUS scossl_aes_gcm_cipher(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encrypt,
     {
         // Auth Data Passed in
         SymCryptGcmAuthPart(&ctx->state, in, inl);
-        *outl = 0;
+        *outl = inl;
         return SCOSSL_SUCCESS;
     }
 
@@ -638,7 +638,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
         if (out == NULL)
         {
             // Auth Data Passed in
-            *outl = 0;
+            *outl = cbAuthdata;
             return SCOSSL_SUCCESS;
         }
     }
