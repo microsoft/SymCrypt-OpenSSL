@@ -82,6 +82,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _Out_writes_bytes_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen)
 {
+    SIZE_T cbSecret;
     SIZE_T cbCipherText;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -98,11 +99,15 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     }
 
     scError = SymCryptMlKemSizeofCiphertextFromParams(ctx->keyCtx->mlkemParams, &cbCipherText);
-
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         return SCOSSL_FAILURE;
+    }
+
+    if (ctx->keyCtx->classicKeyCtx != NULL)
+    {
+
     }
 
     if (out != NULL)

@@ -10,10 +10,6 @@ extern "C" {
 #endif
 
 typedef struct {
-    OSSL_FUNC_keymgmt_gen_cleanup_fn *genCleanup;
-    OSSL_FUNC_keymgmt_gen_init_fn *genInit;
-    OSSL_FUNC_keymgmt_gen_set_template_fn *setTemplate;
-    OSSL_FUNC_keymgmt_gen_fn *gen;
     OSSL_FUNC_keymgmt_new_fn *new;
     OSSL_FUNC_keymgmt_free_fn *free;
     OSSL_FUNC_keymgmt_dup_fn *dup;
@@ -42,7 +38,8 @@ typedef struct {
     SYMCRYPT_MLKEMKEY_FORMAT format;
 
     SCOSSL_ECC_KEY_CTX *classicKeyCtx;
-    SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS *classicKeyMgmt;
+    const SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS *classicKeymgmt;
+    const SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS *classicKeyexch;
 } SCOSSL_MLKEM_KEY_CTX;
 
 #ifdef __cplusplus
