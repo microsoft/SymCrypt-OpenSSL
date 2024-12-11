@@ -2,13 +2,13 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_helpers.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx);
+SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provCtx);
 void p_scossl_mlkem_keymgmt_free_key_ctx(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx);
 
 SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[]);

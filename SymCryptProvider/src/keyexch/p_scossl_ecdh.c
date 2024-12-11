@@ -109,16 +109,16 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-        return SCOSSL_FAILURE;
-    }
-
     cbSecretBuf = SymCryptEckeySizeofPublicKey(ctx->keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
     if (secret == NULL)
     {
         *secretlen = cbSecretBuf;
         return SCOSSL_SUCCESS;
+    }
+
+    if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
     }
 
     if (outlen < cbSecretBuf)
