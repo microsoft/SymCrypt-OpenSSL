@@ -3,10 +3,8 @@
 //
 
 #include "scossl_provider.h"
-#include "p_scossl_base.h"
 #include "kem/p_scossl_mlkem.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
-#include "keyexch/p_scossl_ecdh.h"
 #include "keymgmt/p_scossl_ecc_keymgmt.h"
 
 #include <openssl/core_names.h>
@@ -16,21 +14,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    OSSL_FUNC_keymgmt_gen_cleanup_fn *genCleanup;
-    OSSL_FUNC_keymgmt_gen_init_fn *genInit;
-    OSSL_FUNC_keymgmt_gen_set_template_fn *setTemplate;
-    OSSL_FUNC_keymgmt_gen_fn *gen;
-} SCOSSL_MLKEM_CLASSIC_KEYGEN_FNS;
-
-typedef struct {
-    SCOSSL_PROVCTX *provCtx;
-    const char *groupName;
-
-    PVOID classicKeygenCtx;
-    const SCOSSL_MLKEM_CLASSIC_KEYGEN_FNS *classicKeygen;
-} SCOSSL_MLKEM_KEYGEN_CTX;
 
 #define SCOSSL_MLKEM_PKEY_PARAMETER_TYPES                                           \
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),           \
@@ -76,57 +59,51 @@ static const OSSL_PARAM *p_scossl_mlkem_impexp_types[] = {
     p_scossl_mlkem_pkey_types,
     p_scossl_mlkem_all_types};
 
-static const SCOSSL_MLKEM_CLASSIC_KEYGEN_FNS p_scossl_ecc_classic_keygen = {
+static const SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS p_scossl_ecc_classic_keymgmt = {
     (OSSL_FUNC_keymgmt_gen_cleanup_fn *)        p_scossl_ecc_keygen_cleanup,
     (OSSL_FUNC_keymgmt_gen_init_fn *)           p_scossl_ecc_keygen_init,
     (OSSL_FUNC_keymgmt_gen_set_template_fn *)   p_scossl_ecc_keygen_set_template,
-    (OSSL_FUNC_keymgmt_gen_fn *)                p_scossl_ecc_keygen};
+    (OSSL_FUNC_keymgmt_gen_fn *)                p_scossl_ecc_keygen,
+    (OSSL_FUNC_keymgmt_new_fn *)                p_scossl_ecc_keymgmt_new_ctx,
+    (OSSL_FUNC_keymgmt_free_fn *)               p_scossl_ecc_keymgmt_free_ctx,
+    (OSSL_FUNC_keymgmt_dup_fn *)                p_scossl_ecc_keymgmt_dup_ctx,
+    (OSSL_FUNC_keymgmt_get_params_fn *)         p_scossl_ecc_keymgmt_get_params,
+    (OSSL_FUNC_keymgmt_set_params_fn *)         p_scossl_ecc_keymgmt_set_params,
+    (OSSL_FUNC_keymgmt_has_fn *)                p_scossl_ecc_keymgmt_has,
+    (OSSL_FUNC_keymgmt_match_fn *)              p_scossl_ecc_keymgmt_match,
+    (OSSL_FUNC_keymgmt_import_fn *)             p_scossl_ecc_keymgmt_import,
+    (OSSL_FUNC_keymgmt_export_fn *)             p_scossl_ecc_keymgmt_export,
+    (OSSL_FUNC_keymgmt_validate_fn *)           p_scossl_ecc_keymgmt_validate};
 
-static const SCOSSL_MLKEM_CLASSIC_KEYGEN_FNS p_scossl_x25519_classic_keygen = {
+static const SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS p_scossl_x25519_classic_keymgmt = {
     (OSSL_FUNC_keymgmt_gen_cleanup_fn *)        p_scossl_ecc_keygen_cleanup,
     (OSSL_FUNC_keymgmt_gen_init_fn *)           p_scossl_x25519_keygen_init,
     (OSSL_FUNC_keymgmt_gen_set_template_fn *)   p_scossl_ecc_keygen_set_template,
-    (OSSL_FUNC_keymgmt_gen_fn *)                p_scossl_ecc_keygen};
+    (OSSL_FUNC_keymgmt_gen_fn *)                p_scossl_ecc_keygen,
+    (OSSL_FUNC_keymgmt_new_fn *)                p_scossl_x25519_keymgmt_new_ctx,
+    (OSSL_FUNC_keymgmt_free_fn *)               p_scossl_ecc_keymgmt_free_ctx,
+    (OSSL_FUNC_keymgmt_dup_fn *)                p_scossl_ecc_keymgmt_dup_ctx,
+    (OSSL_FUNC_keymgmt_get_params_fn *)         p_scossl_ecc_keymgmt_get_params,
+    (OSSL_FUNC_keymgmt_set_params_fn *)         p_scossl_ecc_keymgmt_set_params,
+    (OSSL_FUNC_keymgmt_has_fn *)                p_scossl_ecc_keymgmt_has,
+    (OSSL_FUNC_keymgmt_match_fn *)              p_scossl_ecc_keymgmt_match,
+    (OSSL_FUNC_keymgmt_import_fn *)             p_scossl_x25519_keymgmt_import,
+    (OSSL_FUNC_keymgmt_export_fn *)             p_scossl_x25519_keymgmt_export,
+    (OSSL_FUNC_keymgmt_validate_fn *)           p_scossl_ecc_keymgmt_validate};
 
-static const SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS p_scossl_ecc_classic_keymgmt = {
-    (OSSL_FUNC_keymgmt_new_fn *)        p_scossl_ecc_keymgmt_new_ctx,
-    (OSSL_FUNC_keymgmt_free_fn *)       p_scossl_ecc_keymgmt_free_ctx,
-    (OSSL_FUNC_keymgmt_dup_fn *)        p_scossl_ecc_keymgmt_dup_ctx,
-    (OSSL_FUNC_keymgmt_get_params_fn *) p_scossl_ecc_keymgmt_get_params,
-    (OSSL_FUNC_keymgmt_set_params_fn *) p_scossl_ecc_keymgmt_set_params,
-    (OSSL_FUNC_keymgmt_has_fn *)        p_scossl_ecc_keymgmt_has,
-    (OSSL_FUNC_keymgmt_match_fn *)      p_scossl_ecc_keymgmt_match,
-    (OSSL_FUNC_keymgmt_import_fn *)     p_scossl_ecc_keymgmt_import,
-    (OSSL_FUNC_keymgmt_export_fn *)     p_scossl_ecc_keymgmt_export,
-    (OSSL_FUNC_keymgmt_validate_fn *)   p_scossl_ecc_keymgmt_validate};
-
-static const SCOSSL_MLKEM_CLASSIC_KEYMGMT_FNS p_scossl_x25519_classic_keymgmt = {
-    (OSSL_FUNC_keymgmt_new_fn *)        p_scossl_x25519_keymgmt_new_ctx,
-    (OSSL_FUNC_keymgmt_free_fn *)       p_scossl_ecc_keymgmt_free_ctx,
-    (OSSL_FUNC_keymgmt_dup_fn *)        p_scossl_ecc_keymgmt_dup_ctx,
-    (OSSL_FUNC_keymgmt_get_params_fn *) p_scossl_ecc_keymgmt_get_params,
-    (OSSL_FUNC_keymgmt_set_params_fn *) p_scossl_ecc_keymgmt_set_params,
-    (OSSL_FUNC_keymgmt_has_fn *)        p_scossl_ecc_keymgmt_has,
-    (OSSL_FUNC_keymgmt_match_fn *)      p_scossl_ecc_keymgmt_match,
-    (OSSL_FUNC_keymgmt_import_fn *)     p_scossl_x25519_keymgmt_import,
-    (OSSL_FUNC_keymgmt_export_fn *)     p_scossl_x25519_keymgmt_export,
-    (OSSL_FUNC_keymgmt_validate_fn *)   p_scossl_ecc_keymgmt_validate};
-
-static const SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS p_scossl_ecdh_classic_keyexch = {
-    (OSSL_FUNC_keyexch_newctx_fn *)     p_scossl_ecdh_newctx,
-    (OSSL_FUNC_keyexch_freectx_fn *)    p_scossl_ecdh_freectx,
-    (OSSL_FUNC_keyexch_dupctx_fn *)     p_scossl_ecdh_dupctx,
-    (OSSL_FUNC_keyexch_init_fn *)       p_scossl_ecdh_init,
-    (OSSL_FUNC_keyexch_set_peer_fn *)   p_scossl_ecdh_set_peer,
-    (OSSL_FUNC_keyexch_derive_fn *)     p_scossl_ecdh_derive};
-
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_group(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, _In_ const char *groupName,
-                                                      _Out_ const char **classicGroupName);
+static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_group(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, _In_ const char *groupName);
 static int p_scossl_mlkem_keymgmt_get_security_bits(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx);
 
-SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(ossl_unused void *provCtx)
+SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provCtx)
 {
-    return OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));;
+    SCOSSL_MLKEM_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));
+
+    if (keyCtx != NULL)
+    {
+        keyCtx->provCtx = provCtx;
+    }
+
+    return keyCtx;
 }
 
 void p_scossl_mlkem_keymgmt_free_key_ctx(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx)
@@ -157,10 +134,14 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
 
     if (copyCtx != NULL)
     {
+        copyCtx->provCtx = keyCtx->provCtx;
+        copyCtx->classicKeymgmt = keyCtx->classicKeymgmt;
+
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {
             copyCtx->groupName = keyCtx->groupName;
             copyCtx->mlkemParams = keyCtx->mlkemParams;
+            copyCtx->classicGroupName = keyCtx->classicGroupName;
         }
 
         if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->key != NULL)
@@ -204,7 +185,6 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
 
         if (keyCtx->classicKeyCtx != NULL)
         {
-            copyCtx->classicKeymgmt = keyCtx->classicKeymgmt;
             copyCtx->classicKeyCtx = keyCtx->classicKeymgmt->dup(keyCtx->classicKeyCtx, selection);
         }
     }
@@ -224,46 +204,7 @@ cleanup:
     return copyCtx;
 }
 
-//
-// Key Generation
-//
-static SCOSSL_STATUS p_scossl_mlkem_keygen_set_group(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ const char *groupName)
-{
-    if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM512) == 0)
-    {
-        genCtx->groupName = SCOSSL_SN_MLKEM512;
-        genCtx->classicKeygen = NULL;
-    }
-    else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM768) == 0)
-    {
-        genCtx->groupName = SCOSSL_SN_MLKEM768;
-        genCtx->classicKeygen = NULL;
-    }
-    else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM1024) == 0)
-    {
-        genCtx->groupName = SCOSSL_SN_MLKEM1024;
-        genCtx->classicKeygen = NULL;
-    }
-    else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_P256_MLKEM768) == 0)
-    {
-        genCtx->groupName = SCOSSL_SN_P256_MLKEM768;
-        genCtx->classicKeygen = &p_scossl_ecc_classic_keygen;
-    }
-    else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_X25519_MLKEM768) == 0)
-    {
-        genCtx->groupName = SCOSSL_SN_X25519_MLKEM768;
-        genCtx->classicKeygen = &p_scossl_x25519_classic_keygen;
-    }
-    else
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEY_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
@@ -276,7 +217,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
             return SCOSSL_FAILURE;
         }
 
-        if (p_scossl_mlkem_keygen_set_group(genCtx, groupName) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_keymgmt_set_group(genCtx, groupName) != SCOSSL_SUCCESS)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
             return SCOSSL_FAILURE;
@@ -291,42 +232,32 @@ static const OSSL_PARAM *p_scossl_mlkem_keygen_settable_params(ossl_unused void 
     return p_scossl_mlkem_keygen_settable_param_types;
 }
 
-static void p_scossl_mlkem_keygen_cleanup(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx)
+static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, ossl_unused int selection,
+                                                        _In_ const OSSL_PARAM params[])
 {
-    if (genCtx == NULL)
-        return;
-
-    if (genCtx->classicKeygenCtx != NULL)
-    {
-        genCtx->classicKeygen->genCleanup(genCtx->classicKeygenCtx);
-    }
-
-    OPENSSL_free(genCtx);
-}
-
-static SCOSSL_MLKEM_KEYGEN_CTX *p_scossl_mlkem_keygen_init(ossl_unused void *provCtx, ossl_unused int selection,
-                                                           _In_ const OSSL_PARAM params[])
-{
-    SCOSSL_MLKEM_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_KEYGEN_CTX));
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+    SCOSSL_MLKEM_KEY_CTX *genCtx = p_scossl_mlkem_keymgmt_new_ctx(provCtx);
 
     if (genCtx != NULL)
     {
-        genCtx->provCtx = provCtx;
-        genCtx->groupName = SCOSSL_SN_MLKEM768;
-        genCtx->classicKeygenCtx = NULL;
-        genCtx->classicKeygen = NULL;
+        status = p_scossl_mlkem_keygen_set_params(genCtx, params);
 
-        if (p_scossl_mlkem_keygen_set_params(genCtx, params) != SCOSSL_SUCCESS)
+        if (status == SCOSSL_SUCCESS && genCtx->groupName == NULL)
         {
-            OPENSSL_free(genCtx);
-            return NULL;
+            status = p_scossl_mlkem_keymgmt_set_group(genCtx, SCOSSL_SN_MLKEM768);
         }
+    }
+
+    if (status != SCOSSL_SUCCESS)
+    {
+        p_scossl_mlkem_keymgmt_free_key_ctx(genCtx);
+        genCtx = NULL;
     }
 
     return genCtx;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ SCOSSL_MLKEM_KEY_CTX *tmplCtx)
+static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY_CTX *genCtx, _In_ SCOSSL_MLKEM_KEY_CTX *tmplCtx)
 {
     if (genCtx == NULL ||
         tmplCtx == NULL)
@@ -341,7 +272,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
         return SCOSSL_FAILURE;
     }
 
-    if (p_scossl_mlkem_keygen_set_group(genCtx, tmplCtx->groupName) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_set_group(genCtx, tmplCtx->groupName) != SCOSSL_SUCCESS)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
         return SCOSSL_FAILURE;
@@ -350,15 +281,14 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ OSSL_CALLBACK *cb, _In_ void *cbarg)
+static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEY_CTX *genCtx, _In_ OSSL_CALLBACK *cb, _In_ void *cbarg)
 {
-    const char *classicGroupName;
+    PVOID classicKeygenCtx = NULL;
     SCOSSL_MLKEM_KEY_CTX *keyCtx;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
-    if ((keyCtx = p_scossl_mlkem_keymgmt_new_ctx(NULL)) == NULL ||
-        p_scossl_mlkem_keymgmt_set_group(keyCtx, genCtx->groupName, &classicGroupName) != SCOSSL_SUCCESS ||
+    if ((keyCtx = p_scossl_mlkem_keymgmt_dup_key_ctx(genCtx, OSSL_KEYMGMT_SELECT_ALL)) == NULL ||
         (keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -372,19 +302,19 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
         goto cleanup;
     }
 
-    if (genCtx->classicKeygen != NULL)
+    if (keyCtx->classicGroupName != NULL)
     {
         OSSL_PARAM classicParams[2] = {
-            OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)classicGroupName, strlen(classicGroupName)),
+            OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)keyCtx->classicGroupName, strlen(keyCtx->classicGroupName)),
             OSSL_PARAM_END};
 
-        genCtx->classicKeygenCtx = genCtx->classicKeygen->genInit(genCtx->provCtx, 0, classicParams);
-        if (genCtx->classicKeygenCtx == NULL)
+        classicKeygenCtx = keyCtx->classicKeymgmt->genInit(keyCtx->provCtx, 0, classicParams);
+        if (classicKeygenCtx == NULL)
         {
             goto cleanup;
         }
 
-        keyCtx->classicKeyCtx = genCtx->classicKeygen->gen(genCtx->classicKeygenCtx, cb, cbarg);
+        keyCtx->classicKeyCtx = keyCtx->classicKeymgmt->gen(classicKeygenCtx, cb, cbarg);
         if (keyCtx->classicKeyCtx == NULL)
         {
             goto cleanup;
@@ -400,6 +330,11 @@ cleanup:
     {
         p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
         keyCtx = NULL;
+    }
+
+    if (classicKeygenCtx != NULL)
+    {
+        genCtx->classicKeymgmt->genCleanup(classicKeygenCtx);
     }
 
     return keyCtx;
@@ -801,7 +736,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
             return SCOSSL_FAILURE;
         }
 
-        if (p_scossl_mlkem_keymgmt_set_group(keyCtx, keyCtx->groupName, &classicGroupName) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_keymgmt_set_group(keyCtx, keyCtx->groupName) != SCOSSL_SUCCESS)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
             return SCOSSL_FAILURE;
@@ -967,7 +902,7 @@ const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},
     {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_mlkem_keygen_set_params},
     {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_keygen_settable_params},
-    {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_mlkem_keygen_cleanup},
+    {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_mlkem_keygen_init},
     {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_mlkem_keygen_set_template},
     {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_mlkem_keygen},
@@ -1164,43 +1099,37 @@ cleanup:
 
 
 _Use_decl_annotations_
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_group(SCOSSL_MLKEM_KEY_CTX *keyCtx, const char *groupName,
-                                                      const char **classicGroupName)
+static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_group(SCOSSL_MLKEM_KEY_CTX *keyCtx, const char *groupName)
 {
     if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM512) == 0)
     {
         keyCtx->mlkemParams = SYMCRYPT_MLKEM_PARAMS_MLKEM512;
         keyCtx->classicKeymgmt = NULL;
-        keyCtx->classicKeyexch = NULL;
-        *classicGroupName = NULL;
+        keyCtx->classicGroupName = NULL;
     }
     else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM768) == 0)
     {
         keyCtx->mlkemParams = SYMCRYPT_MLKEM_PARAMS_MLKEM768;
         keyCtx->classicKeymgmt = NULL;
-        keyCtx->classicKeyexch = NULL;
-        *classicGroupName = NULL;
+        keyCtx->classicGroupName = NULL;
     }
     else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_MLKEM1024) == 0)
     {
         keyCtx->mlkemParams = SYMCRYPT_MLKEM_PARAMS_MLKEM1024;
         keyCtx->classicKeymgmt = NULL;
-        keyCtx->classicKeyexch = NULL;
-        *classicGroupName = NULL;
+        keyCtx->classicGroupName = NULL;
     }
     else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_P256_MLKEM768) == 0)
     {
         keyCtx->mlkemParams =  SYMCRYPT_MLKEM_PARAMS_MLKEM768;
         keyCtx->classicKeymgmt = &p_scossl_ecc_classic_keymgmt;
-        keyCtx->classicKeyexch = &p_scossl_ecdh_classic_keyexch;
-        *classicGroupName = SN_X9_62_prime256v1;
+        keyCtx->classicGroupName = SN_X9_62_prime256v1;
     }
     else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_X25519_MLKEM768) == 0)
     {
         keyCtx->mlkemParams =  SYMCRYPT_MLKEM_PARAMS_MLKEM768;
         keyCtx->classicKeymgmt = &p_scossl_x25519_classic_keymgmt;
-        keyCtx->classicKeyexch = &p_scossl_ecdh_classic_keyexch;
-        *classicGroupName = SN_X25519;
+        keyCtx->classicGroupName = SN_X25519;
     }
     else
     {

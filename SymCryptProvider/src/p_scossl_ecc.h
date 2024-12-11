@@ -43,7 +43,6 @@ typedef struct {
 SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                            _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
-                                           
 SCOSSL_STATUS p_scossl_ecc_set_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                            _In_reads_bytes_opt_(cbEncodedPublicKey) PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
                                            _In_reads_bytes_opt_(cbPrivateKey) PCBYTE pbPrivateKey, SIZE_T cbPrivateKey);
