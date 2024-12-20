@@ -1,8 +1,7 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
-
-#include "scossl_helpers.h"
+#include "p_scossl_base.h"
 #ifdef KEYSINUSE_ENABLED
 #include "p_scossl_keysinuse.h"
 #endif
@@ -40,6 +39,15 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(_In_ SCOSSL_PROVCTX *provctx);
+void p_scossl_ecc_free_ctx(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
+
+SCOSSL_STATUS p_scossl_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const char *groupName);
+
+SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
+
+SIZE_T p_scossl_ecc_get_max_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh);
 SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                            _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);

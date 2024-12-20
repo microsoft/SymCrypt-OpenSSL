@@ -11,28 +11,277 @@
 extern "C" {
 #endif
 
+#define SCOSSL_X25519_MAX_SIZE (32)
+
+_Use_decl_annotations_
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(SCOSSL_PROVCTX *provctx)
+{
+    SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
+    if (keyCtx != NULL)
+    {
+        keyCtx->libctx = provctx->libctx;
+        keyCtx->includePublic = 1;
+        keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
+    }
+    return keyCtx;
+}
+
+_Use_decl_annotations_
+void p_scossl_ecc_free_ctx(SCOSSL_ECC_KEY_CTX *keyCtx)
+{
+    if (keyCtx == NULL)
+        return;
+    if (keyCtx->key != NULL)
+    {
+        SymCryptEckeyFree(keyCtx->key);
+    }
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_ecc_reset_keysinuse(keyCtx);
+    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
+#endif
+
+    OPENSSL_free(keyCtx);
+}
+
+_Use_decl_annotations_
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
+{
+    PBYTE pbData = NULL;
+    PBYTE pbPrivateKey = NULL;
+    PBYTE pbPublicKey = NULL;
+    SIZE_T cbData = 0;
+    SIZE_T cbPublicKey = 0;
+    SIZE_T cbPrivateKey = 0;
+    SCOSSL_STATUS success = SCOSSL_FAILURE;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
+
+    if (copyCtx != NULL)
+    {
+#ifdef KEYSINUSE_ENABLED
+        copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+
+        if (keyCtx->keysinuseInfo == NULL ||
+            p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
+        {
+            copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
+        }
+#endif
+
+        copyCtx->isX25519 = keyCtx->isX25519;
+        copyCtx->libctx = keyCtx->libctx;
+        copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
+        copyCtx->conversionFormat = keyCtx->conversionFormat;
+
+        if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
+        {
+            copyCtx->curve = keyCtx->curve;
+        }
+        else
+        {
+            copyCtx->curve = NULL;
+        }
+
+        if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->initialized)
+        {
+            if (copyCtx->curve == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+                goto cleanup;
+            }
+
+            if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+                SymCryptEckeyHasPrivateKey(keyCtx->key))
+            {
+                cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
+            }
+
+            if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+            {
+                cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat);
+            }
+
+            cbData = cbPrivateKey + cbPublicKey;
+            if ((pbData = OPENSSL_secure_malloc(cbData)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            pbPrivateKey = cbPrivateKey != 0 ? pbData : NULL;
+            pbPublicKey = cbPublicKey != 0 ? pbData + cbPrivateKey : NULL;
+
+            scError = SymCryptEckeyGetValue(
+                keyCtx->key,
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                pointFormat,
+                0);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeyGetValue failed", scError);
+                goto cleanup;
+            }
+
+            if ((copyCtx->key = SymCryptEckeyAllocate(keyCtx->curve)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            // Default ECDH only. If the key is used for ECDSA then we call SymCryptEckeyExtendKeyUsage
+            scError = SymCryptEckeySetValue(
+                pbPrivateKey, cbPrivateKey,
+                pbPublicKey, cbPublicKey,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                pointFormat,
+                SYMCRYPT_FLAG_ECKEY_ECDH,
+                copyCtx->key);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
+                goto cleanup;
+            }
+
+            copyCtx->initialized = 1;
+            copyCtx->includePublic = keyCtx->includePublic;
+        }
+        else
+        {
+            copyCtx->key = NULL;
+            copyCtx->initialized = 0;
+            copyCtx->includePublic = 1;
+        }
+    }
+
+    success = SCOSSL_SUCCESS;
+
+cleanup:
+    if (pbData != NULL)
+    {
+        OPENSSL_secure_clear_free(pbData, cbData);
+    }
+
+    if (!success)
+    {
+        p_scossl_ecc_free_ctx(copyCtx);
+        copyCtx = NULL;
+    }
+
+    return copyCtx;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_ecc_set_group(SCOSSL_ECC_KEY_CTX *keyCtx, const char *groupName)
+{
+    PCSYMCRYPT_ECURVE curve;
+    int nid = OBJ_sn2nid(groupName);
+
+    if (nid == NID_X25519)
+    {
+        keyCtx->isX25519 = TRUE;
+        curve = scossl_ecc_get_x25519_curve();
+    }
+    else
+    {
+        keyCtx->isX25519 = FALSE;
+        curve = scossl_ecc_nid_to_symcrypt_curve(nid);
+
+        if (curve == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    keyCtx->curve = curve;
+
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+    keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+    keyCtx->keysinuseInfo = NULL;
+#endif
+
+    if (keyCtx->key != NULL)
+    {
+        SymCryptEckeyFree(keyCtx->key);
+    }
+
+    keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve);
+    if (keyCtx->key == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    // Default ECDH only. If the key is used for ECDSA then we call SymCryptEckeyExtendKeyUsage
+    scError = SymCryptEckeySetRandom(SYMCRYPT_FLAG_ECKEY_ECDH, keyCtx->key);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetRandom failed", scError);
+        return SCOSSL_FAILURE;
+    }
+
+    keyCtx->initialized = TRUE;
+
+    return SCOSSL_SUCCESS;
+}
+
+SIZE_T p_scossl_ecc_get_max_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh)
+{
+    if (keyCtx->isX25519)
+    {
+        return SCOSSL_X25519_MAX_SIZE;
+    }
+    else if (isEcdh)
+    {
+        return keyCtx->key == NULL ? 0 : SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
+    }
+
+    return scossl_ecdsa_size(keyCtx->curve);
+}
+
 _Use_decl_annotations_
 SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
-    SYMCRYPT_ECPOINT_FORMAT pointFormat;
+    SIZE_T cbKey;
 
-    if (!keyCtx->initialized)
+    if (keyCtx->curve == NULL)
     {
         return 0;
     }
-    
+
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        return SymCryptEckeySizeofPrivateKey(keyCtx->key);
+        return SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
     }
     else if (keyCtx->isX25519)
     {
         return SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
     }
 
-    pointFormat = keyCtx->conversionFormat == POINT_CONVERSION_COMPRESSED ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    cbKey = SymCryptEcurveSizeofFieldElement(keyCtx->curve);
+    if (!keyCtx->isX25519)
+    {
+        if (keyCtx->conversionFormat != POINT_CONVERSION_COMPRESSED)
+        {
+            cbKey *= 2;
+        }
 
-    return SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + 1;
+        cbKey++;
+    }
+
+    return cbKey;
 }
 
 // Gets the public key as an encoded octet string
@@ -162,7 +411,7 @@ SCOSSL_STATUS p_scossl_ecc_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
     BOOL allocatedKey = FALSE;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    
+
     if (!keyCtx->initialized)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
@@ -184,14 +433,13 @@ SCOSSL_STATUS p_scossl_ecc_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
     else if (*pcbPrivateKey >= cbPrivateKey)
     {
         pbPrivateKey = *ppbPrivateKey;
-
     }
     else
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         goto cleanup;
     }
-    
+
     scError = SymCryptEckeyGetValue(
         keyCtx->key,
         pbPrivateKey, cbPrivateKey,
@@ -248,10 +496,10 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx, int selec
                                            PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
                                            PCBYTE pbPrivateKey, SIZE_T cbPrivateKey)
 {
+    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
     EC_GROUP *ecGroup = NULL;
     EC_POINT *ecPoint = NULL;
     BN_CTX *bnCtx = NULL;
-
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
     SYMCRYPT_ERROR scError;
@@ -296,7 +544,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx, int selec
         pbPrivateKey, cbPrivateKey,
         pbPublicKey, cbPublicKey,
         SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        SYMCRYPT_ECPOINT_FORMAT_XY,
+        pointFormat,
         SYMCRYPT_FLAG_ECKEY_ECDH,
         keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)

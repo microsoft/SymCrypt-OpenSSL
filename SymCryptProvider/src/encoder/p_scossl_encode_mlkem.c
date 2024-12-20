@@ -16,41 +16,9 @@ extern "C" {
 
 extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
 
-static const char *p_scossl_encode_mlkem_params_to_name(SYMCRYPT_MLKEM_PARAMS params)
+static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
-    switch (params)
-    {
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
-        return SCOSSL_SN_MLKEM512;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
-        return SCOSSL_SN_MLKEM768;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
-        return SCOSSL_SN_MLKEM1024;
-    default:
-        break;
-    }
-
-    return NULL;
-}
-
-static ASN1_OBJECT *p_scossl_encode_get_mlkem_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
-{
-    int nid = NID_undef;
-
-    switch (keyCtx->mlkemParams)
-    {
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
-        nid = OBJ_sn2nid(SCOSSL_SN_MLKEM512);
-        break;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
-        nid = OBJ_sn2nid(SCOSSL_SN_MLKEM768);
-        break;
-    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
-        nid = OBJ_sn2nid(SCOSSL_SN_MLKEM1024);
-        break;
-    default:
-        break;
-    }
+    int nid = OBJ_sn2nid(keyCtx->groupName);
 
     if (nid != NID_undef)
     {
@@ -96,7 +64,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if ((p8Obj = p_scossl_encode_get_mlkem_oid(keyCtx)) == NULL)
+    if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
@@ -150,7 +118,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if ((p8Obj = p_scossl_encode_get_mlkem_oid(keyCtx)) == NULL)
+    if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
@@ -331,13 +299,11 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
     BOOL printPrivateSeed = FALSE;
     BOOL printDecapsulationKey = FALSE;
     BOOL printEncapsulationKey = FALSE;
-    const char *paramName = p_scossl_encode_mlkem_params_to_name(keyCtx->mlkemParams);
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-    if (keyCtx->key == NULL ||
-        paramName == NULL)
+    if (keyCtx->key == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         goto cleanup;
@@ -418,7 +384,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         }
     }
 
-    if (BIO_printf(out, "PARAMETER SET: %s\n", paramName) <= 0)
+    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupName) <= 0)
     {
         goto cleanup;
     }
