@@ -13,36 +13,78 @@
 extern "C" {
 #endif
 
+
 typedef struct {
     int nid;
-    const char *name;
-    SYMCRYPT_MLKEM_PARAMS keyParams;
+    const char *groupName;
 } SCOSSL_DECODE_MLKEM_PARAM_MAP;
 
 static SCOSSL_DECODE_MLKEM_PARAM_MAP p_scossl_decode_mlkem_param_maps[] = {
-    {-1, SCOSSL_SN_MLKEM512, SYMCRYPT_MLKEM_PARAMS_MLKEM512},
-    {-1, SCOSSL_SN_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
-    {-1, SCOSSL_SN_MLKEM1024, SYMCRYPT_MLKEM_PARAMS_MLKEM1024}};
+    {-1, SCOSSL_SN_MLKEM512},
+    {-1, SCOSSL_SN_MLKEM768},
+    {-1, SCOSSL_SN_MLKEM1024},
+    {-1, SCOSSL_SN_P256_MLKEM768},
+    {-1, SCOSSL_SN_X25519_MLKEM768}};
 
-static SYMCRYPT_MLKEM_PARAMS p_scossl_decode_mlkem_get_params(int nid)
+static const char *p_scossl_decode_mlkem_obj_to_groupname(const ASN1_OBJECT *obj)
 {
-    for (size_t i = 0; i < sizeof(p_scossl_decode_mlkem_param_maps) / sizeof(SCOSSL_DECODE_MLKEM_PARAM_MAP); i++)
-    {
-        if (p_scossl_decode_mlkem_param_maps[i].nid == -1)
-        {
-            p_scossl_decode_mlkem_param_maps[i].nid = OBJ_sn2nid(p_scossl_decode_mlkem_param_maps[i].name);
-        }
+    int nid = OBJ_obj2nid(obj);
 
-        if (p_scossl_decode_mlkem_param_maps[i].nid == nid)
+    if (nid != -1)
+    {
+        for (size_t i = 0; i < sizeof(p_scossl_decode_mlkem_param_maps) / sizeof(OSSL_ITEM); i++)
         {
-            return p_scossl_decode_mlkem_param_maps[i].keyParams;
+            if (p_scossl_decode_mlkem_param_maps[i].nid == -1)
+            {
+                p_scossl_decode_mlkem_param_maps[i].nid = OBJ_sn2nid(p_scossl_decode_mlkem_param_maps[i].groupName);
+            }
+
+            if (p_scossl_decode_mlkem_param_maps[i].nid == nid)
+            {
+                return p_scossl_decode_mlkem_param_maps[i].groupName;
+            }
         }
     }
 
-    return SYMCRYPT_MLKEM_PARAMS_NULL;
+    return NULL;
 }
 
-static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ BIO *bio)
+static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key(_In_ SCOSSL_DECODE_CTX *ctx, _In_ const ASN1_OBJECT *algorithm, int selection,
+                                                       _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey)
+{
+    const char *groupName;
+    SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if ((keyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_KEY_CTX))) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    keyCtx->provCtx = ctx->provctx;
+
+    groupName = p_scossl_decode_mlkem_obj_to_groupname(algorithm);
+    if (groupName == NULL ||
+        p_scossl_mlkem_keymgmt_set_group(keyCtx, groupName) != SCOSSL_SUCCESS)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+        goto cleanup;
+    }
+
+    status = p_scossl_mlkem_keymgmt_set_encoded_key(keyCtx, selection, pbKey, cbKey);
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        OPENSSL_free(keyCtx);
+        keyCtx = NULL;
+    }
+
+    return keyCtx;
+}
+
+static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const X509_ALGOR *alg = NULL;
@@ -50,9 +92,6 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ BIO *bio)
     int cbKey;
     ASN1_OCTET_STRING *p8Data = NULL;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
-    SYMCRYPT_MLKEMKEY_FORMAT decodeFormat = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
-    SYMCRYPT_ERROR scError;
-    SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
         !PKCS8_pkey_get0(NULL, &pbKey, &cbKey, &alg, p8Info) ||
@@ -62,70 +101,20 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ BIO *bio)
         goto cleanup;
     }
 
-    pbKey = ASN1_STRING_get0_data(p8Data);
-    cbKey = ASN1_STRING_length(p8Data);
-
-    if (cbKey == 64)
-    {
-        decodeFormat = SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED;
-    }
-
-    if ((keyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_KEY_CTX))) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
-    keyCtx->mlkemParams = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(alg->algorithm));
-    keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
-
-    if (keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-        goto cleanup;
-    }
-
-    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
-    scError = SymCryptMlKemkeySetValue(
-        pbKey, cbKey,
-        decodeFormat,
-        0,
-        keyCtx->key);
-
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SymCryptMlKemkeyFree(keyCtx->key);
-        keyCtx->key = NULL;
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-        goto cleanup;
-    }
-
-    status = SCOSSL_SUCCESS;
+    keyCtx = p_scossl_mlkem_decode_key(ctx, alg->algorithm, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+                                       ASN1_STRING_get0_data(p8Data), ASN1_STRING_length(p8Data));
 
 cleanup:
-    if (status != SCOSSL_SUCCESS)
-    {
-        OPENSSL_free(keyCtx);
-        keyCtx = NULL;
-    }
-
     ASN1_OCTET_STRING_free(p8Data);
     PKCS8_PRIV_KEY_INFO_free(p8Info);
 
     return keyCtx;
 }
 
-static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ BIO *bio)
+static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)
 {
     SUBJECT_PUBKEY_INFO *subjPubKeyInfo;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
-    SYMCRYPT_ERROR scError;
-    SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if ((subjPubKeyInfo = OPENSSL_zalloc(sizeof(SUBJECT_PUBKEY_INFO))) == NULL)
     {
@@ -139,51 +128,10 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ BIO *bi
         goto cleanup;
     }
 
-    if ((keyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_KEY_CTX))) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
-    keyCtx->mlkemParams = p_scossl_decode_mlkem_get_params(OBJ_obj2nid(subjPubKeyInfo->algorithm->algorithm));
-    keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
-
-    if (keyCtx->mlkemParams == SYMCRYPT_MLKEM_PARAMS_NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-        goto cleanup;
-    }
-
-    if ((keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->mlkemParams)) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
-    scError = SymCryptMlKemkeySetValue(
-        subjPubKeyInfo->subjectPublicKey->data,
-        subjPubKeyInfo->subjectPublicKey->length,
-        keyCtx->format,
-        0,
-        keyCtx->key);
-
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SymCryptMlKemkeyFree(keyCtx->key);
-        keyCtx->key = NULL;
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-        goto cleanup;
-    }
-
-    status = SCOSSL_SUCCESS;
+    keyCtx = p_scossl_mlkem_decode_key(ctx, subjPubKeyInfo->algorithm->algorithm, OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+                                       subjPubKeyInfo->subjectPublicKey->data, subjPubKeyInfo->subjectPublicKey->length);
 
 cleanup:
-    if (status != SCOSSL_SUCCESS)
-    {
-        OPENSSL_free(keyCtx);
-        keyCtx = NULL;
-    }
-
     OPENSSL_free(subjPubKeyInfo);
 
     return keyCtx;
