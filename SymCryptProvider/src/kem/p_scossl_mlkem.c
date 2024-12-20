@@ -14,15 +14,6 @@ extern "C" {
 
 #define SYMCRYPT_MLKEM_SECRET_LENGTH 32
 
-typedef struct {
-    OSSL_FUNC_keyexch_newctx_fn *newCtx;
-    OSSL_FUNC_keyexch_freectx_fn *freeCtx;
-    OSSL_FUNC_keyexch_dupctx_fn *dupCtx;
-    OSSL_FUNC_keyexch_init_fn *init;
-    OSSL_FUNC_keyexch_set_peer_fn *setPeer;
-    OSSL_FUNC_keyexch_derive_fn *derive;
-} SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS;
-
 typedef struct
 {
     // Unused by MLKEM, but forwarded to the classic key exchange
@@ -31,20 +22,11 @@ typedef struct
     SCOSSL_MLKEM_KEY_CTX *keyCtx;
     int operation;
 
-    PVOID classicKeyexchCtx;
-    const SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS *classicKeyexch;
+    SCOSSL_ECDH_CTX *classicKeyexchCtx;
 } SCOSSL_MLKEM_CTX;
 
 static const OSSL_PARAM p_scossl_mlkem_param_types[] = {
     OSSL_PARAM_END};
-
-static const SCOSSL_MLKEM_CLASSIC_KEYEXCH_FNS p_scossl_ecdh_classic_keyexch = {
-    (OSSL_FUNC_keyexch_newctx_fn *)     p_scossl_ecdh_newctx,
-    (OSSL_FUNC_keyexch_freectx_fn *)    p_scossl_ecdh_freectx,
-    (OSSL_FUNC_keyexch_dupctx_fn *)     p_scossl_ecdh_dupctx,
-    (OSSL_FUNC_keyexch_init_fn *)       p_scossl_ecdh_init,
-    (OSSL_FUNC_keyexch_set_peer_fn *)   p_scossl_ecdh_set_peer,
-    (OSSL_FUNC_keyexch_derive_fn *)     p_scossl_ecdh_derive};
 
 /* Context management */
 static SCOSSL_MLKEM_CTX *p_scossl_mlkem_newctx(ossl_unused void *provctx)
@@ -64,9 +46,9 @@ static void p_scossl_mlkem_freectx(_Inout_ SCOSSL_MLKEM_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    if (ctx->classicKeyexch != NULL)
+    if (ctx->classicKeyexchCtx != NULL)
     {
-        ctx->classicKeyexch->freeCtx(ctx->classicKeyexchCtx);
+        p_scossl_ecdh_freectx(ctx->classicKeyexchCtx);
     }
 
     OPENSSL_free(ctx);
@@ -81,20 +63,15 @@ static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->operation = ctx->operation;
         copyCtx->provCtx = ctx->provCtx;
-        copyCtx->classicKeyexch = ctx->classicKeyexch;
 
         if (ctx->classicKeyexchCtx != NULL)
         {
-            if (copyCtx->classicKeyexch != NULL &&
-                (copyCtx->classicKeyexchCtx = copyCtx->classicKeyexch->dupCtx(ctx->classicKeyexchCtx)) == NULL)
-            {
-                OPENSSL_free(copyCtx);
-                copyCtx = NULL;
-            }
-        }
-        else
-        {
             copyCtx->classicKeyexchCtx = NULL;
+        }
+        else if ((copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
+        {
+            OPENSSL_free(copyCtx);
+            copyCtx = NULL;
         }
     }
 
@@ -103,15 +80,13 @@ static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
 
 static SCOSSL_STATUS p_scossl_mlkem_classic_keyexch_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, PVOID classicKeyCtx)
 {
-    ctx->classicKeyexch = &p_scossl_ecdh_classic_keyexch;
-
-    if ((ctx->classicKeyexchCtx = ctx->classicKeyexch->newCtx(ctx->provCtx)) == NULL)
+    if ((ctx->classicKeyexchCtx = p_scossl_ecdh_newctx(ctx->provCtx)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->classicKeyexch->init(ctx->classicKeyexchCtx, classicKeyCtx, NULL) != SCOSSL_SUCCESS)
+    if (p_scossl_ecdh_init(ctx->classicKeyexchCtx, classicKeyCtx, NULL) != SCOSSL_SUCCESS)
     {
         return SCOSSL_FAILURE;
     }
@@ -143,14 +118,23 @@ static SCOSSL_STATUS p_scossl_mlkem_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCO
 //
 // Encapsulation
 //
+
+// We don't initialize the classic key context for hybrid here, since
+// ctx->keyCtx->classicKeyCtx contains the peer key, and 'our' key is generated
+// during encapsulation.
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                      ossl_unused const OSSL_PARAM params[])
 {
     return p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE);
 }
 
-// Export secret = PEER || MLKEM secret, out = ECDH secret || MLKEM CT
-// Generate ECDH private key
+// Performs ML-KEM encapsulation using the previously initialized context. If
+// this is a hybrid group, then hybrid encapsulation is performed.
+// ctx->keyCtx->classicKeyCtx is used as the peer key, and an ephemeral
+// ECDH key is generated as 'our' key to derive the shared ECDH secret.
+//
+// secret == ECDH shared secret | MLKEM secret
+// out == Ephemeral ECDH public key | MLKEM ciphertext
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _Out_writes_bytes_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen)
@@ -177,19 +161,19 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
     classicKeyCtxPeer = ctx->keyCtx->classicKeyCtx;
 
-    if (ctx->classicKeyexch != NULL)
+    if (ctx->keyCtx->classicGroupName != NULL)
     {
-        if (ctx->keyCtx->classicKeyCtx == NULL)
+        if (classicKeyCtxPeer == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
             goto cleanup;
         }
 
         // Get key size
-        cbClassicKey = p_scossl_ecc_get_encoded_key_size(ctx->keyCtx->classicKeyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
+        cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPeer, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
 
         // Get secret size
-        if (ctx->classicKeyexch->derive(ctx->keyCtx->classicKeyCtx, NULL, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
+        if (p_scossl_ecdh_derive(ctx->classicKeyexchCtx, NULL, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -211,7 +195,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             goto cleanup;
         }
 
-        if (classicKeyCtxPeer != NULL)
+        if (ctx->keyCtx->classicGroupName != NULL)
         {
             // Generate ephemeral ECDH key
             if ((classicKeyCtxPrivate = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
@@ -235,8 +219,8 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
             // Derive ECDH secret
             if (p_scossl_mlkem_classic_keyexch_init(ctx, classicKeyCtxPrivate) != SCOSSL_SUCCESS ||
-                ctx->classicKeyexch->setPeer(ctx->classicKeyexchCtx, ctx->keyCtx->classicKeyCtx) != SCOSSL_SUCCESS ||
-                ctx->classicKeyexch->derive(ctx->classicKeyexchCtx, secret, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
+                p_scossl_ecdh_set_peer(ctx->classicKeyexchCtx, classicKeyCtxPeer) != SCOSSL_SUCCESS ||
+                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, secret, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -284,7 +268,13 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *c
            (ctx->keyCtx->classicKeyCtx != NULL || p_scossl_mlkem_classic_keyexch_init(ctx, ctx->keyCtx->classicKeyCtx));
 }
 
-// Set peer, derive ECDH || MLKEM CT
+// Performs ML-KEM decapsulation using the previously initialized context. If
+// this is a hybrid group, then hybrid decapsulation is performed.
+// ctx->keyCtx->classicKeyCtx is used as 'our' key, and the peer key is
+// extracted from the beginning of 'in'
+//
+// in == Ephemeral ECDH public key | MLKEM ciphertext
+// out == ECDH shared secret | MLKEM secret
 static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
@@ -292,7 +282,8 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     SIZE_T cbClassicKey = 0;
     SIZE_T cbMlkemCiphertext = 0;
     SIZE_T cbClassicSecret = 0;
-    SCOSSL_ECC_KEY_CTX *classicKeyCtxPublic = NULL;
+    SCOSSL_ECC_KEY_CTX *classicKeyCtxPeer = NULL;
+    SCOSSL_ECC_KEY_CTX *classicKeyCtxPrivate = NULL;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -308,19 +299,21 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         goto cleanup;
     }
 
-    if (ctx->classicKeyexch != NULL)
+    classicKeyCtxPrivate = ctx->keyCtx->classicKeyCtx;
+
+    if (ctx->keyCtx->classicGroupName != NULL)
     {
-        if (ctx->keyCtx->classicKeyCtx == NULL)
+        if (classicKeyCtxPrivate == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
             goto cleanup;
         }
 
         // Get key size
-        cbClassicKey = p_scossl_ecc_get_encoded_key_size(ctx->keyCtx->classicKeyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
+        cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
 
         // Get secret size
-        if (ctx->classicKeyexch->derive(ctx->keyCtx->classicKeyCtx, NULL, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
+        if (p_scossl_ecdh_derive(ctx->classicKeyexchCtx, NULL, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -347,29 +340,24 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             goto cleanup;
         }
 
-        if (ctx->classicKeyexch != NULL)
+        if (ctx->keyCtx->classicGroupName != NULL)
         {
             // Extract ECDH public key from in
-            if ((classicKeyCtxPublic = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
+            if ((classicKeyCtxPeer = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
 
-            if (p_scossl_ecc_set_group(classicKeyCtxPublic, ctx->keyCtx->classicGroupName) != SCOSSL_SUCCESS ||
-                p_scossl_ecc_get_encoded_key(classicKeyCtxPublic, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &out, &cbClassicKey) != SCOSSL_SUCCESS)
+            if (p_scossl_ecc_set_group(classicKeyCtxPeer, ctx->keyCtx->classicGroupName) != SCOSSL_SUCCESS ||
+                p_scossl_ecc_get_encoded_key(classicKeyCtxPeer, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &out, &cbClassicKey) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
-            // Set ECDH peer
-            if (ctx->classicKeyexch->setPeer(ctx->classicKeyexchCtx, classicKeyCtxPublic) != SCOSSL_SUCCESS)
-            {
-                goto cleanup;
-            }
             // Derive shared ECDH secret
-            if (ctx->classicKeyexch->setPeer(ctx->classicKeyexchCtx, classicKeyCtxPublic) != SCOSSL_SUCCESS ||
-                ctx->classicKeyexch->derive(ctx->classicKeyexchCtx, out, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
+            if (p_scossl_ecdh_set_peer(ctx->classicKeyexchCtx, classicKeyCtxPeer) != SCOSSL_SUCCESS ||
+                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, out, &cbClassicSecret, 0) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -398,7 +386,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    p_scossl_ecc_free_ctx(classicKeyCtxPublic);
+    p_scossl_ecc_free_ctx(classicKeyCtxPeer);
 
     return ret;
 }
