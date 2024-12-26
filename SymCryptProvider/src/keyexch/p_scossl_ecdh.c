@@ -101,7 +101,7 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
     SIZE_T cbSecretBuf = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SYMCRYPT_NUMBER_FORMAT numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+    SYMCRYPT_NUMBER_FORMAT numberFormat;
 
     if (ctx == NULL || secretlen == NULL)
     {
@@ -120,6 +120,8 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
     }
+
+    numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (outlen < cbSecretBuf)
     {

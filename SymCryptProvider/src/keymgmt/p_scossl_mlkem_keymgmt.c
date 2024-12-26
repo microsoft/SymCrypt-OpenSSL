@@ -885,8 +885,8 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    pbClassicKey = pbKey;
-    pbMlKemKey = pbKey + cbClassicKey;
+    pbMlKemKey = pbKey;
+    pbClassicKey = pbKey + cbMlKemKey;
 
     if (keyCtx->classicKeyCtx != NULL &&
         p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, selection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
@@ -976,31 +976,31 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
         goto cleanup;
     }
 
-    pbClassicKey = pbKey;
-    pbMlKemKey = pbKey + cbClassicKey;
-
-    if (keyCtx->classicKeyCtx != NULL)
-    {
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
-        {
-            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, selection, NULL, 0, pbClassicKey, cbClassicKey);
-        }
-        else
-        {
-            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, selection, pbClassicKey, cbClassicKey, NULL, 0);
-        }
-
-        if (ret != SCOSSL_SUCCESS)
-        {
-            goto cleanup;
-        }
-    }
+    pbMlKemKey = pbKey;
+    pbClassicKey = pbKey + cbMlKemKey;
 
     scError = SymCryptMlKemkeySetValue(pbMlKemKey, cbMlKemKey, keyCtx->format, 0, keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
         goto cleanup;
+    }
+
+    if (keyCtx->classicKeyCtx != NULL)
+    {
+        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        {
+            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, NULL, 0, pbClassicKey, cbClassicKey);
+        }
+        else
+        {
+            ret = p_scossl_ecc_set_encoded_key(keyCtx->classicKeyCtx, pbClassicKey, cbClassicKey, NULL, 0);
+        }
+
+        if (ret != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
     }
 
     ret = SCOSSL_SUCCESS;

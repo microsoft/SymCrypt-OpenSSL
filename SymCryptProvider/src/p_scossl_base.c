@@ -77,6 +77,7 @@ extern "C" {
 typedef struct {
     unsigned int groupId;
     unsigned int securityBits;
+    int is_kem;
     int minTls;
     int maxTls;
     int minDtls;
@@ -84,72 +85,72 @@ typedef struct {
 } SCOSSL_TLS_GROUP_INFO;
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p192 = {
-    SCOSSL_TLS_GROUP_ID_secp192r1, 80,
+    SCOSSL_TLS_GROUP_ID_secp192r1, 80, 0,
     TLS1_VERSION, TLS1_2_VERSION,
     DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p224 = {
-    SCOSSL_TLS_GROUP_ID_secp224r1, 112,
+    SCOSSL_TLS_GROUP_ID_secp224r1, 112, 0,
     TLS1_VERSION, TLS1_2_VERSION,
     DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p256 = {
-    SCOSSL_TLS_GROUP_ID_secp256r1, 128,
+    SCOSSL_TLS_GROUP_ID_secp256r1, 128, 0,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p384 = {
-    SCOSSL_TLS_GROUP_ID_secp384r1, 192,
+    SCOSSL_TLS_GROUP_ID_secp384r1, 192, 0,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p521 = {
-    SCOSSL_TLS_GROUP_ID_secp521r1, 256,
+    SCOSSL_TLS_GROUP_ID_secp521r1, 256, 0,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
-    SCOSSL_TLS_GROUP_ID_x25519, 128,
+    SCOSSL_TLS_GROUP_ID_x25519, 128, 0,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe2048 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe2048, 112,
+    SCOSSL_TLS_GROUP_ID_ffdhe2048, 112, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe3072 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe3072, 128,
+    SCOSSL_TLS_GROUP_ID_ffdhe3072, 128, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe4096, 128,
+    SCOSSL_TLS_GROUP_ID_ffdhe4096, 128, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem512 = {
-    SCOSSL_TLS_GROUP_ID_mlkem512, 128,
+    SCOSSL_TLS_GROUP_ID_mlkem512, 128, 1,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_mlkem768, 192,
+    SCOSSL_TLS_GROUP_ID_mlkem768, 192, 1,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem1024 = {
-    SCOSSL_TLS_GROUP_ID_mlkem1024, 215,
+    SCOSSL_TLS_GROUP_ID_mlkem1024, 256, 1,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp256r1mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_secp256r1mlkem768, 192,
+    SCOSSL_TLS_GROUP_ID_secp256r1mlkem768, 192, 1,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_x25519mlkem768, 192,
+    SCOSSL_TLS_GROUP_ID_x25519mlkem768, 192, 1,
     TLS1_3_VERSION, 0,
     -1, -1};
 
@@ -163,6 +164,7 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519mlkem768 = {
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls), \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls), \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),       \
     OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;

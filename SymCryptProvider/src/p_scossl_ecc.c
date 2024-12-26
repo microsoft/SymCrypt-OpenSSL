@@ -492,16 +492,19 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx, int selec
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
                                            PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
-                                           PCBYTE pbPrivateKey, SIZE_T cbPrivateKey)
+                                           PCBYTE pbEncodedPrivateKey, SIZE_T cbEncodedPrivateKey)
 {
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_NUMBER_FORMAT numFormat;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat;
     EC_GROUP *ecGroup = NULL;
     EC_POINT *ecPoint = NULL;
     BN_CTX *bnCtx = NULL;
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
+    PBYTE pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -515,35 +518,82 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx, int selec
     p_scossl_ecc_reset_keysinuse(keyCtx);
 #endif
 
+    if (keyCtx->isX25519)
+    {
+        numFormat = SYMCRYPT_NUMBER_FORMAT_LSB_FIRST;
+        pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+    }
+    else
+    {
+        numFormat = SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+        pointFormat = SYMCRYPT_ECPOINT_FORMAT_XY;
+    }
+
     if ((keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    if (pbEncodedPublicKey != NULL)
     {
-        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
-        if (((ecPoint = EC_POINT_new(ecGroup))    == NULL) ||
-            ((bnCtx = BN_CTX_new_ex(keyCtx->libctx))      == NULL) ||
-            ((pbPublicKey = OPENSSL_malloc(cbPublicKey))  == NULL))
+        if (keyCtx->isX25519)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
+            pbPublicKey = (PBYTE) pbEncodedPublicKey;
+            cbPublicKey = cbEncodedPublicKey;
         }
-
-        if (!EC_POINT_oct2point(ecGroup, ecPoint, pbEncodedPublicKey, cbEncodedPublicKey, bnCtx) ||
-            !scossl_ec_point_to_pubkey(ecPoint, ecGroup, bnCtx, pbPublicKey, cbPublicKey))
+        else
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
+            cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_XY);
+            if (((ecGroup = scossl_ecc_symcrypt_curve_to_ecc_group(keyCtx->curve)) == NULL) ||
+                ((ecPoint = EC_POINT_new(ecGroup))            == NULL) ||
+                ((bnCtx = BN_CTX_new_ex(keyCtx->libctx))      == NULL) ||
+                ((pbPublicKey = OPENSSL_malloc(cbPublicKey))  == NULL))
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            if (!EC_POINT_oct2point(ecGroup, ecPoint, pbEncodedPublicKey, cbEncodedPublicKey, bnCtx) ||
+                !scossl_ec_point_to_pubkey(ecPoint, ecGroup, bnCtx, pbPublicKey, cbPublicKey))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+        }
+    }
+
+    if (pbEncodedPrivateKey != NULL)
+    {
+        if (keyCtx->isX25519)
+        {
+            if ((pbPrivateKey = OPENSSL_secure_malloc(cbEncodedPrivateKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            memcpy(pbPrivateKey, pbEncodedPrivateKey, cbEncodedPrivateKey);
+
+            // Preserve original bits for export
+            keyCtx->modifiedPrivateBits = pbPrivateKey[0] & 0x07;
+            keyCtx->modifiedPrivateBits |= pbPrivateKey[cbPrivateKey-1] & 0xc0;
+
+            pbPrivateKey[0] &= 0xf8;
+            pbPrivateKey[cbPrivateKey-1] &= 0x7f;
+            pbPrivateKey[cbPrivateKey-1] |= 0x40;
+        }
+        else
+        {
+            pbPrivateKey = (PBYTE) pbEncodedPrivateKey;
+            cbPrivateKey = cbEncodedPrivateKey;
         }
     }
 
     scError = SymCryptEckeySetValue(
         pbPrivateKey, cbPrivateKey,
         pbPublicKey, cbPublicKey,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+        numFormat,
         pointFormat,
         SYMCRYPT_FLAG_ECKEY_ECDH,
         keyCtx->key);
@@ -561,10 +611,21 @@ cleanup:
         keyCtx->key != NULL)
     {
         SymCryptEckeyFree(keyCtx->key);
+        keyCtx->key = NULL;
+    }
+
+    // X25519 needs to copy and decode the private key, other ECC needs
+    // to copy and decode the public key.
+    if (keyCtx->isX25519)
+    {
+        OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
+    }
+    else
+    {
+        OPENSSL_free(pbPublicKey);
     }
 
     EC_GROUP_free(ecGroup);
-    OPENSSL_free(pbPublicKey);
     EC_POINT_free(ecPoint);
     BN_CTX_free(bnCtx);
 
