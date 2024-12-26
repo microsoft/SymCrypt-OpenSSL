@@ -276,6 +276,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unus
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
     keyCtx->conversionFormat = genCtx->conversionFormat;
+    keyCtx->key = NULL;
 
     if (p_scossl_ecc_gen(keyCtx) != SCOSSL_SUCCESS)
     {
@@ -946,7 +947,7 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int select
                 goto cleanup;
             }
 
-            cbPrivateKey = SymCryptEckeySizeofPrivateKey(keyCtx->key);
+            cbPrivateKey = p_scossl_ecc_get_encoded_key_size(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY);
             if ((pbPrivateKey = OPENSSL_secure_malloc(cbPrivateKey)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -960,7 +961,7 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int select
             }
         }
 
-        ret = p_scossl_ecc_set_encoded_key(keyCtx, selection,
+        ret = p_scossl_ecc_set_encoded_key(keyCtx,
             pbEncodedPublicKey, cbEncodedPublicKey,
             pbPrivateKey, cbPrivateKey);
 
