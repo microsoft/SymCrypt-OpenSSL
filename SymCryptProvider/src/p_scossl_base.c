@@ -196,8 +196,10 @@ static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("mlkem768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
     TLS_GROUP_ENTRY("mlkem1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
     TLS_GROUP_ENTRY("secp256r1mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
+    TLS_GROUP_ENTRY("P256mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
     TLS_GROUP_ENTRY("x25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
-    TLS_GROUP_ENTRY("secp384r1mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
+    TLS_GROUP_ENTRY("secp384r1mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024),
+    TLS_GROUP_ENTRY("P384mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -218,22 +220,22 @@ extern const OSSL_DISPATCH p_scossl_cshake_128_functions[];
 extern const OSSL_DISPATCH p_scossl_cshake_256_functions[];
 
 static const OSSL_ALGORITHM p_scossl_digest[] = {
-    ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", p_scossl_md5_functions),
-    ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", p_scossl_sha1_functions),
-    ALG("SHA2-224:SHA-224:SHA224:2.16.840.1.101.3.4.2.4", p_scossl_sha224_functions),
-    ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", p_scossl_sha256_functions),
-    ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", p_scossl_sha384_functions),
-    ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", p_scossl_sha512_functions),
-    ALG("SHA2-512/224:SHA-512/224:SHA512-224:2.16.840.1.101.3.4.2.5", p_scossl_sha512_224_functions),
-    ALG("SHA2-512/256:SHA-512/256:SHA512-256:2.16.840.1.101.3.4.2.6", p_scossl_sha512_256_functions),
-    ALG("SHA3-224:2.16.840.1.101.3.4.2.7", p_scossl_sha3_224_functions),
-    ALG("SHA3-256:2.16.840.1.101.3.4.2.8", p_scossl_sha3_256_functions),
-    ALG("SHA3-384:2.16.840.1.101.3.4.2.9", p_scossl_sha3_384_functions),
-    ALG("SHA3-512:2.16.840.1.101.3.4.2.10", p_scossl_sha3_512_functions),
-    ALG("SHAKE-128:SHAKE128:2.16.840.1.101.3.4.2.11", p_scossl_shake_128_functions),
-    ALG("SHAKE-256:SHAKE256:2.16.840.1.101.3.4.2.12", p_scossl_shake_256_functions),
-    ALG("CSHAKE-128:CSHAKE128", p_scossl_cshake_128_functions),
-    ALG("CSHAKE-256:CSHAKE256", p_scossl_cshake_256_functions),
+    ALG(SCOSSL_ALG_NAME_MD5, p_scossl_md5_functions),
+    ALG(SCOSSL_ALG_NAME_SHA1, p_scossl_sha1_functions),
+    ALG(SCOSSL_ALG_NAME_SHA224, p_scossl_sha224_functions),
+    ALG(SCOSSL_ALG_NAME_SHA256, p_scossl_sha256_functions),
+    ALG(SCOSSL_ALG_NAME_SHA384, p_scossl_sha384_functions),
+    ALG(SCOSSL_ALG_NAME_SHA512, p_scossl_sha512_functions),
+    ALG(SCOSSL_ALG_NAME_SHA512_224, p_scossl_sha512_224_functions),
+    ALG(SCOSSL_ALG_NAME_SHA512_256, p_scossl_sha512_256_functions),
+    ALG(SCOSSL_ALG_NAME_SHA3_224, p_scossl_sha3_224_functions),
+    ALG(SCOSSL_ALG_NAME_SHA3_256, p_scossl_sha3_256_functions),
+    ALG(SCOSSL_ALG_NAME_SHA3_384, p_scossl_sha3_384_functions),
+    ALG(SCOSSL_ALG_NAME_SHA3_512, p_scossl_sha3_512_functions),
+    ALG(SCOSSL_ALG_NAME_SHAKE128, p_scossl_shake_128_functions),
+    ALG(SCOSSL_ALG_NAME_SHAKE256, p_scossl_shake_256_functions),
+    ALG(SCOSSL_ALG_NAME_CSHAKE128, p_scossl_cshake_128_functions),
+    ALG(SCOSSL_ALG_NAME_CSHAKE256, p_scossl_cshake_256_functions),
     ALG_TABLE_END};
 
 // Cipher
