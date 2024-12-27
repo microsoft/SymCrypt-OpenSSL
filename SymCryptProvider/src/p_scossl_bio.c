@@ -78,30 +78,30 @@ static int p_scossl_bio_core_puts(BIO *bio, const char *str)
 _Use_decl_annotations_
 void p_scossl_set_core_bio(const OSSL_DISPATCH *dispatch)
 {
-    for (const OSSL_DISPATCH *coreFns = dispatch; coreFns->function_id != 0; coreFns++)
+    for (; dispatch->function_id != 0; dispatch++)
     {
-        switch (coreFns->function_id)
+        switch (dispatch->function_id)
         {
         case OSSL_FUNC_BIO_READ_EX:
-            core_bio_read_ex = (OSSL_FUNC_BIO_read_ex_fn *)coreFns->function;
+            core_bio_read_ex = (OSSL_FUNC_BIO_read_ex_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_WRITE_EX:
-            core_bio_write_ex = (OSSL_FUNC_BIO_write_ex_fn *)coreFns->function;
+            core_bio_write_ex = (OSSL_FUNC_BIO_write_ex_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_UP_REF:
-            core_bio_up_ref = (OSSL_FUNC_BIO_up_ref_fn *)coreFns->function;
+            core_bio_up_ref = (OSSL_FUNC_BIO_up_ref_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_FREE:
-            core_bio_free = (OSSL_FUNC_BIO_free_fn *)coreFns->function;
+            core_bio_free = (OSSL_FUNC_BIO_free_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_PUTS:
-            core_bio_puts = (OSSL_FUNC_BIO_puts_fn *)coreFns->function;
+            core_bio_puts = (OSSL_FUNC_BIO_puts_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_GETS:
-            core_bio_gets = (OSSL_FUNC_BIO_gets_fn *)coreFns->function;
+            core_bio_gets = (OSSL_FUNC_BIO_gets_fn *)dispatch->function;
             break;
         case OSSL_FUNC_BIO_CTRL:
-            core_bio_ctrl = (OSSL_FUNC_BIO_ctrl_fn *)coreFns->function;
+            core_bio_ctrl = (OSSL_FUNC_BIO_ctrl_fn *)dispatch->function;
             break;
         }
     }

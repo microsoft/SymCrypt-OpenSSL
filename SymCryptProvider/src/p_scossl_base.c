@@ -12,6 +12,7 @@
 #include "p_scossl_bio.h"
 #include "p_scossl_keysinuse.h"
 #include "p_scossl_names.h"
+#include "kem/p_scossl_mlkem.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,23 +48,29 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_x25519mlkem768      0x11ec
 #define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024  0x11ed
 
-#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
-#define ALG_DECODER(algNames, name, decoderType) {       \
-    algNames,                                            \
-    "provider="P_SCOSSL_NAME                             \
-    ",fips=yes"                                          \
-    ",input=der"                                         \
-    ",structure="#decoderType,                           \
-    p_scossl_der_to_##name##_##decoderType##_functions,  \
+#define ALG(names, funcs) {     \
+    names,                      \
+    "provider="P_SCOSSL_NAME    \
+    ",fips=yes",                \
+    funcs,                      \
     NULL}
 
-#define ALG_ENCODER(algNames, name, encoderType, format) {            \
-    algNames,                                                         \
-    "provider="P_SCOSSL_NAME                                          \
-    ",fips=yes"                                                       \
-    ",output="#format                                                 \
-    ",structure="#encoderType,                                        \
-    p_scossl_##name##_to_##encoderType##_##format##_functions,        \
+#define ALG_DECODER(algNames, name, decoderType) {      \
+    algNames,                                           \
+    "provider="P_SCOSSL_NAME                            \
+    ",fips=yes"                                         \
+    ",input=der"                                        \
+    ",structure="#decoderType,                          \
+    p_scossl_der_to_##name##_##decoderType##_functions, \
+    NULL}
+
+#define ALG_ENCODER(algNames, name, encoderType, format) {      \
+    algNames,                                                   \
+    "provider="P_SCOSSL_NAME                                    \
+    ",fips=yes"                                                 \
+    ",output="#format                                           \
+    ",structure="#encoderType,                                  \
+    p_scossl_##name##_to_##encoderType##_##format##_functions,  \
     NULL}
 
 #define ALG_TEXT_ENCODER(algNames, name) { \
@@ -160,17 +167,17 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
-#define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) { \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)), \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)), \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_ALG, algorithm, sizeof(algorithm)), \
-    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_ID, (unsigned int *)&group_info.groupId), \
+#define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) {                                     \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)),                   \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)),        \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_ALG, algorithm, sizeof(algorithm)),                \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_ID, (unsigned int *)&group_info.groupId),                 \
     OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, (unsigned int *)&group_info.securityBits), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),       \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls),                       \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls),                       \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls),                      \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls),                      \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),                        \
     OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;
@@ -358,12 +365,12 @@ static const OSSL_ALGORITHM p_scossl_keyexch[] = {
     ALG_TABLE_END};
 
 // Signature
-extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
-    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
     ALG(SCOSSL_ALG_NAME_ECDSA, p_scossl_ecdsa_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher
@@ -410,17 +417,7 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
-    if (OBJ_create(SCOSSL_OID_MLKEM512, SCOSSL_SN_MLKEM512, SCOSSL_SN_MLKEM512) == NID_undef ||
-        OBJ_create(SCOSSL_OID_MLKEM768, SCOSSL_SN_MLKEM768, SCOSSL_SN_MLKEM768) == NID_undef ||
-        OBJ_create(SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_SN_MLKEM1024) == NID_undef ||
-        OBJ_create(SCOSSL_OID_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768) == NID_undef ||
-        OBJ_create(SCOSSL_OID_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768) == NID_undef ||
-        OBJ_create(SCOSSL_OID_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024) == NID_undef)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
+    return p_scossl_mlkem_register_algorithms();
 }
 
 static int p_scossl_get_status()
@@ -716,12 +713,19 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     p_ctx->handle = handle;
     p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
-    for (const OSSL_DISPATCH *coreFns = in; coreFns->function_id != 0; coreFns++)
+    p_scossl_set_core_bio(in);
+    if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
     {
-        switch(coreFns->function_id)
+        OPENSSL_free(p_ctx);
+        return SCOSSL_FAILURE;
+    }
+
+    for (; in->function_id != 0; in++)
+    {
+        switch(in->function_id)
         {
         case OSSL_FUNC_CORE_GET_PARAMS:
-            core_get_params = OSSL_FUNC_core_get_params(coreFns);
+            core_get_params = OSSL_FUNC_core_get_params(in);
             break;
         }
     }
@@ -738,7 +742,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
             goto cleanup;
         }
-
         scossl_prov_initialized = 1;
     }
 
@@ -746,7 +749,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
     {
         OPENSSL_free(p_ctx);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
     *provctx = p_ctx;
 

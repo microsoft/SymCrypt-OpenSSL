@@ -13,47 +13,11 @@
 extern "C" {
 #endif
 
-
-typedef struct {
-    int nid;
-    const char *groupName;
-} SCOSSL_DECODE_MLKEM_PARAM_MAP;
-
-static SCOSSL_DECODE_MLKEM_PARAM_MAP p_scossl_decode_mlkem_param_maps[] = {
-    {-1, SCOSSL_SN_MLKEM512},
-    {-1, SCOSSL_SN_MLKEM768},
-    {-1, SCOSSL_SN_MLKEM1024},
-    {-1, SCOSSL_SN_P256_MLKEM768},
-    {-1, SCOSSL_SN_X25519_MLKEM768},
-    {-1, SCOSSL_SN_P384_MLKEM1024}};
-
-static const char *p_scossl_decode_mlkem_obj_to_groupname(const ASN1_OBJECT *obj)
-{
-    int nid = OBJ_obj2nid(obj);
-
-    if (nid != -1)
-    {
-        for (size_t i = 0; i < sizeof(p_scossl_decode_mlkem_param_maps) / sizeof(OSSL_ITEM); i++)
-        {
-            if (p_scossl_decode_mlkem_param_maps[i].nid == -1)
-            {
-                p_scossl_decode_mlkem_param_maps[i].nid = OBJ_sn2nid(p_scossl_decode_mlkem_param_maps[i].groupName);
-            }
-
-            if (p_scossl_decode_mlkem_param_maps[i].nid == nid)
-            {
-                return p_scossl_decode_mlkem_param_maps[i].groupName;
-            }
-        }
-    }
-
-    return NULL;
-}
-
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key(_In_ SCOSSL_DECODE_CTX *ctx, _In_ const ASN1_OBJECT *algorithm, int selection,
                                                        _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey)
 {
     const char *groupName;
+    int nid;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
@@ -65,8 +29,8 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key(_In_ SCOSSL_DECODE_CTX *c
 
     keyCtx->provCtx = ctx->provctx;
 
-    groupName = p_scossl_decode_mlkem_obj_to_groupname(algorithm);
-    if (groupName == NULL ||
+    if ((nid = OBJ_obj2nid(algorithm)) < 0 ||
+        (groupName = OBJ_nid2sn(nid)) == NULL ||
         p_scossl_mlkem_keymgmt_set_group(keyCtx, groupName) != SCOSSL_SUCCESS)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
@@ -123,7 +87,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_
         goto cleanup;
     }
 
-    if (ASN1_item_d2i_bio(p_scossl_decode_get_pubkey_asn1_item(), bio, (ASN1_VALUE **)&subjPubKeyInfo) == NULL)
+    if (ASN1_item_d2i_bio(ASN1_ITEM_rptr(SUBJECT_PUBKEY_INFO), bio, (ASN1_VALUE **)&subjPubKeyInfo) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ASN1_R_DECODE_ERROR);
         goto cleanup;

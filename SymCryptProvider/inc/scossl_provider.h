@@ -32,16 +32,8 @@ extern "C" {
 #define SCOSSL_SRTP_LABEL_SALTING "salting"
 
 //
-// Hybrid PQ parameters
-//
-#define SCOSSL_PKEY_PARAM_CLASSIC_PRIV_KEY              "classic-priv"
-#define SCOSSL_PKEY_PARAM_CLASSIC_PUB_KEY               "classic-pub"
-#define SCOSSL_PKEY_PARAM_CLASSIC_ENCODED_PUBLIC_KEY    "classic-encoded-pub-key"
-
-//
 // Extended algorithms not found in default OpenSSL implementation
 //
-
 #define SCOSSL_SN_MLKEM512      "mlkem512"
 #define SCOSSL_OID_MLKEM512     "2.16.840.1.101.3.4.4.1"
 

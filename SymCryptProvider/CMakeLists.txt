@@ -21,21 +21,21 @@ set(SCOSSL_SOURCES
     ./src/ciphers/p_scossl_aes.c
     ./src/ciphers/p_scossl_aes_aead.c
     ./src/ciphers/p_scossl_aes_xts.c
+    ./src/decoder/p_scossl_decode_common.c
+    ./src/decoder/p_scossl_decode_mlkem.c
     ./src/digests/p_scossl_digest_common.c
     ./src/digests/p_scossl_digest_generic.c
     ./src/digests/p_scossl_shake.c
     ./src/digests/p_scossl_cshake.c
-    ./src/decoder/p_scossl_decode_common.c
-    ./src/decoder/p_scossl_decode_mlkem.c
     ./src/encoder/p_scossl_encode_common.c
     ./src/encoder/p_scossl_encode_mlkem.c
-    ./src/kem/p_scossl_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_srtpkdf.c
     ./src/kdf/p_scossl_sshkdf.c
     ./src/kdf/p_scossl_sskdf.c
     ./src/kdf/p_scossl_tls1prf.c
+    ./src/kem/p_scossl_mlkem.c
     ./src/keyexch/p_scossl_dh.c
     ./src/keyexch/p_scossl_ecdh.c
     ./src/keyexch/p_scossl_kdf_keyexch.c

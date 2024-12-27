@@ -51,8 +51,6 @@ SCOSSL_STATUS p_scossl_decode(_In_ SCOSSL_DECODE_CTX *ctx, _In_ OSSL_CORE_BIO *i
                               _In_ OSSL_CALLBACK *dataCb, _In_ void *dataCbArg,
                               ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArg);
 
-const ASN1_ITEM *p_scossl_decode_get_pubkey_asn1_item();
-
 #ifdef __cplusplus
 }
 #endif
