@@ -21,6 +21,8 @@ typedef struct {
     SCOSSL_ECC_KEY_CTX *classicKeyCtx;
 } SCOSSL_MLKEM_KEY_CTX;
 
+SCOSSL_STATUS p_scossl_mlkem_register_algorithms();
+
 #ifdef __cplusplus
 }
 #endif

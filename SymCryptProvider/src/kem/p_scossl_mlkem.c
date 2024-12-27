@@ -2,6 +2,7 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_provider.h"
 #include "p_scossl_base.h"
 #include "kem/p_scossl_mlkem.h"
 #include "keyexch/p_scossl_ecdh.h"
@@ -462,6 +463,21 @@ const OSSL_DISPATCH p_scossl_mlkem_functions[] = {
     {OSSL_FUNC_KEM_GET_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_get_ctx_params},
     {OSSL_FUNC_KEM_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_ctx_param_types},
     {0, NULL}};
+
+SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
+{
+    if (OBJ_create(SCOSSL_OID_MLKEM512, SCOSSL_SN_MLKEM512, SCOSSL_SN_MLKEM512) == NID_undef ||
+        OBJ_create(SCOSSL_OID_MLKEM768, SCOSSL_SN_MLKEM768, SCOSSL_SN_MLKEM768) == NID_undef ||
+        OBJ_create(SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_SN_MLKEM1024) == NID_undef ||
+        OBJ_create(SCOSSL_OID_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768) == NID_undef ||
+        OBJ_create(SCOSSL_OID_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768) == NID_undef ||
+        OBJ_create(SCOSSL_OID_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024) == NID_undef)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
 
 #ifdef __cplusplus
 }

@@ -5,7 +5,6 @@
 #include "scossl_provider.h"
 #include "kem/p_scossl_mlkem.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
-#include "keymgmt/p_scossl_ecc_keymgmt.h"
 
 #include <openssl/core_names.h>
 #include <openssl/param_build.h>
@@ -19,9 +18,6 @@ extern "C" {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),           \
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),                      \
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),                     \
-    OSSL_PARAM_octet_string(SCOSSL_PKEY_PARAM_CLASSIC_ENCODED_PUBLIC_KEY, NULL, 0), \
-    OSSL_PARAM_octet_string(SCOSSL_PKEY_PARAM_CLASSIC_PUB_KEY, NULL, 0),            \
-    OSSL_PARAM_octet_string(SCOSSL_PKEY_PARAM_CLASSIC_PRIV_KEY, NULL, 0),           \
 
 static const OSSL_PARAM p_scossl_mlkem_keygen_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
@@ -29,7 +25,6 @@ static const OSSL_PARAM p_scossl_mlkem_keygen_settable_param_types[] = {
 
 static const OSSL_PARAM p_scossl_mlkem_keymgmt_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
-    OSSL_PARAM_octet_string(SCOSSL_PKEY_PARAM_CLASSIC_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_mlkem_keymgmt_gettable_param_types[] = {

@@ -5,7 +5,6 @@
 #include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
 #include "keymgmt/p_scossl_ecc_impexp_types.h"
-#include "keymgmt/p_scossl_ecc_keymgmt.h"
 
 #include <openssl/param_build.h>
 #include <openssl/proverr.h>
@@ -17,6 +16,14 @@ extern "C" {
 #define SCOSSL_X25519_MAX_SIZE (32)
 #define SCOSSL_ECC_DEFAULT_DIGEST SN_sha256
 #define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
+
+typedef struct
+{
+    OSSL_LIB_CTX *libctx;
+    PCSYMCRYPT_ECURVE curve;
+    BOOL isX25519;
+    point_conversion_form_t conversionFormat;
+} SCOSSL_ECC_KEYGEN_CTX;
 
 // ScOSSL only supports named curves
 static const OSSL_PARAM p_scossl_ecc_keygen_settable_param_types[] = {
@@ -84,8 +91,7 @@ static point_conversion_form_t p_scossl_ecc_keymgmt_conversion_name_to_id(_In_ c
 // the size of the SYMCRYPT_ECKEY depends on parameters that aren't
 // known until import, no key is actually allocated here.
 
-_Use_decl_annotations_
-SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(SCOSSL_PROVCTX *provctx)
+static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_new_ctx(provctx);
     if (keyCtx != NULL)
@@ -98,8 +104,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(SCOSSL_PROVCTX *provctx)
     return keyCtx;
 }
 
-_Use_decl_annotations_
-SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(SCOSSL_PROVCTX *provctx)
+static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_new_ctx(provctx);
     if (keyCtx != NULL)
@@ -200,8 +205,7 @@ static const OSSL_PARAM *p_scossl_ecc_keygen_settable_params(ossl_unused void *g
     return p_scossl_ecc_keygen_settable_param_types;
 }
 
-_Use_decl_annotations_
-void p_scossl_ecc_keygen_cleanup(SCOSSL_ECC_KEYGEN_CTX *genCtx)
+static void p_scossl_ecc_keygen_cleanup(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx)
 {
     OPENSSL_free(genCtx);
 }
@@ -229,16 +233,14 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCT
     return genCtx;
 }
 
-_Use_decl_annotations_
-SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(SCOSSL_PROVCTX *provctx, ossl_unused int selection,
-                                                const OSSL_PARAM params[])
+static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
+                                                       _In_ const OSSL_PARAM params[])
 {
     return p_scossl_ecc_common_keygen_init(provctx, selection, params, FALSE);
 }
 
-_Use_decl_annotations_
-SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(SCOSSL_PROVCTX *provctx, ossl_unused int selection,
-                                                   const OSSL_PARAM params[])
+static SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
+                                                          _In_ const OSSL_PARAM params[])
 {
     SCOSSL_ECC_KEYGEN_CTX *genCtx = p_scossl_ecc_common_keygen_init(provctx, selection, params, TRUE);
     // Always set curve to X25519
@@ -250,8 +252,7 @@ SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(SCOSSL_PROVCTX *provctx, ossl
     return genCtx;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keygen_set_template(SCOSSL_ECC_KEYGEN_CTX *genCtx, SCOSSL_ECC_KEY_CTX *tmplCtx)
+static SCOSSL_STATUS p_scossl_ecc_keygen_set_template(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx, SCOSSL_ECC_KEY_CTX *tmplCtx)
 {
     if (tmplCtx == NULL || tmplCtx->curve == NULL)
     {
@@ -262,8 +263,7 @@ SCOSSL_STATUS p_scossl_ecc_keygen_set_template(SCOSSL_ECC_KEYGEN_CTX *genCtx, SC
     return SCOSSL_SUCCESS;
 }
 
-_Use_decl_annotations_
-SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
+static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (keyCtx == NULL)
@@ -366,8 +366,7 @@ cleanup:
     return ret;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(SCOSSL_ECC_KEY_CTX *keyCtx, OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, _Inout_ OSSL_PARAM params[])
 {
     PBYTE pbEncodedKey = NULL;
     PBYTE  pbPrivateKey = NULL;
@@ -528,8 +527,7 @@ static const OSSL_PARAM *p_scossl_x25519_keymgmt_gettable_params(ossl_unused voi
     return p_scossl_x25519_keymgmt_gettable_param_types;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(SCOSSL_ECC_KEY_CTX *keyCtx, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
 {
     EC_GROUP *ecGroup = NULL;
     PBYTE  encodedPoint = NULL;
@@ -660,8 +658,7 @@ static const OSSL_PARAM *p_scossl_ecc_keymgmt_settable_params(ossl_unused void *
     return p_scossl_ecc_keymgmt_settable_param_types;
 }
 
-_Use_decl_annotations_
-BOOL p_scossl_ecc_keymgmt_has(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
+static BOOL p_scossl_ecc_keymgmt_has(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
     BOOL hasSelection = TRUE;
 
@@ -692,8 +689,7 @@ BOOL p_scossl_ecc_keymgmt_has(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 
 // Key checking is handled by SymCrypt, and the curves are valid named curves. This function
 // just needs to check whether the data indicated by selection has been set.
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keymgmt_validate(SCOSSL_ECC_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_validate(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
 {
     SCOSSL_STATUS success = SCOSSL_SUCCESS;
 
@@ -705,9 +701,8 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_validate(SCOSSL_ECC_KEY_CTX *keyCtx, int sele
     return success;
 }
 
-_Use_decl_annotations_
-BOOL p_scossl_ecc_keymgmt_match(SCOSSL_ECC_KEY_CTX *keyCtx1, SCOSSL_ECC_KEY_CTX *keyCtx2,
-                                int selection)
+static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SCOSSL_ECC_KEY_CTX *keyCtx2,
+                                       int selection)
 {
     BOOL ret = FALSE;
     PBYTE pbPrivateKey1 = NULL;
@@ -846,14 +841,13 @@ static const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_types(int selection)
     return p_scossl_ecc_keymgmt_impexp_param_types[idx];
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int selection, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     EC_GROUP *ecGroup = NULL;
     PCSYMCRYPT_ECURVE pCurve;
-    PCBYTE pbEncodedPublicKey = NULL;
-    SIZE_T cbEncodedPublicKey = 0;
+    PCBYTE pbPublicKey = NULL;
+    SIZE_T cbPublicKey = 0;
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
     BIGNUM *bnPrivateKey = NULL;
@@ -926,7 +920,7 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int select
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL &&
-            !OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbEncodedPublicKey, &cbEncodedPublicKey))
+            !OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbPublicKey, &cbPublicKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
@@ -961,8 +955,9 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int select
             }
         }
 
-        ret = p_scossl_ecc_set_encoded_key(keyCtx,
-            pbEncodedPublicKey, cbEncodedPublicKey,
+        ret = p_scossl_ecc_set_encoded_key(
+            keyCtx,
+            pbPublicKey, cbPublicKey,
             pbPrivateKey, cbPrivateKey);
 
         if (ret != SCOSSL_SUCCESS)
@@ -978,21 +973,17 @@ SCOSSL_STATUS p_scossl_ecc_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int select
 
     ret = SCOSSL_SUCCESS;
 cleanup:
-    if (pbPrivateKey != NULL)
-    {
-        OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
-    }
-    EC_GROUP_free(ecGroup);
+    OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
     BN_clear_free(bnPrivateKey);
+    EC_GROUP_free(ecGroup);
     EC_POINT_free(ecPoint);
     BN_CTX_free(bnCtx);
 
     return ret;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_keymgmt_export(SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
-                                          OSSL_CALLBACK *param_cb, void *cbarg)
+static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                                 _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM_BLD *bld = NULL;
@@ -1089,8 +1080,7 @@ static const OSSL_PARAM *p_scossl_x25519_keymgmt_impexp_types(int selection)
     return (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0 ? NULL : p_scossl_x25519_keymgmt_impexp_param_types;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_x25519_keymgmt_import(SCOSSL_ECC_KEY_CTX *keyCtx, int selection, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -1171,9 +1161,8 @@ cleanup:
     return ret;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_x25519_keymgmt_export(SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
-                                             OSSL_CALLBACK *param_cb, void *cbarg)
+static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                                    _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;

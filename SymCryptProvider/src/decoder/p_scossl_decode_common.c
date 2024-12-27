@@ -2,19 +2,19 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "p_scossl_bio.h"
-#include "decoder/p_scossl_decode_common.h"
-
 #include <openssl/asn1t.h>
 #include <openssl/core_object.h>
+
+#include "p_scossl_bio.h"
+#include "decoder/p_scossl_decode_common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 ASN1_NDEF_SEQUENCE(SUBJECT_PUBKEY_INFO) = {
-        ASN1_SIMPLE(SUBJECT_PUBKEY_INFO, algorithm, X509_ALGOR),
-        ASN1_SIMPLE(SUBJECT_PUBKEY_INFO, subjectPublicKey, ASN1_BIT_STRING),
+    ASN1_SIMPLE(SUBJECT_PUBKEY_INFO, algorithm, X509_ALGOR),
+    ASN1_SIMPLE(SUBJECT_PUBKEY_INFO, subjectPublicKey, ASN1_BIT_STRING),
 } ASN1_SEQUENCE_END(SUBJECT_PUBKEY_INFO)
 
 IMPLEMENT_ASN1_FUNCTIONS(SUBJECT_PUBKEY_INFO)
@@ -65,7 +65,6 @@ BOOL p_scossl_decode_does_selection(SCOSSL_DECODE_KEYTYPE_DESC *desc, int select
 
     // Supporting private key implies supporting public key.
     // Both imply supporting key parameters
-
     return ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 && (desc->selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0) ||
            ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 && (desc->selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)   ||
            ((selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0 && (desc->selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0);
@@ -112,11 +111,6 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
     ctx->desc->freeKeyCtx(keyCtx);
 
     return ret;
-}
-
-const ASN1_ITEM *p_scossl_decode_get_pubkey_asn1_item()
-{
-    return ASN1_ITEM_rptr(SUBJECT_PUBKEY_INFO);
 }
 
 #ifdef __cplusplus

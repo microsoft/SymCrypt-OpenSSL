@@ -53,7 +53,7 @@ SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int 
                                            _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
 SCOSSL_STATUS p_scossl_ecc_set_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                            _In_reads_bytes_opt_(cbEncodedPublicKey) PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
-                                           _In_reads_bytes_opt_(cbPrivateKey) PCBYTE pbPrivateKey, SIZE_T cbPrivateKey);
+                                           _In_reads_bytes_opt_(cbEncodedPrivateKey) PCBYTE pbEncodedPrivateKey, SIZE_T cbEncodedPrivateKey);
 
 #ifdef KEYSINUSE_ENABLED
 void p_scossl_ecc_init_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
