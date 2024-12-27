@@ -24,7 +24,8 @@ static SCOSSL_DECODE_MLKEM_PARAM_MAP p_scossl_decode_mlkem_param_maps[] = {
     {-1, SCOSSL_SN_MLKEM768},
     {-1, SCOSSL_SN_MLKEM1024},
     {-1, SCOSSL_SN_P256_MLKEM768},
-    {-1, SCOSSL_SN_X25519_MLKEM768}};
+    {-1, SCOSSL_SN_X25519_MLKEM768},
+    {-1, SCOSSL_SN_P384_MLKEM1024}};
 
 static const char *p_scossl_decode_mlkem_obj_to_groupname(const ASN1_OBJECT *obj)
 {
