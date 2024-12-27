@@ -140,6 +140,10 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _Out_writes_bytes_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen)
 {
+    PBYTE pbMlkemCipherText = NULL;
+    PBYTE pbClassicKey = NULL;
+    PBYTE pbMlkemSecret = NULL;
+    PBYTE pbClassicSecret = NULL;
     SIZE_T cbClassicKey = 0;
     SIZE_T cbMlkemCiphertext = 0;
     SIZE_T cbClassicSecret = 0;
@@ -189,25 +193,23 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
     if (out != NULL)
     {
-        if ((outlen != NULL && *outlen < cbClassicKey + cbMlkemCiphertext) ||
-            (secretlen != NULL && *secretlen < cbClassicSecret + SYMCRYPT_MLKEM_SECRET_LENGTH))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-            goto cleanup;
-        }
-
-        scError = SymCryptMlKemEncapsulate(ctx->keyCtx->key, secret, SYMCRYPT_MLKEM_SECRET_LENGTH, out, cbMlkemCiphertext);
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            goto cleanup;
-        }
-
-        out += cbMlkemCiphertext;
-        secret += SYMCRYPT_MLKEM_SECRET_LENGTH;
-
         if (ctx->keyCtx->classicGroupName != NULL)
         {
+            if (classicKeyCtxPeer->isX25519)
+            {
+                pbMlkemCipherText = out;
+                pbClassicKey = out + cbMlkemCiphertext;
+                pbMlkemSecret = secret;
+                pbClassicSecret = secret + SYMCRYPT_MLKEM_SECRET_LENGTH;
+            }
+            else
+            {
+                pbClassicKey = out;
+                pbMlkemCipherText = out + cbClassicKey;
+                pbClassicSecret = secret ;
+                pbMlkemSecret = secret + cbClassicSecret;
+            }
+
             // Generate ephemeral ECDH key
             if ((classicKeyCtxPrivate = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
             {
@@ -222,7 +224,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             }
 
             // Write encoded public key bytes
-            if (p_scossl_ecc_get_encoded_key(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &out, &cbClassicKey) != SCOSSL_SUCCESS)
+            if (p_scossl_ecc_get_encoded_key(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -230,10 +232,29 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             // Derive ECDH secret
             if (p_scossl_mlkem_classic_keyexch_init(ctx, classicKeyCtxPrivate) != SCOSSL_SUCCESS ||
                 p_scossl_ecdh_set_peer(ctx->classicKeyexchCtx, classicKeyCtxPeer) != SCOSSL_SUCCESS ||
-                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, secret, &cbClassicSecret, *secretlen) != SCOSSL_SUCCESS)
+                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, pbClassicSecret, &cbClassicSecret, *secretlen - SYMCRYPT_MLKEM_SECRET_LENGTH) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
+        }
+        else
+        {
+            pbMlkemCipherText = out;
+            pbMlkemSecret = secret;
+        }
+
+        if ((outlen != NULL && *outlen < cbClassicKey + cbMlkemCiphertext) ||
+            (secretlen != NULL && *secretlen < cbClassicSecret + SYMCRYPT_MLKEM_SECRET_LENGTH))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            goto cleanup;
+        }
+
+        scError = SymCryptMlKemEncapsulate(ctx->keyCtx->key, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH, pbMlkemCipherText, cbMlkemCiphertext);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
         }
     }
     else if (outlen == NULL && secretlen == NULL)
@@ -281,6 +302,10 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
+    PCBYTE pbMlkemCipherText = NULL;
+    PCBYTE pbClassicKey = NULL;
+    PBYTE pbMlkemSecret = NULL;
+    PBYTE pbClassicSecret = NULL;
     SIZE_T cbClassicKey = 0;
     SIZE_T cbMlkemCiphertext = 0;
     SIZE_T cbClassicSecret = 0;
@@ -342,18 +367,23 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             goto cleanup;
         }
 
-        scError = SymCryptMlKemDecapsulate(ctx->keyCtx->key, in, cbMlkemCiphertext, out, SYMCRYPT_MLKEM_SECRET_LENGTH);
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-            goto cleanup;
-        }
-
-        in += cbMlkemCiphertext;
-        out += SYMCRYPT_MLKEM_SECRET_LENGTH;
-
         if (ctx->keyCtx->classicGroupName != NULL)
         {
+            if (classicKeyCtxPrivate->isX25519)
+            {
+                pbMlkemCipherText = in;
+                pbClassicKey = in + cbMlkemCiphertext;
+                pbMlkemSecret = out;
+                pbClassicSecret = out + SYMCRYPT_MLKEM_SECRET_LENGTH;
+            }
+            else
+            {
+                pbClassicKey = in;
+                pbMlkemCipherText = in + cbClassicKey;
+                pbClassicSecret = out;
+                pbMlkemSecret = out + cbClassicSecret;
+            }
+
             // Extract ECDH public key from in
             if ((classicKeyCtxPeer = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
             {
@@ -362,17 +392,24 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             }
 
             if (p_scossl_ecc_set_group(classicKeyCtxPeer, ctx->keyCtx->classicGroupName) != SCOSSL_SUCCESS ||
-                p_scossl_ecc_set_encoded_key(classicKeyCtxPeer, in, cbClassicKey, NULL, 0) != SCOSSL_SUCCESS)
+                p_scossl_ecc_set_encoded_key(classicKeyCtxPeer, pbClassicKey, cbClassicKey, NULL, 0) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
             // Derive shared ECDH secret
             if (p_scossl_ecdh_set_peer(ctx->classicKeyexchCtx, classicKeyCtxPeer) != SCOSSL_SUCCESS ||
-                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, out, &cbClassicSecret, *outlen - SYMCRYPT_MLKEM_SECRET_LENGTH) != SCOSSL_SUCCESS)
+                p_scossl_ecdh_derive(ctx->classicKeyexchCtx, pbClassicSecret, &cbClassicSecret, *outlen - SYMCRYPT_MLKEM_SECRET_LENGTH) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
+        }
+
+        scError = SymCryptMlKemDecapsulate(ctx->keyCtx->key, pbMlkemCipherText, cbMlkemCiphertext, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            goto cleanup;
         }
     }
     else if (outlen == NULL)

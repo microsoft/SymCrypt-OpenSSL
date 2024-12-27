@@ -45,6 +45,7 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_mlkem1024           0x0202
 #define SCOSSL_TLS_GROUP_ID_secp256r1mlkem768   0x11eb
 #define SCOSSL_TLS_GROUP_ID_x25519mlkem768      0x11ec
+#define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024  0x11ed
 
 #define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_DECODER(algNames, name, decoderType) {       \
@@ -154,6 +155,11 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519mlkem768 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
+    SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024, 256, 1,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
 #define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) { \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)), \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)), \
@@ -190,7 +196,8 @@ static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("mlkem768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
     TLS_GROUP_ENTRY("mlkem1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
     TLS_GROUP_ENTRY("secp256r1mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
-    TLS_GROUP_ENTRY("x25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768)};
+    TLS_GROUP_ENTRY("x25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
+    TLS_GROUP_ENTRY("secp384r1mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -405,7 +412,8 @@ static SCOSSL_STATUS p_scossl_register_extended_algorithms()
         OBJ_create(SCOSSL_OID_MLKEM768, SCOSSL_SN_MLKEM768, SCOSSL_SN_MLKEM768) == NID_undef ||
         OBJ_create(SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_SN_MLKEM1024) == NID_undef ||
         OBJ_create(SCOSSL_OID_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768) == NID_undef ||
-        OBJ_create(SCOSSL_OID_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768) == NID_undef)
+        OBJ_create(SCOSSL_OID_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768) == NID_undef ||
+        OBJ_create(SCOSSL_OID_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024) == NID_undef)
     {
         return SCOSSL_FAILURE;
     }

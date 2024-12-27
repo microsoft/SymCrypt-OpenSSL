@@ -885,19 +885,28 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    pbMlKemKey = pbKey;
-    pbClassicKey = pbKey + cbMlKemKey;
-
     if (keyCtx->classicKeyCtx != NULL &&
-        p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, selection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
+        keyCtx->classicKeyCtx->isX25519)
     {
-        goto cleanup;
+        pbMlKemKey = pbKey;
+        pbClassicKey = pbKey + cbMlKemKey;
+    }
+    else
+    {
+        pbClassicKey = pbKey;
+        pbMlKemKey = pbKey + cbClassicKey;
     }
 
     scError = SymCryptMlKemkeyGetValue(keyCtx->key, pbMlKemKey, cbMlKemKey, format, 0);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        goto cleanup;
+    }
+
+    if (keyCtx->classicKeyCtx != NULL &&
+        p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, selection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
+    {
         goto cleanup;
     }
 
@@ -976,8 +985,17 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
         goto cleanup;
     }
 
-    pbMlKemKey = pbKey;
-    pbClassicKey = pbKey + cbMlKemKey;
+    if (keyCtx->classicKeyCtx != NULL &&
+        keyCtx->classicKeyCtx->isX25519)
+    {
+        pbMlKemKey = pbKey;
+        pbClassicKey = pbKey + cbMlKemKey;
+    }
+    else
+    {
+        pbClassicKey = pbKey;
+        pbMlKemKey = pbKey + cbClassicKey;
+    }
 
     scError = SymCryptMlKemkeySetValue(pbMlKemKey, cbMlKemKey, keyCtx->format, 0, keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
@@ -1049,6 +1067,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_group(SCOSSL_MLKEM_KEY_CTX *keyCtx, con
         keyCtx->groupName = SCOSSL_SN_X25519_MLKEM768;
         keyCtx->mlkemParams =  SYMCRYPT_MLKEM_PARAMS_MLKEM768;
         keyCtx->classicGroupName = SN_X25519;
+    }
+    else if (OPENSSL_strcasecmp(groupName, SCOSSL_SN_P384_MLKEM1024) == 0)
+    {
+        keyCtx->groupName = SCOSSL_SN_P384_MLKEM1024;
+        keyCtx->mlkemParams =  SYMCRYPT_MLKEM_PARAMS_MLKEM1024;
+        keyCtx->classicGroupName = SN_secp384r1;
     }
     else
     {
