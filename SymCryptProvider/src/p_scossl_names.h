@@ -13,7 +13,6 @@ extern "C" {
 //
 
 // Digests
-
 #define SCOSSL_ALG_NAME_MD5 SN_md5"SSL3-MD5:1.2.840.113549.2.5"
 #define SCOSSL_ALG_NAME_SHA1 SN_sha1"SHA-1:SSL3-SHA1:1.3.14.3.2.26"
 #define SCOSSL_ALG_NAME_SHA224 SN_sha224"SHA2-224:SHA-224:2.16.840.1.101.3.4.2.4"
@@ -86,7 +85,13 @@ extern "C" {
 
 // Key encapsulation
 #define SCOSSL_ALG_NAME_MLKEM           "MLKEM"
-#define SCOSSL_ALG_NAME_MLKEM_DECODER   SCOSSL_ALG_NAME_MLKEM":"SCOSSL_SN_MLKEM512":"SCOSSL_OID_MLKEM512":"SCOSSL_SN_MLKEM768":"SCOSSL_OID_MLKEM768":"SCOSSL_SN_MLKEM1024":"SCOSSL_OID_MLKEM1024
+#define SCOSSL_ALG_NAME_MLKEM_DECODER   SCOSSL_ALG_NAME_MLKEM":"    \
+                                        SCOSSL_SN_MLKEM512":"       \
+                                        SCOSSL_OID_MLKEM512":"      \
+                                        SCOSSL_SN_MLKEM768":"       \
+                                        SCOSSL_OID_MLKEM768":"      \
+                                        SCOSSL_SN_MLKEM1024":"      \
+                                        SCOSSL_OID_MLKEM1024
 
 #ifdef __cplusplus
 }

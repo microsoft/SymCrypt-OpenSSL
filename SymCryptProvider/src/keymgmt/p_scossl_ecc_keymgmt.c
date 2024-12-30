@@ -4,7 +4,7 @@
 
 #include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
-#include "keymgmt/p_scossl_ecc_impexp_types.h"
+#include "p_scossl_ecc_keymgmt.h"
 
 #include <openssl/param_build.h>
 #include <openssl/proverr.h>

@@ -3,7 +3,7 @@
 //
 
 #include "scossl_provider.h"
-#include "encoder/p_scossl_encode_common.h"
+#include "p_scossl_encode_common.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
 
 #include <openssl/asn1t.h>
@@ -18,14 +18,7 @@ extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
 
 static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
-    int nid = OBJ_sn2nid(keyCtx->groupName);
-
-    if (nid != NID_undef)
-    {
-        return OBJ_nid2obj(nid);
-    }
-
-    return NULL;
+    return keyCtx->groupInfo != NULL ? OBJ_nid2obj(keyCtx->groupInfo->nid) : NULL;
 }
 
 static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
@@ -151,8 +144,7 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                                _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                                ossl_unused int selection,
-                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs,
-                                                               BOOL encodeToPem)
+                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
     int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
@@ -184,7 +176,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCOD
         goto cleanup;
     }
 
-    if (encodeToPem)
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
     {
         encodeSuccess = PEM_write_bio_PKCS8(out, p8);
     }
@@ -212,16 +204,15 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                       _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                       ossl_unused int selection,
-                                                      _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs,
-                                                      BOOL encodeToPem)
+                                                      _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
     int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-    if (ctx->cipherIntent)
+    if (ctx->cipher != NULL)
     {
-        return p_scossl_mlkem_to_EncryptedPrivateKeyInfo(ctx, out, keyCtx, selection, passphraseCb, passphraseCbArgs, encodeToPem);
+        return p_scossl_mlkem_to_EncryptedPrivateKeyInfo(ctx, out, keyCtx, selection, passphraseCb, passphraseCbArgs);
     }
 
     if ((p8Info = p_scossl_mlkem_key_to_p8info(keyCtx)) == NULL)
@@ -229,7 +220,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
         goto cleanup;
     }
 
-    if (encodeToPem)
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
     {
         encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
     }
@@ -255,8 +246,7 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(ossl_unused SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                             _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                             ossl_unused int selection,
-                                                            ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs,
-                                                            BOOL encodeToPem)
+                                                            ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
     int encodeSuccess;
     X509_PUBKEY *pubKey = NULL;
@@ -267,7 +257,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(ossl_unused SCOSSL_E
         goto cleanup;
     }
 
-    if (encodeToPem)
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
     {
         encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
     }
@@ -293,8 +283,7 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                             _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                             int selection,
-                                            ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs,
-                                            ossl_unused BOOL encodeToPem)
+                                            ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
     BOOL printPrivateSeed = FALSE;
     BOOL printDecapsulationKey = FALSE;
@@ -384,7 +373,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         }
     }
 
-    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupName) <= 0)
+    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupInfo->groupName) <= 0)
     {
         goto cleanup;
     }
@@ -410,57 +399,66 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_encoder_import_object(_In_ SCOSSL_EN
     return keyCtx;
 }
 
-#define MAKE_MLKEM_ENCODER(decoderType)                                                                           \
-    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##decoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)          \
+#define MAKE_MLKEM_ASN1_ENCODER(encoderType)                                                                      \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_##encoderType##_der_desc = {                                 \
+        select_##encoderType,                                                                                     \
+        SCOSSL_ENCODE_DER,                                                                                        \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##encoderType};                                             \
+                                                                                                                  \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_##encoderType##_pem_desc = {                                 \
+        select_##encoderType,                                                                                     \
+        SCOSSL_ENCODE_PEM,                                                                                        \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##encoderType};                                             \
+                                                                                                                  \
+    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)          \
     {                                                                                                             \
-        return p_scossl_encode_newctx(provctx, select_##decoderType,                                              \
-            SCOSSL_ENCODE_DER,                                                                                    \
-            (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##decoderType);                                         \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_##encoderType##_der_desc);                         \
     }                                                                                                             \
                                                                                                                   \
-    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##decoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)          \
+    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)          \
     {                                                                                                             \
-        return p_scossl_encode_newctx(provctx, select_##decoderType,                                              \
-            SCOSSL_ENCODE_PEM,                                                                                    \
-            (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##decoderType);                                         \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_##encoderType##_pem_desc);                         \
     }                                                                                                             \
                                                                                                                   \
-    static BOOL p_scossl_der_to_mlkem_##decoderType##_does_selection(ossl_unused void *provctx, int selection)    \
+    static BOOL p_scossl_der_to_mlkem_##encoderType##_does_selection(ossl_unused void *provctx, int selection)    \
     {                                                                                                             \
-        return p_scossl_encode_does_selection(select_##decoderType, selection);                                   \
+        return p_scossl_encode_does_selection(&p_scossl_mlkem_##encoderType##_der_desc, selection);               \
     }                                                                                                             \
                                                                                                                   \
-    const OSSL_DISPATCH p_scossl_mlkem_to_##decoderType##_der_functions[] = {                                     \
-        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##decoderType##_der_newctx},                 \
+    const OSSL_DISPATCH p_scossl_mlkem_to_##encoderType##_der_functions[] = {                                     \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##encoderType##_der_newctx},                 \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                     \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                       \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},             \
-        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##decoderType##_does_selection}, \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##encoderType##_does_selection}, \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                              \
         {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mlkem_encoder_import_object},                  \
         {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},                     \
         {0, NULL}};                                                                                               \
                                                                                                                   \
-    const OSSL_DISPATCH p_scossl_mlkem_to_##decoderType##_pem_functions[] = {                                     \
-        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##decoderType##_pem_newctx},                 \
+    const OSSL_DISPATCH p_scossl_mlkem_to_##encoderType##_pem_functions[] = {                                     \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##encoderType##_pem_newctx},                 \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                     \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                       \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},             \
-        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##decoderType##_does_selection}, \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##encoderType##_does_selection}, \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                              \
         {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mlkem_encoder_import_object},                  \
         {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},                     \
         {0, NULL}};
 
-MAKE_MLKEM_ENCODER(PrivateKeyInfo)
-MAKE_MLKEM_ENCODER(EncryptedPrivateKeyInfo)
-MAKE_MLKEM_ENCODER(SubjectPublicKeyInfo)
+MAKE_MLKEM_ASN1_ENCODER(PrivateKeyInfo)
+MAKE_MLKEM_ASN1_ENCODER(EncryptedPrivateKeyInfo)
+MAKE_MLKEM_ASN1_ENCODER(SubjectPublicKeyInfo)
+
+static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_text_desc = {
+    0,
+    SCOSSL_ENCODE_TEXT,
+    (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_text};
 
 static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_text_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    return p_scossl_encode_newctx(provctx, 0,
-        SCOSSL_ENCODE_TEXT,
-        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_text);
+    return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_text_desc);
 }
 
 const OSSL_DISPATCH p_scossl_mlkem_to_text_functions[] = {
