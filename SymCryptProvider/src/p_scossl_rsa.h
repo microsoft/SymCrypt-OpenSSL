@@ -34,7 +34,7 @@ typedef struct
 #endif
 } SCOSSL_PROV_RSA_KEY_CTX;
 
-const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx,
+const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx, UINT padding,
                                                _In_ const char *mdname, _In_ const char *propq,
                                                _Out_opt_ EVP_MD **md);
 

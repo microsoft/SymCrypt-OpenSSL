@@ -403,9 +403,13 @@ BOOL scossl_is_md_supported(int mdnid)
     switch (mdnid)
     {
     case NID_sha1:
+    case NID_sha224:
     case NID_sha256:
     case NID_sha384:
     case NID_sha512:
+    case NID_sha512_224:
+    case NID_sha512_256:
+    case NID_sha3_224:
     case NID_sha3_256:
     case NID_sha3_384:
     case NID_sha3_512:
@@ -421,12 +425,20 @@ PCSYMCRYPT_MAC scossl_get_symcrypt_hmac_algorithm(int mdnid)
     {
     case NID_sha1:
         return SymCryptHmacSha1Algorithm;
+    case NID_sha224:
+        return SymCryptHmacSha224Algorithm;
     case NID_sha256:
         return SymCryptHmacSha256Algorithm;
     case NID_sha384:
         return SymCryptHmacSha384Algorithm;
     case NID_sha512:
         return SymCryptHmacSha512Algorithm;
+    case NID_sha512_224:
+        return SymCryptHmacSha512_224Algorithm;
+    case NID_sha512_256:
+        return SymCryptHmacSha512_256Algorithm;
+    case NID_sha3_224:
+        return SymCryptHmacSha3_224Algorithm;
     case NID_sha3_256:
         return SymCryptHmacSha3_256Algorithm;
     case NID_sha3_384:
@@ -445,12 +457,20 @@ PCSYMCRYPT_HASH scossl_get_symcrypt_hash_algorithm(int mdnid)
     {
     case NID_sha1:
         return SymCryptSha1Algorithm;
+    case NID_sha224:
+        return SymCryptSha224Algorithm;
     case NID_sha256:
         return SymCryptSha256Algorithm;
     case NID_sha384:
         return SymCryptSha384Algorithm;
     case NID_sha512:
         return SymCryptSha512Algorithm;
+    case NID_sha512_224:
+        return SymCryptSha512_224Algorithm;
+    case NID_sha512_256:
+        return SymCryptSha512_256Algorithm;
+    case NID_sha3_224:
+        return SymCryptSha3_224Algorithm;
     case NID_sha3_256:
         return SymCryptSha3_256Algorithm;
     case NID_sha3_384:
@@ -470,6 +490,10 @@ int scossl_get_mdnid_from_symcrypt_hash_algorithm(PCSYMCRYPT_HASH symCryptHash)
     {
         return NID_sha1;
     }
+    else if (symCryptHash == SymCryptSha224Algorithm)
+    {
+        return NID_sha224;
+    }
     else if (symCryptHash == SymCryptSha256Algorithm)
     {
         return NID_sha256;
@@ -481,6 +505,18 @@ int scossl_get_mdnid_from_symcrypt_hash_algorithm(PCSYMCRYPT_HASH symCryptHash)
     else if (symCryptHash == SymCryptSha512Algorithm)
     {
         return NID_sha512;
+    }
+    else if (symCryptHash == SymCryptSha512_224Algorithm)
+    {
+        return NID_sha512_224;
+    }
+    else if (symCryptHash == SymCryptSha512_256Algorithm)
+    {
+        return NID_sha512_256;
+    }
+    else if (symCryptHash == SymCryptSha3_224Algorithm)
+    {
+        return NID_sha3_224;
     }
     else if (symCryptHash == SymCryptSha3_256Algorithm)
     {

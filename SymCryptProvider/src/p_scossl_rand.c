@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-const BYTE dummy_scossl_ctx = 0;
+static const BYTE dummy_scossl_ctx = 0;
 
 static const OSSL_PARAM gettable_ctx_param_types[] = {
     OSSL_PARAM_int(OSSL_RAND_PARAM_STATE, NULL),

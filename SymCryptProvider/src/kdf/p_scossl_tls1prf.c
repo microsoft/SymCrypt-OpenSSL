@@ -2,24 +2,13 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/proverr.h>
+#include "kdf/p_scossl_tls1prf.h"
 
-#include "scossl_tls1prf.h"
-#include "p_scossl_base.h"
+#include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    // Needed for fetching md
-    OSSL_LIB_CTX *libctx;
-
-    // Purely informational
-    char *mdName;
-
-    SCOSSL_TLS1_PRF_CTX *tls1prfCtx;
-} SCOSSL_PROV_TLS1_PRF_CTX;
 
 static const OSSL_PARAM p_scossl_tls1prf_gettable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
@@ -34,8 +23,6 @@ static const OSSL_PARAM p_scossl_tls1prf_settable_ctx_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SECRET, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SEED, NULL, 0),
     OSSL_PARAM_END};
-
-SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -83,7 +70,7 @@ SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_dupctx(_In_ SCOSSL_PROV_TLS1_PRF_CTX 
     return copyCtx;
 }
 
-SCOSSL_STATUS p_scossl_tls1prf_reset(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
+static SCOSSL_STATUS p_scossl_tls1prf_reset(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
 {
     OPENSSL_free(ctx->mdName);
     ctx->mdName = NULL;

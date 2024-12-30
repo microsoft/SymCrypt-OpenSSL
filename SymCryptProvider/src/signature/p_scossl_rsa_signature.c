@@ -225,6 +225,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
@@ -245,19 +246,19 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         goto err;
     }
 
-    if (ctx->mdInfo == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-        goto err;
-    }
-
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        ret = scossl_rsa_pkcs1_sign(ctx->keyCtx->key, mdnid, tbs, tbslen, sig, siglen);
         break;
     case RSA_PKCS1_PSS_PADDING:
-        ret = scossl_rsapss_sign(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        if (mdnid == NID_undef)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            goto err;
+        }
+
+        ret = scossl_rsapss_sign(ctx->keyCtx->key, mdnid, ctx->cbSalt, tbs, tbslen, sig, siglen);
         break;
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
@@ -279,6 +280,8 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
+    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
@@ -291,18 +294,18 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->mdInfo == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
-        return SCOSSL_FAILURE;
-    }
-
     switch (ctx->padding)
     {
     case RSA_PKCS1_PADDING:
-        return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, ctx->mdInfo->id, tbs, tbslen, sig, siglen);
+        return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, tbs, tbslen, sig, siglen);
     case RSA_PKCS1_PSS_PADDING:
-        return scossl_rsapss_verify(ctx->keyCtx->key, ctx->mdInfo->id, ctx->cbSalt, tbs, tbslen, sig, siglen);
+        if (mdnid == NID_undef)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+            return SCOSSL_FAILURE;
+        }
+
+        return scossl_rsapss_verify(ctx->keyCtx->key, mdnid, ctx->cbSalt, tbs, tbslen, sig, siglen);
     default:
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }
@@ -328,8 +331,8 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CT
             return SCOSSL_FAILURE;
         }
 
-        EVP_MD *md;
-        const OSSL_ITEM *mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdname, NULL, &md);
+        EVP_MD *md = NULL;
+        const OSSL_ITEM *mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdname, NULL, &md);
 
         if (mdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && mdInfo->id != ctx->mgf1MdInfo->id))
@@ -438,7 +441,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
     {
-        EVP_MD *md;
+        EVP_MD *md = NULL;
         const OSSL_ITEM *mdInfo;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
@@ -456,7 +459,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        mdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, &md);
         if (mdInfo == NULL ||
             (ctx->mgf1MdInfo != NULL && mdInfo->id != ctx->mgf1MdInfo->id))
         {
@@ -525,6 +528,15 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
              padding != RSA_PKCS1_PSS_PADDING))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_ILLEGAL_OR_UNSUPPORTED_PADDING_MODE);
+            return SCOSSL_FAILURE;
+        }
+
+        // MD5+SHA1 is only allowed for RSA_PKCS1_PADDING
+        if (padding != RSA_PKCS1_PADDING &&
+            ctx->mdInfo != NULL &&
+            ctx->mdInfo->id == NID_md5_sha1)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED);
             return SCOSSL_FAILURE;
         }
 
@@ -638,7 +650,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             return SCOSSL_FAILURE;
         }
 
-        EVP_MD *md;
+        EVP_MD *md = NULL;
         const OSSL_ITEM *mgf1MdInfo;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &mdName))
@@ -656,7 +668,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         }
 
         // ScOSSL does not support distinct MD and MGF1 MD
-        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, mdName, mdProps, &md);
+        mgf1MdInfo = p_scossl_rsa_get_supported_md(ctx->libctx, ctx->padding, mdName, mdProps, &md);
         if (mgf1MdInfo == NULL ||
             (ctx->mdInfo != NULL && mgf1MdInfo->id != ctx->mdInfo->id))
         {
@@ -879,6 +891,9 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
             case NID_sha1:
                 algNid = NID_sha1WithRSAEncryption;
                 break;
+            case NID_sha224:
+                algNid = NID_sha224WithRSAEncryption;
+                break;
             case NID_sha256:
                 algNid = NID_sha256WithRSAEncryption;
                 break;
@@ -887,6 +902,15 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, 
                 break;
             case NID_sha512:
                 algNid = NID_sha512WithRSAEncryption;
+                break;
+            case NID_sha512_224:
+                algNid = NID_sha512_224WithRSAEncryption;
+                break;
+            case NID_sha512_256:
+                algNid = NID_sha512_256WithRSAEncryption;
+                break;
+            case NID_sha3_224:
+                algNid = NID_RSA_SHA3_224;
                 break;
             case NID_sha3_256:
                 algNid = NID_RSA_SHA3_256;
