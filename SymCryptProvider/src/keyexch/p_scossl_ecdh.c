@@ -4,7 +4,7 @@
 
 #include "p_scossl_ecc.h"
 #include "p_scossl_base.h"
-#include "keyexch/p_scossl_ecdh.h"
+#include "p_scossl_ecdh.h"
 
 #include <openssl/proverr.h>
 

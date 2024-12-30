@@ -144,7 +144,7 @@ static const OSSL_PARAM p_scossl_ecc_impexp_types_0x0f[] = {
     SCOSSL_ECC_IMPEXP_OTHER_PARAMS
     OSSL_PARAM_END};
 
-const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_param_types[] = {
+static const OSSL_PARAM *p_scossl_ecc_keymgmt_impexp_param_types[] = {
     NULL,
     p_scossl_ecc_impexp_types_0x01,
     p_scossl_ecc_impexp_types_0x02,

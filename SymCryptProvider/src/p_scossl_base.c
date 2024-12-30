@@ -10,7 +10,6 @@
 #include "scossl_ecc.h"
 #include "scossl_provider.h"
 #include "p_scossl_bio.h"
-#include "p_scossl_keysinuse.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
 
@@ -697,7 +696,15 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    SCOSSL_PROVCTX *p_ctx = NULL;
+    SCOSSL_PROVCTX *p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    p_ctx->handle = handle;
+    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
     p_scossl_set_core_bio(in);
     if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
@@ -731,15 +738,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         scossl_prov_initialized = 1;
     }
 
-    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
-    if (p_ctx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return SCOSSL_FAILURE;
-    }
-
-    p_ctx->handle = handle;
-    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
     *provctx = p_ctx;
 
     *out = p_scossl_base_dispatch;

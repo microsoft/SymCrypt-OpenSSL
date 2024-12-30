@@ -4,11 +4,11 @@
 
 #pragma once
 
+#include "scossl_helpers.h"
+
 #include <openssl/bio.h>
 #include <openssl/core_names.h>
 #include <openssl/params.h>
-
-#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {
