@@ -203,7 +203,7 @@ static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("mlkem1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
     TLS_GROUP_ENTRY("secp256r1mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
     TLS_GROUP_ENTRY("P256mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
-    TLS_GROUP_ENTRY("x25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
+    TLS_GROUP_ENTRY("X25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
     TLS_GROUP_ENTRY("secp384r1mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024),
     TLS_GROUP_ENTRY("P384mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
 
