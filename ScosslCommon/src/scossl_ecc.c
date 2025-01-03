@@ -362,6 +362,15 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
         goto cleanup;
     }
 
+    if (pbS + cbS != pbSeq + cbSeq)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
+                         "Unexpected value in sequence");
+        SCOSSL_LOG_BYTES_DEBUG(SCOSSL_ERR_F_ECDSA_REMOVE_DER, ERR_R_PASSED_INVALID_ARGUMENT,
+                               "pbDerSignature", pbDerSignature, cbDerSignature);
+        goto cleanup;
+    }
+
     // Check R's validity
     if (((pbR[0] & 0x80) == 0x80) ||                                  // R is negative
         ((cbR > 1) && (pbR[0] == 0x00) && ((pbR[1] & 0x80) != 0x80))) // R is non-zero, and has a redundant leading 0 byte
@@ -411,6 +420,13 @@ static SCOSSL_STATUS scossl_ecdsa_remove_der(_In_reads_bytes_(cbDerSignature) PC
 cleanup:
     return res;
 }
+
+/*
+ECDSA-Sig-Value ::= SEQUENCE {
+    r INTEGER,
+    s INTEGER
+}
+*/
 
 // Quick hack function to generate precisely the DER encodings which we want for ECDSA signatures for the NIST prime curves
 // Takes 2 same-size big-endian integers output from SymCrypt and encodes them in the minimally sized (strict) equivalent DER encoding
