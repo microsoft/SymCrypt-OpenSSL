@@ -11,10 +11,11 @@ extern "C" {
 #endif
 
 // Constants defined SP800-132 that should be checked
-// unless the OSSL_KDF_PARAM_PKCS5 paremeter gets set
+// unless the OSSL_KDF_PARAM_PKCS5 parameter gets set
 #define SCOSSL_PBKDF2_MIN_KEY_LEN_BITS  (112)
 #define SCOSSL_PBKDF2_MIN_ITERATIONS (1000)
 #define SCOSSL_PBKDF2_MIN_SALT_LEN   (128 / 8)
+#define SCOSSL_PKCS5_DEFAULT_ITER    (2048)
 
 typedef struct {
     OSSL_LIB_CTX *libctx;
@@ -55,8 +56,8 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_newctx(SCOSSL_PROVCTX *provctx)
     {
         ctx->libctx = provctx->libctx;
         ctx->pMac = SymCryptHmacSha1Algorithm;
-        ctx->iterationCount = PKCS5_DEFAULT_ITER;
-        ctx->checkMinSizes = TRUE;
+        ctx->iterationCount = SCOSSL_PKCS5_DEFAULT_ITER;
+        ctx->checkMinSizes = FALSE;
     }
 
     return ctx;
@@ -67,7 +68,7 @@ void p_scossl_pbkdf2_freectx(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx)
     if (ctx == NULL)
         return;
 
-    SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_SRTPKDF_EXPANDED_KEY));
+    SymCryptWipeKnownSize(&ctx->expandedKey, sizeof(SYMCRYPT_PBKDF2_EXPANDED_KEY));
     OPENSSL_secure_clear_free(ctx->pbPassword, ctx->cbPassword);
     OPENSSL_free(ctx->pbSalt);
     OPENSSL_free(ctx);
@@ -84,6 +85,7 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
         copyCtx->pMac = ctx->pMac;
         copyCtx->iterationCount = ctx->iterationCount;
         copyCtx->checkMinSizes = ctx->checkMinSizes;
+        copyCtx->initialized = FALSE;
 
         if (ctx->pbPassword != NULL)
         {
@@ -95,21 +97,6 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
 
             memcpy(copyCtx->pbPassword, ctx->pbPassword, ctx->cbPassword);
             copyCtx->cbPassword = ctx->cbPassword;
-
-            if (copyCtx->pMac != NULL)
-            {
-                if (SymCryptPbkdf2ExpandKey(&copyCtx->expandedKey, copyCtx->pMac, copyCtx->pbPassword, copyCtx->cbPassword) != SYMCRYPT_NO_ERROR)
-                {
-                    ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-                    goto cleanup;
-                }
-
-                copyCtx->initialized = TRUE;
-            }
-            else
-            {
-                copyCtx->initialized = FALSE;
-            }
         }
         else
         {
