@@ -36,7 +36,7 @@ EVP_KDF_IMPL* e_scossl_sshkdf_new()
     EVP_KDF_IMPL *impl = OPENSSL_zalloc(sizeof(*impl));
 
     if (!impl) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_NEW, ERR_R_MALLOC_FAILURE,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_NEW, ERR_R_MALLOC_FAILURE,
             "OPENSSL_zalloc return NULL");
     }
 
@@ -67,8 +67,8 @@ static PCSYMCRYPT_HASH e_scossl_get_symcrypt_hash_algorithm(const EVP_MD *md)
         return SymCryptSha384Algorithm;
     if (type == NID_sha512)
         return SymCryptSha512Algorithm;
- 
-    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+
+    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
         "SymCrypt engine does not support hash algorithm %d", type);
 
     return NULL;
@@ -108,7 +108,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
             impl->pbKey = OPENSSL_memdup(buffer, length);
 
             if(!impl->pbKey) {
-                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_MALLOC_FAILURE,
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_CTRL, ERR_R_MALLOC_FAILURE,
                     "OPENSSL_memdup return NULL");
                 ret = SCOSSL_FAILURE;
             }
@@ -122,7 +122,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
             length = va_arg(args, size_t);
 
             if(length > sizeof(impl->pbHashValue)) {
-                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
                     "Hash value length too large");
                 ret = SCOSSL_FAILURE;
             }
@@ -136,7 +136,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
             length = va_arg(args, size_t);
 
             if(length > sizeof(impl->pbSessionId)) {
-                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
                     "Session ID length too large");
                 ret = SCOSSL_FAILURE;
             }
@@ -152,7 +152,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl(EVP_KDF_IMPL *impl, int cmd, va_list args)
                 impl->label = value;
             }
             else {
-                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_CTRL, ERR_R_INTERNAL_ERROR,
                     "Label out of range");
                 ret = SCOSSL_FAILURE;
             }
@@ -224,7 +224,7 @@ SCOSSL_STATUS e_scossl_sshkdf_ctrl_str(EVP_KDF_IMPL *impl, const char *type, con
         ret = e_scossl_sshkdf_call_ctrl(impl, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID, value, strlen(value));
     }
     else {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_CTRL_STR, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_CTRL_STR, ERR_R_INTERNAL_ERROR,
             "Unknown command %s", type);
     }
 
@@ -242,14 +242,14 @@ SCOSSL_STATUS e_scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, siz
     SYMCRYPT_ERROR scError;
 
     if(!impl->pHash) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
             "Missing Digest");
         ret = SCOSSL_FAILURE;
         goto end;
     }
 
     if(!impl->pbKey) {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
             "Missing Key");
         ret = SCOSSL_FAILURE;
         goto end;
@@ -263,7 +263,7 @@ SCOSSL_STATUS e_scossl_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *out, siz
                             out, out_len);
 
     if(scError != SYMCRYPT_NO_ERROR) {
-        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, SCOSSL_ERR_R_SYMCRYPT_FAILURE,
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_SSHKDF_DERIVE,
             "SymCryptSshKdf failed", scError);
         ret = SCOSSL_FAILURE;
     }

@@ -230,8 +230,8 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
         ctx->pMacEx = &SymCryptHmacSha3_512Ex;
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, SCOSSL_ERR_R_NOT_IMPLEMENTED,
-                         "SCOSSL does not support hash algorithm for MAC %d", mdNid);
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_SET_HMAC_MD, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+            "SCOSSL does not support hash algorithm for MAC %d", mdNid);
         return SCOSSL_FAILURE;
     }
 
@@ -304,17 +304,29 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
                               PCBYTE pbKey, SIZE_T cbKey)
 {
+    SYMCRYPT_ERROR scError;
+
     if (pbKey != NULL)
     {
         if (ctx->expandedKey == NULL)
         {
             SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+            if (expandedKey == NULL)
+            {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_INTERNAL_ERROR,
+                    "Failed to aligned allocated expanded key");
+                return SCOSSL_FAILURE;
+            }
+
             ctx->expandedKey = expandedKey;
         }
 
-        if (ctx->expandedKey == NULL ||
-            ctx->pMac->expandKeyFunc(ctx->expandedKey, pbKey, cbKey) != SYMCRYPT_NO_ERROR)
+        scError = ctx->pMac->expandKeyFunc(ctx->expandedKey, pbKey, cbKey);
+
+        if (scError != SYMCRYPT_NO_ERROR)
         {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_MAC_INIT,
+                "SymCryptMacExpandKey failed", scError);
             return SCOSSL_FAILURE;
         }
     }

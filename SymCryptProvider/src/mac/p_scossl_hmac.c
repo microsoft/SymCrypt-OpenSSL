@@ -195,7 +195,6 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
 
         if (!scossl_mac_init(ctx, pbMacKey, cbMacKey))
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
             goto cleanup;
         }
     }

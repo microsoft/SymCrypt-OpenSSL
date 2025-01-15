@@ -39,67 +39,111 @@ static ERR_STRING_DATA SCOSSL_ERR_library_string[] = {
     {0, NULL}
 };
 
+// ERR_put_error is deprecated in 3.0+. We replace the functionality with the equivalent
+// function calls in OpenSSL 3.0+. This macro currently exists as ERR_put_error in
+// the openssl/err.h but may be removed in the future.
+#if OPENSSL_API_LEVEL >= 30000
+#define SCOSSL_put_error(lib, func, reason, file, line) \
+    (ERR_new(),                                         \
+     ERR_set_debug(file, line, 0),                      \
+     ERR_set_error(lib, reason, NULL))
+#else
+#define SCOSSL_put_error(lib, func, reason, file, line) \
+    ERR_put_error(lib, func, reason, file, line)
+
 static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
+    // ScosslCommon
     {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_CIPHER, 0), "scossl_aes_ccm_cipher"},
-    {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_CTRL, 0), "scossl_aes_ccm_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_SET_IV_FIXED, 0), "scossl_aes_ccm_set_iv_fixed"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_SET_IV_LEN, 0), "scossl_aes_ccm_set_iv_len"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_SET_TLS1_AAD, 0), "scossl_aes_ccm_set_tls1_aad"},
     {ERR_PACK(0, SCOSSL_ERR_F_AES_CCM_TLS, 0), "scossl_aes_ccm_tls"},
-    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_CTRL, 0), "scossl_aes_gcm_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_CIPHER, 0), "scossl_aes_gcm_cipher"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_IV_GEN, 0), "scossl_aes_gcm_iv_gen"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_SET_IV_FIXED, 0), "scossl_aes_gcm_set_iv_fixed"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_SET_IV_INV, 0), "scossl_aes_gcm_set_iv_inv"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_SET_IV_LEN, 0), "scossl_aes_gcm_set_iv_len"},
+    {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_SET_TLS1_AAD, 0), "scossl_aes_gcm_set_tls1_aad"},
     {ERR_PACK(0, SCOSSL_ERR_F_AES_GCM_TLS, 0), "scossl_aes_gcm_tls"},
-    {ERR_PACK(0, SCOSSL_ERR_F_AES_XTS_CIPHER, 0), "scossl_aes_xts_cipher"},
-    {ERR_PACK(0, SCOSSL_ERR_F_AES_XTS_CTRL, 0), "scossl_aes_xts_ctrl"},
-    {ERR_PACK(0, SCOSSL_ERR_F_DH_COMPUTE_KEY, 0), "scossl_dh_compute_key"},
-    {ERR_PACK(0, SCOSSL_ERR_F_DH_GENERATE_KEY, 0), "scossl_dh_generate_key"},
     {ERR_PACK(0, SCOSSL_ERR_F_DH_GENERATE_KEYPAIR, 0), "scossl_dh_generate_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_DH_GET_GROUP_BY_NID, 0), "scossl_dh_get_group_by_nid"},
     {ERR_PACK(0, SCOSSL_ERR_F_DH_IMPORT_KEYPAIR, 0), "scossl_dh_import_keypair"},
-    {ERR_PACK(0, SCOSSL_ERR_F_DIGESTS, 0), "scossl_digests"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECC_GENERATE_KEYPAIR, 0), "scossl_ecc_generate_keypair"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECC_IMPORT_KEYPAIR, 0), "scossl_ecc_import_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ECC_GROUP_TO_SYMCRYPT_CURVE, 0), "scossl_ecc_group_to_symcrypt_curve"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ECC_POINT_TO_PUBKEY, 0), "scossl_ec_point_to_pubkey"},
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_APPLY_DER, 0), "scossl_ecdsa_apply_der"},
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_DER_CHECK_TAG_AND_GET_VALUE_AND_LENGTH, 0), "scossl_ecdsa_der_check_tag_and_get_value_and_length"},
     {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_REMOVE_DER, 0), "scossl_ecdsa_remove_der"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_COMPUTE_KEY, 0), "scossl_eckey_compute_key"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_KEYGEN, 0), "scossl_eckey_keygen"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_SIGN, 0), "scossl_eckey_sign"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_SIGN_SETUP, 0), "scossl_eckey_sign_setup"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_SIGN_SIG, 0), "scossl_eckey_sign_sig"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_VERIFY, 0), "scossl_eckey_verify"},
-    {ERR_PACK(0, SCOSSL_ERR_F_ECKEY_VERIFY_SIG, 0), "scossl_eckey_verify_sig"},
-    {ERR_PACK(0, SCOSSL_ERR_F_GET_DH_CONTEXT_EX, 0), "scossl_get_dh_context_ex"},
-    {ERR_PACK(0, SCOSSL_ERR_F_GET_ECC_CONTEXT_EX, 0), "scossl_get_ecc_context_ex"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_SIGN, 0), "scossl_ecdsa_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ECDSA_VERIFY, 0), "scossl_ecdsa_verify"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, 0), "scossl_get_symcrypt_hash_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, 0), "scossl_get_symcrypt_hmac_algorithm"},
-    {ERR_PACK(0, SCOSSL_ERR_F_HKDF_CTRL, 0), "scossl_hkdf_ctrl"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_DERIVE, 0), "scossl_hkdf_derive"},
-    {ERR_PACK(0, SCOSSL_ERR_F_HKDF_INIT, 0), "scossl_hkdf_init"},
-    {ERR_PACK(0, SCOSSL_ERR_F_INITIALIZE_RSA_KEY, 0), "scossl_initialize_rsa_key"},
-    {ERR_PACK(0, SCOSSL_ERR_F_PKEY_METHODS, 0), "scossl_pkey_methods"},
-    {ERR_PACK(0, SCOSSL_ERR_F_PKEY_RSA_SIGN, 0), "scossl_pkey_rsa_sign"},
-    {ERR_PACK(0, SCOSSL_ERR_F_PKEY_RSA_VERIFY, 0), "scossl_pkey_rsa_verify"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_INIT, 0), "scossl_rsa_init"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_KEYGEN, 0), "scossl_rsa_keygen"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PRIV_DEC, 0), "scossl_rsa_priv_dec"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PRIV_ENC, 0), "scossl_rsa_priv_enc"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PUB_DEC, 0), "scossl_rsa_pub_dec"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PUB_ENC, 0), "scossl_rsa_pub_enc"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_SIGN, 0), "scossl_rsa_sign"},
-    {ERR_PACK(0, SCOSSL_ERR_F_RSA_VERIFY, 0), "scossl_rsa_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_MAC_INIT, 0), "scossl_mac_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_MAC_SET_HMAC_MD, 0), "scossl_mac_set_hmac_md"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_DECRYPT, 0), "scossl_rsa_decrypt"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_ENCRYPT, 0), "scossl_rsa_encrypt"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_EXPORT_KEY, 0), "scossl_rsa_export_key"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_NEW_EXPORT_PARAMS, 0), "scossl_rsa_new_export_params"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PKCS1_SIGN, 0), "scossl_rsa_pkcs1_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_RSA_PKCS1_VERIFY, 0), "scossl_rsa_pkcs1_verify"},
     {ERR_PACK(0, SCOSSL_ERR_F_RSAPSS_SIGN, 0), "scossl_rsapss_sign"},
     {ERR_PACK(0, SCOSSL_ERR_F_RSAPSS_VERIFY, 0), "scossl_rsapss_verify"},
-    {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_CTRL, 0), "scossl_tls1prf_ctrl"},
-    {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_DERIVE, 0), "scossl_tls1prf_derive"},
-    {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_INIT, 0), "scossl_tls1prf_init"},
-    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_INIT, 0), "scossl_hmac_init"},
-    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL, 0), "scossl_hmac_ctrl"},
-    {ERR_PACK(0, SCOSSL_ERR_F_HMAC_CTRL_STR, 0), "scossl_hmac_ctrl_str"},
-    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_NEW, 0), "scossl_sshkdf_new"},
-    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_CTRL, 0), "scossl_sshkdf_ctrl"},
-    {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_CTRL_STR, 0), "scossl_sshkdf_ctrl_str"},
     {ERR_PACK(0, SCOSSL_ERR_F_SSHKDF_DERIVE, 0), "scossl_sshkdf_derive"},
+    {ERR_PACK(0, SCOSSL_ERR_F_TLS1PRF_DERIVE, 0), "scossl_tls1prf_derive"},
+    // SymCryptEngine
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_AES_CCM_CTRL, 0), "e_scossl_aes_ccm_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_AES_GCM_CTRL, 0), "e_scossl_aes_gcm_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_AES_XTS_CIPHER, 0), "e_scossl_aes_xts_cipher"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_AES_XTS_CTRL, 0), "e_scossl_aes_xts_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_DH_COMPUTE_KEY, 0), "e_scossl_dh_compute_key"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_DH_GENERATE_KEY, 0), "e_scossl_dh_generate_key"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_DH_GENERATE_KEYPAIR, 0), "e_scossl_dh_generate_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_DH_IMPORT_KEYPAIR, 0), "e_scossl_dh_import_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_DIGESTS, 0), "e_scossl_digests"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECC_GENERATE_KEYPAIR, 0), "e_scossl_ecc_generate_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECC_IMPORT_KEYPAIR, 0), "e_scossl_ecc_import_keypair"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_COMPUTE_KEY, 0), "e_scossl_eckey_compute_key"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_KEYGEN, 0), "e_scossl_eckey_keygen"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_SIGN, 0), "e_scossl_eckey_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_SIGN_SETUP, 0), "e_scossl_eckey_sign_setup"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_SIGN_SIG, 0), "e_scossl_eckey_sign_sig"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_VERIFY, 0), "e_scossl_eckey_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_ECKEY_VERIFY_SIG, 0), "e_scossl_eckey_verify_sig"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_GET_DH_CONTEXT_EX, 0), "e_scossl_get_dh_context_ex"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_GET_ECC_CONTEXT_EX, 0), "e_scossl_get_ecc_context_ex"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_GET_SYMCRYPT_HASH_ALGORITHM, 0), "e_scossl_get_symcrypt_hash_algorithm"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HKDF_CTRL, 0), "e_scossl_hkdf_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HKDF_DERIVE, 0), "e_scossl_hkdf_derive"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HKDF_INIT, 0), "e_scossl_hkdf_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HMAC_COPY, 0), "e_scossl_hmac_copy"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HMAC_CTRL, 0), "e_scossl_hmac_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_HMAC_INIT, 0), "e_scossl_hmac_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_INITIALIZE_RSA_KEY, 0), "e_scossl_initialize_rsa_key"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_PKEY_METHODS, 0), "e_scossl_pkey_methods"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_PKEY_RSA_SIGN, 0), "e_scossl_pkey_rsa_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_PKEY_RSA_VERIFY, 0), "e_scossl_pkey_rsa_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_PKEY_RSAPSS_VERIFY, 0), "e_scossl_pkey_rsapss_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_INIT, 0), "e_scossl_rsa_init"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_KEYGEN, 0), "e_scossl_rsa_keygen"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_PRIV_DEC, 0), "e_scossl_rsa_priv_dec"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_PRIV_ENC, 0), "e_scossl_rsa_priv_enc"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_PUB_DEC, 0), "e_scossl_rsa_pub_dec"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_PUB_ENC, 0), "e_scossl_rsa_pub_enc"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_SIGN, 0), "e_scossl_rsa_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSA_VERIFY, 0), "e_scossl_rsa_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSAPSS_SIGN, 0), "e_scossl_rsapss_sign"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_RSAPSS_VERIFY, 0), "e_scossl_rsapss_verify"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_SSHKDF_CTRL, 0), "e_scossl_sshkdf_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_SSHKDF_CTRL_STR, 0), "e_scossl_sshkdf_ctrl_str"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_SSHKDF_DERIVE, 0), "e_scossl_sshkdf_derive"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_SSHKDF_NEW, 0), "e_scossl_sshkdf_new"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_TLS1PRF_CTRL, 0), "e_scossl_tls1prf_ctrl"},
+    {ERR_PACK(0, SCOSSL_ERR_F_ENG_TLS1PRF_INIT, 0), "e_scossl_tls1prf_init"},
     {0, NULL}
 };
 
 C_ASSERT( (sizeof(SCOSSL_ERR_function_strings) / sizeof(ERR_STRING_DATA)) == SCOSSL_ERR_F_ENUM_END-SCOSSL_ERR_F_ENUM_START );
-
+#endif
 
 static ERR_STRING_DATA SCOSSL_ERR_reason_strings[] = {
     {ERR_PACK(0, 0, SCOSSL_ERR_R_MISSING_CTX_DATA), "Missing data in context"},
@@ -107,6 +151,7 @@ static ERR_STRING_DATA SCOSSL_ERR_reason_strings[] = {
     {ERR_PACK(0, 0, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM), "Algorithm not FIPS certifiable"},
     {ERR_PACK(0, 0, SCOSSL_ERR_R_OPENSSL_FALLBACK), "SCOSSL falling back to OpenSSL"},
     {ERR_PACK(0, 0, SCOSSL_ERR_R_SYMCRYPT_FAILURE), "SCOSSL triggered SymCrypt failure"},
+    {ERR_PACK(0, 0, SCOSSL_ERR_R_KEYSINUSE_FAILURE), "KeysInUse failure"},
     {0, NULL}
 };
 
@@ -121,9 +166,11 @@ void scossl_setup_logging()
         // Bind the library name "SCOSSL" to the library code
         SCOSSL_ERR_library_string[0].error = ERR_PACK(_scossl_err_library_code, 0, 0);
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_library_string);
-        ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_function_strings);
         ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_reason_strings);
 
+#if OPENSSL_API_LEVEL < 30000
+        ERR_load_strings(_scossl_err_library_code, SCOSSL_ERR_function_strings);
+#endif
         _loggingLock = CRYPTO_THREAD_lock_new();
         SCOSSL_set_trace_log_filename(NULL);
     }
@@ -225,7 +272,7 @@ static void _scossl_log_bytes_valist(
         if( _osslERRLogLevel >= trace_level )
         {
             // Log an OpenSSL error, so calling applications can handle the log appropriately
-            ERR_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
+            SCOSSL_put_error(_scossl_err_library_code, func_code, reason_code, file, line);
             // Add error string indicating the error details as error data
             ERR_add_error_data(1, paraBuf);
         }
@@ -275,53 +322,9 @@ void _scossl_log(
     va_end(args);
 }
 
-void _scossl_log_bignum(
-    int trace_level,
-    SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
-    const char *file,
-    int line,
-    char *description,
-    BIGNUM *bn)
-{
-    unsigned char *string = NULL;
-    int length = 0;
-
-    if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
-    {
-        return;
-    }
-
-    if( bn == NULL )
-    {
-        return;
-    }
-
-    length = BN_num_bytes(bn);
-    if( length < 0 )
-    {
-        return;
-    }
-
-    string = (unsigned char *)OPENSSL_zalloc(length);
-    if( string == NULL )
-    {
-        return;
-    }
-
-    if( BN_bn2bin(bn, string) < 0 )
-    {
-        return;
-    }
-
-    _scossl_log_bytes(trace_level, func_code, reason_code, file, line, (const char*) string, length, description);
-    OPENSSL_free(string);
-}
-
 void _scossl_log_SYMCRYPT_ERROR(
     int trace_level,
     SCOSSL_ERR_FUNC func_code,
-    SCOSSL_ERR_REASON reason_code,
     const char *file,
     int line,
     char *description,
@@ -392,7 +395,7 @@ void _scossl_log_SYMCRYPT_ERROR(
             scErrorString = "UNKNOWN SYMCRYPT_ERROR";
             break;
     }
-    _scossl_log(trace_level, func_code, reason_code, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
+    _scossl_log(trace_level, func_code, SCOSSL_ERR_R_SYMCRYPT_FAILURE, file, line, "%s - %s (0x%x)", description, scErrorString, scError);
 }
 
 BOOL scossl_is_md_supported(int mdnid)

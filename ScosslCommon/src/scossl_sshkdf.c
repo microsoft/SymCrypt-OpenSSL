@@ -65,28 +65,28 @@ SCOSSL_STATUS scossl_sshkdf_derive(SCOSSL_SSHKDF_CTX *ctx,
         ctx->cbHashValue == 0)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Digest");
+            "Missing Digest");
         return SCOSSL_FAILURE;
     }
 
     if (!ctx->pbKey)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Key");
+            "Missing Key");
         return SCOSSL_FAILURE;
     }
 
     if (ctx->cbSessionId == 0)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Session ID");
+            "Missing Session ID");
         return SCOSSL_FAILURE;
     }
 
     if (ctx->label == 0)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Missing Label");
+            "Missing Label");
         return SCOSSL_FAILURE;
     }
 
@@ -100,6 +100,8 @@ SCOSSL_STATUS scossl_sshkdf_derive(SCOSSL_SSHKDF_CTX *ctx,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_SSHKDF_DERIVE,
+            "SymCryptSshKdf failed", scError);
         return SCOSSL_FAILURE;
     }
 

@@ -191,8 +191,8 @@ void p_scossl_rsa_pss_restrictions_get_defaults(SCOSSL_RSA_PSS_RESTRICTIONS* pss
         pssRestrictions->mgf1MdInfo = &p_scossl_rsa_supported_mds[SCOSSL_PROV_RSA_PSS_DEFAULT_MD];
         pssRestrictions->cbSaltMin = SCOSSL_PROV_RSA_PSS_DEFAULT_SALTLEN_MIN;
     }
-}  
-  
+}
+
 #ifdef KEYSINUSE_ENABLED
 // KeyInUse requires the public key encoded in the same format as subjectPublicKey in a certificate.
 // This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.
@@ -213,16 +213,22 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
     int cbEncodedKey;
     SCOSSL_STATUS  ret = SCOSSL_FAILURE;
 
+    // KeysInUse related errors shouldn't surface to caller
+    ERR_set_mark();
+
     rsaParams = scossl_rsa_new_export_params(FALSE);
     if (rsaParams == NULL ||
         !scossl_rsa_export_key(key, rsaParams))
     {
+        SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+            "scossl_rsa_export_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
         goto cleanup;
     }
 
     if ((cbEncodedKey = i2d_SymcryptRsaPublicKey(rsaParams, &pbEncodedKey)) < 0)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+            "i2d_SymcryptRsaPublicKey failed: %s", ERR_error_string(ERR_get_error(), NULL));
         goto cleanup;
     }
 
@@ -232,6 +238,8 @@ SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(PCSYMCRYPT_RSAKEY key,
 
 cleanup:
     scossl_rsa_free_export_params(rsaParams, TRUE);
+
+    ERR_pop_to_mark();
 
     return ret;
 }

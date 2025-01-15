@@ -96,6 +96,8 @@ static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
+    SYMCRYPT_ERROR scError;
+
     ctx->encrypt = encrypt;
     ctx->cbBuf = 0;
 
@@ -106,10 +108,11 @@ static SCOSSL_STATUS p_scossl_aes_generic_init_internal(_Inout_ SCOSSL_AES_CTX *
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             return SCOSSL_FAILURE;
         }
-        SYMCRYPT_ERROR scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
+
+        scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptAesExpandKey failed", scError);
             return SCOSSL_FAILURE;
         }
     }
@@ -914,7 +917,7 @@ static SCOSSL_STATUS scossl_aes_cfb_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     {
         if (ctx->cbBuf != 0)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Unexpected partial block in buffer");
             return SCOSSL_FAILURE;
         }
 

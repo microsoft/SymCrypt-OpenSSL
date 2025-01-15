@@ -15,6 +15,11 @@
 extern "C" {
 #endif
 
+// SCOSSL provider debug logging
+#define CONF_LOGGING_FILE "logging_file"
+#define CONF_LOGGING_LEVEL "logging_level"
+#define CONF_ERROR_LEVEL "error_level"
+
 #ifdef KEYSINUSE_ENABLED
 #define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
 #define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
@@ -495,6 +500,61 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 }
 #endif
 
+static int p_scossl_level_string_to_id(_In_ const char *level)
+{
+    if (level == NULL)
+    {
+        return SCOSSL_LOG_LEVEL_NO_CHANGE;
+    }
+
+    if (OPENSSL_strcasecmp(level, "off") == 0)
+    {
+        return SCOSSL_LOG_LEVEL_OFF;
+    }
+    else if (OPENSSL_strcasecmp(level, "error") == 0)
+    {
+        return SCOSSL_LOG_LEVEL_ERROR;
+    }
+    else if (OPENSSL_strcasecmp(level, "info") == 0)
+    {
+        return SCOSSL_LOG_LEVEL_INFO;
+    }
+    else if (OPENSSL_strcasecmp(level, "debug") == 0)
+    {
+        return SCOSSL_LOG_LEVEL_DEBUG;
+    }
+
+    return SCOSSL_LOG_LEVEL_NO_CHANGE;
+}
+
+static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
+{
+    const char *confErrorLevel = NULL;
+    const char *confLoggingLevel = NULL;
+    const char *confLoggingFile = NULL;
+
+    OSSL_PARAM confParams[] = {
+        OSSL_PARAM_utf8_ptr(CONF_LOGGING_FILE, &confLoggingFile, 0),
+        OSSL_PARAM_utf8_ptr(CONF_LOGGING_LEVEL, &confLoggingLevel, 0),
+        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confLoggingLevel, 0),
+        OSSL_PARAM_END};
+
+    scossl_setup_logging();
+
+    if (core_get_params != NULL &&
+        core_get_params(handle, confParams))
+    {
+        if (confLoggingFile != NULL)
+        {
+            SCOSSL_set_trace_log_filename(confLoggingFile);
+        }
+
+        SCOSSL_set_trace_level(
+            p_scossl_level_string_to_id(confLoggingLevel),
+            p_scossl_level_string_to_id(confErrorLevel));
+    }
+}
+
 static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))p_scossl_teardown},
     {OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (void (*)(void))p_scossl_gettable_params},
@@ -520,7 +580,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
         }
     }
 
-    scossl_setup_logging();
+    p_scossl_setup_logging(handle);
 
     if (!scossl_prov_initialized)
     {

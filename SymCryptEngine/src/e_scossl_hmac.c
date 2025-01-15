@@ -19,8 +19,8 @@ SCOSSL_STATUS e_scossl_hmac_init(EVP_PKEY_CTX *ctx)
 
     if ((e_scossl_hmac_context = OPENSSL_zalloc(sizeof(SCOSSL_MAC_CTX))) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
-                         "OPENSSL_zalloc returned NULL");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HMAC_INIT, ERR_R_MALLOC_FAILURE,
+            "OPENSSL_zalloc returned NULL");
         return SCOSSL_FAILURE;
     }
 
@@ -52,8 +52,8 @@ SCOSSL_STATUS e_scossl_hmac_copy(EVP_PKEY_CTX *dst, const EVP_PKEY_CTX *src)
 
     if ((dst_ctx = scossl_mac_dupctx(src_ctx)) == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_INIT, ERR_R_MALLOC_FAILURE,
-                         "scossl_hmac_dupctx returned NULL");
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HMAC_COPY, ERR_R_MALLOC_FAILURE,
+            "scossl_hmac_dupctx returned NULL");
         return SCOSSL_FAILURE;
     }
 
@@ -96,7 +96,7 @@ SCOSSL_STATUS e_scossl_hmac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
         ret = scossl_mac_init(e_scossl_hmac_context, key->data, key->length);
         break;
     default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HMAC_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ENG_HMAC_CTRL, SCOSSL_ERR_R_NOT_IMPLEMENTED,
             "SymCrypt Engine does not support ctrl type (%d)", type);
         ret =  SCOSSL_UNSUPPORTED;
     }
