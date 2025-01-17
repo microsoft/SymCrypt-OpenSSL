@@ -959,10 +959,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             keyCtx,
             pbPublicKey, cbPublicKey,
             pbPrivateKey, cbPrivateKey);
-
         if (ret != SCOSSL_SUCCESS)
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
