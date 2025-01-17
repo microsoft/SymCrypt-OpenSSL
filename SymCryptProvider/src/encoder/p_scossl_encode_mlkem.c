@@ -59,7 +59,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
 
     if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mlkem_get_oid returned NULL");
         goto cleanup;
     }
 
@@ -113,7 +113,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
 
     if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mlkem_get_oid returned NULL");
         goto cleanup;
     }
 

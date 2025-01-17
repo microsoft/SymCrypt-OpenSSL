@@ -197,7 +197,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     scError = SymCryptMlKemSizeofCiphertextFromParams(groupInfo->mlkemParams, &cbMlkemCiphertext);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemSizeofCiphertextFromParams failed", scError);
         goto cleanup;
     }
 
@@ -263,7 +263,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         scError = SymCryptMlKemEncapsulate(ctx->keyCtx->key, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH, pbMlkemCipherText, cbMlkemCiphertext);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemEncapsulate failed", scError);
             goto cleanup;
         }
     }
@@ -366,7 +366,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     scError = SymCryptMlKemSizeofCiphertextFromParams(groupInfo->mlkemParams, &cbMlkemCiphertext);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemSizeofCiphertextFromParams failed", scError);
         goto cleanup;
     }
 
@@ -430,7 +430,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         scError = SymCryptMlKemDecapsulate(ctx->keyCtx->key, pbMlkemCipherText, cbMlkemCiphertext, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH);
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemDecapsulate failed", scError);
             goto cleanup;
         }
     }
