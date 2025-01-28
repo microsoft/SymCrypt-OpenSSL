@@ -540,7 +540,7 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
     OSSL_PARAM confParams[] = {
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_FILE, &confLoggingFile, 0),
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_LEVEL, &confLoggingLevel, 0),
-        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confLoggingLevel, 0),
+        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confErrorLevel, 0),
         OSSL_PARAM_END};
 
     scossl_setup_logging();
