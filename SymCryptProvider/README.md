@@ -1,7 +1,7 @@
 # SymCrypt Provider
 The SymCrypt provider implements the [OpenSSL provider interface](https://docs.openssl.org/3.0/man7/provider/) to supply cryptographic
 operations from SymCrypt to OpenSSL's libcrypto.so. The provider interface was added in OpenSSL 3 and has largely replaced the functionality
-of the engine interface. The SymCrypt provider will accept and forward all cryptographic operations it supports to SymCrypt.
+of the engine interface. For OpenSSL 1.1.1 and legacy function support in OpenSSL 3, see the [SymCrypt engine](../SymCryptEngine/).
 
 All cryptographic operations using the EVP APIs in OpenSSL 3 are handled by a provider. The deprecated legacy APIs, hardcoded with a specific
 algorithm name (e.g., RSA_*) will not use providers, and should not be used in OpenSSL 3. The OpenSSL implementations are found in the default
@@ -136,8 +136,9 @@ The SymCrypt provider can be configured in the SymCrypt provider section of the 
 ### KeysInUse Logging
 The SymCrypt provider optionally supports [KeysInUse logging](https://github.com/microsoft/KeysInUse-OpenSSL) for monitoring private key usage.
 The primary motivation is for application owners to keep inventory of which certificates and keys are actively being used on their machine.
-The feature is off by default and must be enabled by config. KeysInUse configuration is placed in a separate section. This section must
-be referenced in the symcrypt provider section with the `keysinuse` key.
+The feature is off by default and must be enabled by config. If you are building the SymCrypt provider from scratch, the feature also needs
+to be enabled at compile time by adding the `-DKEYSINUSE_ENABLED=1` to the cmake configuration step. KeysInUse configuration is placed in a
+separate section. This section must be referenced in the symcrypt provider section with the `keysinuse` key.
 | Key                   | Description                                                                                                                                   | Default   |
 | -                     | -                                                                                                                                             | -         |
 | enabled               | 0 or 1 to disable or enable keysinuse logging.                                                                                                | 0         |

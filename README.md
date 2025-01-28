@@ -4,7 +4,7 @@ The SymCrypt engine and provider for OpenSSL (SCOSSL) allow the use of OpenSSL w
 for core cryptographic operations. The primary motivation for this is to support FIPS certification, as vanilla OpenSSL 1.1.1 does not have a FIPS-certified
 cryptographic module, and the OpenSSL 3 fips module is not certified on the FIPS 140-3 standard.
 
-- [SymCrypt Engine](./SymCryptEngine/) 
+- [SymCrypt Engine](./SymCryptEngine/)  (OpenSSL 1.1.1)
 - [SymCrypt Provider](./SymCryptProvider/) (OpenSSL 3)
 
 ## Versioning and Servicing
