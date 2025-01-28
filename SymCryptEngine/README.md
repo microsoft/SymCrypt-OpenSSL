@@ -6,7 +6,7 @@ OpenSSL 1.1.1. Engines have been deprecated in OpenSSL 3 and have limited use fo
 [SymCrypt provider](../SymCryptProvider/), which serves a similar purpose to the SymCrypt engine in OpenSSL 3.
 
 Where possible the SymCrypt engine will direct OpenSSL API calls to the SymCrypt FIPS module. In cases where SymCrypt cannot (currently) 
-support anOpenSSL API, the best effort is made to fall-back to the default OpenSSL implementation of the given function. In a few cases 
+support an OpenSSL API, the best effort is made to fall-back to the default OpenSSL implementation of the given function. In a few cases 
 the engine will instead fail the call completely, as re-routing to OpenSSL's implementation is not always easy, and as with any project 
 we have to prioritize!
 

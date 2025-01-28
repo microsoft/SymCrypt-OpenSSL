@@ -110,7 +110,7 @@ symcrypt_provider = symcrypt_prov_sect
 [default_sect]
 activate=1
 
-.include /etc/symcrypt-openssl/symcrypt_provider
+.include /etc/symcrypt-openssl/symcrypt_provider.cnf
 
 ...
 ```
