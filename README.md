@@ -16,7 +16,7 @@ As of version 1.0.0, SCOSSL uses the versioning scheme defined by the [Semantic 
 - Patch version changes introduce backwards compatible bug fixes
 
 Regarding servicing, our strong recommendation is that distro vendors and application developers regularly
-update to the latest version of SymCrypt and SymCrypt engine for both security fixes and
+update to the latest version of SymCrypt and SymCrypt engine/provider for both security fixes and
 functionality/performance improvements.
 
 We will support long-term servicing of specific releases for security fixes. Details of this plan will be
