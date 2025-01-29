@@ -311,7 +311,11 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 #ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_teardown();
 #endif
-    OPENSSL_free(provctx);
+    if (provctx != NULL)
+    {
+        OSSL_LIB_CTX_free(provctx->libctx);
+        OPENSSL_free(provctx);
+    }
 }
 
 static const OSSL_PARAM *p_scossl_gettable_params(ossl_unused void *provctx)
@@ -536,7 +540,7 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
     OSSL_PARAM confParams[] = {
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_FILE, &confLoggingFile, 0),
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_LEVEL, &confLoggingLevel, 0),
-        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confLoggingLevel, 0),
+        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confErrorLevel, 0),
         OSSL_PARAM_END};
 
     scossl_setup_logging();
@@ -568,7 +572,17 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    SCOSSL_PROVCTX *p_ctx = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    SCOSSL_PROVCTX *p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    p_ctx->handle = handle;
+    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
     for (; in->function_id != 0; in++)
     {
@@ -589,20 +603,11 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
             !scossl_ecc_init_static())
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
         scossl_prov_initialized = 1;
     }
 
-    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
-    if (p_ctx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return SCOSSL_FAILURE;
-    }
-
-    p_ctx->handle = handle;
-    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
     *provctx = p_ctx;
 
     *out = p_scossl_base_dispatch;
@@ -615,7 +620,15 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     }
 #endif
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (ret != SCOSSL_SUCCESS)
+    {
+        p_scossl_teardown(p_ctx);
+    }
+
+    return ret;
 }
 
 #if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0

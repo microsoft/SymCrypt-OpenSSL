@@ -290,7 +290,7 @@ Title = ECDH tests (with random keys)
 
 # # ECDH Bob with Alice peer
 
-# Availablein = symcrypt
+# Availablein = symcryptprovider
 # Derive=BOB_secp160r1
 # PeerKey=ALICE_secp160r1_PUB
 # SharedSecret=87856536b6a295ea94d3e483d69c6212d5c7afcf

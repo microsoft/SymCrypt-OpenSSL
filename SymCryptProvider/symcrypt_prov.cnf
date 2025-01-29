@@ -10,6 +10,6 @@ identity = symcryptprovider
 keysinuse = keysinuse_sect
 
 [keysinuse_sect]
-enabled = 1
+enabled = 0
 max_file_size = 5KB
 logging_delay_seconds = 3600
