@@ -21,7 +21,7 @@ an algorithm the SymCrypt provider does support, the operation will fail. For ex
 curves for ECDH and ECDSA. Attempting to use a curve other than those listed below will fail with the SymCrypt provider.
 
 _Compatibility between the default provider and SymCrypt provider is not guaranteed. Please test your application with the SymCrypt provider.
-Any undocumented or unexpected incompatibilities should raised in the issue tracker._
+Any undocumented or unexpected incompatibilities should be raised in the issue tracker._
 
 ## Algorithms Supported by the SymCrypt Provider
 The following list is not necessarily exhaustive, and will be updated as more functionality is added to SCOSSL.
