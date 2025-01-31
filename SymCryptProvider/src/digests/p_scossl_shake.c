@@ -46,14 +46,8 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
                                             PSYMCRYPT_HASH_EXTRACT extractFunc, BOOLEAN wipeState,
                                             _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
-    if (outlen < ctx->xofLen)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
-    }
-
-    extractFunc(ctx->pState, out, ctx->xofLen, wipeState);
-    *outl = ctx->xofLen;
+    extractFunc(ctx->pState, out, outlen, wipeState);
+    *outl = outlen;
 
     return SCOSSL_SUCCESS;
 }
@@ -70,10 +64,16 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
         _In_ SCOSSL_DIGEST_CTX *ctx,                                                                \
         _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)            \
     {                                                                                               \
+        if (outlen < ctx->xofLen)                                                                   \
+        {                                                                                           \
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);                                \
+            return SCOSSL_FAILURE;                                                                  \
+        }                                                                                           \
+                                                                                                    \
         return p_scossl_shake_extract(ctx,                                                          \
             (PSYMCRYPT_HASH_EXTRACT)SymCryptShake##bits##Extract,                                   \
             TRUE,                                                                                   \
-            out, outl, outlen);                                                                     \
+            out, outl, ctx->xofLen);                                                                \
     }                                                                                               \
                                                                                                     \
     static SCOSSL_STATUS p_scossl_shake_##bits##_squeeze(                                           \
