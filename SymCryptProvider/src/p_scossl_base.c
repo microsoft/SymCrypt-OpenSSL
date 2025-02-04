@@ -598,7 +598,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     if (!scossl_prov_initialized)
     {
-        SYMCRYPT_MODULE_INIT();
+        SymCryptModuleInit(P_SCOSSL_SYMCRYPT_MINIMUM_MAJOR, P_SCOSSL_SYMCRYPT_MINIMUM_MINOR);
         if (!scossl_dh_init_static() ||
             !scossl_ecc_init_static())
         {
