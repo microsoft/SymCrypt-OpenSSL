@@ -23,7 +23,6 @@ typedef struct
     OSSL_LIB_CTX *libctx;
     BOOL initialized;
     PSYMCRYPT_RSAKEY key;
-    UINT padding;
     UINT keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 

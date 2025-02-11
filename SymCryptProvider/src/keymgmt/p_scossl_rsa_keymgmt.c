@@ -17,6 +17,7 @@ typedef struct
 {
     OSSL_LIB_CTX *libctx;
     // May be set for PSS
+    UINT keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
     UINT32 nBitsOfModulus;
@@ -85,8 +86,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *p
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx != NULL)
     {
-        keyCtx->padding = RSA_PKCS1_PADDING;
-        keyCtx->keyType = EVP_PKEY_RSA;
+        keyCtx->keyType = RSA_FLAG_TYPE_RSA;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 #endif
@@ -100,7 +100,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
     if (keyCtx != NULL)
     {
         keyCtx->libctx = provctx->libctx;
-        keyCtx->padding = RSA_PKCS1_PSS_PADDING;
         keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
@@ -252,7 +251,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
 #endif
 
     copyCtx->initialized = keyCtx->initialized;
-    copyCtx->padding = keyCtx->padding;
+    copyCtx->keyType = keyCtx->keyType;
 
     if (keyCtx->initialized && (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
@@ -264,7 +263,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         }
     }
 
-    if (keyCtx->padding == RSA_PKCS1_PSS_PADDING &&
+    if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
         keyCtx->pssRestrictions != NULL &&
         (copyCtx->pssRestrictions = OPENSSL_memdup(keyCtx->pssRestrictions, sizeof(SCOSSL_RSA_PSS_RESTRICTIONS))) == NULL)
     {
@@ -329,7 +328,7 @@ static SCOSSL_STATUS p_scossl_rsa_keygen_set_params(_Inout_ SCOSSL_RSA_KEYGEN_CT
         genCtx->nPubExp = 1;
     }
 
-    if (genCtx->padding == RSA_PKCS1_PSS_PADDING &&
+    if (genCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
         !p_scossl_rsa_pss_restrictions_from_params(genCtx->libctx, params, &genCtx->pssRestrictions))
     {
         return SCOSSL_FAILURE;
@@ -360,10 +359,10 @@ static void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 }
 
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(_In_ SCOSSL_PROVCTX *provctx, int selection,
-                                                              _In_ const OSSL_PARAM params[], UINT padding)
+                                                              _In_ const OSSL_PARAM params[], UINT keyType)
 {
     // Sanity check
-    if (!(selection & OSSL_KEYMGMT_SELECT_KEYPAIR))
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
     {
         return NULL;
     }
@@ -378,7 +377,7 @@ static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(_In_ SCOSSL_PROVCT
     genCtx->nBitsOfModulus = SCOSSL_RSA_DEFAULT_BITS;
     genCtx->nPubExp = 0;
     genCtx->libctx = provctx->libctx;
-    genCtx->padding = padding;
+    genCtx->keyType = keyType;
     genCtx->pssRestrictions = NULL;
 
     if (!p_scossl_rsa_keygen_set_params(genCtx, params))
@@ -393,29 +392,13 @@ static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(_In_ SCOSSL_PROVCT
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                        _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_rsa_keygen_init_common(provctx, selection, params, RSA_PKCS1_PADDING);
+    return p_scossl_rsa_keygen_init_common(provctx, selection, params, RSA_FLAG_TYPE_RSA);
 }
 
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsapss_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                           _In_ const OSSL_PARAM params[])
 {
-    SCOSSL_RSA_KEYGEN_CTX *genCtx = p_scossl_rsa_keygen_init_common(provctx, selection, params, RSA_PKCS1_PSS_PADDING);
-
-    if (genCtx != NULL)
-    {
-        if (genCtx->pssRestrictions == NULL &&
-            (genCtx->pssRestrictions = OPENSSL_malloc(sizeof(SCOSSL_RSA_PSS_RESTRICTIONS))) == NULL)
-        {
-            p_scossl_rsa_keygen_cleanup(genCtx);
-            genCtx = NULL;
-        } 
-        else
-        {
-            p_scossl_rsa_pss_restrictions_get_defaults(genCtx->pssRestrictions);
-        }
-    }
-
-    return genCtx;
+    return p_scossl_rsa_keygen_init_common(provctx, selection, params, RSA_FLAG_TYPE_RSASSAPSS);
 }
 
 static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
@@ -452,19 +435,9 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     }
 
     keyCtx->initialized = TRUE;
-    keyCtx->padding = genCtx->padding;
-
-    if (genCtx->pssRestrictions != NULL)
-    {
-        keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
-        keyCtx->pssRestrictions = genCtx->pssRestrictions;
-        genCtx->pssRestrictions = NULL;
-    }
-    else
-    {
-        keyCtx->keyType = EVP_PKEY_RSA;
-    }
-
+    keyCtx->keyType = genCtx->keyType;
+    keyCtx->pssRestrictions = genCtx->pssRestrictions;
+    genCtx->pssRestrictions = NULL;
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
     keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
@@ -1285,7 +1258,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0 &&
-        keyCtx->padding == RSA_PKCS1_PSS_PADDING &&
+        keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
         !p_scossl_rsa_pss_restrictions_from_params(keyCtx->libctx, params, &keyCtx->pssRestrictions))
     {
         goto cleanup;
@@ -1351,7 +1324,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *k
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0 &&
-        keyCtx->padding == RSA_PKCS1_PSS_PADDING &&
+        keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
         keyCtx->pssRestrictions != NULL &&
         !p_scossl_rsa_pss_restrictions_to_params(keyCtx->pssRestrictions, bld))
     {
