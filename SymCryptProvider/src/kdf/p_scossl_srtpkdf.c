@@ -88,6 +88,7 @@ static void p_scossl_srtpkdf_freectx(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
 
 static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx)
 {
+    SYMCRYPT_ERROR scError;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SCOSSL_PROV_SRTPKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
 
@@ -104,9 +105,10 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
             memcpy(copyCtx->pbKey, ctx->pbKey, ctx->cbKey);
             copyCtx->cbKey = ctx->cbKey;
 
-            if (SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pbKey, copyCtx->cbKey) != SYMCRYPT_NO_ERROR)
+            scError = SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pbKey, copyCtx->cbKey);
+            if (scError != SYMCRYPT_NO_ERROR)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSrtpKdfExpandKey failed", scError);
                 goto cleanup;
             }
         }
@@ -196,7 +198,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_derive(_In_ SCOSSL_PROV_SRTPKDF_CTX *ctx,
 
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSrtpKdfDerive failed", scError);
         return SCOSSL_FAILURE;
     }
 
@@ -235,6 +237,7 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
     {
         PBYTE pbKey;
         SIZE_T cbKey;
+        SYMCRYPT_ERROR scError;
 
         OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
         ctx->pbKey = NULL;
@@ -267,13 +270,14 @@ static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF
         memcpy(ctx->pbKey, pbKey, cbKey);
         ctx->cbKey = cbKey;
 
-        if (SymCryptSrtpKdfExpandKey(&ctx->expandedKey, ctx->pbKey, ctx->cbKey) != SYMCRYPT_NO_ERROR)
+        scError = SymCryptSrtpKdfExpandKey(&ctx->expandedKey, ctx->pbKey, ctx->cbKey);
+        if (scError != SYMCRYPT_NO_ERROR)
         {
             OPENSSL_secure_clear_free(ctx->pbKey, ctx->cbKey);
             ctx->pbKey = NULL;
             ctx->cbKey = 0;
 
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSrtpKdfExpandKey failed", scError);
             return SCOSSL_FAILURE;
         }
     }
