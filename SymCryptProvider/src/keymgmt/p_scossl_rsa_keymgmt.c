@@ -23,7 +23,6 @@ typedef struct
     UINT32 nBitsOfModulus;
     UINT64 pubExp64;
     UINT32 nPubExp;
-    UINT padding;
 } SCOSSL_RSA_KEYGEN_CTX;
 
 #define SCOSSL_RSA_DEFAULT_DIGEST SN_sha256
