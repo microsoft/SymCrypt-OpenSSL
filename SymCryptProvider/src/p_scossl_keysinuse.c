@@ -30,7 +30,8 @@ static BOOL keysinuse_enabled = FALSE;
 #define KEYSINUSE_NOTICE 1
 // Log files separated by UID.
 // /var/log/keysinuse/keysinuse_<level>_<euid>.log
-#define LOG_PATH_TMPL "/var/log/keysinuse/keysinuse_%.3s_%08x.log"
+#define LOG_DIR       "/var/log/keysinuse"
+#define LOG_PATH_TMPL LOG_DIR "/keysinuse_%.3s_%08x.log"
 #define LOG_MSG_MAX 256
 static const char *default_prefix = "";
 static char *prefix = NULL;
@@ -146,6 +147,13 @@ static void p_scossl_keysinuse_init_once()
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
+
+    // Make sure /var/log/keysinuse exists
+    if (mkdir(LOG_DIR, 1733) == -1 && errno != EEXIST)
+    {
+        p_scossl_keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
+        goto cleanup;
+    }
 
     // Start the logging thread. Monotonic clock needs to be set to
     // prevent wall clock changes from affecting the logging delay sleep time
