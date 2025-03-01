@@ -16,47 +16,39 @@ OSSL_FUNC_BIO_gets_fn *core_bio_gets = NULL;
 OSSL_FUNC_BIO_puts_fn *core_bio_puts = NULL;
 OSSL_FUNC_BIO_ctrl_fn *core_bio_ctrl = NULL;
 
-static int p_scossl_bio_core_read_ex(BIO *bio, char *data, size_t data_len,
-                                     size_t *bytes_read)
+static SCOSSL_STATUS p_scossl_bio_core_read_ex(BIO *bio, char *data, size_t data_len,
+                                               size_t *bytes_read)
 {
     if (core_bio_read_ex == NULL)
-        return 0;
+        return SCOSSL_FAILURE;
 
     return core_bio_read_ex(BIO_get_data(bio), data, data_len, bytes_read);
 }
 
-static int p_scossl_bio_core_write_ex(BIO *bio, const char *data, size_t data_len,
-                                      size_t *written)
+static SCOSSL_STATUS p_scossl_bio_core_write_ex(BIO *bio, const char *data, size_t data_len,
+                                                size_t *written)
 {
     if (core_bio_write_ex == NULL)
-        return 0;
+        return SCOSSL_FAILURE;
 
     return core_bio_write_ex(BIO_get_data(bio), data, data_len, written);
 }
 
-static int p_scossl_bio_core_create(BIO *bio)
+static SCOSSL_STATUS p_scossl_bio_core_create(BIO *bio)
 {
     BIO_set_init(bio, 1);
 
-    return 1;
+    return SCOSSL_SUCCESS;
 }
 
-static int p_scossl_bio_core_destroy(BIO *bio)
+static SCOSSL_STATUS p_scossl_bio_core_destroy(BIO *bio)
 {
     BIO_set_init(bio, 0);
 
     if (core_bio_free != NULL)
         core_bio_free(BIO_get_data(bio));
 
-    return 1;
-}
-
-static long p_scossl_bio_core_ctrl(BIO *bio, int cmd, long num, void *ptr)
-{
-    if (core_bio_ctrl == NULL)
-        return 0;
-
-    return core_bio_ctrl(BIO_get_data(bio), cmd, num, ptr);
+    return SCOSSL_SUCCESS;
 }
 
 static int p_scossl_bio_core_gets(BIO *bio, char *buf, int size)
@@ -75,6 +67,14 @@ static int p_scossl_bio_core_puts(BIO *bio, const char *str)
     return core_bio_puts(BIO_get_data(bio), str);
 }
 
+static long p_scossl_bio_core_ctrl(BIO *bio, int cmd, long num, void *ptr)
+{
+    if (core_bio_ctrl == NULL)
+        return 0;
+
+    return core_bio_ctrl(BIO_get_data(bio), cmd, num, ptr);
+}
+
 _Use_decl_annotations_
 void p_scossl_set_core_bio(const OSSL_DISPATCH *dispatch)
 {
@@ -83,25 +83,25 @@ void p_scossl_set_core_bio(const OSSL_DISPATCH *dispatch)
         switch (dispatch->function_id)
         {
         case OSSL_FUNC_BIO_READ_EX:
-            core_bio_read_ex = (OSSL_FUNC_BIO_read_ex_fn *)dispatch->function;
+            core_bio_read_ex = OSSL_FUNC_BIO_read_ex(dispatch);
             break;
         case OSSL_FUNC_BIO_WRITE_EX:
-            core_bio_write_ex = (OSSL_FUNC_BIO_write_ex_fn *)dispatch->function;
+            core_bio_write_ex = OSSL_FUNC_BIO_write_ex(dispatch);
             break;
         case OSSL_FUNC_BIO_UP_REF:
-            core_bio_up_ref = (OSSL_FUNC_BIO_up_ref_fn *)dispatch->function;
+            core_bio_up_ref = OSSL_FUNC_BIO_up_ref(dispatch);
             break;
         case OSSL_FUNC_BIO_FREE:
-            core_bio_free = (OSSL_FUNC_BIO_free_fn *)dispatch->function;
+            core_bio_free = OSSL_FUNC_BIO_free(dispatch);
             break;
         case OSSL_FUNC_BIO_PUTS:
-            core_bio_puts = (OSSL_FUNC_BIO_puts_fn *)dispatch->function;
+            core_bio_puts = OSSL_FUNC_BIO_puts(dispatch);
             break;
         case OSSL_FUNC_BIO_GETS:
-            core_bio_gets = (OSSL_FUNC_BIO_gets_fn *)dispatch->function;
+            core_bio_gets = OSSL_FUNC_BIO_gets(dispatch);
             break;
         case OSSL_FUNC_BIO_CTRL:
-            core_bio_ctrl = (OSSL_FUNC_BIO_ctrl_fn *)dispatch->function;
+            core_bio_ctrl = OSSL_FUNC_BIO_ctrl(dispatch);
             break;
         }
     }
@@ -137,7 +137,7 @@ BIO *p_scossl_bio_new_from_core_bio(SCOSSL_PROVCTX *provctx, OSSL_CORE_BIO *core
         return NULL;
     }
 
-    if ((bio = BIO_new(provctx->coreBioMeth)) != NULL)
+    if ((bio = BIO_new_ex(provctx->libctx, provctx->coreBioMeth)) != NULL)
     {
         if (core_bio_up_ref == NULL ||
             !core_bio_up_ref(coreBio))

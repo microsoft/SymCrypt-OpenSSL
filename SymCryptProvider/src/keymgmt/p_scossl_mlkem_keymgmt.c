@@ -480,7 +480,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL &&
-        !OSSL_PARAM_set_utf8_string(p, keyCtx->groupInfo->groupName != NULL ? keyCtx->groupInfo->groupName : ""))
+        !OSSL_PARAM_set_utf8_string(p, keyCtx->groupInfo->snGroupName != NULL ? keyCtx->groupInfo->snGroupName : ""))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -744,7 +744,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
         goto cleanup;
     }
 
-    mlkemParamsName = keyCtx->groupInfo->groupName != NULL ? keyCtx->groupInfo->groupName : "";
+    mlkemParamsName = keyCtx->groupInfo->snGroupName != NULL ? keyCtx->groupInfo->snGroupName : "";
     if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, mlkemParamsName, strlen(mlkemParamsName)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

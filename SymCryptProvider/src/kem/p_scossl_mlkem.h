@@ -12,7 +12,8 @@ extern "C" {
 typedef struct {
     int nid;
     const char *oid;
-    const char *groupName;
+    const char *snGroupName;
+    const char *lnGroupName;
     const char *classicGroupName;
     SYMCRYPT_MLKEM_PARAMS mlkemParams;
 } SCOSSL_MLKEM_GROUP_INFO;

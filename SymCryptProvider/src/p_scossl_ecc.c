@@ -61,6 +61,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     if (copyCtx != NULL)
     {
 #ifdef KEYSINUSE_ENABLED
+        copyCtx->isImported = keyCtx->isImported;
         copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 
         if (keyCtx->keysinuseInfo == NULL ||
@@ -247,6 +248,10 @@ SIZE_T p_scossl_ecc_get_max_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh)
     {
         return keyCtx->key == NULL ? 0 : SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
     }
+    else if (keyCtx->curve == NULL)
+    {
+        return 0;
+    }
 
     return scossl_ecdsa_size(keyCtx->curve);
 }
@@ -407,7 +412,6 @@ SCOSSL_STATUS p_scossl_ecc_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
     PBYTE pbPrivateKey = NULL;
     SIZE_T cbPrivateKey;
     SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
     BOOL allocatedKey = FALSE;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -445,7 +449,7 @@ SCOSSL_STATUS p_scossl_ecc_get_private_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
         pbPrivateKey, cbPrivateKey,
         NULL, 0,
         numFormat,
-        pointFormat,
+        0,
         0);
     if (scError != SYMCRYPT_NO_ERROR)
     {

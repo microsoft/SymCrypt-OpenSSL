@@ -538,11 +538,6 @@ cleanup:
 _Use_decl_annotations_
 SIZE_T scossl_ecdsa_size(PCSYMCRYPT_ECURVE curve)
 {
-    if (curve == NULL)
-    {
-        return 0;
-    }
-
     return 2*SymCryptEcurveSizeofScalarMultiplier(curve) + 8;
 }
 

@@ -373,7 +373,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         }
     }
 
-    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupInfo->groupName) <= 0)
+    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupInfo->lnGroupName) <= 0)
     {
         goto cleanup;
     }

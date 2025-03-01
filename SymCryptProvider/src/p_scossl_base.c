@@ -166,6 +166,7 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
+#define NUM_PARAMS_TLS_GROUP_ENTRY 11
 #define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) {                                     \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)),                   \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)),        \
@@ -183,7 +184,7 @@ static int scossl_prov_initialized = 0;
 
 static OSSL_FUNC_core_get_params_fn *core_get_params;
 
-static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
+static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENTRY] = {
     TLS_GROUP_ENTRY("secp192r1", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("P-192", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("secp224r1", SN_secp224r1, "EC", scossl_tls_group_info_p224),
@@ -198,14 +199,12 @@ static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
     TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),
-    TLS_GROUP_ENTRY("mlkem512", SCOSSL_SN_MLKEM512, "MLKEM", scossl_tls_group_info_mlkem512),
-    TLS_GROUP_ENTRY("mlkem768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
-    TLS_GROUP_ENTRY("mlkem1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
-    TLS_GROUP_ENTRY("secp256r1mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
-    TLS_GROUP_ENTRY("P256mlkem768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
-    TLS_GROUP_ENTRY("X25519mlkem768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
-    TLS_GROUP_ENTRY("secp384r1mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024),
-    TLS_GROUP_ENTRY("P384mlkem1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
+    TLS_GROUP_ENTRY("MLKEM512", SCOSSL_SN_MLKEM512, "MLKEM", scossl_tls_group_info_mlkem512),
+    TLS_GROUP_ENTRY("MLKEM768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
+    TLS_GROUP_ENTRY("MLKEM1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
+    TLS_GROUP_ENTRY("SecP256r1MLKEM768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
+    TLS_GROUP_ENTRY("X25519MLKEM768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
+    TLS_GROUP_ENTRY("SecP384r1MLKEM1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -313,7 +312,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_KBKKDF, p_scossl_kbkdf_kdf_functions),
+    ALG(SCOSSL_ALG_NAME_KBKDF, p_scossl_kbkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTPKDF, p_scossl_srtpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTCPKDF, p_scossl_srtcpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SSHKDF, p_scossl_sshkdf_kdf_functions),
