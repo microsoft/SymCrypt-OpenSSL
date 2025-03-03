@@ -149,7 +149,16 @@ static void p_scossl_keysinuse_init_once()
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
 
     // Make sure /var/log/keysinuse exists
-    if (mkdir(LOG_DIR, 1733) == -1 && errno != EEXIST)
+    if (mkdir(LOG_DIR, 1733) == 0)
+    {
+        if (chown(LOG_DIR, 0, 0) == -1)
+        {
+            p_scossl_keysinuse_log_error("Failed to set ownership of logging directory at %s,SYS_%d", LOG_DIR, errno);
+            rmdir(LOG_DIR);
+            goto cleanup;
+        }
+    }    
+    else if (errno != EEXIST)
     {
         p_scossl_keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
         goto cleanup;
