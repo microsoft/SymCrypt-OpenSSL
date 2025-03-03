@@ -47,7 +47,7 @@ SCOSSL_STATUS p_scossl_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ co
 
 SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 
-SIZE_T p_scossl_ecc_get_max_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh);
+SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh);
 SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                            _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);

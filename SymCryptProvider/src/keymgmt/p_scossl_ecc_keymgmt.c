@@ -376,7 +376,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
-        !OSSL_PARAM_set_uint32(p, p_scossl_ecc_get_max_size(keyCtx, FALSE)))
+        !OSSL_PARAM_set_uint32(p, p_scossl_ecc_get_max_result_size(keyCtx, FALSE)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;

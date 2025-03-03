@@ -469,7 +469,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
 
         if (keyCtx->classicKeyCtx != NULL)
         {
-            cbMax += p_scossl_ecc_get_max_size(keyCtx->classicKeyCtx, TRUE);
+            cbMax += p_scossl_ecc_get_max_result_size(keyCtx->classicKeyCtx, TRUE);
         }
 
         if (!OSSL_PARAM_set_size_t(p, cbMax))

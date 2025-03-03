@@ -188,7 +188,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
         cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPeer, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
 
-        if ((cbClassicSecret = p_scossl_ecc_get_max_size(classicKeyCtxPeer, TRUE)) == 0)
+        if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPeer, TRUE)) == 0)
         {
             goto cleanup;
         }
@@ -357,7 +357,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
 
         // Get secret size
-        if ((cbClassicSecret = p_scossl_ecc_get_max_size(classicKeyCtxPrivate, TRUE)) == 0)
+        if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPrivate, TRUE)) == 0)
         {
             goto cleanup;
         }
