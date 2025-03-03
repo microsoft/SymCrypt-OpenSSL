@@ -73,7 +73,6 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
         copyCtx->isX25519 = keyCtx->isX25519;
         copyCtx->libctx = keyCtx->libctx;
-        copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
         copyCtx->conversionFormat = keyCtx->conversionFormat;
 
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
@@ -149,12 +148,14 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
             copyCtx->initialized = 1;
             copyCtx->includePublic = keyCtx->includePublic;
+            copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
         }
         else
         {
             copyCtx->key = NULL;
             copyCtx->initialized = 0;
             copyCtx->includePublic = 1;
+            copyCtx->modifiedPrivateBits = 0;
         }
     }
 
