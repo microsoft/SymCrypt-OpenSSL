@@ -47,6 +47,7 @@ void p_scossl_tls1prf_freectx(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
     if (ctx != NULL)
     {
         scossl_tls1prf_freectx(ctx->tls1prfCtx);
+        OPENSSL_free(ctx->mdName);
     }
 
     OPENSSL_free(ctx);
