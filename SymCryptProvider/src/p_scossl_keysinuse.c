@@ -101,6 +101,8 @@ static void p_scossl_keysinuse_cleanup()
 
 static void p_scossl_keysinuse_init_once()
 {
+    int mkdirResult;
+    mode_t umaskOriginal;
     pid_t pid = getpid();
     time_t initTime = time(NULL);
     char *symlinkPath = NULL;
@@ -148,8 +150,14 @@ static void p_scossl_keysinuse_init_once()
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
 
-    // Make sure /var/log/keysinuse exists
-    if (mkdir(LOG_DIR, 1733) == 0)
+    // Try to create /var/log/keysinuse if it isn't present.
+    // This is a best attempt and only succeeds if the callers
+    // has sufficient permissions
+    umaskOriginal = umask(0);
+    mkdirResult = mkdir(LOG_DIR, 01733);
+    umask(umaskOriginal);
+
+    if (mkdirResult == 0)
     {
         if (chown(LOG_DIR, 0, 0) == -1)
         {
@@ -158,7 +166,7 @@ static void p_scossl_keysinuse_init_once()
             goto cleanup;
         }
     }    
-    else if (errno != EEXIST)
+    else if (errno != EACCES && errno != EEXIST)
     {
         p_scossl_keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
         goto cleanup;

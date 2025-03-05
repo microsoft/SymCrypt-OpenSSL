@@ -26,7 +26,7 @@ extern "C" {
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
 
 // Cap configured file size at 2GB
-#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2 << 30)
+#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
 #endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
