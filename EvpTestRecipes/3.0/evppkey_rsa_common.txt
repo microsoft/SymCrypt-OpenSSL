@@ -1214,18 +1214,36 @@ Title = Test RSA keygen
 KeyGen = RSASSA-PSS
 KeyName = tmppss
 Ctrl = rsa_pss_keygen_md:sha256
-Ctrl = rsa_pss_keygen_mgf1_md:sha512
+Ctrl = rsa_pss_keygen_mgf1_md:sha256
+Ctrl = saltlen:32
 
-# Check MGF1 restrictions
-DigestVerify = SHA256
-Key = tmppss
-Ctrl = rsa_mgf1_md:sha256
+# Check digest restrictions
+Verify = tmppss
+Ctrl = digest:SHA1
 Result = PKEY_CTRL_ERROR
 
-# Check caching of key MGF1 digest restriction
-DigestVerify = SHA256
-Key = tmppss
+# Check MGF1 digest restriction
+Verify = tmppss
 Ctrl = rsa_mgf1_md:sha1
+Result = PKEY_CTRL_ERROR
+
+# Check minimum saltlen restriction
+Verify = tmppss
+Ctrl = saltlen:20
+Result = PKEY_CTRL_ERROR
+
+# Check padding restriction
+Verify = tmppss
+Ctrl = rsa_padding_mode:pkcs1
+Result = PKEY_CTRL_ERROR
+
+# RSA-PSS with no restrictions, should succeed.
+KeyGen = RSASSA-PSS
+KeyName = tmppss_unrestricted
+
+# Check padding restriction
+Verify = tmppss_unrestricted
+Ctrl = rsa_padding_mode:pkcs1
 Result = PKEY_CTRL_ERROR
 
 Title = RSA FIPS tests

@@ -216,15 +216,9 @@ static SCOSSL_STATUS p_scossl_cshake_update(_Inout_ SCOSSL_CSHAKE_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOL wipeState,
+static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOL isFinal,
                                              _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
-    if (outlen < ctx->xofLen)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        return SCOSSL_FAILURE;
-    }
-
     if (ctx->xofState == SCOSSL_XOF_STATE_FINAL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
@@ -241,17 +235,9 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOL w
             ctx->pbCustomizationString, ctx->cbCustomizationString);
     }
 
-    ctx->pHash->extractFunc(&ctx->state, out, ctx->xofLen, wipeState);
-    *outl = ctx->xofLen;
-
-    if (wipeState)
-    {
-        ctx->xofState = SCOSSL_XOF_STATE_FINAL;
-    }
-    else
-    {
-        ctx->xofState = SCOSSL_XOF_STATE_SQUEEZE;
-    }
+    ctx->pHash->extractFunc(&ctx->state, out, outlen, isFinal);
+    *outl = outlen;
+    ctx->xofState = isFinal ? SCOSSL_XOF_STATE_FINAL : SCOSSL_XOF_STATE_SQUEEZE;
 
     return SCOSSL_SUCCESS;
 }
@@ -259,7 +245,13 @@ static SCOSSL_STATUS p_scossl_cshake_extract(_In_ SCOSSL_CSHAKE_CTX *ctx, BOOL w
 static SCOSSL_STATUS p_scossl_cshake_final(_In_ SCOSSL_CSHAKE_CTX *ctx,
                                            _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
-    return p_scossl_cshake_extract(ctx, TRUE, out, outl, outlen);
+    if (outlen < ctx->xofLen)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
+    return p_scossl_cshake_extract(ctx, TRUE, out, outl, ctx->xofLen);
 }
 
 #ifdef OSSL_FUNC_DIGEST_SQUEEZE

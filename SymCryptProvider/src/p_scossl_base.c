@@ -26,7 +26,7 @@ extern "C" {
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
 
 // Cap configured file size at 2GB
-#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2 << 30)
+#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
 #endif
 
 #define OSSL_TLS_GROUP_ID_secp192r1        0x0013
@@ -104,8 +104,8 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
     OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, (unsigned int *)&group_info.securityBits), \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls), \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minDtls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxDtls), \
     OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;
@@ -313,7 +313,11 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
 #ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_teardown();
 #endif
-    OPENSSL_free(provctx);
+    if (provctx != NULL)
+    {
+        OSSL_LIB_CTX_free(provctx->libctx);
+        OPENSSL_free(provctx);
+    }
 }
 
 static const OSSL_PARAM *p_scossl_gettable_params(ossl_unused void *provctx)
@@ -538,7 +542,7 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
     OSSL_PARAM confParams[] = {
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_FILE, &confLoggingFile, 0),
         OSSL_PARAM_utf8_ptr(CONF_LOGGING_LEVEL, &confLoggingLevel, 0),
-        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confLoggingLevel, 0),
+        OSSL_PARAM_utf8_ptr(CONF_ERROR_LEVEL, &confErrorLevel, 0),
         OSSL_PARAM_END};
 
     scossl_setup_logging();
@@ -570,7 +574,17 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
                                  _Out_ const OSSL_DISPATCH **out,
                                  _Out_ void **provctx)
 {
-    SCOSSL_PROVCTX *p_ctx = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    SCOSSL_PROVCTX *p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
+    if (p_ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    p_ctx->handle = handle;
+    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
     for (; in->function_id != 0; in++)
     {
@@ -586,25 +600,16 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
 
     if (!scossl_prov_initialized)
     {
-        SYMCRYPT_MODULE_INIT();
+        SymCryptModuleInit(P_SCOSSL_SYMCRYPT_MINIMUM_MAJOR, P_SCOSSL_SYMCRYPT_MINIMUM_MINOR);
         if (!scossl_dh_init_static() ||
             !scossl_ecc_init_static())
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
         scossl_prov_initialized = 1;
     }
 
-    p_ctx = OPENSSL_malloc(sizeof(SCOSSL_PROVCTX));
-    if (p_ctx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return SCOSSL_FAILURE;
-    }
-
-    p_ctx->handle = handle;
-    p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
     *provctx = p_ctx;
 
     *out = p_scossl_base_dispatch;
@@ -617,7 +622,15 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     }
 #endif
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (ret != SCOSSL_SUCCESS)
+    {
+        p_scossl_teardown(p_ctx);
+    }
+
+    return ret;
 }
 
 #if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0

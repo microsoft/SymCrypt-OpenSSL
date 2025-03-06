@@ -15,6 +15,8 @@ extern "C" {
 // Value provided by CMake, defined in top level CMakeLists.txt
 #define P_SCOSSL_VERSION "@SymCrypt-OpenSSL_VERSION@"
 #define P_SCOSSL_NAME "symcryptprovider"
+#define P_SCOSSL_SYMCRYPT_MINIMUM_MAJOR @SYMCRYPT_MINIMUM_MAJOR@
+#define P_SCOSSL_SYMCRYPT_MINIMUM_MINOR @SYMCRYPT_MINIMUM_MINOR@
 
 typedef struct
 {

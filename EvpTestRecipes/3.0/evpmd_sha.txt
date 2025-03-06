@@ -291,14 +291,18 @@ Output = 2e975f6a8a14f0704d51b13667d8195c219f71e6345696c49fa4b9d08e9225d3d393934
 
 Title = CSHAKE
 
+Availablein = symcryptprovider
 Digest = CSHAKE128
 Input = "abc"
 Output = 5881092dd818bf5cf8a3ddb793fbcba74097d5c526a6d35f97b83351940f2cc8
 
 
+Availablein = symcryptprovider
 Digest = CSHAKE256
 Input = "abc"
 Output = 483366601360a8771c6863080cc4114d8db44530f8f1e1ee4f94ea37e78b5739d5a15bef186a5386c75744c0527e1faa9f8726e462a12a4feb06bd8801e751e4
+
+
 
 Title = Case insensitive digest tests
 
@@ -309,4 +313,3 @@ Output = A7FFC6F8BF1ED76651C14756A061D662F580FF4DE43B49FA82D80A4B80F8434A
 Digest = shA512
 Input = "abc"
 Output = ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f
-
