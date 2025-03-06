@@ -261,8 +261,8 @@ void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
             }
 
             OPENSSL_free(pbPublicKey);
-            CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
         }
+        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
     }
 }
 

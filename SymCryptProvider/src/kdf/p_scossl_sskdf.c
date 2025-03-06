@@ -380,7 +380,6 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
-        EVP_MD *md;
         const char *mdName;
     
         ctx->pHash = NULL;
