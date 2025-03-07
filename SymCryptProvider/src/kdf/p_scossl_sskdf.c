@@ -197,7 +197,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
                 
             if (scError != SYMCRYPT_NO_ERROR)
             {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSskdfMacExpandSalt failed", scError);
                 return SCOSSL_FAILURE;
             }
 
@@ -213,7 +213,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSskdfMacDerive failed", scError);
             return SCOSSL_FAILURE;
         }
     }
@@ -227,7 +227,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
 
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSskdfHash failed", scError);
             return SCOSSL_FAILURE;
         }
     }
