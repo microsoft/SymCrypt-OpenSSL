@@ -240,17 +240,18 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
     {
         OPENSSL_secure_clear_free(ctx->pbPassword, ctx->cbPassword);
         ctx->pbPassword = NULL;
-        ctx->cbPassword = 0;
+        ctx->cbPassword = p->data_size;
 
         if (p->data_size != 0)
         {
-            if ((ctx->pbPassword = OPENSSL_secure_malloc(p->data_size)) == NULL)
+            if ((ctx->pbPassword = OPENSSL_secure_malloc(ctx->cbPassword)) == NULL)
             {
+                ctx->cbPassword = 0;
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
 
-            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbPassword, p->data_size, &ctx->cbPassword))
+            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbPassword, ctx->cbPassword, &ctx->cbPassword))
             {
                 OPENSSL_secure_clear_free(ctx->pbPassword, ctx->cbPassword);
                 ctx->pbPassword = NULL;
