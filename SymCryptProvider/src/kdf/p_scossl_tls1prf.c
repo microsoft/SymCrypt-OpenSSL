@@ -47,6 +47,7 @@ void p_scossl_tls1prf_freectx(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
     if (ctx != NULL)
     {
         scossl_tls1prf_freectx(ctx->tls1prfCtx);
+        OPENSSL_free(ctx->mdName);
     }
 
     OPENSSL_free(ctx);
@@ -148,22 +149,23 @@ SCOSSL_STATUS p_scossl_tls1prf_get_ctx_params(_In_ SCOSSL_PROV_TLS1_PRF_CTX *ctx
 
 SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    const OSSL_PARAM *p;
+    EVP_MD *md = NULL;
+    char *mdName = NULL;
     PCBYTE pbSeed;
     SIZE_T cbSeed;
-    const OSSL_PARAM *p;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
         BOOL isTlsPrf1_1 = FALSE;
         const char *paramMdName, *mdProps;
-        char *mdName;
-        EVP_MD *md;
 
         if (!OSSL_PARAM_get_utf8_string_ptr(p, &paramMdName))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         // Special case to always allow md5_sha1 for tls1.1 PRF compat
@@ -175,22 +177,21 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
                 !OSSL_PARAM_get_utf8_string_ptr(p, &mdProps)))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
 
             if ((md = EVP_MD_fetch(ctx->libctx, paramMdName, mdProps)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
 
             mdName = OPENSSL_strdup(EVP_MD_get0_name(md));
             symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(md));
-            EVP_MD_free(md);
 
             if (symcryptHmacAlg == NULL)
             {
-                return SCOSSL_FAILURE;
+                goto cleanup;
             }
         }
         else
@@ -201,6 +202,8 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
 
         OPENSSL_free(ctx->mdName);
         ctx->mdName = mdName;
+        mdName = NULL;
+
         ctx->tls1prfCtx->pHmac = symcryptHmacAlg;
         ctx->tls1prfCtx->isTlsPrf1_1 = isTlsPrf1_1;
     }
@@ -214,7 +217,7 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
             !OSSL_PARAM_get_octet_string(p, (void **)&pbSecret, 0, &cbSecret))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         OPENSSL_clear_free(ctx->tls1prfCtx->pbSecret, ctx->tls1prfCtx->cbSecret);
@@ -230,17 +233,23 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
         if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbSeed, &cbSeed))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         if (!scossl_tls1prf_append_seed(ctx->tls1prfCtx, pbSeed, cbSeed))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    EVP_MD_free(md);
+    OPENSSL_free(mdName);
+
+    return ret;
 }
 
 const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[] = {

@@ -31,6 +31,7 @@ set(SCOSSL_SOURCES
     ./src/encoder/p_scossl_encode_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
+    ./src/kdf/p_scossl_pbkdf2.c
     ./src/kdf/p_scossl_srtpkdf.c
     ./src/kdf/p_scossl_sshkdf.c
     ./src/kdf/p_scossl_sskdf.c

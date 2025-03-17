@@ -182,6 +182,8 @@ static void p_scossl_dh_keymgmt_free_key_ctx(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx)
     {
         SymCryptDlgroupFree(ctx->pDlGroup);
     }
+
+    OPENSSL_free(ctx);
 }
 
 // Helper functions for retrieving public and private key size.
@@ -1238,10 +1240,10 @@ cleanup:
             SymCryptDlgroupFree(pDlGroup);
             ctx->pDlGroup = NULL;
         }
-
-        BN_clear_free(bnPrivateKey);
-        BN_free(bnPublicKey);
     }
+
+    BN_clear_free(bnPrivateKey);
+    BN_free(bnPublicKey);
 
     return ret;
 }

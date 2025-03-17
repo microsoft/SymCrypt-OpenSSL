@@ -23,6 +23,7 @@ extern "C" {
 // Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
 #define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
 
+static BOOL scossl_ecc_initialized = FALSE;
 static PSYMCRYPT_ECURVE _hidden_curve_P192 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
@@ -32,6 +33,9 @@ static PSYMCRYPT_ECURVE _hidden_curve_X25519 = NULL;
 
 SCOSSL_STATUS scossl_ecc_init_static()
 {
+    if (scossl_ecc_initialized)
+        return SCOSSL_SUCCESS;
+
     if( ((_hidden_curve_P192 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP192, 0)) == NULL) ||
         ((_hidden_curve_P224 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP224, 0)) == NULL) ||
         ((_hidden_curve_P256 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP256, 0)) == NULL) ||
@@ -41,6 +45,7 @@ SCOSSL_STATUS scossl_ecc_init_static()
     {
         return SCOSSL_FAILURE;
     }
+    scossl_ecc_initialized = TRUE;
     return SCOSSL_SUCCESS;
 }
 
@@ -76,6 +81,7 @@ void scossl_ecc_destroy_ecc_curves()
         SymCryptEcurveFree(_hidden_curve_X25519);
         _hidden_curve_X25519 = NULL;
     }
+    scossl_ecc_initialized = FALSE;
 }
 
 PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)

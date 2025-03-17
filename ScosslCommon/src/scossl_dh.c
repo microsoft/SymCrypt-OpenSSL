@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+static BOOL scossl_dh_initialized = FALSE;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
@@ -356,6 +357,9 @@ cleanup:
 
 SCOSSL_STATUS scossl_dh_init_static(void)
 {
+    if (scossl_dh_initialized)
+        return SCOSSL_SUCCESS;
+
     if (((_hidden_dlgroup_ffdhe2048 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048)) == NULL) ||
         ((_hidden_dlgroup_ffdhe3072 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072)) == NULL) ||
         ((_hidden_dlgroup_ffdhe4096 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096)) == NULL) ||
@@ -368,6 +372,8 @@ SCOSSL_STATUS scossl_dh_init_static(void)
     {
         return SCOSSL_FAILURE;
     }
+
+    scossl_dh_initialized = TRUE;
     return SCOSSL_SUCCESS;
 }
 
@@ -409,6 +415,8 @@ void scossl_destroy_safeprime_dlgroups(void)
     _hidden_bignum_modp3072 = NULL;
     BN_free(_hidden_bignum_modp4096);
     _hidden_bignum_modp4096 = NULL;
+
+    scossl_dh_initialized = FALSE;
 }
 
 // Other providers may export the group to the SymCrypt provider by parameters

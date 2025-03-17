@@ -28,7 +28,7 @@ extern "C" {
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
 
 // Cap configured file size at 2GB
-#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2 << 30)
+#define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
 #endif
 
 #define SCOSSL_TLS_GROUP_ID_secp192r1           0x0013
@@ -175,8 +175,8 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, (unsigned int *)&group_info.securityBits), \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls),                       \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls),                       \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minTls),                      \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxTls),                      \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minDtls),                     \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxDtls),                     \
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),                        \
     OSSL_PARAM_END}
 
@@ -304,6 +304,7 @@ static const OSSL_ALGORITHM p_scossl_mac[] = {
 // KDF
 extern const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_kbkdf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_pbkdf2_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_srtpkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_srtcpkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
@@ -313,6 +314,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_KBKDF, p_scossl_kbkdf_kdf_functions),
+    ALG(SCOSSL_ALG_NAME_PBKDF2 p_scossl_pbkdf2_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTPKDF, p_scossl_srtpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTCPKDF, p_scossl_srtcpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SSHKDF, p_scossl_sshkdf_kdf_functions),
