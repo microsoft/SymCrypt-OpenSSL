@@ -428,12 +428,12 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-    BIO_meth_free(provctx->coreBioMeth);
-#ifdef KEYSINUSE_ENABLED
+    #ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_teardown();
-#endif
+    #endif
     if (provctx != NULL)
     {
+        BIO_meth_free(provctx->coreBioMeth);
         OSSL_LIB_CTX_free(provctx->libctx);
         OPENSSL_free(provctx);
     }

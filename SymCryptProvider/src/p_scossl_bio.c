@@ -132,7 +132,7 @@ BIO *p_scossl_bio_new_from_core_bio(SCOSSL_PROVCTX *provctx, OSSL_CORE_BIO *core
 {
     BIO *bio;
 
-    if (provctx->coreBioMeth == NULL)
+    if (provctx == NULL || provctx->coreBioMeth == NULL)
     {
         return NULL;
     }

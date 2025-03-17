@@ -78,6 +78,7 @@ cleanup:
 
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)
 {
+    OSSL_LIB_CTX *libCtx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     SUBJECT_PUBKEY_INFO *subjPubKeyInfo = NULL;
     const ASN1_OBJECT *algorithm;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
@@ -88,7 +89,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_
         goto cleanup;
     }
 
-    if (ASN1_item_d2i_bio(p_scossl_decode_subject_pubkey_asn1_item(), bio, (ASN1_VALUE **)&subjPubKeyInfo) == NULL)
+    if (ASN1_item_d2i_bio_ex(p_scossl_decode_subject_pubkey_asn1_item(), bio, (ASN1_VALUE **)&subjPubKeyInfo, libCtx, NULL) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;

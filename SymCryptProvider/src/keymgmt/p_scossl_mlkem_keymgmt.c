@@ -142,12 +142,19 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
                 }
 
                 copyCtx->format = keyCtx->format;
+
+                if (p_scossl_mlkem_is_hybrid(keyCtx))
+                {
+                    if (keyCtx->classicKeyCtx == NULL)
+                    {
+                        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Missing classic key in hybrid MLKEM key");
+                        goto cleanup;
+                    }
+
+                    copyCtx->classicKeyCtx = p_scossl_ecc_dup_ctx(keyCtx->classicKeyCtx, selection);
+                }
             }
 
-            if (keyCtx->classicKeyCtx != NULL)
-            {
-                copyCtx->classicKeyCtx = p_scossl_ecc_dup_ctx(keyCtx->classicKeyCtx, selection);
-            }
         }
     }
 
@@ -185,7 +192,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGE
         }
     }
 
-    return SCOSSL_SUCCESS;;
+    return SCOSSL_SUCCESS;
 }
 
 static const OSSL_PARAM *p_scossl_mlkem_keygen_settable_params(ossl_unused void *genCtx, ossl_unused void *provCtx)
@@ -243,6 +250,37 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
     return SCOSSL_SUCCESS;
 }
 
+static SCOSSL_STATUS p_scossl_mlkem_hybrid_keygen(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, _In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx)
+{
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (genCtx->groupInfo->classicGroupName != NULL)
+    {
+        if ((keyCtx->classicKeyCtx = p_scossl_ecc_new_ctx(keyCtx->provCtx)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (p_scossl_ecc_set_group(keyCtx->classicKeyCtx, genCtx->groupInfo->classicGroupName) != SCOSSL_SUCCESS ||
+            p_scossl_ecc_gen(keyCtx->classicKeyCtx) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    if (ret != SCOSSL_SUCCESS)
+    {
+        p_scossl_ecc_free_ctx(keyCtx->classicKeyCtx);
+        keyCtx->classicKeyCtx = NULL;
+    }
+
+    return ret;
+}
+
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SCOSSL_MLKEM_KEY_CTX *keyCtx;
@@ -252,6 +290,12 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
     if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (genCtx->groupInfo == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
         return SCOSSL_FAILURE;
     }
 
@@ -269,19 +313,9 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
         goto cleanup;
     }
 
-    if (genCtx->groupInfo->classicGroupName != NULL)
+    if (p_scossl_mlkem_hybrid_keygen(keyCtx, genCtx) != SCOSSL_SUCCESS)
     {
-        if ((keyCtx->classicKeyCtx = p_scossl_ecc_new_ctx(keyCtx->provCtx)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
-        if (p_scossl_ecc_set_group(keyCtx->classicKeyCtx, genCtx->groupInfo->classicGroupName) != SCOSSL_SUCCESS ||
-            p_scossl_ecc_gen(keyCtx->classicKeyCtx) != SCOSSL_SUCCESS)
-        {
-            goto cleanup;
-        }
+        goto cleanup;
     }
 
     keyCtx->provCtx = genCtx->provCtx;
@@ -293,11 +327,6 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        if (keyCtx != NULL)
-        {
-            p_scossl_ecc_free_ctx(keyCtx->classicKeyCtx);
-        }
-
         p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
         keyCtx = NULL;
     }
@@ -323,7 +352,7 @@ static const OSSL_PARAM *p_scossl_mlkem_keymgmt_settable_params(ossl_unused void
     return p_scossl_mlkem_keymgmt_settable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -401,12 +430,6 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_key_params(_In_ SCOSSL_MLKEM_KEY
     {
         OPENSSL_secure_clear_free(pbKey, cbKey);
 
-        if (keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-            goto cleanup;
-        }
-
         status = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
             &pbKey, &cbKey);
@@ -467,9 +490,15 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
             return SCOSSL_FAILURE;
         }
 
-        if (keyCtx->classicKeyCtx != NULL)
+        if (p_scossl_mlkem_is_hybrid(keyCtx))
         {
-            cbMax += p_scossl_ecc_get_max_result_size(keyCtx->classicKeyCtx, TRUE);
+            if (keyCtx->classicKeyCtx == NULL)
+            {
+                SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Missing classic key in hybrid MLKEM key");
+                return SCOSSL_FAILURE;
+            }
+
+            cbMax += p_scossl_ecc_get_max_result_size(keyCtx->classicKeyCtx, FALSE);
         }
 
         if (!OSSL_PARAM_set_size_t(p, cbMax))
@@ -536,71 +565,36 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR))
     {
-        if (keyCtx1->key != NULL || keyCtx2->key != NULL)
+        if (keyCtx1->key != NULL && keyCtx2->key != NULL)
         {
-            if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+            success = p_scossl_mlkem_keymgmt_get_encoded_key(
+                keyCtx1,
+                selection,
+                &pbKey1, &cbKey1);
+            if (!success)
             {
-                // Both keys must be decapsulation keys to compare
-                if (keyCtx1->format != keyCtx2->format)
-                {
-                    goto cleanup;
-                }
-
-                // Reset pbKeys in case they was used for encapsulation key compare
-                OPENSSL_secure_clear_free(pbKey1, cbKey1);
-                OPENSSL_secure_clear_free(pbKey2, cbKey2);
-
-                success = p_scossl_mlkem_keymgmt_get_encoded_key(
-                    keyCtx1,
-                    OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-                    &pbKey1, &cbKey1);
-                if (!success)
-                {
-                    goto cleanup;
-                }
-
-                success = p_scossl_mlkem_keymgmt_get_encoded_key(
-                    keyCtx2,
-                    OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-                    &pbKey2, &cbKey2);
-                if (!success)
-                {
-                    goto cleanup;
-                }
-
-                if (cbKey1 != cbKey2 ||
-                    memcmp(pbKey1, pbKey2, cbKey1) != 0)
-                {
-                    goto cleanup;
-                }
+                goto cleanup;
             }
 
-            if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+            success = p_scossl_mlkem_keymgmt_get_encoded_key(
+                keyCtx2,
+                selection,
+                &pbKey2, &cbKey2);
+            if (!success)
             {
-                success = p_scossl_mlkem_keymgmt_get_encoded_key(
-                    keyCtx1,
-                    OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
-                    &pbKey1, &cbKey1);
-                if (!success)
-                {
-                    goto cleanup;
-                }
-
-                success = p_scossl_mlkem_keymgmt_get_encoded_key(
-                    keyCtx2,
-                    OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
-                    &pbKey2, &cbKey2);
-                if (!success)
-                {
-                    goto cleanup;
-                }
-
-                if (cbKey1 != cbKey2 ||
-                    memcmp(pbKey1, pbKey2, cbKey1) != 0)
-                {
-                    goto cleanup;
-                }
+                goto cleanup;
             }
+
+            if (cbKey1 != cbKey2 ||
+                memcmp(pbKey1, pbKey2, cbKey1) != 0)
+            {
+                goto cleanup;
+            }
+        }
+        // No match in the case where only one key is set.
+        else if ((keyCtx1->key == NULL) != (keyCtx2->key == NULL))
+        {
+            goto cleanup;
         }
     }
 
@@ -659,8 +653,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
             return SCOSSL_FAILURE;
         }
 
-        if (keyCtx->classicKeyCtx != NULL &&
-            keyCtx->groupInfo->classicGroupName != NULL &&
+        if (p_scossl_mlkem_is_hybrid(keyCtx) &&
             p_scossl_ecc_set_group(keyCtx->classicKeyCtx, keyCtx->groupInfo->classicGroupName) != SCOSSL_SUCCESS)
         {
             return SCOSSL_FAILURE;
@@ -731,13 +724,6 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 &&
-        keyCtx->key == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        goto cleanup;
-    }
-
     if ((bld = OSSL_PARAM_BLD_new()) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -772,12 +758,6 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        if (keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-            goto cleanup;
-        }
-
         // Reset pbKey in case it was used for encapsulation key export
         OPENSSL_secure_clear_free(pbKey, cbKey);
 
@@ -796,6 +776,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+    }
+
+    if ((params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
     }
 
     ret = param_cb(params, cbarg);
@@ -844,6 +830,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
     SIZE_T cbMlKemKey = 0;
     PBYTE pbClassicKey = NULL;
     SIZE_T cbClassicKey = 0;
+    BOOL isHybrid = p_scossl_mlkem_is_hybrid(keyCtx);
     SYMCRYPT_MLKEMKEY_FORMAT format;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -852,6 +839,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return SCOSSL_FAILURE;
+    }
+
+    if (isHybrid && keyCtx->classicKeyCtx == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Missing classic key in hybrid MLKEM key");
+        goto cleanup;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
@@ -877,7 +870,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    if (keyCtx->classicKeyCtx != NULL &&
+    if (isHybrid &&
         (cbClassicKey = p_scossl_ecc_get_encoded_key_size(keyCtx->classicKeyCtx, selection)) == 0)
     {
         goto cleanup;
@@ -893,8 +886,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    if (keyCtx->classicKeyCtx != NULL &&
-        keyCtx->classicKeyCtx->isX25519)
+    if (isHybrid && keyCtx->classicKeyCtx->isX25519)
     {
         pbMlKemKey = pbKey;
         pbClassicKey = pbKey + cbMlKemKey;
@@ -912,7 +904,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
-    if (keyCtx->classicKeyCtx != NULL &&
+    if (isHybrid &&
         p_scossl_ecc_get_encoded_key(keyCtx->classicKeyCtx, selection, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
@@ -932,14 +924,21 @@ cleanup:
     return SCOSSL_SUCCESS;
 }
 
+// Sets the key in keyCtx to the encoded key bytes in pbKey. The key type is indicated by selection.
+// If this is a private key, and the ML-KEM portion is 64 bytes, then the ML-KEM portion is 
+// decoded as a private seed. If keyCtx->key is NULL, then a new key is allocated. Otherwise,
+// the existing key data in keyCtx->key is overwritten by the new data.
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
                                                      PCBYTE pbKey, SIZE_T cbKey)
 {
+    BOOL isNewKey = keyCtx->key == NULL;
+    SYMCRYPT_MLKEMKEY_FORMAT format;
     PCBYTE pbMlKemKey = NULL;
     SIZE_T cbMlKemKey = 0;
     PCBYTE pbClassicKey = NULL;
     SIZE_T cbClassicKey = 0;
+    BOOL isHybrid = p_scossl_mlkem_is_hybrid(keyCtx);
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -949,14 +948,20 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
         goto cleanup;
     }
 
-    if (keyCtx->key == NULL &&
+    if (isHybrid && keyCtx->classicKeyCtx == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Missing classic key in hybrid MLKEM key");
+        goto cleanup;
+    }
+
+    if (isNewKey &&
         (keyCtx->key = SymCryptMlKemkeyAllocate(keyCtx->groupInfo->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
-    if (keyCtx->groupInfo->classicGroupName != NULL)
+    if (isHybrid)
     {
         if (keyCtx->classicKeyCtx == NULL &&
             (keyCtx->classicKeyCtx = p_scossl_ecc_new_ctx(keyCtx->provCtx)) == NULL)
@@ -973,14 +978,14 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        keyCtx->format = cbKey - cbClassicKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
+        format = cbKey - cbClassicKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
     }
     else
     {
-        keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
+        format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
     }
 
-    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->groupInfo->mlkemParams, keyCtx->format, &cbMlKemKey);
+    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->groupInfo->mlkemParams, format, &cbMlKemKey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemSizeofKeyFormatFromParams failed", scError);
@@ -993,8 +998,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
         goto cleanup;
     }
 
-    if (keyCtx->classicKeyCtx != NULL &&
-        keyCtx->classicKeyCtx->isX25519)
+    if (isHybrid && keyCtx->classicKeyCtx->isX25519)
     {
         pbMlKemKey = pbKey;
         pbClassicKey = pbKey + cbMlKemKey;
@@ -1005,14 +1009,15 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
         pbMlKemKey = pbKey + cbClassicKey;
     }
 
-    scError = SymCryptMlKemkeySetValue(pbMlKemKey, cbMlKemKey, keyCtx->format, 0, keyCtx->key);
+    scError = SymCryptMlKemkeySetValue(pbMlKemKey, cbMlKemKey, format, 0, keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemkeySetValue failed", scError);
         goto cleanup;
     }
+    keyCtx->format = format;
 
-    if (keyCtx->classicKeyCtx != NULL)
+    if (isHybrid)
     {
         if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
         {
@@ -1032,10 +1037,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    if (ret != SCOSSL_SUCCESS)
-    {
+    if (ret != SCOSSL_SUCCESS && isNewKey)
+    {    
         SymCryptMlKemkeyFree(keyCtx->key);
+        p_scossl_ecc_free_ctx(keyCtx->classicKeyCtx);
         keyCtx->key = NULL;
+        keyCtx->classicKeyCtx = NULL;
         keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
     }
 

@@ -29,7 +29,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
     int cbDer;
     ASN1_OCTET_STRING *p8Data = NULL;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
-    ASN1_OBJECT *p8Obj = NULL;
+    ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (keyCtx->key == NULL)
@@ -45,7 +45,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -68,6 +68,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
     }
+    pbDer = NULL;
 
     status = SCOSSL_SUCCESS;
 
@@ -75,13 +76,12 @@ cleanup:
     if (status != SCOSSL_SUCCESS)
     {
         PKCS8_PRIV_KEY_INFO_free(p8Info);
-        OPENSSL_free(pbDer);
         p8Info = NULL;
     }
-
-    ASN1_OCTET_STRING_free(p8Data);
-    ASN1_OBJECT_free(p8Obj);
+    
+    OPENSSL_clear_free(pbDer, cbDer);
     OPENSSL_secure_clear_free(pbKey, cbKey);
+    ASN1_OCTET_STRING_free(p8Data);
 
     return p8Info;
 }
@@ -91,7 +91,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
     PBYTE pbKey = NULL;
     SIZE_T cbKey;
     X509_PUBKEY *pubKey = NULL;
-    ASN1_OBJECT *p8Obj = NULL;
+    ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (keyCtx->key == NULL)
@@ -106,7 +106,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -122,20 +122,18 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
     }
+    pbKey = NULL;
 
     status = SCOSSL_SUCCESS;
 
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        if (pubKey == NULL)
-        {
-            OPENSSL_secure_free(pbKey);
-            ASN1_OBJECT_free(p8Obj);
-        }
         X509_PUBKEY_free(pubKey);
         pubKey = NULL;
     }
+
+    OPENSSL_secure_free(pbKey); 
 
     return pubKey;
 }
@@ -143,15 +141,22 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                                _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                               ossl_unused int selection,
+                                                               int selection,
                                                                _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
+    OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     X509_SIG *p8 = NULL;
     char pbPass[PEM_BUFSIZE];
     SIZE_T cbPass = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
 
     if (ctx->cipher == NULL)
     {
@@ -170,7 +175,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCOD
         goto cleanup;
     }
 
-    if ((p8 = PKCS8_encrypt_ex(-1, ctx->cipher, pbPass, cbPass, NULL, 0, 0, p8Info, ctx->provctx->libctx, NULL)) == NULL)
+    if ((p8 = PKCS8_encrypt_ex(-1, ctx->cipher, pbPass, cbPass, NULL, 0, 0, p8Info, libctx, NULL)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
         goto cleanup;
@@ -203,12 +208,18 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                       _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                      ossl_unused int selection,
+                                                      int selection,
                                                       _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
     int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
 
     if (ctx->cipher != NULL)
     {
@@ -243,14 +254,20 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(ossl_unused SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
                                                             _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                            ossl_unused int selection,
+                                                            int selection,
                                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
     int encodeSuccess;
     X509_PUBKEY *pubKey = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
 
     if ((pubKey = p_scossl_mlkem_key_to_pubkey(keyCtx)) == NULL)
     {
@@ -285,9 +302,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
                                             int selection,
                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
-    BOOL printPrivateSeed = FALSE;
-    BOOL printDecapsulationKey = FALSE;
-    BOOL printEncapsulationKey = FALSE;
+    BOOL printedPrivateKey = FALSE;
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -300,80 +315,73 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-            goto cleanup;
-        }
-
-        printDecapsulationKey = TRUE;
-        printEncapsulationKey = TRUE;
-    }
-    else if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
-    {
-        printEncapsulationKey = TRUE;
-    }
-
-    if (printDecapsulationKey)
-    {
         // Try to get the private seed. Otherwise this key was encoded using the whole decapsulation key.
-        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey))
+
+        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED)
         {
-            if (BIO_printf(out, "MLKEM Decapsulation-Key (512 bit private seed encoding):\n") <= 0)
+            if (p_scossl_mlkem_is_hybrid(keyCtx))
+            {
+                if (BIO_printf(out, "MLKEM Hybrid Private-Key (classic private key with 512 bit MLKEM private seed):\nhybrid-private-key") <= 0)
+                {
+                    goto cleanup;
+                }
+            }
+            else if (BIO_printf(out, "MLKEM Private-Key (512 bit private seed encoding):\nprivate-seed") <= 0)
             {
                 goto cleanup;
             }
-
-            if (BIO_printf(out, "private-seed") <= 0 ||
-                p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
+        }
+        else 
+        {
+            if (p_scossl_mlkem_is_hybrid(keyCtx))
+            {
+                if (BIO_printf(out, "MLKEM Hybrid Private-Key (classic private key with %ld bit MLKEM decapsulation key):\nhybrid-private-key",  cbKey * 8) <= 0)
+                {
+                    goto cleanup;
+                }
+            }
+            else if (BIO_printf(out, "MLKEM Private-Key (%ld bit decapsulation key encoding):\ndecapsulation-key", cbKey * 8) <= 0)
             {
                 goto cleanup;
             }
-
-            printPrivateSeed = TRUE;
         }
 
-        OPENSSL_secure_clear_free(pbKey, cbKey);
-        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY, &pbKey, &cbKey))
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbKey, &cbKey) ||
+             p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (!printPrivateSeed &&
-            BIO_printf(out, "MLKEM Decapsulation-Key (%ld bit decapsulation key encoding):", cbKey * 8) <= 0)
-        {
-            goto cleanup;
-        }
-
-        if (BIO_printf(out, "decapsulation-key") <= 0 ||
-            p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
-        {
-            goto cleanup;
-        }
+        printedPrivateKey = TRUE;
     }
 
-    if (printEncapsulationKey)
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
     {
         OPENSSL_secure_clear_free(pbKey, cbKey);
-        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey))
+
+        if (p_scossl_mlkem_is_hybrid(keyCtx))
+        {
+            if ((!printedPrivateKey && BIO_printf(out, "MLKEM Hybrid Public-Key (classic public key with %ld bit MLKEM encapsulation key):\n", cbKey * 8) <= 0) ||
+                BIO_printf(out, "hybrid-public-key") <= 0)
+            {
+                goto cleanup;
+            }
+        }
+        else if ((!printedPrivateKey && BIO_printf(out, "MLKEM Public-Key (%ld bit):\n", cbKey * 8) <= 0) ||
+                 BIO_printf(out, "encapsulation-key") <= 0)
         {
             goto cleanup;
         }
 
-        if (!printDecapsulationKey && // Implies no private seed
-            BIO_printf(out, "MLKEM Encapsulation-Key (%ld bit):", cbKey * 8) <= 0)
-        {
-            goto cleanup;
-        }
-
-        if (BIO_printf(out, "encapsulation-key") <= 0 ||
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) ||
             p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
     }
 
-    if (BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupInfo->lnGroupName) <= 0)
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0 &&
+        BIO_printf(out, "PARAMETER SET: %s\n", keyCtx->groupInfo->lnGroupName) <= 0)
     {
         goto cleanup;
     }
@@ -391,9 +399,11 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_encoder_import_object(_In_ SCOSSL_EN
 {
     SCOSSL_MLKEM_KEY_CTX *keyCtx = p_scossl_mlkem_keymgmt_new_ctx(ctx->provctx);
 
-    if (keyCtx != NULL)
+    if (keyCtx != NULL &&
+        p_scossl_mlkem_keymgmt_import(keyCtx, selection, params) != SCOSSL_SUCCESS)
     {
-        p_scossl_mlkem_keymgmt_import(keyCtx, selection, params);
+        p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
+        keyCtx = NULL;
     }
 
     return keyCtx;

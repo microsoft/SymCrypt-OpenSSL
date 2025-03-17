@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-#define SYMCRYPT_MLKEM_SECRET_LENGTH 32
+#define SCOSSL_MLKEM_SECRET_LENGTH 32
 
 static SCOSSL_MLKEM_GROUP_INFO p_scossl_mlkem_groups[] = {
     {NID_undef, SCOSSL_OID_MLKEM512, SCOSSL_SN_MLKEM512, SCOSSL_LN_MLKEM512, NULL, SYMCRYPT_MLKEM_PARAMS_MLKEM512},
@@ -116,6 +116,13 @@ static SCOSSL_STATUS p_scossl_mlkem_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCO
         return SCOSSL_FAILURE;
     }
 
+    if (p_scossl_mlkem_is_hybrid(keyCtx) &&
+        keyCtx->classicKeyCtx == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Missing classic key in hybrid MLKEM key");
+        return SCOSSL_FAILURE;
+    }
+
     ctx->keyCtx = keyCtx;
     ctx->operation = operation;
 
@@ -149,7 +156,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *c
 //      P-256/P-384:    Ephemeral ECDH public key || MLKEM ciphertext
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
-                                                _Out_writes_bytes_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen)
+                                                _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen)
 {
     PBYTE pbMlkemCipherText = NULL;
     PBYTE pbClassicKey = NULL;
@@ -158,6 +165,8 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
     SIZE_T cbClassicKey = 0;
     SIZE_T cbMlkemCiphertext = 0;
     SIZE_T cbClassicSecret = 0;
+    SIZE_T cbOut;
+    SIZE_T cbSecret;
     SCOSSL_ECC_KEY_CTX *classicKeyCtxPeer = NULL;
     SCOSSL_ECC_KEY_CTX *classicKeyCtxPrivate = NULL;
     const SCOSSL_MLKEM_GROUP_INFO *groupInfo;
@@ -190,6 +199,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
         if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPeer, TRUE)) == 0)
         {
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_max_result_size failed");
             goto cleanup;
         }
     }
@@ -201,10 +211,19 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         goto cleanup;
     }
 
+    cbOut = cbClassicKey + cbMlkemCiphertext;
+    cbSecret = cbClassicSecret + SCOSSL_MLKEM_SECRET_LENGTH;
+
     if (out != NULL)
     {
-        if ((outlen != NULL && *outlen < cbClassicKey + cbMlkemCiphertext) ||
-            (secretlen != NULL && *secretlen < cbClassicSecret + SYMCRYPT_MLKEM_SECRET_LENGTH))
+        if (secret == NULL || outlen == NULL || secretlen == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+            goto cleanup;
+        }
+
+        if ((*outlen < cbOut) ||
+            (*secretlen < cbSecret))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
             goto cleanup;
@@ -217,7 +236,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                 pbMlkemCipherText = out;
                 pbClassicKey = out + cbMlkemCiphertext;
                 pbMlkemSecret = secret;
-                pbClassicSecret = secret + SYMCRYPT_MLKEM_SECRET_LENGTH;
+                pbClassicSecret = secret + SCOSSL_MLKEM_SECRET_LENGTH;
             }
             else
             {
@@ -260,7 +279,7 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             pbMlkemSecret = secret;
         }
 
-        scError = SymCryptMlKemEncapsulate(ctx->keyCtx->key, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH, pbMlkemCipherText, cbMlkemCiphertext);
+        scError = SymCryptMlKemEncapsulate(ctx->keyCtx->key, pbMlkemSecret, SCOSSL_MLKEM_SECRET_LENGTH, pbMlkemCipherText, cbMlkemCiphertext);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemEncapsulate failed", scError);
@@ -275,12 +294,12 @@ static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
     if (outlen != NULL)
     {
-        *outlen = cbClassicKey + cbMlkemCiphertext;
+        *outlen = cbOut;
     }
 
     if (secretlen != NULL)
     {
-        *secretlen = cbClassicSecret + SYMCRYPT_MLKEM_SECRET_LENGTH;
+        *secretlen = cbSecret;
     }
 
     ret = SCOSSL_SUCCESS;
@@ -301,8 +320,25 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_decapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                      ossl_unused const OSSL_PARAM params[])
 {
-    return p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_DECAPSULATE) &&
-           (keyCtx->classicKeyCtx == NULL || p_scossl_mlkem_classic_keyexch_init(ctx, ctx->keyCtx->classicKeyCtx));
+    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_DECAPSULATE) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED &&
+        ctx->keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+        return SCOSSL_FAILURE;   
+    }
+
+    if (keyCtx->groupInfo->classicGroupName != NULL &&
+        p_scossl_mlkem_classic_keyexch_init(ctx, ctx->keyCtx->classicKeyCtx) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 // Performs ML-KEM decapsulation using the previously initialized context. If
@@ -359,6 +395,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         // Get secret size
         if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPrivate, TRUE)) == 0)
         {
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_max_result_size failed");
             goto cleanup;
         }
     }
@@ -370,15 +407,21 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
         goto cleanup;
     }
 
-    if (inlen != cbMlkemCiphertext + cbClassicKey)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_INPUT_LENGTH);
-        goto cleanup;
-    }
-
     if (out != NULL)
     {
-        if (outlen != NULL && *outlen < SYMCRYPT_MLKEM_SECRET_LENGTH + cbClassicSecret)
+        if (inlen != cbMlkemCiphertext + cbClassicKey)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_INPUT_LENGTH);
+            goto cleanup;
+        }
+
+        if (outlen == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+            goto cleanup;
+        }
+
+        if (*outlen < SCOSSL_MLKEM_SECRET_LENGTH + cbClassicSecret)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
             goto cleanup;
@@ -391,7 +434,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                 pbMlkemCipherText = in;
                 pbClassicKey = in + cbMlkemCiphertext;
                 pbMlkemSecret = out;
-                pbClassicSecret = out + SYMCRYPT_MLKEM_SECRET_LENGTH;
+                pbClassicSecret = out + SCOSSL_MLKEM_SECRET_LENGTH;
             }
             else
             {
@@ -427,7 +470,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             pbMlkemSecret = out;
         }
 
-        scError = SymCryptMlKemDecapsulate(ctx->keyCtx->key, pbMlkemCipherText, cbMlkemCiphertext, pbMlkemSecret, SYMCRYPT_MLKEM_SECRET_LENGTH);
+        scError = SymCryptMlKemDecapsulate(ctx->keyCtx->key, pbMlkemCipherText, cbMlkemCiphertext, pbMlkemSecret, SCOSSL_MLKEM_SECRET_LENGTH);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemDecapsulate failed", scError);
@@ -442,9 +485,8 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
 
     if (outlen != NULL)
     {
-        *outlen = SYMCRYPT_MLKEM_SECRET_LENGTH + cbClassicSecret;
+        *outlen = SCOSSL_MLKEM_SECRET_LENGTH + cbClassicSecret;
     }
-
     ret = SCOSSL_SUCCESS;
 
 cleanup:
@@ -485,6 +527,14 @@ const OSSL_DISPATCH p_scossl_mlkem_functions[] = {
     {OSSL_FUNC_KEM_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_ctx_param_types},
     {0, NULL}};
 
+_Use_decl_annotations_
+BOOL p_scossl_mlkem_is_hybrid(const SCOSSL_MLKEM_KEY_CTX *keyCtx)
+{
+    return keyCtx != NULL &&
+           keyCtx->groupInfo != NULL &&
+           keyCtx->groupInfo->classicGroupName != NULL;
+}
+    
 _Use_decl_annotations_
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info_by_nid(int nid)
 {

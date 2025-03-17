@@ -28,6 +28,8 @@ typedef struct {
     SCOSSL_ECC_KEY_CTX *classicKeyCtx;
 } SCOSSL_MLKEM_KEY_CTX;
 
+BOOL p_scossl_mlkem_is_hybrid(_In_ const SCOSSL_MLKEM_KEY_CTX *ctx);
+
 SCOSSL_STATUS p_scossl_mlkem_register_algorithms();
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info_by_nid(int nid);
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info(_In_ const char *groupName);

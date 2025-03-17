@@ -431,7 +431,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL)
     {
         SIZE_T cbEncodedKey;
-        if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbEncodedKey, &cbEncodedKey) ||
+        if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbEncodedKey, &cbEncodedKey) ||
             !OSSL_PARAM_set_octet_string(p, pbEncodedKey, cbEncodedKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -445,7 +445,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     {
         if (keyCtx->isX25519)
         {
-            if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_KEYPAIR, &pbPrivateKey, &cbPrivateKey) ||
+            if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbPrivateKey, &cbPrivateKey) ||
                 !OSSL_PARAM_set_octet_string(p, pbPrivateKey, cbPrivateKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -851,8 +851,6 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
     BIGNUM *bnPrivateKey = NULL;
-    BN_CTX *bnCtx = NULL;
-    EC_POINT *ecPoint = NULL;
     const OSSL_PARAM *p;
 
     // Domain parameters (curve) are required for import
@@ -974,8 +972,6 @@ cleanup:
     OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
     BN_clear_free(bnPrivateKey);
     EC_GROUP_free(ecGroup);
-    EC_POINT_free(ecPoint);
-    BN_CTX_free(bnCtx);
 
     return ret;
 }
@@ -1028,7 +1024,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
 
         if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
         {
-            if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbPublicKey, &cbPublicKey) ||
+            if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbPublicKey, &cbPublicKey) ||
                 !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbPublicKey, cbPublicKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

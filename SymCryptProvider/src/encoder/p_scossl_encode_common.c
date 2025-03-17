@@ -48,7 +48,7 @@ SCOSSL_STATUS p_scossl_encode_set_ctx_params(SCOSSL_ENCODE_CTX *ctx, const OSSL_
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_ENCODER_PARAM_CIPHER)) != NULL)
     {
-        OSSL_LIB_CTX *libctx = ctx->provctx != NULL ? ctx->provctx->libctx : NULL;
+        OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
         const char *cipherName = NULL;
         const char *propQ = NULL;
 
@@ -155,15 +155,10 @@ SCOSSL_STATUS p_scossl_encode_write_key_bytes(PCBYTE pbKey, SIZE_T cbKey, BIO *o
             }
         }
 
-        if (BIO_printf(out, "%02x%s", pbKey[i], (i < cbKey - 1) ? ":" : "") <= 0)
+        if (BIO_printf(out, "%02x%s", pbKey[i], (i < cbKey - 1) ? ":" : "\n") <= 0)
         {
             return SCOSSL_FAILURE;
         }
-    }
-
-    if (BIO_printf(out, "\n") <= 0)
-    {
-        return SCOSSL_FAILURE;
     }
 
     return SCOSSL_SUCCESS;
