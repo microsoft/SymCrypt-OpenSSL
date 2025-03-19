@@ -666,6 +666,7 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                 SymCryptCcmEncryptPart(&ctx->state, in, out, inl);
             }
             SymCryptCcmEncryptFinal(&ctx->state, ctx->tag, ctx->taglen);
+            ctx->tagSet = 1;
             ctx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
         }
         else
