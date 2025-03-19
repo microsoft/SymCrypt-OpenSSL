@@ -61,6 +61,7 @@ extern "C" {
 // KDF
 #define SCOSSL_ALG_NAME_HKDF        SN_hkdf
 #define SCOSSL_ALG_NAME_KBKDF       "KBKDF"
+#define SCOSSL_ALG_NAME_PBKDF2      LN_id_pbkdf2":1.2.840.113549.1.5.12"
 #define SCOSSL_ALG_NAME_SRTPKDF     "SRTPKDF"
 #define SCOSSL_ALG_NAME_SRTCPKDF    "SRTCPKDF"
 #define SCOSSL_ALG_NAME_SSHKDF      SN_sshkdf

@@ -111,9 +111,6 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
     {
         keyCtx->curve = scossl_ecc_get_x25519_curve();
         keyCtx->isX25519 = TRUE;
-#ifdef KEYSINUSE_ENABLED
-        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-#endif
     }
 
     return keyCtx;
