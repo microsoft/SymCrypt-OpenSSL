@@ -1271,6 +1271,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     ret = SCOSSL_SUCCESS;
 
 cleanup:
+    OPENSSL_free(pbPrivateExponent);
     OPENSSL_free(pbModulus);
     OPENSSL_free(ppbPrimes[0]);
     OPENSSL_free(ppbPrimes[1]);
