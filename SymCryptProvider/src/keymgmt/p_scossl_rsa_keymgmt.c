@@ -1064,8 +1064,8 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
 cleanup:
     OPENSSL_free(pbModulus1);
     OPENSSL_free(pbModulus2);
-    OPENSSL_secure_free(pbPrivateExponent1);
-    OPENSSL_secure_free(pbPrivateExponent2);
+    OPENSSL_secure_clear_free(pbPrivateExponent1, cbModulus);
+    OPENSSL_secure_clear_free(pbPrivateExponent2, cbModulus);
 
     return ret;
 }
@@ -1114,7 +1114,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         {
             cbModulus = p->data_size;
 
-            pbModulus = OPENSSL_zalloc(cbModulus);
+            pbModulus = OPENSSL_malloc(cbModulus);
             if (pbModulus == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -1141,7 +1141,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             {
                 pcbPrimes[0] = p->data_size;
 
-                ppbPrimes[0] = OPENSSL_zalloc(pcbPrimes[0]);
+                ppbPrimes[0] = OPENSSL_secure_malloc(pcbPrimes[0]);
                 if (ppbPrimes[0] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -1160,7 +1160,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             {
                 pcbPrimes[1] = p->data_size;
 
-                ppbPrimes[1] = OPENSSL_zalloc(pcbPrimes[1]);
+                ppbPrimes[1] = OPENSSL_secure_malloc(pcbPrimes[1]);
                 if(ppbPrimes[1] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -1182,7 +1182,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             {
                 cbPrivateExponent = p->data_size;
 
-                pbPrivateExponent = OPENSSL_zalloc(cbPrivateExponent);
+                pbPrivateExponent = OPENSSL_secure_malloc(cbPrivateExponent);
                 if(pbPrivateExponent == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -1271,10 +1271,10 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_free(pbPrivateExponent);
+    OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
+    OPENSSL_secure_clear_free(ppbPrimes[0], pcbPrimes[0]);
+    OPENSSL_secure_clear_free(ppbPrimes[1], pcbPrimes[1]);
     OPENSSL_free(pbModulus);
-    OPENSSL_free(ppbPrimes[0]);
-    OPENSSL_free(ppbPrimes[1]);
     BN_free(bn);
 
     return ret;
