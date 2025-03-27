@@ -287,12 +287,15 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_len(SCOSSL_CIPHER_GCM_CTX *ctx, size_t ivlen
         return SCOSSL_FAILURE;
     }
 
-    ctx->ivlen = ivlen;
-
-    if (ctx->iv != NULL)
+    if (ivlen != ctx->ivlen)
     {
-        OPENSSL_free(ctx->iv);
-        ctx->iv = NULL;
+        ctx->ivlen = ivlen;
+    
+        if (ctx->iv != NULL)
+        {
+            OPENSSL_free(ctx->iv);
+            ctx->iv = NULL;
+        }
     }
 
     return SCOSSL_SUCCESS;
@@ -429,6 +432,8 @@ void scossl_aes_ccm_init_ctx(SCOSSL_CIPHER_CCM_CTX *ctx,
         memcpy(ctx->iv, iv, ctx->ivlen);
     }
     ctx->taglen = SCOSSL_CCM_MAX_TAG_LENGTH;
+    ctx->ivSet = 0;
+    ctx->tagSet = 0;
     ctx->tlsAadSet = 0;
 }
 
@@ -450,6 +455,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(SCOSSL_CIPHER_CCM_CTX *ctx,
 
         ctx->ivlen = ivlen;
         memcpy(ctx->iv, iv, ctx->ivlen);
+        ctx->ivSet = 1;
     }
     if (key)
     {
@@ -618,6 +624,13 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
 
     if (ctx->ccmStage == SCOSSL_CCM_STAGE_SET_CBDATA)
     {
+        if (!ctx->ivSet)
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
+                "No IV provided to CCM");
+            return SCOSSL_FAILURE;
+        }
+
         if (out == NULL)
         {
             // Auth Data Passed in
@@ -653,10 +666,17 @@ SCOSSL_STATUS scossl_aes_ccm_cipher(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encrypt,
                 SymCryptCcmEncryptPart(&ctx->state, in, out, inl);
             }
             SymCryptCcmEncryptFinal(&ctx->state, ctx->tag, ctx->taglen);
+            ctx->tagSet = 1;
             ctx->ccmStage = SCOSSL_CCM_STAGE_COMPLETE;
         }
         else
         {
+            if (!ctx->tagSet)
+            {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_AES_CCM_CIPHER, ERR_R_PASSED_INVALID_ARGUMENT,
+                    "No tag provided to CCM Decrypt");
+                return SCOSSL_FAILURE;
+            }
             // Decryption
             if (in != NULL)
             {
@@ -680,7 +700,7 @@ SCOSSL_STATUS scossl_aes_ccm_get_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
                                           unsigned char *tag, size_t taglen)
 {
     if ((taglen & 1) || taglen < SCOSSL_CCM_MIN_TAG_LENGTH || taglen > SCOSSL_CCM_MAX_TAG_LENGTH ||
-        taglen > ctx->taglen || !encrypt)
+        taglen > ctx->taglen || !encrypt || !ctx->tagSet)
     {
         return SCOSSL_FAILURE;
     }
@@ -702,6 +722,7 @@ SCOSSL_STATUS scossl_aes_ccm_set_aead_tag(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
         memcpy(ctx->tag, tag, taglen);
     }
     ctx->taglen = taglen;
+    ctx->tagSet = 1;
 
     return SCOSSL_SUCCESS;
 }
@@ -717,7 +738,12 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_len(SCOSSL_CIPHER_CCM_CTX *ctx, size_t ivlen
         return SCOSSL_FAILURE;
     }
 
-    ctx->ivlen = ivlen;
+    if (ctx->ivlen != ivlen)
+    {
+        ctx->ivlen = ivlen;
+        ctx->ivSet = 0;
+    }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -750,6 +776,8 @@ SCOSSL_STATUS scossl_aes_ccm_set_iv_fixed(SCOSSL_CIPHER_CCM_CTX *ctx, INT32 encr
     {
         return SCOSSL_FAILURE;
     }
+
+    ctx->ivSet = 1;
 
     return SCOSSL_SUCCESS;
 }

@@ -88,10 +88,12 @@ typedef struct
     SCOSSL_CCM_STAGE ccmStage;
     BYTE iv[SCOSSL_CCM_MAX_IV_LENGTH];
     SIZE_T ivlen;
+    INT32 ivSet;
     SYMCRYPT_CCM_STATE state;
     SYMCRYPT_AES_EXPANDED_KEY key;
     BYTE tag[EVP_CCM_TLS_TAG_LEN];
     SIZE_T taglen;
+    INT32 tagSet;
     UINT64 cbData;
     BYTE tlsAad[EVP_AEAD_TLS1_AAD_LEN];
     INT32 tlsAadSet;
