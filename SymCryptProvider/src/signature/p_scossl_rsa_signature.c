@@ -198,6 +198,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ctx->padding = keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS ? RSA_PKCS1_PSS_PADDING : RSA_PKCS1_PADDING;
 
 #ifdef KEYSINUSE_ENABLED
+        // TODO: New APIS
         if (p_scossl_keysinuse_running() &&
             operation == EVP_PKEY_OP_SIGN)
         {
