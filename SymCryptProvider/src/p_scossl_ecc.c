@@ -625,6 +625,7 @@ cleanup:
 
 #ifdef KEYSINUSE_ENABLED
 _Use_decl_annotations_
+// TODO: Update to new APIs
 void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 {
     if (keyCtx->isImported &&

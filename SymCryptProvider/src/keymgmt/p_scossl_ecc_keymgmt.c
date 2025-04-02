@@ -97,7 +97,8 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
     if (keyCtx != NULL)
     {
 #ifdef KEYSINUSE_ENABLED
-        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+        // TODO: New APIS
+        keyCtx->Lock = CRYPTO_THREAD_lock_new();
 #endif
     }
 

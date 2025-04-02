@@ -106,6 +106,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
     {
         ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
+        // TODO: New APIs
         if (p_scossl_keysinuse_running() &&
             operation == EVP_PKEY_OP_DECRYPT &&
             keyCtx->isImported &&
