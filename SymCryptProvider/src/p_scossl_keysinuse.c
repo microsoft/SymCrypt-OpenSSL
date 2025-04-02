@@ -15,6 +15,42 @@
 extern "C" {
 #endif
 
+typedef struct
+{
+    time_t firstLogTime;
+    time_t lastLogTime;
+    UINT32 signCounter;
+    UINT32 decryptCounter;
+    // The first 32 bytes of the SHA256 hash of the encoded public key.
+    // Use the same encoding rules as the subjectPublicKey field of a certificate
+    // (PKCS#1 format for RSA, octet string for ECDSA)
+    char keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE + 1];
+    BOOL logPending;
+    INT32 refCount;
+    CRYPTO_RWLOCK *lock;
+} SCOSSL_KEYSINUSE_CTX_IMPL;
+
+static unsigned long scossl_keysinuse_ctx_hash(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx);
+static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx1, _In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx2);
+
+static IMPLEMENT_LHASH_HASH_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMPL)
+static IMPLEMENT_LHASH_COMP_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMPL)
+DEFINE_LHASH_OF_EX(SCOSSL_KEYSINUSE_CTX_IMPL);
+
+// All keysinuse contexts are created and destroyed by the keysinuse module.
+// The keysinuse contexts are refcounted and indexed in lh_keysinuse_info by
+// their keyIdentifier. 
+//
+// The first call to p_scossl_keysinuse_load_key with a given keyIdentifier
+// will create a new keysinuse context, increment its ref count, and add it 
+// to lh_keysinuse_info. Subsequent calls will fetch the existing context 
+// and increment the refcount. When the ref count reaches zero, the context
+// is freed and removed from lh_keysinuse_info. When p_scossl_keysinuse_teardown
+// is called, all keysinuse contexts are freed and removed from lh_keysinuse_info.
+static LHASH_OF(SCOSSL_KEYSINUSE_CTX) *lh_keysinuse_ctx = NULL;
+// This lock must be acquired before accessing lh_keysinuse_ctx
+static CRYPTO_RWLOCK *lh_keysinuse_ctx_lock = NULL;
+
 //
 // Configuration
 //
@@ -40,6 +76,8 @@ static int prefix_size = 0;
 //
 // Logging thread
 //
+
+// TODO: remove in favor of lh_TYPE_doall
 DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 // Stack of keysinuseInfo that have pending usage events to be logged by the logging thread.
 // This is destroyed if the logging thread fails to start, or when the logging thread exits.
@@ -65,6 +103,7 @@ static BOOL is_logging = FALSE;
 //
 // Internal function declarations
 //
+
 static void p_scossl_keysinuse_init_once();
 
 static void p_scossl_keysinuse_add_use(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning);
@@ -146,6 +185,8 @@ static void p_scossl_keysinuse_init_once()
         OPENSSL_free(prefix);
         prefix = (char*)default_prefix;
     }
+
+    // TODO: alloc lh_keysinuse_ctx and lh_keysinuse_ctx_lock
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
@@ -247,6 +288,13 @@ void p_scossl_keysinuse_teardown()
         prefix = (char*)default_prefix;
         prefix_size = 0;
     }
+    
+    // TODO
+    // Free lh_keysinuse_ctx_lock
+    // lh_keysinuse_ctx_lock = NULL;
+    // Free all objects left in lh_keysinuse_ctx
+    // Free lh_keysinuse_ctx
+    // Set lh_keysinuse_ctx to NULL
 
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
     sk_keysinuse_info_lock = NULL;
@@ -272,8 +320,102 @@ void p_scossl_keysinuse_set_logging_delay(INT64 delay)
 }
 
 //
-// KeysInUse info management
+// KeysInUse context lhash functions
 //
+_Use_decl_annotations_
+static unsigned long scossl_keysinuse_ctx_hash(const SCOSSL_KEYSINUSE_CTX_IMPL *ctx)
+{
+    return ctx == NULL ? NULL : OPENSSL_LH_strhash(ctx->keyIdentifier);
+}
+
+_Use_decl_annotations_
+static int scossl_keysinuse_ctx_cmp(const SCOSSL_KEYSINUSE_CTX_IMPL *ctx1, const SCOSSL_KEYSINUSE_CTX_IMPL *ctx2)
+ {
+    return ctx1 == NULL  && ctx2 != NULL &&
+        memcmp(ctx1->keyIdentifier, ctx2->keyIdentifier, sizeof(ctx1->keyIdentifier)) == 0;
+}
+
+//
+// KeysInUse context management
+//
+_Use_decl_annotations_
+SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
+{
+    SCOSSL_KEYSINUSE_CTX_IMPL keysinuseCtxTmpl;
+    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtx = NULL;
+    if (pbEncodedKey == NULL || 
+        cbEncodedKey == 0 || 
+        !p_scossl_keysinuse_running())
+    {
+        return NULL;
+    }
+    
+    // TODO
+    // keysinuseCtxTmpl->keyIdentifier = pbEncodedKey
+    // 
+    // lh_KEYSINUSE_CTX_retrieve()
+    // if NULL:
+    //     Alloc new KEYSINUSE_CTX
+    //     Initialize KEYSINUSE_CTX
+    //     lh_KEYSINUSE_CTX_insert
+    //     if FAIL:
+    //         Free KEYSINUSE_CTX
+    //         keysinuseCtx = NULL;
+    // Upref KEYSINUSE_CTX
+    //     if FAIL:
+    //         keysinuseCtx = NULL;
+
+    return keysinuseCtx;
+}
+
+_Use_decl_annotations_
+SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *keysinuseCtx)
+{
+    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtxImpl = (SCOSSL_KEYSINUSE_CTX_IMPL *)keysinuseCtx;
+
+    if (keysinuseCtx == NULL || 
+        !p_scossl_keysinuse_running())
+    {
+        return NULL;
+    }
+    
+    // TODO
+    // Upref keysinuseCtxImpl
+    //     if FAIL:
+    //         return NULL;
+
+    return keysinuseCtx;
+}
+
+_Use_decl_annotations_
+void p_scossl_keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *keysinuseCtx)
+{
+    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtxImpl = (SCOSSL_KEYSINUSE_CTX_IMPL*)keysinuseCtx;
+    INT32 ref;
+
+    if (keysinuseCtxImpl == NULL)
+        return;
+    // TODO
+    //  if (p_scossl_keysinuse_downref(keysinuseCtxImpl, &ref) &&
+    //      ref == 0)
+    //  {
+    //      if (p_scossl_keysinuse_running())
+    //      {
+    //          if (acquire lh_keysinuse_ctx_lock)
+    //              lh_TYPE_delete
+    //              unlock lh_keysinuse_ctx_lock
+    //          else
+    //              log keysinuse error
+    //              DO NOT free keysinuseCtxImpl, since a hanging reference will be left in lh_keysinuse_ctx
+    //              This will be unconditionally freed in teardown
+    //              return 
+    //      }
+    //      CRYPTO_THREAD_lock_free(keysinuseCtxImpl->lock);
+    //      OPENSSL_free(keysinuseCtxImpl);
+    //  }
+}
+
+// TODO: remove
 _Use_decl_annotations_
 SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(PBYTE pbPublicKey, SIZE_T cbPublicKey)
 {
@@ -308,6 +450,7 @@ SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(PBYTE pbPublicKey, SIZE_
     return keysinuseInfo;
 }
 
+// TODO remove
 _Use_decl_annotations_
 void p_scossl_keysinuse_info_free(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo)
 {
@@ -324,6 +467,7 @@ void p_scossl_keysinuse_info_free(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo)
     }
 }
 
+// TODO change signature, move up
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_keysinuse_upref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, INT32 *refOut)
 {
@@ -345,6 +489,7 @@ SCOSSL_STATUS p_scossl_keysinuse_upref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
     return SCOSSL_SUCCESS;
 }
 
+// TODO change signature, move up
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, INT32 *refOut)
 {
@@ -369,6 +514,8 @@ SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseIn
 //
 // Usage tracking
 //
+
+// TODO change signature, remove stack logic
 _Use_decl_annotations_
 static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning)
 {
@@ -449,11 +596,13 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
     }
 }
 
+// TODO change signature
 void p_scossl_keysinuse_on_sign(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo)
 {
     p_scossl_keysinuse_add_use(keysinuseInfo, TRUE);
 }
 
+// TODO change signature
 void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo)
 {
     p_scossl_keysinuse_add_use(keysinuseInfo, FALSE);
@@ -744,6 +893,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             goto cleanup;
         }
 
+        // TODO: lh_TYPE_doall instead of popping from a stack. Check if signCounter > 0 || decryptCounter > 0 to log
         if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
         {
             while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)

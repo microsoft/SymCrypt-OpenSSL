@@ -87,6 +87,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *p
     {
         keyCtx->keyType = RSA_FLAG_TYPE_RSA;
 #ifdef KEYSINUSE_ENABLED
+        // TODO: New APIS
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 #endif
     }
