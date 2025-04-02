@@ -122,6 +122,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
         ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
+        // TODO: New APIS
         if (p_scossl_keysinuse_running() &&
             operation == EVP_PKEY_OP_SIGN)
         {
