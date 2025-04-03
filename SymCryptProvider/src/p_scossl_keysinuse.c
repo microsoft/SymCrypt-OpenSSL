@@ -25,17 +25,16 @@ typedef struct
     // Use the same encoding rules as the subjectPublicKey field of a certificate
     // (PKCS#1 format for RSA, octet string for ECDSA)
     char keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE + 1];
-    BOOL logPending;
     INT32 refCount;
     CRYPTO_RWLOCK *lock;
-} SCOSSL_KEYSINUSE_CTX_IMPL;
+} SCOSSL_KEYSINUSE_CTX_IMP;
 
-static unsigned long scossl_keysinuse_ctx_hash(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx);
-static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx1, _In_opt_ const SCOSSL_KEYSINUSE_CTX_IMPL *ctx2);
+static unsigned long scossl_keysinuse_ctx_hash(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx1, _In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx2);
 
-static IMPLEMENT_LHASH_HASH_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMPL)
-static IMPLEMENT_LHASH_COMP_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMPL)
-DEFINE_LHASH_OF_EX(SCOSSL_KEYSINUSE_CTX_IMPL);
+static IMPLEMENT_LHASH_HASH_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMP)
+static IMPLEMENT_LHASH_COMP_FN(scossl_keysinuse_ctx, SCOSSL_KEYSINUSE_CTX_IMP)
+DEFINE_LHASH_OF_EX(SCOSSL_KEYSINUSE_CTX_IMP);
 
 // All keysinuse contexts are created and destroyed by the keysinuse module.
 // The keysinuse contexts are refcounted and indexed in lh_keysinuse_info by
@@ -323,66 +322,152 @@ void p_scossl_keysinuse_set_logging_delay(INT64 delay)
 // KeysInUse context lhash functions
 //
 _Use_decl_annotations_
-static unsigned long scossl_keysinuse_ctx_hash(const SCOSSL_KEYSINUSE_CTX_IMPL *ctx)
+static unsigned long scossl_keysinuse_ctx_hash(const SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 {
     return ctx == NULL ? NULL : OPENSSL_LH_strhash(ctx->keyIdentifier);
 }
 
 _Use_decl_annotations_
-static int scossl_keysinuse_ctx_cmp(const SCOSSL_KEYSINUSE_CTX_IMPL *ctx1, const SCOSSL_KEYSINUSE_CTX_IMPL *ctx2)
+static int scossl_keysinuse_ctx_cmp(const SCOSSL_KEYSINUSE_CTX_IMP *ctx1, const SCOSSL_KEYSINUSE_CTX_IMP *ctx2)
  {
     return ctx1 == NULL  && ctx2 != NULL &&
         memcmp(ctx1->keyIdentifier, ctx2->keyIdentifier, sizeof(ctx1->keyIdentifier)) == 0;
 }
 
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_keysinuse_ctx_upref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
+{
+    INT32 ref = 0;
+
+    if (!CRYPTO_atomic_add(&ctx->refCount, 1, &ref, ctx->lock))
+    {
+        p_scossl_keysinuse_log_error("p_scossl_keysinuse_ctx_upref failed,OPENSSL_%d", ERR_get_error());
+        return SCOSSL_FAILURE;
+    }
+
+    if (refOut != NULL)
+    {
+        *refOut = ref;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
+{
+    INT32 ref = 0;
+
+    if (!CRYPTO_atomic_add(&ctx->refCount, -1, &ref, ctx->lock))
+    {
+        p_scossl_keysinuse_log_error("p_scossl_keysinuse_ctx_downref failed,OPENSSL_%d", ERR_get_error());
+        return SCOSSL_FAILURE;
+    }
+
+    if (refOut != NULL)
+    {
+        *refOut = ref;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 //
 // KeysInUse context management
 //
+void p_scossl_keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *keysinuseCtx)
+{
+    if (keysinuseCtx == NULL)
+        return;
+
+    CRYPTO_THREAD_lock_free(keysinuseCtx->lock);
+    OPENSSL_free(keysinuseCtx);
+}
+
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
 {
-    SCOSSL_KEYSINUSE_CTX_IMPL keysinuseCtxTmpl;
-    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtx = NULL;
-    if (pbEncodedKey == NULL || 
-        cbEncodedKey == 0 || 
+    BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
+    SCOSSL_KEYSINUSE_CTX_IMP keysinuseCtxImpTmpl;
+    SCOSSL_KEYSINUSE_CTX_IMP *keysinuseCtxImp = NULL;
+    int lhErr = 0;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if (pbEncodedKey == NULL || cbEncodedKey == 0 ||
         !p_scossl_keysinuse_running())
     {
         return NULL;
     }
-    
-    // TODO
-    // keysinuseCtxTmpl->keyIdentifier = pbEncodedKey
-    // 
-    // lh_KEYSINUSE_CTX_retrieve()
-    // if NULL:
-    //     Alloc new KEYSINUSE_CTX
-    //     Initialize KEYSINUSE_CTX
-    //     lh_KEYSINUSE_CTX_insert
-    //     if FAIL:
-    //         Free KEYSINUSE_CTX
-    //         keysinuseCtx = NULL;
-    // Upref KEYSINUSE_CTX
-    //     if FAIL:
-    //         keysinuseCtx = NULL;
 
-    return keysinuseCtx;
+    // Compute the key identifier (First 16 bytes of the SHA256 hash of the encoded key)
+    SymCryptSha256(pbEncodedKey, cbEncodedKey, abHash);
+
+    for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
+    {
+        sprintf(keysinuseCtxImpTmpl.keyIdentifier[i*2], "%02x", abHash[i]);
+    }
+    keysinuseCtxImpTmpl.keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
+    
+    if ((keysinuseCtxImp = lh_SCOSSL_KEYSINUSE_CTX_IMP_retrieve(lh_keysinuse_ctx, &keysinuseCtxImpTmpl)) == NULL)
+    {
+        // New key used for keysinuse. Create a new context and add it to the hash table
+        if ((keysinuseCtxImp = OPENSSL_zalloc(sizeof(SCOSSL_PROV_KEYSINUSE_INFO))) == NULL ||
+            (keysinuseCtxImp->lock = CRYPTO_THREAD_lock_new()) == NULL)
+        {
+            p_scossl_keysinuse_log_error("malloc failure in p_scossl_keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_lock))
+        {
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_insert(lh_keysinuse_ctx, keysinuseCtxImp);
+            lhErr = lh_SCOSSL_KEYSINUSE_CTX_IMP_error(lh_keysinuse_ctx);
+
+            CRYPTO_THREAD_unlock(lh_keysinuse_ctx_lock);
+
+            if (lhErr)
+            {
+                p_scossl_keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
+                goto cleanup;
+            }
+        }
+        else
+        {
+            p_scossl_keysinuse_log_error("Failed to keysinuse context hash table,OPENSSL_%d", ERR_get_error());
+            goto cleanup;
+        }
+
+        // One reference for the caller, one for the hash table
+        keysinuseCtxImp->refCount = 2;
+    }
+    else if (p_scossl_keysinuse_ctx_upref(keysinuseCtxImp, NULL) != SCOSSL_SUCCESS)
+    {
+        goto cleanup;
+    }
+
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        p_scossl_keysinuse_free_key_ctx(keysinuseCtxImp);
+        keysinuseCtxImp = NULL;
+    }
+
+    return keysinuseCtxImp;
 }
 
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *keysinuseCtx)
 {
-    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtxImpl = (SCOSSL_KEYSINUSE_CTX_IMPL *)keysinuseCtx;
+    SCOSSL_KEYSINUSE_CTX_IMP *keysinuseCtxImp = (SCOSSL_KEYSINUSE_CTX_IMP *)keysinuseCtx;
 
     if (keysinuseCtx == NULL || 
-        !p_scossl_keysinuse_running())
+        !p_scossl_keysinuse_running() ||
+        p_scossl_keysinuse_ctx_upref(keysinuseCtxImp, NULL) != SCOSSL_SUCCESS)
     {
         return NULL;
     }
-    
-    // TODO
-    // Upref keysinuseCtxImpl
-    //     if FAIL:
-    //         return NULL;
 
     return keysinuseCtx;
 }
@@ -390,29 +475,39 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *k
 _Use_decl_annotations_
 void p_scossl_keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *keysinuseCtx)
 {
-    SCOSSL_KEYSINUSE_CTX_IMPL *keysinuseCtxImpl = (SCOSSL_KEYSINUSE_CTX_IMPL*)keysinuseCtx;
+    SCOSSL_KEYSINUSE_CTX_IMP *keysinuseCtxImp = (SCOSSL_KEYSINUSE_CTX_IMP*)keysinuseCtx;
     INT32 ref;
+    int lhErr = 0;
 
-    if (keysinuseCtxImpl == NULL)
+    if (keysinuseCtxImp == NULL)
         return;
-    // TODO
-    //  if (p_scossl_keysinuse_downref(keysinuseCtxImpl, &ref) &&
-    //      ref == 0)
-    //  {
-    //      if (p_scossl_keysinuse_running())
-    //      {
-    //          if (acquire lh_keysinuse_ctx_lock)
-    //              lh_TYPE_delete
-    //              unlock lh_keysinuse_ctx_lock
-    //          else
-    //              log keysinuse error
-    //              DO NOT free keysinuseCtxImpl, since a hanging reference will be left in lh_keysinuse_ctx
-    //              This will be unconditionally freed in teardown
-    //              return 
-    //      }
-    //      CRYPTO_THREAD_lock_free(keysinuseCtxImpl->lock);
-    //      OPENSSL_free(keysinuseCtxImpl);
-    //  }
+
+    if (p_scossl_keysinuse_ctx_downref(keysinuseCtxImp, &ref) &&
+        ref == 0)
+    {
+        // We dont check if keysinuse is running until this point.
+        // Callers should be allowed to free the keysinuse context
+        // even after keysinuse has been torn down. The hash
+        // table will no longer exist though, so we don't need to
+        // remove the context from the hash table.
+        if (p_scossl_keysinuse_running())
+        {
+            if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_lock))
+            {
+                if (lh_SCOSSL_KEYSINUSE_CTX_IMP_delete(lh_keysinuse_ctx, keysinuseCtxImp) == NULL)
+                {
+                    p_scossl_keysinuse_log_error("Failed to remove keysinuse context from the hash table,OPENSSL_%d", ERR_get_error());
+                }
+
+                CRYPTO_THREAD_unlock(lh_keysinuse_ctx_lock);
+            }
+            else
+            {
+                p_scossl_keysinuse_log_error("Failed to keysinuse context hash table,OPENSSL_%d", ERR_get_error());
+            }
+        }
+        p_scossl_keysinuse_free_key_ctx(keysinuseCtxImp);
+    }
 }
 
 // TODO: remove
@@ -459,56 +554,12 @@ void p_scossl_keysinuse_info_free(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo)
 
     INT32 ref;
 
-    if (p_scossl_keysinuse_downref(keysinuseInfo, &ref) &&
+    if (p_scossl_keysinuse_ctx_downref(keysinuseInfo, &ref) &&
         ref == 0)
     {
         CRYPTO_THREAD_lock_free(keysinuseInfo->lock);
         OPENSSL_free(keysinuseInfo);
     }
-}
-
-// TODO change signature, move up
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_keysinuse_upref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, INT32 *refOut)
-{
-    if (keysinuseInfo == NULL)
-        return SCOSSL_FAILURE;
-
-    INT32 ref = 0;
-
-    if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, 1, &ref, keysinuseInfo->lock))
-    {
-        p_scossl_keysinuse_log_error("p_scossl_keysinuse_upref failed,OPENSSL_%d", ERR_get_error());
-        return SCOSSL_FAILURE;
-    }
-    else if (refOut != NULL)
-    {
-        *refOut = ref;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-// TODO change signature, move up
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_keysinuse_downref(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, INT32 *refOut)
-{
-    if (keysinuseInfo == NULL)
-        return SCOSSL_FAILURE;
-
-    INT32 ref = 0;
-
-    if (!CRYPTO_atomic_add(&keysinuseInfo->refCount, -1, &ref, keysinuseInfo->lock))
-    {
-        p_scossl_keysinuse_log_error("p_scossl_keysinuse_downref failed,OPENSSL_%d", ERR_get_error());
-        return SCOSSL_FAILURE;
-    }
-    else if (refOut != NULL)
-    {
-        *refOut = ref;
-    }
-
-    return SCOSSL_SUCCESS;
 }
 
 //
