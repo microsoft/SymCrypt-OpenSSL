@@ -580,8 +580,9 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 
                 maxFileSizeBytes = maxFileSizeBytes * 10 + (confMaxFileSize[i++] - '0');
 
-                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE in case of overflow
-                if (maxFileSizeBytes < maxFileSizeBytesTmp)
+                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE
+                if (maxFileSizeBytes >= SCOSSL_MAX_CONFIGURABLE_FILE_SIZE ||
+                    maxFileSizeBytes < maxFileSizeBytesTmp)
                 {
                     maxFileSizeBytes = SCOSSL_MAX_CONFIGURABLE_FILE_SIZE;
                     break;
@@ -611,8 +612,9 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                     break;
                 }
 
-                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE in case of overflow
-                if (maxFileSizeBytes < maxFileSizeBytesTmp)
+                // Clamp to SCOSSL_MAX_CONFIGURABLE_FILE_SIZE
+                if (maxFileSizeBytes >= SCOSSL_MAX_CONFIGURABLE_FILE_SIZE ||
+                    maxFileSizeBytes < maxFileSizeBytesTmp)
                 {
                     maxFileSizeBytes = SCOSSL_MAX_CONFIGURABLE_FILE_SIZE;
                 }
