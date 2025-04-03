@@ -314,7 +314,7 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_KBKDF, p_scossl_kbkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_PBKDF2 p_scossl_pbkdf2_kdf_functions),
+    ALG(SCOSSL_ALG_NAME_PBKDF2, p_scossl_pbkdf2_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTPKDF, p_scossl_srtpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SRTCPKDF, p_scossl_srtcpkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SSHKDF, p_scossl_sshkdf_kdf_functions),

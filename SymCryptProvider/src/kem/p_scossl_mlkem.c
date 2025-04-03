@@ -389,10 +389,8 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
             goto cleanup;
         }
 
-        // Get key size
         cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY);
 
-        // Get secret size
         if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPrivate, TRUE)) == 0)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_max_result_size failed");
