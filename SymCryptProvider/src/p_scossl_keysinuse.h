@@ -35,7 +35,6 @@ typedef VOID SCOSSL_KEYSINUSE_CTX;
 // Setup/teardown
 void p_scossl_keysinuse_init();     // Exported
 void p_scossl_keysinuse_teardown(); // Exported
-BOOL p_scossl_keysinuse_running();  // Exported
 
 // Configuration
 // If an invalid config value is passed, the respective default is used instead
@@ -48,14 +47,9 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(_In_reads_bytes_opt_(cbEncoded
 SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(_In_opt_ SCOSSL_KEYSINUSE_CTX *keysinuseCtx);                          // Exported
 void p_scossl_keysinuse_unload_key(_Inout_ SCOSSL_KEYSINUSE_CTX *keysinuseCtx);                                                 // Exported
 
-// TODO: Remove
-SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_reads_bytes_(cbPublicKey) PBYTE pbPublicKey, SIZE_T cbPublicKey);
-void p_scossl_keysinuse_info_free(_Inout_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
-
 // Usage tracking
-// TODO: Change signature
-void p_scossl_keysinuse_on_sign(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);    // Exported
-void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo); // Exported
+void p_scossl_keysinuse_on_sign(_In_ SCOSSL_KEYSINUSE_CTX *keysinuseInfo);    // Exported
+void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_KEYSINUSE_CTX *keysinuseInfo); // Exported
 
 #ifdef __cplusplus
 }
