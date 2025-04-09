@@ -8,29 +8,7 @@
 extern "C" {
 #endif
 
-// This structure is refcounted. The key object this is associated with may
-// be freed, but logging events may be pending according to the logging backoff.
-// This is created on the first sign/decrypt init using the key, and destroyed
-// with the key context in the key management interface.
-
-// TODO: Remove
-typedef struct
-{
-    time_t firstLogTime;
-    time_t lastLogTime;
-    UINT32 signCounter;
-    UINT32 decryptCounter;
-    // The first 32 bytes of the SHA256 hash of the encoded public key.
-    // Use the same encoding rules as the subjectPublicKey field of a certificate
-    // (PKCS#1 format for RSA, octet string for ECDSA)
-    char keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE + 1];
-    BOOL logPending;
-    INT32 refCount;
-    CRYPTO_RWLOCK *lock;
-} SCOSSL_PROV_KEYSINUSE_INFO;
-
-typedef VOID SCOSSL_KEYSINUSE_CTX;
-
+typedef VOID SCOSSL_KEYSINUSE_CTX;  // Exported opaque type
 
 // Setup/teardown
 void p_scossl_keysinuse_init();     // Exported
