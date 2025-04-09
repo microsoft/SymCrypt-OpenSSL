@@ -37,7 +37,6 @@ void p_scossl_ecc_free_ctx(SCOSSL_ECC_KEY_CTX *keyCtx)
     }
 #ifdef KEYSINUSE_ENABLED
     p_scossl_ecc_reset_keysinuse(keyCtx);
-    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
 #endif
 
     OPENSSL_free(keyCtx);
@@ -60,17 +59,6 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
     if (copyCtx != NULL)
     {
-#ifdef KEYSINUSE_ENABLED
-        copyCtx->isImported = keyCtx->isImported;
-        copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-
-        if (keyCtx->keysinuseInfo == NULL ||
-            p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
-        {
-            copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
-        }
-#endif
-
         copyCtx->isX25519 = keyCtx->isX25519;
         copyCtx->libctx = keyCtx->libctx;
         copyCtx->conversionFormat = keyCtx->conversionFormat;
@@ -149,6 +137,10 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
             copyCtx->initialized = 1;
             copyCtx->includePublic = keyCtx->includePublic;
             copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
+
+#ifdef KEYSINUSE_ENABLED
+            copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+#endif
         }
         else
         {
@@ -628,47 +620,38 @@ _Use_decl_annotations_
 // TODO: Update to new APIs
 void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 {
-    if (keyCtx->isImported &&
-        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    // Initialize keysinuse for private keys. Generated keys are
+    // ignored to avoid noise from ephemeral keys.
+    PBYTE pbPublicKey = NULL;
+    SIZE_T cbPublicKey;
+
+    if (keyCtx->isImported)
     {
-        if (keyCtx->keysinuseInfo == NULL)
+        // KeysInUse related errors shouldn't surface to caller, including errors
+        // from p_scossl_ecc_get_encoded_public_key
+        ERR_set_mark();
+
+        if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
         {
-            // Initialize keysinuse for private keys. Generated keys are
-            // ignored to avoid noise from ephemeral keys.
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
-
-            // KeysInUse related errors shouldn't surface to caller
-            ERR_set_mark();
-
-            if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
-            {
-                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
-            }
-            else
-            {
-                SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
-                    "p_scossl_ecc_get_encoded_public_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
-            }
-
-            ERR_pop_to_mark();
-
-            OPENSSL_free(pbPublicKey);
+            keyCtx->keysinuseCtx = p_scossl_keysinuse_load_key(pbPublicKey, cbPublicKey);
         }
-        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+        else
+        {
+            SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+                "p_scossl_ecc_get_encoded_public_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
+        }
+
+        ERR_pop_to_mark();
+
+        OPENSSL_free(pbPublicKey);
     }
 }
 
 _Use_decl_annotations_
 void p_scossl_ecc_reset_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 {
-    if (keyCtx->keysinuseLock != NULL &&
-        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
-    {
-        p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
-        keyCtx->keysinuseInfo = NULL;
-        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
-    }
+    p_scossl_keysinuse_unload_key(keyCtx->keysinuseCtx);
+    keyCtx->keysinuseCtx = NULL;
 }
 #endif
 

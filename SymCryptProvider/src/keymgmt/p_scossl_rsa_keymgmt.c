@@ -86,10 +86,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *p
     if (keyCtx != NULL)
     {
         keyCtx->keyType = RSA_FLAG_TYPE_RSA;
-#ifdef KEYSINUSE_ENABLED
-        // TODO: New APIS
-        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-#endif
     }
     return keyCtx;
 }
@@ -101,9 +97,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
     {
         keyCtx->libctx = provctx->libctx;
         keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
-#ifdef KEYSINUSE_ENABLED
-        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-#endif
     }
     return keyCtx;
 }
@@ -119,7 +112,6 @@ void p_scossl_rsa_keymgmt_free_ctx(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
     }
 #ifdef KEYSINUSE_ENABLED
     p_scossl_rsa_reset_keysinuse(keyCtx);
-    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
 #endif
     OPENSSL_free(keyCtx->pssRestrictions);
     OPENSSL_free(keyCtx);
@@ -240,17 +232,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         return NULL;
     }
 
-#ifdef KEYSINUSE_ENABLED
-    copyCtx->isImported = keyCtx->isImported;
-    copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-
-    if (keyCtx->keysinuseInfo == NULL ||
-        p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
-    {
-        copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
-    }
-#endif
-
     copyCtx->initialized = keyCtx->initialized;
     copyCtx->keyType = keyCtx->keyType;
 
@@ -262,6 +243,10 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
             p_scossl_rsa_keymgmt_free_ctx(copyCtx);
             return NULL;
         }
+
+#ifdef KEYSINUSE_ENABLED
+        copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+#endif
     }
 
     if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
@@ -449,8 +434,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     genCtx->pssRestrictions = NULL;
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
-    keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-    keyCtx->keysinuseInfo = NULL;
+    keyCtx->keysinuseCtx = NULL;
 #endif
 
 cleanup:

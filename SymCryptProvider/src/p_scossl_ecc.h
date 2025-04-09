@@ -33,10 +33,8 @@ typedef struct {
     point_conversion_form_t conversionFormat;
 
 #ifdef KEYSINUSE_ENABLED
-    // TODO: New APIs, remove lock
     BOOL isImported;
-    CRYPTO_RWLOCK *keysinuseLock;
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+    SCOSSL_KEYSINUSE_CTX *keysinuseCtx;
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
