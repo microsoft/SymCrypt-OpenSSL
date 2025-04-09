@@ -96,10 +96,9 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
     SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_new_ctx(provctx);
     if (keyCtx != NULL)
     {
-#ifdef KEYSINUSE_ENABLED
-        // TODO: New APIS
-        keyCtx->Lock = CRYPTO_THREAD_lock_new();
-#endif
+        keyCtx->libctx = provctx->libctx;
+        keyCtx->includePublic = 1;
+        keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
     }
 
     return keyCtx;
@@ -273,6 +272,10 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->libctx = genCtx->libctx;
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+    keyCtx->keysinuseCtx = NULL;
+#endif
     keyCtx->conversionFormat = genCtx->conversionFormat;
     keyCtx->key = NULL;
 
