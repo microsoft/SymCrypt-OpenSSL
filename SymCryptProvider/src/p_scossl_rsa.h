@@ -27,10 +27,8 @@ typedef struct
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
 #ifdef KEYSINUSE_ENABLED
-    // TODO: New APIs, remove lock
     BOOL isImported;
-    CRYPTO_RWLOCK *keysinuseLock;
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+    SCOSSL_KEYSINUSE_CTX *keysinuseCtx;
 #endif
 } SCOSSL_PROV_RSA_KEY_CTX;
 
@@ -47,7 +45,6 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_
 void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);  
 
 #ifdef KEYSINUSE_ENABLED
-// TODO: New APIs
 SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,
                                                   _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
 void p_scossl_rsa_init_keysinuse(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx);
