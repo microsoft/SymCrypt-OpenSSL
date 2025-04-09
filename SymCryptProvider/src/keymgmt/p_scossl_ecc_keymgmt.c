@@ -102,10 +102,6 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
         keyCtx->libctx = provctx->libctx;
         keyCtx->includePublic = 1;
         keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
-#ifdef KEYSINUSE_ENABLED
-        // TODO: New APIS
-        keyCtx->Lock = CRYPTO_THREAD_lock_new();
-#endif
     }
 
     return keyCtx;
@@ -133,7 +129,6 @@ void p_scossl_ecc_keymgmt_free_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx)
     }
 #ifdef KEYSINUSE_ENABLED
     p_scossl_ecc_reset_keysinuse(keyCtx);
-    CRYPTO_THREAD_lock_free(keyCtx->keysinuseLock);
 #endif
 
     OPENSSL_free(keyCtx);
@@ -155,16 +150,6 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
 
     if (copyCtx != NULL)
     {
-#ifdef KEYSINUSE_ENABLED
-        copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-
-        if (keyCtx->keysinuseInfo == NULL ||
-            p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
-        {
-            copyCtx->keysinuseInfo = keyCtx->keysinuseInfo;
-        }
-#endif
-
         copyCtx->isX25519 = keyCtx->isX25519;
         copyCtx->libctx = keyCtx->libctx;
         copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
@@ -243,6 +228,10 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
 
             copyCtx->initialized = 1;
             copyCtx->includePublic = keyCtx->includePublic;
+
+#ifdef KEYSINUSE_ENABLED
+        copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+#endif
         }
         else
         {
@@ -429,8 +418,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->isX25519 = genCtx->isX25519;
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
-    keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-    keyCtx->keysinuseInfo = NULL;
+    keyCtx->keysinuseCtx = NULL;
 #endif
     keyCtx->conversionFormat = genCtx->conversionFormat;
 

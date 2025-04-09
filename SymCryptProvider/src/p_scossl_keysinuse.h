@@ -11,8 +11,15 @@ extern "C" {
 typedef VOID SCOSSL_KEYSINUSE_CTX;  // Exported opaque type
 
 // Setup/teardown
-void p_scossl_keysinuse_init();     // Exported
-void p_scossl_keysinuse_teardown(); // Exported
+void p_scossl_keysinuse_init();         // Exported
+void p_scossl_keysinuse_teardown();     // Exported
+
+// Quick check for callers to see if keysinuse is enabled.
+// KeysInUse may be disabled between checking this and calling
+// additional keysinuse functions, but callers can use this
+// to avoid unnecessary work (e.g. encoding the public key) if
+// KeysInUse is already disabled.
+BOOL p_scossl_keysinuse_is_enabled();   // Exported
 
 // Configuration
 // If an invalid config value is passed, the respective default is used instead
