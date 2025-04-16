@@ -128,7 +128,6 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
             p_scossl_ecc_init_keysinuse(keyCtx);
         }
 #endif
-
     }
 
     return p_scossl_ecdsa_set_ctx_params(ctx, params);
