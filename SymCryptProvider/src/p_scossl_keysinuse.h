@@ -23,7 +23,6 @@ BOOL p_scossl_keysinuse_is_enabled();   // Exported
 
 // Configuration
 // If an invalid config value is passed, the respective default is used instead
-void p_scossl_keysinuse_set_logging_id(_In_ const char *id);
 void p_scossl_keysinuse_set_max_file_size(off_t size);
 void p_scossl_keysinuse_set_logging_delay(INT64 delay);
 
