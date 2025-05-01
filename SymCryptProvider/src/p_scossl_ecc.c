@@ -139,6 +139,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
             copyCtx->modifiedPrivateBits = keyCtx->modifiedPrivateBits;
 
 #ifdef KEYSINUSE_ENABLED
+            copyCtx->isImported = keyCtx->isImported;
             copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
 #endif
         }
@@ -625,7 +626,7 @@ void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey;
 
-    if (keyCtx->isImported)
+    if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
     {
         // KeysInUse related errors shouldn't surface to caller, including errors
         // from p_scossl_ecc_get_encoded_public_key
