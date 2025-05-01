@@ -130,7 +130,7 @@ void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey;
 
-    if (keyCtx->isImported)
+    if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
     {
         // KeysInUse related errors shouldn't surface to caller, including errors
         // from p_scossl_ecc_get_encoded_public_key
