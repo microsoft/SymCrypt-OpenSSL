@@ -245,17 +245,23 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
         }
 
 #ifdef KEYSINUSE_ENABLED
+        copyCtx->isImported = keyCtx->isImported;
         copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
 #endif
     }
 
-    if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
-        keyCtx->pssRestrictions != NULL &&
-        (copyCtx->pssRestrictions = OPENSSL_memdup(keyCtx->pssRestrictions, sizeof(SCOSSL_RSA_PSS_RESTRICTIONS))) == NULL)
+    if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS && keyCtx->pssRestrictions != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        p_scossl_rsa_keymgmt_free_ctx(copyCtx);
-        return NULL;
+        if ((copyCtx->pssRestrictions = OPENSSL_memdup(keyCtx->pssRestrictions, sizeof(SCOSSL_RSA_PSS_RESTRICTIONS))) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            p_scossl_rsa_keymgmt_free_ctx(copyCtx);
+            return NULL;
+        }
+    }
+    else
+    {
+        copyCtx->pssRestrictions = NULL;
     }
 
     return copyCtx;
