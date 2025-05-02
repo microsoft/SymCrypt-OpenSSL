@@ -2,8 +2,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <scossl_helpers.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
