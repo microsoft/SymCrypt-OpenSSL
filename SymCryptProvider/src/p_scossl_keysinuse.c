@@ -11,6 +11,8 @@
 #include <openssl/lhash.h>
 #include <openssl/proverr.h>
 
+#include <scossl_helpers.h>
+
 #include "p_scossl_keysinuse.h"
 
 #ifdef __cplusplus
@@ -160,8 +162,10 @@ static void p_scossl_keysinuse_init_once()
         if ((procPath = OPENSSL_malloc(cbProcPath)) != NULL &&
             (cbProcPathUsed = readlink(symlinkPath, procPath, cbProcPath)) == -1)
         {
+#ifndef KEYSINUSE_STANDALONE
             SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
                 "Failed to get process path from /proc/%d/exe with error %d", pid, errno);
+#endif
             OPENSSL_free(procPath);
             procPath = NULL;
             cbProcPathUsed = 0;
@@ -174,8 +178,10 @@ static void p_scossl_keysinuse_init_once()
     if ((prefix = OPENSSL_malloc(prefix_size + 1)) == NULL ||
         snprintf(prefix, prefix_size + 1, "%ld,%.*s", initTime, cbProcPathUsed, procPath) < 0)
     {
+#ifndef KEYSINUSE_STANDALONE
         SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
             "Failed to generate logging prefix with error %d", errno);
+#endif
         OPENSSL_free(prefix);
         prefix = (char*)default_prefix;
     }
@@ -406,8 +412,10 @@ SCOSSL_STATUS p_scossl_keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *c
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
 {
+    EVP_MD *md = NULL;
     BOOL lockedState = FALSE;
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
+    SIZE_T cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
     SCOSSL_KEYSINUSE_CTX_IMP *ctx = NULL;
     int lhErr;
@@ -423,13 +431,17 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
     {
         lockedState = TRUE;
 
-        if (!keysinuse_enabled)
+        if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
         {
+            p_scossl_keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
 
-        // Compute the key identifier (First 16 bytes of the SHA256 hash of the encoded key)
-        SymCryptSha256(pbEncodedKey, cbEncodedKey, abHash);
+        if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, md, NULL) <= 0)
+        {
+            p_scossl_keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
+            goto cleanup;
+        }
 
         for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
         {
@@ -495,6 +507,8 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
     }
 
 cleanup:
+    EVP_MD_free(md);
+
     if (lockedState)
     {
         CRYPTO_THREAD_unlock(keysinuse_state_lock);
