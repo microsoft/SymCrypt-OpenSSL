@@ -20,5 +20,7 @@ target_include_directories(KeysInUseTest PUBLIC ${CMAKE_SOURCE_DIR}/SymCryptEngi
 target_include_directories(KeysInUseTest PUBLIC ${CMAKE_SOURCE_DIR}/ScosslCommon/inc)
 target_include_directories(KeysInUseTest PUBLIC ${CMAKE_SOURCE_DIR}/SymCryptProvider/src)
 
-target_link_libraries(KeysInUseTest PUBLIC scossl_provider ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(KeysInUseTest PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+# target_link_libraries(KeysInUseTest PUBLIC keysinuse)
+target_link_libraries(KeysInUseTest PUBLIC scossl_provider)
 target_link_libraries(KeysInUseTest PRIVATE scossl_common)
