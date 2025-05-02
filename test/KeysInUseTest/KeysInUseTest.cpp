@@ -559,23 +559,23 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     }
 
     // Sign init
-    if (EVP_DigestSignInit_ex(ctx, NULL,
-        SN_sha256,
-        NULL,
-        propq.c_str(),
-        pkey,
-        NULL) <= 0)
+    if (!EVP_DigestSignInit_ex(ctx, NULL,
+            SN_sha256,
+            NULL,
+            propq.c_str(),
+            pkey,
+            NULL))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
         goto cleanup;
     }
 
-    if (EVP_DigestSignInit_ex(ctxCopy, NULL,
-        SN_sha256,
-        NULL,
-        propq.c_str(),
-        pkeyCopy,
-        NULL) <= 0)
+    if (!EVP_DigestSignInit_ex(ctxCopy, NULL,
+            SN_sha256,
+            NULL,
+            propq.c_str(),
+            pkeyCopy,
+            NULL))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
         goto cleanup;
@@ -589,19 +589,19 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if (EVP_DigestSignInit_ex(ctxCopyByRef, NULL,
-        SN_sha256,
-        NULL,
-        propq.c_str(),
-        pkeyCopyByRef,
-        NULL) <= 0)
+    if (!EVP_DigestSignInit_ex(ctxCopyByRef, NULL,
+            SN_sha256,
+            NULL,
+            propq.c_str(),
+            pkeyCopyByRef,
+            NULL))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
         goto cleanup;
     }
 
     // Sign
-    if (EVP_DigestSign(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    if (!EVP_DigestSign(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
@@ -613,7 +613,7 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if (EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    if (!EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
@@ -624,8 +624,8 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third sign. Only the first event should be logged.
-    if (EVP_DigestSign(ctxCopy, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) <= 0 ||
-        EVP_DigestSign(ctxCopyByRef, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    if (!EVP_DigestSign(ctxCopy, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) ||
+        !EVP_DigestSign(ctxCopyByRef, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
@@ -665,18 +665,18 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     }
 
     // Test key use again, this event should be immediately logged
-    if (EVP_DigestSignInit_ex(ctx, NULL,
-        SN_sha256,
-        NULL,
-        propq.c_str(),
-        pkey,
-        NULL) <= 0)
+    if (!EVP_DigestSignInit_ex(ctx, NULL,
+            SN_sha256,
+            NULL,
+            propq.c_str(),
+            pkey,
+            NULL))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
         goto cleanup;
     }
 
-    if (EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    if (!EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
@@ -1068,6 +1068,9 @@ int main(int argc, char** argv)
     OSSL_PARAM params[2] = { OSSL_PARAM_END };
     int ret = 0;
     void * p = malloc(5);
+
+    OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, NULL);
+
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--provider") == 0)
@@ -1078,10 +1081,10 @@ int main(int argc, char** argv)
                 goto cleanup;
             }
 
-            // OSSL_PROVIDER_load(NULL, argv[i + 1]);
-            if (!OSSL_PROVIDER_available(NULL, argv[i]))
+            if (OSSL_PROVIDER_load(NULL, argv[i]) == NULL ||
+                !OSSL_PROVIDER_available(NULL, argv[i]))
             {
-                TEST_LOG_ERROR("Provider %s not available", argv[i])
+                TEST_LOG_OPENSSL_ERROR("Provider %s not available", argv[i])
                 goto cleanup;
             }
 
@@ -1089,7 +1092,13 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "--provider-path") == 0)
         {
-            OSSL_PROVIDER_set_default_search_path(NULL, argv[++i]);
+            if (!OSSL_PROVIDER_set_default_search_path(NULL, argv[++i]))
+            {
+                {
+                    TEST_LOG_OPENSSL_ERROR("Failed to set provider path %s", argv[i])
+                    goto cleanup;
+                }
+            }
         }
         else if (strcmp(argv[i], "--verbose") == 0)
         {
@@ -1109,6 +1118,13 @@ int main(int argc, char** argv)
             TEST_LOG_ERROR("Unknown argument: %s", argv[i])
             goto cleanup;
         }
+    }
+
+    if (OSSL_PROVIDER_load(NULL, "default") == NULL ||
+        !OSSL_PROVIDER_available(NULL, "default"))
+    {
+        TEST_LOG_OPENSSL_ERROR("Failed to load the default provider")
+        goto cleanup;
     }
 
     p_scossl_keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
@@ -1192,11 +1208,13 @@ int main(int argc, char** argv)
             goto cleanup;
         }
 
-        printf("Testing RSA decrypt with size %d\n", rsaTestSizes[i]);
+        printf("\nTesting RSA decrypt with size %d\n", rsaTestSizes[i]);
         if (keysinuse_run_tests(params, "RSA", FALSE, providers) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
+
+        printf("\n");
     }
 
     // Test ECDSA/X25519 sign
@@ -1209,8 +1227,11 @@ int main(int argc, char** argv)
         {
             goto cleanup;
         }
+
+        printf("\n");
     }
 
+    printf("All tests passed\n");
     ret = 1;
 
 cleanup:
