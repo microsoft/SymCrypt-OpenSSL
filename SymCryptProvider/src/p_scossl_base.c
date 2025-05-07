@@ -444,9 +444,9 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-    #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_teardown();
-    #endif
+#ifdef KEYSINUSE_ENABLED
+    keysinuse_teardown();
+#endif
     if (provctx != NULL)
     {
         BIO_meth_free(provctx->coreBioMeth);
@@ -547,7 +547,7 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
 }
 
 #ifdef KEYSINUSE_ENABLED
-// TODO: Move config read to p_scossl_keysinuse_init
+// TODO: Move config read to keysinuse_init
 // Always put keysinsue config in "/openssldir/keysinuse.conf"?.
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
@@ -636,15 +636,15 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                 }
             }
 
-            p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
+            keysinuse_set_max_file_size(maxFileSizeBytes);
         }
 
         if (confLoggingDelay != NULL)
         {
-            p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
+            keysinuse_set_logging_delay(atol(confLoggingDelay));
         }
 
-        p_scossl_keysinuse_init();
+        keysinuse_init();
     }
 
     ERR_pop_to_mark();

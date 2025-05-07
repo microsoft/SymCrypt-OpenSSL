@@ -388,21 +388,21 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
         {0, 0, 0}};
 
     // Load the keysinuse context
-    if ((keysinuseCtx = p_scossl_keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
+    if ((keysinuseCtx = keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
     {
         TEST_LOG_ERROR("Failed to load keysinuse context")
         return SCOSSL_FAILURE;
     }
 
     // Load the same keysinuse context by bytes again
-    if ((keysinuseCtxCopy = p_scossl_keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
+    if ((keysinuseCtxCopy = keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
     {
         TEST_LOG_ERROR("Failed to load second keysinuse context with key bytes")
         return SCOSSL_FAILURE;
     }
 
     // Load the same keysinuse context by reference
-    if ((keysinuseCtxCopyByRef = p_scossl_keysinuse_load_key_by_ctx(keysinuseCtx)) == NULL)
+    if ((keysinuseCtxCopyByRef = keysinuse_load_key_by_ctx(keysinuseCtx)) == NULL)
     {
         TEST_LOG_ERROR("Failed to load second keysinuse context by reference")
         return SCOSSL_FAILURE;
@@ -416,7 +416,7 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     }
 
     // Unload one of the keysinuse contexts. The other two should still be valid
-    p_scossl_keysinuse_unload_key(keysinuseCtxCopy);
+    keysinuse_unload_key(keysinuseCtxCopy);
     keysinuseCtxCopy = NULL;
 
     // Test three consecutive uses. The first event should be logged.
@@ -424,38 +424,38 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     if (testSign)
     {
         // Test sign
-        p_scossl_keysinuse_on_sign(keysinuseCtx);
+        keysinuse_on_sign(keysinuseCtx);
         expectedEvents[0].signCount = 1;
 
         // Wait a little to allow the logging thread to process the event
         usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
         // Test second sign. Only the first event should be logged.
-        p_scossl_keysinuse_on_sign(keysinuseCtx);
-        p_scossl_keysinuse_on_sign(keysinuseCtxCopyByRef);
+        keysinuse_on_sign(keysinuseCtx);
+        keysinuse_on_sign(keysinuseCtxCopyByRef);
         expectedEvents[1].signCount = 2;
     }
     else
     {
         // Test decrypt
-        p_scossl_keysinuse_on_decrypt(keysinuseCtx);
+        keysinuse_on_decrypt(keysinuseCtx);
         expectedEvents[0].decryptCount = 1;
 
         // Wait a little to allow the logging thread to process the event
         usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
         // Test second decrypt. Only the first event should be logged.
-        p_scossl_keysinuse_on_decrypt(keysinuseCtx);
-        p_scossl_keysinuse_on_decrypt(keysinuseCtxCopyByRef);
+        keysinuse_on_decrypt(keysinuseCtx);
+        keysinuse_on_decrypt(keysinuseCtxCopyByRef);
         expectedEvents[1].decryptCount = 2;
     }
 
     // Unload all references to the key. Pending events should still be logged
     // after the after the unload.
-    p_scossl_keysinuse_unload_key(keysinuseCtx);
+    keysinuse_unload_key(keysinuseCtx);
     keysinuseCtx = NULL;
 
-    p_scossl_keysinuse_unload_key(keysinuseCtxCopyByRef);
+    keysinuse_unload_key(keysinuseCtxCopyByRef);
     keysinuseCtxCopyByRef = NULL;
 
     // Wait for the logging delay to elapse so ensure events from unloaded
@@ -463,7 +463,7 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     sleep(KEYSINUSE_TEST_LOG_DELAY);
 
     // Reload they key by bytes after original references were unloaded.
-    if ((keysinuseCtxCopy = p_scossl_keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
+    if ((keysinuseCtxCopy = keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
     {
         TEST_LOG_ERROR("Failed to load second keysinuse context with key bytes")
         return SCOSSL_FAILURE;
@@ -472,12 +472,12 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     // Test key use again, this event should be immediately logged
     if (testSign)
     {
-        p_scossl_keysinuse_on_sign(keysinuseCtxCopy);
+        keysinuse_on_sign(keysinuseCtxCopy);
         expectedEvents[2].signCount = 1;
     }
     else
     {
-        p_scossl_keysinuse_on_decrypt(keysinuseCtxCopy);
+        keysinuse_on_decrypt(keysinuseCtxCopy);
         expectedEvents[2].decryptCount = 1;
     }
 
@@ -487,9 +487,9 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     remove(KEYSINUSE_LOG_FILE);
 
 cleanup:
-    p_scossl_keysinuse_unload_key(keysinuseCtx);
-    p_scossl_keysinuse_unload_key(keysinuseCtxCopy);
-    p_scossl_keysinuse_unload_key(keysinuseCtxCopyByRef);
+    keysinuse_unload_key(keysinuseCtx);
+    keysinuse_unload_key(keysinuseCtxCopy);
+    keysinuse_unload_key(keysinuseCtxCopyByRef);
 
     return ret;
 }
@@ -582,7 +582,7 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     }
 
     // Duplicating the pkey object after EVP_DigestSignInit_ex
-    // should trigger p_scossl_keysinuse_load_key_by_ctx
+    // should trigger keysinuse_load_key_by_ctx
     if ((pkeyCopyByRef = EVP_PKEY_dup(pkey)) == NULL)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
@@ -809,7 +809,7 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[S
     }
 
     // Duplicating the pkey object after EVP_PKEY_decrypt_init
-    // should trigger p_scossl_keysinuse_load_key_by_ctx
+    // should trigger keysinuse_load_key_by_ctx
     if ((pkeyCopyByRef = EVP_PKEY_dup(pkey)) == NULL)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
@@ -1127,8 +1127,8 @@ int main(int argc, char** argv)
         goto cleanup;
     }
 
-    p_scossl_keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
-    p_scossl_keysinuse_init();
+    keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
+    keysinuse_init();
 
     processName = realpath(argv[0], NULL);
     processStartTime = time(NULL);
@@ -1191,7 +1191,7 @@ int main(int argc, char** argv)
 
     umask(umaskOriginal);
 
-    if (!p_scossl_keysinuse_is_enabled())
+    if (!keysinuse_is_enabled())
     {
         TEST_LOG_ERROR("KeysInUse is not enabled")
         goto cleanup;
@@ -1238,7 +1238,7 @@ cleanup:
     OPENSSL_free(processName);
     OPENSSL_free(pbEncodedKey);
     EVP_PKEY_free(pkey);
-    p_scossl_keysinuse_teardown();
+    keysinuse_teardown();
     keysinsue_test_cleanup();
 
     return ret;
