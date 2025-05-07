@@ -140,7 +140,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
 #ifdef KEYSINUSE_ENABLED
             copyCtx->isImported = keyCtx->isImported;
-            copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+            copyCtx->keysinuseCtx = keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
 #endif
         }
         else
@@ -634,7 +634,7 @@ void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 
         if (p_scossl_ecc_get_encoded_public_key(keyCtx, &pbPublicKey, &cbPublicKey))
         {
-            keyCtx->keysinuseCtx = p_scossl_keysinuse_load_key(pbPublicKey, cbPublicKey);
+            keyCtx->keysinuseCtx = keysinuse_load_key(pbPublicKey, cbPublicKey);
         }
         else
         {
@@ -651,7 +651,7 @@ void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 _Use_decl_annotations_
 void p_scossl_ecc_reset_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 {
-    p_scossl_keysinuse_unload_key(keyCtx->keysinuseCtx);
+    keysinuse_unload_key(keyCtx->keysinuseCtx);
     keyCtx->keysinuseCtx = NULL;
 }
 #endif

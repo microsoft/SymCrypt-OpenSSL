@@ -47,11 +47,11 @@ static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx
 // The keysinuse contexts are refcounted and indexed in lh_keysinuse_info by
 // their keyIdentifier.
 //
-// The first call to p_scossl_keysinuse_load_key with a given keyIdentifier
+// The first call to keysinuse_load_key with a given keyIdentifier
 // will create a new keysinuse context, increment its ref count, and add it
 // to lh_keysinuse_info. Subsequent calls will fetch the existing context
 // and increment the refcount. When the ref count reaches zero, the context
-// is freed and removed from lh_keysinuse_info. When p_scossl_keysinuse_teardown
+// is freed and removed from lh_keysinuse_info. When keysinuse_teardown
 // is called, all keysinuse contexts are freed and removed from lh_keysinuse_info.
 static LHASH_OF(SCOSSL_KEYSINUSE_CTX_IMP) *lh_keysinuse_ctx_imp = NULL;
 // This lock must be acquired before accessing lh_keysinuse_ctx_imp
@@ -69,13 +69,13 @@ static BOOL keysinuse_enabled = FALSE;
 
 // Number of times keysinuse has been initialized. If multiple providers are
 // using keysinuse, then keysinuse will not clean up until all consumers have
-// called p_scossl_keysinuse_teardown.
+// called keysinuse_teardown.
 static int keysinuse_init_count = 0;
 
 // This lock must be acquired for writing before accessing keysinuse_init_count
 // or keysinuse_enabled. A read lock must be held for any sections that depend
 // on the state of keysinuse_enabled being true.
-// NOTE: The caller MUST NOT call any keysinuse functions after p_scossl_keysinuse_teardown.
+// NOTE: The caller MUST NOT call any keysinuse functions after keysinuse_teardown.
 static CRYPTO_RWLOCK *keysinuse_state_lock = NULL;
 
 //
@@ -114,23 +114,23 @@ static BOOL is_logging = FALSE;
 // Internal function declarations
 //
 
-static void p_scossl_keysinuse_init_once();
+static void keysinuse_init_internal();
 
-static void p_scossl_keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
-static void p_scossl_keysinuse_add_use(_In_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, BOOL isSigning);
-static void p_scossl_keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
+static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static void keysinuse_add_use(_In_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, BOOL isSigning);
+static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
 
-static void p_scossl_keysinuse_log_common(int level, _In_ const char *message, va_list args);
-static void p_scossl_keysinuse_log_error(_In_ const char *message, ...);
-static void p_scossl_keysinuse_log_notice(_In_ const char *message, ...);
+static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
+static void keysinuse_log_error(_In_ const char *message, ...);
+static void keysinuse_log_notice(_In_ const char *message, ...);
 
-static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg);
+static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 
 //
 // Setup/teardown
 //
 
-static void p_scossl_keysinuse_init_once()
+static void keysinuse_init_internal()
 {
     int mkdirResult;
     mode_t umaskOriginal;
@@ -197,14 +197,14 @@ static void p_scossl_keysinuse_init_once()
     {
         if (chown(LOG_DIR, 0, 0) == -1)
         {
-            p_scossl_keysinuse_log_error("Failed to set ownership of logging directory at %s,SYS_%d", LOG_DIR, errno);
+            keysinuse_log_error("Failed to set ownership of logging directory at %s,SYS_%d", LOG_DIR, errno);
             rmdir(LOG_DIR);
             goto cleanup;
         }
     }
     else if (errno != EACCES && errno != EEXIST)
     {
-        p_scossl_keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
+        keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
         goto cleanup;
     }
 
@@ -214,9 +214,9 @@ static void p_scossl_keysinuse_init_once()
     if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
         (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
         (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
-        (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+        (pthreadErr = pthread_create(&logging_thread, NULL, keysinuse_logging_thread_start, NULL)) != 0)
     {
-        p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
+        keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
         is_logging = FALSE;
         goto cleanup;
     }
@@ -229,32 +229,32 @@ cleanup:
     {
         lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
         lh_keysinuse_ctx_imp = NULL;
-        p_scossl_keysinuse_teardown();
+        keysinuse_teardown();
     }
 
     OPENSSL_free(symlinkPath);
     OPENSSL_free(procPath);
 }
 
-void p_scossl_keysinuse_init()
+void keysinuse_init()
 {
     int ref;
-    CRYPTO_THREAD_run_once(&keysinuse_init_once, p_scossl_keysinuse_init_once);
+    CRYPTO_THREAD_run_once(&keysinuse_init_once, keysinuse_init_internal);
     CRYPTO_atomic_add(&keysinuse_init_count, 1, &ref, keysinuse_state_lock);
 }
 
 // This function MUST only be called after keysinuse_enabled has been set to FALSE under lock.
 // The other keysinuse functions will check keysinuse_enabled and do nothing if it is FALSE, so
 // we can safely cleanup the keysinuse contexts saved in the keysinuse context lhash. Typically
-// this will only happen when p_scossl_keysinuse_teardown is called, but may also happen if
+// this will only happen when keysinuse_teardown is called, but may also happen if
 // the logging thread exits early.
-static void p_scossl_keysinuse_cleanup_lhash()
+static void keysinuse_cleanup_lhash()
 {
     if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
     {
         if (lh_keysinuse_ctx_imp != NULL)
         {
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, p_scossl_keysinuse_free_key_ctx);
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
             lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
             lh_keysinuse_ctx_imp = NULL;
         }
@@ -263,11 +263,11 @@ static void p_scossl_keysinuse_cleanup_lhash()
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse context hash table in p_scossl_keysinuse_cleanup_lhash,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse context hash table in keysinuse_cleanup_lhash,OPENSSL_%d", ERR_get_error());
     }
 }
 
-void p_scossl_keysinuse_teardown()
+void keysinuse_teardown()
 {
     int ref;
     int pthreadErr;
@@ -281,13 +281,13 @@ void p_scossl_keysinuse_teardown()
         // keysinuse will no longer be in a running state.
         if (!CRYPTO_THREAD_write_lock(keysinuse_state_lock))
         {
-            p_scossl_keysinuse_log_error("Failed to lock keysinuse state in p_scossl_keysinuse_teardown,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("Failed to lock keysinuse state in keysinuse_teardown,OPENSSL_%d", ERR_get_error());
         }
 
         keysinuse_enabled = FALSE;
         CRYPTO_THREAD_unlock(keysinuse_state_lock);
 
-        // Finish logging thread. The logging thread will call p_scossl_keysinuse_cleanup
+        // Finish logging thread. The logging thread will call keysinuse_cleanup
         // and free all references to any keysinuse contexts it still has a reference to.
         if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex) == 0))
         {
@@ -299,17 +299,17 @@ void p_scossl_keysinuse_teardown()
 
                 if ((pthreadErr = pthread_join(logging_thread, NULL)) != 0)
                 {
-                    p_scossl_keysinuse_log_error("Failed to join logging thread,SYS_%d", pthreadErr);
+                    keysinuse_log_error("Failed to join logging thread,SYS_%d", pthreadErr);
                 }
                 else if (logging_thread_exit_status != SCOSSL_SUCCESS)
                 {
-                    p_scossl_keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
+                    keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
                 }
             }
         }
         else
         {
-            p_scossl_keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
+            keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
         }
         pthread_mutex_unlock(&logging_thread_mutex);
 
@@ -320,7 +320,7 @@ void p_scossl_keysinuse_teardown()
             prefix_size = 0;
         }
 
-        p_scossl_keysinuse_cleanup_lhash();
+        keysinuse_cleanup_lhash();
         CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
         CRYPTO_THREAD_lock_free(keysinuse_state_lock);
         lh_keysinuse_ctx_imp_lock = NULL;
@@ -328,7 +328,7 @@ void p_scossl_keysinuse_teardown()
     }
 }
 
-BOOL p_scossl_keysinuse_is_enabled()
+BOOL keysinuse_is_enabled()
 {
     return keysinuse_enabled;
 }
@@ -336,7 +336,7 @@ BOOL p_scossl_keysinuse_is_enabled()
 //
 // Configuration
 //
-void p_scossl_keysinuse_set_max_file_size(off_t size)
+void keysinuse_set_max_file_size(off_t size)
 {
     if (size > 0)
     {
@@ -344,7 +344,7 @@ void p_scossl_keysinuse_set_max_file_size(off_t size)
     }
 }
 
-void p_scossl_keysinuse_set_logging_delay(INT64 delay)
+void keysinuse_set_logging_delay(INT64 delay)
 {
     if (delay >= 0)
     {
@@ -372,13 +372,13 @@ static int scossl_keysinuse_ctx_cmp(const SCOSSL_KEYSINUSE_CTX_IMP *ctx1, const 
 // KeysInUse context management
 //
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_keysinuse_ctx_upref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
+SCOSSL_STATUS keysinuse_ctx_upref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
 {
     INT32 ref = 0;
 
     if (!CRYPTO_atomic_add(&ctx->refCount, 1, &ref, ctx->lock))
     {
-        p_scossl_keysinuse_log_error("p_scossl_keysinuse_ctx_upref failed,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("keysinuse_ctx_upref failed,OPENSSL_%d", ERR_get_error());
         return SCOSSL_FAILURE;
     }
 
@@ -391,13 +391,13 @@ SCOSSL_STATUS p_scossl_keysinuse_ctx_upref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
+SCOSSL_STATUS keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_ INT32 *refOut)
 {
     INT32 ref = 0;
 
     if (!CRYPTO_atomic_add(&ctx->refCount, -1, &ref, ctx->lock))
     {
-        p_scossl_keysinuse_log_error("p_scossl_keysinuse_ctx_downref failed,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("keysinuse_ctx_downref failed,OPENSSL_%d", ERR_get_error());
         return SCOSSL_FAILURE;
     }
 
@@ -410,12 +410,12 @@ SCOSSL_STATUS p_scossl_keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *c
 }
 
 _Use_decl_annotations_
-SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
+SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
 {
     EVP_MD *md = NULL;
     BOOL lockedState = FALSE;
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
-    SIZE_T cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
+    UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
     SCOSSL_KEYSINUSE_CTX_IMP *ctx = NULL;
     int lhErr;
@@ -433,13 +433,13 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
 
         if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
         {
-            p_scossl_keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
 
         if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, md, NULL) <= 0)
         {
-            p_scossl_keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
 
@@ -456,7 +456,7 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
         }
         else
         {
-            p_scossl_keysinuse_log_error("Failed to keysinuse context hash table for reading in p_scossl_keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("Failed to keysinuse context hash table for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
 
@@ -466,7 +466,7 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
             if ((ctx = OPENSSL_zalloc(sizeof(SCOSSL_KEYSINUSE_CTX_IMP))) == NULL ||
                 (ctx->lock = CRYPTO_THREAD_lock_new()) == NULL)
             {
-                p_scossl_keysinuse_log_error("malloc failure in p_scossl_keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
+                keysinuse_log_error("malloc failure in keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
 
@@ -478,7 +478,7 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
                 lh_SCOSSL_KEYSINUSE_CTX_IMP_insert(lh_keysinuse_ctx_imp, ctx);
                 if ((lhErr = lh_SCOSSL_KEYSINUSE_CTX_IMP_error(lh_keysinuse_ctx_imp)))
                 {
-                    p_scossl_keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
+                    keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
                 }
 
                 CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
@@ -490,11 +490,11 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
             }
             else
             {
-                p_scossl_keysinuse_log_error("Failed to lock keysinuse context hash table in p_scossl_keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+                keysinuse_log_error("Failed to lock keysinuse context hash table in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
                 goto cleanup;
             }
         }
-        else if (p_scossl_keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
+        else if (keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -503,7 +503,7 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cb
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse state for reading in p_scossl_keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
     }
 
 cleanup:
@@ -516,7 +516,7 @@ cleanup:
 
     if (status != SCOSSL_SUCCESS)
     {
-        p_scossl_keysinuse_free_key_ctx(ctx);
+        keysinuse_free_key_ctx(ctx);
         ctx = NULL;
     }
 
@@ -524,7 +524,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
+SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
 {
     if (ctx == NULL)
         return NULL;
@@ -532,7 +532,7 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *c
     if (CRYPTO_THREAD_read_lock(keysinuse_state_lock))
     {
         if (!keysinuse_enabled ||
-            p_scossl_keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
+            keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
         {
             ctx = NULL;
         }
@@ -541,14 +541,14 @@ SCOSSL_KEYSINUSE_CTX *p_scossl_keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *c
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse state for reading in p_scossl_keysinuse_load_key_by_ctx,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_load_key_by_ctx,OPENSSL_%d", ERR_get_error());
     }
 
     return ctx;
 }
 
 _Use_decl_annotations_
-void p_scossl_keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
+void keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
 {
     INT32 ref;
 
@@ -562,19 +562,19 @@ void p_scossl_keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
         // but can happen if the logging thread exited early. Do nothing.
         if (keysinuse_enabled)
         {
-            p_scossl_keysinuse_ctx_downref(ctx, &ref);
+            keysinuse_ctx_downref(ctx, &ref);
         }
 
         CRYPTO_THREAD_unlock(keysinuse_state_lock);
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse state for reading in p_scossl_keysinuse_unload_key,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_unload_key,OPENSSL_%d", ERR_get_error());
     }
 }
 
 _Use_decl_annotations_
-static void p_scossl_keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 {
     if (ctx == NULL)
         return;
@@ -587,7 +587,7 @@ static void p_scossl_keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 // Usage tracking
 //
 _Use_decl_annotations_
-static void p_scossl_keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL isSigning)
+static void keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL isSigning)
 {
     int pthreadErr;
     BOOL wakeLoggingThread = FALSE;
@@ -624,7 +624,7 @@ static void p_scossl_keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL is
             }
             else
             {
-                p_scossl_keysinuse_log_error("Failed to lock keysinuse info in p_scossl_keysinuse_add_use,OPENSSL_%d", ERR_get_error());
+                keysinuse_log_error("Failed to lock keysinuse info in keysinuse_add_use,OPENSSL_%d", ERR_get_error());
             }
 
             if (wakeLoggingThread)
@@ -633,13 +633,13 @@ static void p_scossl_keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL is
                 {
                     if ((pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
                     {
-                        p_scossl_keysinuse_log_error("Failed to signal logging thread in p_scossl_keysinuse_add_use,SYS_%d", pthreadErr);
+                        keysinuse_log_error("Failed to signal logging thread in keysinuse_add_use,SYS_%d", pthreadErr);
                     }
                     pthread_mutex_unlock(&logging_thread_mutex);
                 }
                 else
                 {
-                    p_scossl_keysinuse_log_error("Failed to lock logging thread mutex in p_scossl_keysinuse_add_use,SYS_%d", pthreadErr);
+                    keysinuse_log_error("Failed to lock logging thread mutex in keysinuse_add_use,SYS_%d", pthreadErr);
                 }
             }
         }
@@ -648,25 +648,25 @@ static void p_scossl_keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL is
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse state for reading in p_scossl_keysinuse_add_use,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_add_use,OPENSSL_%d", ERR_get_error());
     }
 }
 
-void p_scossl_keysinuse_on_sign(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
+void keysinuse_on_sign(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    p_scossl_keysinuse_add_use(ctx, TRUE);
+    keysinuse_add_use(ctx, TRUE);
 }
 
-void p_scossl_keysinuse_on_decrypt(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
+void keysinuse_on_decrypt(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    p_scossl_keysinuse_add_use(ctx, FALSE);
+    keysinuse_add_use(ctx, FALSE);
 }
 
 // This function should only be called by the logging thread using lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg.
 // This function assumes that the caller has already acquired the write lock on lh_keysinuse_ctx_imp_lock,
 // and that it is safe to call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete.
 _Use_decl_annotations_
-static void p_scossl_keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
+static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
 {
     BOOL logEvent = FALSE;
     BOOL freeCtx = FALSE;
@@ -711,13 +711,13 @@ static void p_scossl_keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID d
     }
     else
     {
-        p_scossl_keysinuse_log_error("Failed to lock keysinuse info in p_scossl_keysinuse_ctx_log,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse info in keysinuse_ctx_log,OPENSSL_%d", ERR_get_error());
         return;
     }
 
     if (logEvent)
     {
-        p_scossl_keysinuse_log_notice("%s,%d,%d,%ld,%ld",
+        keysinuse_log_notice("%s,%d,%d,%ld,%ld",
             ctxImpTmp.keyIdentifier,
             ctxImpTmp.signCounter,
             ctxImpTmp.decryptCounter,
@@ -728,7 +728,7 @@ static void p_scossl_keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID d
     if (freeCtx)
     {
         lh_SCOSSL_KEYSINUSE_CTX_IMP_delete(lh_keysinuse_ctx_imp, ctxImp);
-        p_scossl_keysinuse_free_key_ctx(ctxImp);
+        keysinuse_free_key_ctx(ctxImp);
     }
 }
 
@@ -736,7 +736,7 @@ static void p_scossl_keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID d
 // Logging
 //
 _Use_decl_annotations_
-static void p_scossl_keysinuse_log_common(int level, const char *message, va_list args)
+static void keysinuse_log_common(int level, const char *message, va_list args)
 {
     char *level_str = "";
     // (Length of LOG_PATH_TMPL) - (8 for format specifiers)
@@ -784,7 +784,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
             {
                 if (level > KEYSINUSE_ERR)
                 {
-                    p_scossl_keysinuse_log_error("Found symlink at %s. Removing file", log_path);
+                    keysinuse_log_error("Found symlink at %s. Removing file", log_path);
                 }
 #ifdef DEBUG
                 else
@@ -800,7 +800,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
             {
                 if (level > KEYSINUSE_ERR)
                 {
-                    p_scossl_keysinuse_log_error("Found unexpected permissions (%o) on %s. Removing file", (sb.st_mode & 0777), log_path);
+                    keysinuse_log_error("Found unexpected permissions (%o) on %s. Removing file", (sb.st_mode & 0777), log_path);
                 }
 #ifdef DEBUG
                 else
@@ -817,7 +817,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
                 {
                     if (level > KEYSINUSE_ERR)
                     {
-                        p_scossl_keysinuse_log_error("Failed to remove bad log file at %s,SYS_%d", log_path, errno);
+                        keysinuse_log_error("Failed to remove bad log file at %s,SYS_%d", log_path, errno);
                     }
 #ifdef DEBUG
                     else
@@ -832,7 +832,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
             {
                 if (level > KEYSINUSE_ERR)
                 {
-                    p_scossl_keysinuse_log_error("Failed to log to %s. File size capped at %ld bytes", log_path, max_file_size);
+                    keysinuse_log_error("Failed to log to %s. File size capped at %ld bytes", log_path, max_file_size);
                 }
 #ifdef DEBUG
                 else
@@ -847,7 +847,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
         {
             if (level > KEYSINUSE_ERR)
             {
-                p_scossl_keysinuse_log_error("Failed to stat file at %s,SYS_%d", log_path, errno);
+                keysinuse_log_error("Failed to stat file at %s,SYS_%d", log_path, errno);
             }
 #ifdef DEBUG
             else
@@ -874,7 +874,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
         {
             if (level > KEYSINUSE_ERR)
             {
-                p_scossl_keysinuse_log_error("Failed to open log file for appending at %s,SYS_%d", log_path, errno);
+                keysinuse_log_error("Failed to open log file for appending at %s,SYS_%d", log_path, errno);
             }
 #ifdef DEBUG
             else
@@ -890,7 +890,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
         {
             if (level > KEYSINUSE_ERR)
             {
-                p_scossl_keysinuse_log_error("Failed to write to log file at %s,SYS_%d", log_path, errno);
+                keysinuse_log_error("Failed to write to log file at %s,SYS_%d", log_path, errno);
             }
 #ifdef DEBUG
             else
@@ -904,7 +904,7 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
         {
             if (level > KEYSINUSE_ERR)
             {
-                p_scossl_keysinuse_log_error("Failed to close log file at %s,SYS_%d", log_path, errno);
+                keysinuse_log_error("Failed to close log file at %s,SYS_%d", log_path, errno);
             }
 #ifdef DEBUG
             else
@@ -919,19 +919,19 @@ static void p_scossl_keysinuse_log_common(int level, const char *message, va_lis
 // Used for logging keysinuse related errors to a separate log file.
 // This avoids poluting the error stack with keysinuse related errors.
 _Use_decl_annotations_
-static void p_scossl_keysinuse_log_error(const char *message, ...)
+static void keysinuse_log_error(const char *message, ...)
 {
     va_list args;
     va_start(args, message);
-    p_scossl_keysinuse_log_common(KEYSINUSE_ERR, message, args);
+    keysinuse_log_common(KEYSINUSE_ERR, message, args);
 }
 
 _Use_decl_annotations_
-static void p_scossl_keysinuse_log_notice(const char *message, ...)
+static void keysinuse_log_notice(const char *message, ...)
 {
     va_list args;
     va_start(args, message);
-    p_scossl_keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
+    keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
 }
 
 // The logging thread runs in a loop. It pops all pending usage from sk_keysinuse_info,
@@ -939,7 +939,7 @@ static void p_scossl_keysinuse_log_notice(const char *message, ...)
 // On the first use of a key, the thread is woken immediatley log the event. All pending
 // events are logged on program exit.
 _Use_decl_annotations_
-static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
+static void *keysinuse_logging_thread_start(ossl_unused void *arg)
 {
     // Logging thread is terminated by setting is_logging to FALSE and signaling logging_thread_cond_wake_early
     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
@@ -1003,13 +1003,13 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
         if (pthreadErr != 0)
         {
-            p_scossl_keysinuse_log_error("Logging thread failed to acquire mutex,SYS_%d", pthreadErr);
+            keysinuse_log_error("Logging thread failed to acquire mutex,SYS_%d", pthreadErr);
             goto cleanup;
         }
 
         if (waitStatus != 0 && waitStatus != ETIMEDOUT)
         {
-            p_scossl_keysinuse_log_error("Logging thread woken up with unexpected status, SYS_%d", waitStatus);
+            keysinuse_log_error("Logging thread woken up with unexpected status, SYS_%d", waitStatus);
             goto cleanup;
         }
 
@@ -1017,12 +1017,12 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
         {
             // Set load factor to 0 during this operation to prevent hash table contraction.
             // This allows us to safely call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete from
-            // p_scossl_keysinuse_ctx_log to safely remove contexts with no more references.
+            // keysinuse_ctx_log to safely remove contexts with no more references.
             lhDownLoad = lh_SCOSSL_KEYSINUSE_CTX_IMP_get_down_load(lh_keysinuse_ctx_imp);
             lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, 0);
 
             isScheduledLogEvent = waitStatus == ETIMEDOUT;
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg(lh_keysinuse_ctx_imp, p_scossl_keysinuse_ctx_log, &isScheduledLogEvent);
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg(lh_keysinuse_ctx_imp, keysinuse_ctx_log, &isScheduledLogEvent);
 
             lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, lhDownLoad);
 
@@ -1030,7 +1030,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
         }
         else
         {
-            p_scossl_keysinuse_log_error("Logging thread failed to lock keysinuse context hash table for reading,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("Logging thread failed to lock keysinuse context hash table for reading,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
     }
@@ -1040,16 +1040,16 @@ cleanup:
     // Only clean up the lhash if we can set keysinuse_enabled to FALSE
     // under lock. Another thread may be in a critical section that touches
     // the keysinuse contexts stored in the hash table. If we fail to cleanup
-    // the hash table here, it will be forcibly cleaned in p_scossl_keysinuse_teardown.
+    // the hash table here, it will be forcibly cleaned in keysinuse_teardown.
     if (CRYPTO_THREAD_write_lock(keysinuse_state_lock))
     {
         keysinuse_enabled = FALSE;
         CRYPTO_THREAD_unlock(keysinuse_state_lock);
-        p_scossl_keysinuse_cleanup_lhash();
+        keysinuse_cleanup_lhash();
     }
     else
     {
-        p_scossl_keysinuse_log_error("Logging thread failed to lock keysinuse state for writing,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Logging thread failed to lock keysinuse state for writing,OPENSSL_%d", ERR_get_error());
     }
 
     logging_thread_exit_status = SCOSSL_SUCCESS;

@@ -198,7 +198,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
         ctx->padding = keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS ? RSA_PKCS1_PSS_PADDING : RSA_PKCS1_PADDING;
 
 #ifdef KEYSINUSE_ENABLED
-        if (p_scossl_keysinuse_is_enabled() &&
+        if (keysinuse_is_enabled() &&
             operation == EVP_PKEY_OP_SIGN)
         {
             p_scossl_rsa_init_keysinuse(keyCtx);
@@ -268,7 +268,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 #ifdef KEYSINUSE_ENABLED
     if (ret && sig != NULL)
     {
-        p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseCtx);
+        keysinuse_on_sign(ctx->keyCtx->keysinuseCtx);
     }
 #endif
 
