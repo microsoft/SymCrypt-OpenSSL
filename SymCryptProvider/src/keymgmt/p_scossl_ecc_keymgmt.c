@@ -231,7 +231,7 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
 
 #ifdef KEYSINUSE_ENABLED
         copyCtx->isImported = keyCtx->isImported;
-        copyCtx->keysinuseCtx = p_scossl_keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+        copyCtx->keysinuseCtx = keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
 #endif
         }
         else
