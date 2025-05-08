@@ -1119,6 +1119,18 @@ cleanup:
     return ret;
 }
 
+static BOOL p_scossl_dh_keymgmt_validate(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, int selection, ossl_unused int checktype)
+{
+    if ((selection & (OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS | OSSL_KEYMGMT_SELECT_KEYPAIR)) == 0)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    // The key material is validated by SymCrypt when the key and/or group are set.
+    // If the key and/or group are set then that implies the key is valid.
+    return p_scossl_dh_keymgmt_has(ctx, selection);
+}
+
 //
 // Key import/export
 //
@@ -1511,6 +1523,7 @@ const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_dh_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_dh_keymgmt_has},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_dh_keymgmt_match},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_dh_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_dh_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_dh_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_dh_keymgmt_import},
