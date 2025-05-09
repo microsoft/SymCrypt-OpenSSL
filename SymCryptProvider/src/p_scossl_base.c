@@ -444,9 +444,7 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-#ifdef KEYSINUSE_ENABLED
-    keysinuse_teardown();
-#endif
+
     if (provctx != NULL)
     {
         BIO_meth_free(provctx->coreBioMeth);

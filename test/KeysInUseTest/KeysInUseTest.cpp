@@ -424,29 +424,29 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     if (testSign)
     {
         // Test sign
-        keysinuse_on_sign(keysinuseCtx);
+        keysinuse_on_use(keysinuseCtx, KEYSINUSE_SIGN);
         expectedEvents[0].signCount = 1;
 
         // Wait a little to allow the logging thread to process the event
         usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
         // Test second sign. Only the first event should be logged.
-        keysinuse_on_sign(keysinuseCtx);
-        keysinuse_on_sign(keysinuseCtxCopyByRef);
+        keysinuse_on_use(keysinuseCtx, KEYSINUSE_SIGN);
+        keysinuse_on_use(keysinuseCtxCopyByRef, KEYSINUSE_SIGN);
         expectedEvents[1].signCount = 2;
     }
     else
     {
         // Test decrypt
-        keysinuse_on_decrypt(keysinuseCtx);
+        keysinuse_on_use(keysinuseCtx, KEYSINUSE_DECRYPT);
         expectedEvents[0].decryptCount = 1;
 
         // Wait a little to allow the logging thread to process the event
         usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
         // Test second decrypt. Only the first event should be logged.
-        keysinuse_on_decrypt(keysinuseCtx);
-        keysinuse_on_decrypt(keysinuseCtxCopyByRef);
+        keysinuse_on_use(keysinuseCtx, KEYSINUSE_DECRYPT);
+        keysinuse_on_use(keysinuseCtxCopyByRef, KEYSINUSE_DECRYPT);
         expectedEvents[1].decryptCount = 2;
     }
 
@@ -472,12 +472,12 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     // Test key use again, this event should be immediately logged
     if (testSign)
     {
-        keysinuse_on_sign(keysinuseCtxCopy);
+        keysinuse_on_use(keysinuseCtxCopy, KEYSINUSE_SIGN);
         expectedEvents[2].signCount = 1;
     }
     else
     {
-        keysinuse_on_decrypt(keysinuseCtxCopy);
+        keysinuse_on_use(keysinuseCtxCopy, KEYSINUSE_DECRYPT);
         expectedEvents[2].decryptCount = 1;
     }
 
@@ -1238,7 +1238,6 @@ cleanup:
     OPENSSL_free(processName);
     OPENSSL_free(pbEncodedKey);
     EVP_PKEY_free(pkey);
-    keysinuse_teardown();
     keysinsue_test_cleanup();
 
     return ret;

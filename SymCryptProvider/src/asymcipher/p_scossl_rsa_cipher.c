@@ -223,7 +223,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 #ifdef KEYSINUSE_ENABLED
     if (out != NULL)
     {
-        keysinuse_on_decrypt(ctx->keyCtx->keysinuseCtx);
+        keysinuse_on_use(ctx->keyCtx->keysinuseCtx, KEYSINUSE_DECRYPT);
     }
 #endif
 
