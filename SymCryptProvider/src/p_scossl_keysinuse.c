@@ -61,26 +61,15 @@ static CRYPTO_RWLOCK *lh_keysinuse_ctx_imp_lock = NULL;
 // Configuration
 //
 
-// TODO: Check, what happens when I load the provider, unload it, and reload it?
 static CRYPTO_ONCE keysinuse_init_once = CRYPTO_ONCE_STATIC_INIT;
 static off_t max_file_size = 5 << 10; // Default to 5KB
 static long logging_delay = 60 * 60; // Default to 1 hour
 static BOOL keysinuse_enabled = FALSE;
 
-// Number of times keysinuse has been initialized. If multiple providers are
-// using keysinuse, then keysinuse will not clean up until all consumers have
-// called keysinuse_teardown.
-static int keysinuse_init_count = 0;
-
-// This lock must be acquired for writing before accessing keysinuse_init_count
-// or keysinuse_enabled. A read lock must be held for any sections that depend
-// on the state of keysinuse_enabled being true.
-// NOTE: The caller MUST NOT call any keysinuse functions after keysinuse_teardown.
-static CRYPTO_RWLOCK *keysinuse_state_lock = NULL;
-
 //
 // Logging
 //
+
 #define KEYSINUSE_ERR 0
 #define KEYSINUSE_NOTICE 1
 // Log files separated by UID.
@@ -115,9 +104,9 @@ static BOOL is_logging = FALSE;
 //
 
 static void keysinuse_init_internal();
+static void keysinuse_teardown();
 
 static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
-static void keysinuse_add_use(_In_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, BOOL isSigning);
 static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
@@ -145,7 +134,6 @@ static void keysinuse_init_internal()
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    keysinuse_state_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
 
@@ -221,6 +209,12 @@ static void keysinuse_init_internal()
         goto cleanup;
     }
 
+    if (!OPENSSL_atexit(keysinuse_teardown))
+    {
+        keysinuse_log_error("OPENSSL_at_exit failed,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
+    }
+
     keysinuse_enabled = TRUE;
     status = SCOSSL_SUCCESS;
 
@@ -238,98 +232,66 @@ cleanup:
 
 void keysinuse_init()
 {
-    int ref;
     CRYPTO_THREAD_run_once(&keysinuse_init_once, keysinuse_init_internal);
-    CRYPTO_atomic_add(&keysinuse_init_count, 1, &ref, keysinuse_state_lock);
-}
-
-// This function MUST only be called after keysinuse_enabled has been set to FALSE under lock.
-// The other keysinuse functions will check keysinuse_enabled and do nothing if it is FALSE, so
-// we can safely cleanup the keysinuse contexts saved in the keysinuse context lhash. Typically
-// this will only happen when keysinuse_teardown is called, but may also happen if
-// the logging thread exits early.
-static void keysinuse_cleanup_lhash()
-{
-    if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
-    {
-        if (lh_keysinuse_ctx_imp != NULL)
-        {
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
-            lh_keysinuse_ctx_imp = NULL;
-        }
-
-        CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
-    }
-    else
-    {
-        keysinuse_log_error("Failed to lock keysinuse context hash table in keysinuse_cleanup_lhash,OPENSSL_%d", ERR_get_error());
-    }
 }
 
 void keysinuse_teardown()
 {
-    int ref;
     int pthreadErr;
 
-    CRYPTO_atomic_add(&keysinuse_init_count, -1, &ref, keysinuse_state_lock);
-    if (ref == 0)
+    keysinuse_enabled = FALSE;
+
+    // Finish logging thread. The logging thread will call keysinuse_cleanup
+    // and free all references to any keysinuse contexts it still has a reference to.
+    if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex) == 0))
     {
-        // Set keysinuse_enabled to FALSE in case the logging thread exits unexpectedly
-        // and is unable to properly cleanup. We try to acquire the write lock. We should
-        // still set keysinuse_enabled to false even if we fail to acquire the lock, since
-        // keysinuse will no longer be in a running state.
-        if (!CRYPTO_THREAD_write_lock(keysinuse_state_lock))
+        if (is_logging)
         {
-            keysinuse_log_error("Failed to lock keysinuse state in keysinuse_teardown,OPENSSL_%d", ERR_get_error());
-        }
+            is_logging = FALSE;
+            pthread_cond_signal(&logging_thread_cond_wake_early);
+            pthread_mutex_unlock(&logging_thread_mutex);
 
-        keysinuse_enabled = FALSE;
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
-
-        // Finish logging thread. The logging thread will call keysinuse_cleanup
-        // and free all references to any keysinuse contexts it still has a reference to.
-        if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex) == 0))
-        {
-            if (is_logging)
+            if ((pthreadErr = pthread_join(logging_thread, NULL)) != 0)
             {
-                is_logging = FALSE;
-                pthread_cond_signal(&logging_thread_cond_wake_early);
-                pthread_mutex_unlock(&logging_thread_mutex);
-
-                if ((pthreadErr = pthread_join(logging_thread, NULL)) != 0)
-                {
-                    keysinuse_log_error("Failed to join logging thread,SYS_%d", pthreadErr);
-                }
-                else if (logging_thread_exit_status != SCOSSL_SUCCESS)
-                {
-                    keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
-                }
+                keysinuse_log_error("Failed to join logging thread,SYS_%d", pthreadErr);
+            }
+            else if (logging_thread_exit_status != SCOSSL_SUCCESS)
+            {
+                keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
             }
         }
         else
         {
-            keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
+            pthread_mutex_unlock(&logging_thread_mutex);
         }
-        pthread_mutex_unlock(&logging_thread_mutex);
-
-        if (prefix != default_prefix)
-        {
-            OPENSSL_free(prefix);
-            prefix = (char*)default_prefix;
-            prefix_size = 0;
-        }
-
-        keysinuse_cleanup_lhash();
-        CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
-        CRYPTO_THREAD_lock_free(keysinuse_state_lock);
-        lh_keysinuse_ctx_imp_lock = NULL;
-        keysinuse_state_lock = NULL;
     }
+    else
+    {
+        keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
+    }
+
+    if (prefix != default_prefix)
+    {
+        OPENSSL_free(prefix);
+        prefix = (char*)default_prefix;
+        prefix_size = 0;
+    }
+
+    if (lh_keysinuse_ctx_imp != NULL)
+    {
+        lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
+        lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
+        lh_keysinuse_ctx_imp = NULL;
+    }
+
+    CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
+    lh_keysinuse_ctx_imp_lock = NULL;
 }
 
 BOOL keysinuse_is_enabled()
 {
+    // Try to initialize keysinuse if it hasn't been already
+    keysinuse_init();
     return keysinuse_enabled;
 }
 
@@ -413,7 +375,6 @@ _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
 {
     EVP_MD *md = NULL;
-    BOOL lockedState = FALSE;
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
     UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
@@ -421,98 +382,103 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKe
     int lhErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    if (pbEncodedKey == NULL || cbEncodedKey == 0)
+    if (!keysinuse_is_enabled() ||
+        pbEncodedKey == NULL ||
+        cbEncodedKey == 0)
     {
         return NULL;
     }
 
-    // Lock keysinuse state to prevent teardown until after this function finishes
-    if (CRYPTO_THREAD_read_lock(keysinuse_state_lock))
+    if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
     {
-        lockedState = TRUE;
+        keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
+    }
 
-        if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
-        {
-            keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
-            goto cleanup;
-        }
+    if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, md, NULL) <= 0)
+    {
+        keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
+    }
 
-        if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, md, NULL) <= 0)
-        {
-            keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
-            goto cleanup;
-        }
+    for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
+    {
+        sprintf(&ctxTmpl.keyIdentifier[i*2], "%02x", abHash[i]);
+    }
+    ctxTmpl.keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
 
-        for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
-        {
-            sprintf(&ctxTmpl.keyIdentifier[i*2], "%02x", abHash[i]);
-        }
-        ctxTmpl.keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
-
-        if (CRYPTO_THREAD_read_lock(lh_keysinuse_ctx_imp_lock))
+    if (CRYPTO_THREAD_read_lock(lh_keysinuse_ctx_imp_lock))
+    {
+        if (lh_keysinuse_ctx_imp != NULL)
         {
             ctx = lh_SCOSSL_KEYSINUSE_CTX_IMP_retrieve(lh_keysinuse_ctx_imp, &ctxTmpl);
-            CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
         }
-        else
+
+        CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
+
+        if (lh_keysinuse_ctx_imp == NULL)
         {
-            keysinuse_log_error("Failed to keysinuse context hash table for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
+            goto cleanup;
+        }
+    }
+    else
+    {
+        keysinuse_log_error("Failed to keysinuse context hash table for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
+    }
+
+    if (ctx == NULL)
+    {
+        // New key used for keysinuse. Create a new context and add it to the hash table
+        if ((ctx = OPENSSL_zalloc(sizeof(SCOSSL_KEYSINUSE_CTX_IMP))) == NULL ||
+            (ctx->lock = CRYPTO_THREAD_lock_new()) == NULL)
+        {
+            keysinuse_log_error("malloc failure in keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        if (ctx == NULL)
+        memcpy(ctx->keyIdentifier, ctxTmpl.keyIdentifier, sizeof(ctxTmpl.keyIdentifier));
+        ctx->refCount = 1;
+
+        if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
         {
-            // New key used for keysinuse. Create a new context and add it to the hash table
-            if ((ctx = OPENSSL_zalloc(sizeof(SCOSSL_KEYSINUSE_CTX_IMP))) == NULL ||
-                (ctx->lock = CRYPTO_THREAD_lock_new()) == NULL)
-            {
-                keysinuse_log_error("malloc failure in keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-
-            memcpy(ctx->keyIdentifier, ctxTmpl.keyIdentifier, sizeof(ctxTmpl.keyIdentifier));
-            ctx->refCount = 1;
-
-            if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
+            if (lh_keysinuse_ctx_imp != NULL)
             {
                 lh_SCOSSL_KEYSINUSE_CTX_IMP_insert(lh_keysinuse_ctx_imp, ctx);
+
                 if ((lhErr = lh_SCOSSL_KEYSINUSE_CTX_IMP_error(lh_keysinuse_ctx_imp)))
                 {
                     keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
                 }
-
-                CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
-
-                if (lhErr)
-                {
-                    goto cleanup;
-                }
             }
             else
             {
-                keysinuse_log_error("Failed to lock keysinuse context hash table in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+                keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
+            }
+
+            CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
+
+            if (lh_keysinuse_ctx_imp == NULL || lhErr)
+            {
                 goto cleanup;
             }
         }
-        else if (keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
+        else
         {
+            keysinuse_log_error("Failed to lock keysinuse context hash table in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
-
-        status = SCOSSL_SUCCESS;
     }
-    else
+    else if (keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
     {
-        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
     }
+
+    status = SCOSSL_SUCCESS;
 
 cleanup:
     EVP_MD_free(md);
-
-    if (lockedState)
-    {
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
-    }
 
     if (status != SCOSSL_SUCCESS)
     {
@@ -526,50 +492,23 @@ cleanup:
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    if (ctx == NULL)
-        return NULL;
-
-    if (CRYPTO_THREAD_read_lock(keysinuse_state_lock))
+    if (keysinuse_is_enabled() && ctx != NULL &&
+        keysinuse_ctx_upref(ctx, NULL) == SCOSSL_SUCCESS)
     {
-        if (!keysinuse_enabled ||
-            keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
-        {
-            ctx = NULL;
-        }
-
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
-    }
-    else
-    {
-        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_load_key_by_ctx,OPENSSL_%d", ERR_get_error());
+        return ctx;
     }
 
-    return ctx;
+    return NULL;
 }
 
 _Use_decl_annotations_
 void keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    INT32 ref;
-
-    if (ctx == NULL)
-        return;
-
-    if (CRYPTO_THREAD_read_lock(keysinuse_state_lock))
+    if (keysinuse_is_enabled() && ctx != NULL)
     {
-        // If keysinuse is not enabled, then the hash table and all of its stored contexts have
-        // been destroyed. The supplied context was already freed. This should not normally happen
-        // but can happen if the logging thread exited early. Do nothing.
-        if (keysinuse_enabled)
-        {
-            keysinuse_ctx_downref(ctx, &ref);
-        }
-
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
-    }
-    else
-    {
-        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_unload_key,OPENSSL_%d", ERR_get_error());
+        // Don't free the key context here. The logging thread will free the context
+        // and remove it from the hash table after logging any pending usage events.
+        keysinuse_ctx_downref(ctx, NULL);;
     }
 }
 
@@ -587,84 +526,66 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 // Usage tracking
 //
 _Use_decl_annotations_
-static void keysinuse_add_use(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, BOOL isSigning)
+void keysinuse_on_use(SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
 {
+    SCOSSL_KEYSINUSE_CTX_IMP *ctxImp = (SCOSSL_KEYSINUSE_CTX_IMP*)ctx;
     int pthreadErr;
     BOOL wakeLoggingThread = FALSE;
 
-    if (ctxImp == NULL)
+    if (!keysinuse_is_enabled() ||
+        ctxImp == NULL)
         return;
 
-    if (CRYPTO_THREAD_read_lock(keysinuse_state_lock))
+    if (CRYPTO_THREAD_write_lock(ctxImp->lock))
     {
-        // If keysinuse is not enabled, then the hash table and all of its stored contexts have
-        // been destroyed. The supplied context was already freed. This can happen if the
-        // logging thread exited early. Do nothing.
-        if (keysinuse_enabled)
+        // Increment appropriate usage counter
+        switch (operation)
         {
-            if (CRYPTO_THREAD_write_lock(ctxImp->lock))
-            {
-                // Increment appropriate usage counter
-                if (isSigning)
-                {
-                    ctxImp->signCounter++;
-                }
-                else
-                {
-                    ctxImp->decryptCounter++;
-                }
-
-                // First use of this key, wake the logging thread
-                if (ctxImp->firstLogTime == 0)
-                {
-                    wakeLoggingThread = TRUE;
-                }
-
-                CRYPTO_THREAD_unlock(ctxImp->lock);
-            }
-            else
-            {
-                keysinuse_log_error("Failed to lock keysinuse info in keysinuse_add_use,OPENSSL_%d", ERR_get_error());
-            }
-
-            if (wakeLoggingThread)
-            {
-                if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) == 0)
-                {
-                    if ((pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
-                    {
-                        keysinuse_log_error("Failed to signal logging thread in keysinuse_add_use,SYS_%d", pthreadErr);
-                    }
-                    pthread_mutex_unlock(&logging_thread_mutex);
-                }
-                else
-                {
-                    keysinuse_log_error("Failed to lock logging thread mutex in keysinuse_add_use,SYS_%d", pthreadErr);
-                }
-            }
+        case KEYSINUSE_SIGN:
+            ctxImp->signCounter++;
+            break;
+        case KEYSINUSE_DECRYPT:
+            ctxImp->decryptCounter++;
+            break;
+        default:
+            keysinuse_log_error("Invalid operation in keysinuse_on_use: %d", operation);
+            CRYPTO_THREAD_unlock(ctxImp->lock);
+            return;
         }
 
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
+        // First use of this key, wake the logging thread
+        if (ctxImp->firstLogTime == 0)
+        {
+            wakeLoggingThread = TRUE;
+        }
+
+        CRYPTO_THREAD_unlock(ctxImp->lock);
     }
     else
     {
-        keysinuse_log_error("Failed to lock keysinuse state for reading in keysinuse_add_use,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse info in keysinuse_on_use,OPENSSL_%d", ERR_get_error());
     }
-}
 
-void keysinuse_on_sign(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
-{
-    keysinuse_add_use(ctx, TRUE);
-}
-
-void keysinuse_on_decrypt(_In_ SCOSSL_KEYSINUSE_CTX *ctx)
-{
-    keysinuse_add_use(ctx, FALSE);
+    if (wakeLoggingThread)
+    {
+        if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) == 0)
+        {
+            if ((pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
+            {
+                keysinuse_log_error("Failed to signal logging thread in keysinuse_on_use,SYS_%d", pthreadErr);
+            }
+            pthread_mutex_unlock(&logging_thread_mutex);
+        }
+        else
+        {
+            keysinuse_log_error("Failed to lock logging thread mutex in keysinuse_on_use,SYS_%d", pthreadErr);
+        }
+    }
 }
 
 // This function should only be called by the logging thread using lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg.
 // This function assumes that the caller has already acquired the write lock on lh_keysinuse_ctx_imp_lock,
-// and that it is safe to call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete.
+// and that it is safe to call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete (the lhash load factor has been set to 0)
 _Use_decl_annotations_
 static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
 {
@@ -1037,21 +958,8 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg)
     while (isLoggingThreadRunning);
 
 cleanup:
-    // Only clean up the lhash if we can set keysinuse_enabled to FALSE
-    // under lock. Another thread may be in a critical section that touches
-    // the keysinuse contexts stored in the hash table. If we fail to cleanup
-    // the hash table here, it will be forcibly cleaned in keysinuse_teardown.
-    if (CRYPTO_THREAD_write_lock(keysinuse_state_lock))
-    {
-        keysinuse_enabled = FALSE;
-        CRYPTO_THREAD_unlock(keysinuse_state_lock);
-        keysinuse_cleanup_lhash();
-    }
-    else
-    {
-        keysinuse_log_error("Logging thread failed to lock keysinuse state for writing,OPENSSL_%d", ERR_get_error());
-    }
-
+    is_logging = FALSE;
+    keysinuse_enabled = FALSE;
     logging_thread_exit_status = SCOSSL_SUCCESS;
 
     return NULL;
