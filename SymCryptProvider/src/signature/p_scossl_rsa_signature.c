@@ -268,7 +268,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 #ifdef KEYSINUSE_ENABLED
     if (ret && sig != NULL)
     {
-        keysinuse_on_sign(ctx->keyCtx->keysinuseCtx);
+        keysinuse_on_use(ctx->keyCtx->keysinuseCtx, KEYSINUSE_SIGN);
     }
 #endif
 

@@ -194,7 +194,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
     }
 
 #ifdef KEYSINUSE_ENABLED
-    keysinuse_on_sign(ctx->keyCtx->keysinuseCtx);
+    keysinuse_on_use(ctx->keyCtx->keysinuseCtx, KEYSINUSE_SIGN);
 #endif
 
     return SCOSSL_SUCCESS;
