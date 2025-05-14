@@ -23,7 +23,7 @@ const OSSL_PARAM p_scossl_digest_export_settable_param_types[] = {
     OSSL_PARAM_END};
 
 const OSSL_PARAM p_scossl_digest_export_gettable_ctx_param_types[] = {
-    OSSL_PARAM_int(SCOSSL_DIGEST_PARAM_RECOMPUTE_CHECKSUM, NULL),
+    OSSL_PARAM_int(SCOSSL_DIGEST_PARAM_STATE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM *p_scossl_digest_export_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -57,55 +57,20 @@ static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_digest_get_md5_state(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[])
-{
-    return p_scossl_digest_get_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_EXPORT) SymCryptMd5StateExport,
-        SYMCRYPT_MD5_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_get_sha1_state(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[])
-{
-    return p_scossl_digest_get_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_EXPORT) SymCryptSha1StateExport,
-        SYMCRYPT_SHA1_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_get_sha256_state(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[])
-{
-    return p_scossl_digest_get_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_EXPORT) SymCryptSha256StateExport,
-        SYMCRYPT_SHA256_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_get_sha512_state(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[])
-{
-    return p_scossl_digest_get_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_EXPORT) SymCryptSha512StateExport,
-        SYMCRYPT_SHA512_STATE_EXPORT_SIZE);
-}
-
 static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[],
-                                                        _In_ PSYMCRYPT_DIGEST_STATE_IMPORT pImportFunc,
-                                                        SIZE_T cbImportBlob)
+                                                        _In_ PSYMCRYPT_DIGEST_STATE_IMPORT pImportFunc)
 {
-    BYTE pbImportBlob[cbImportBlob];
-    SIZE_T cbImportParam;
+    PBYTE pbImportBlob;
+    SIZE_T cbImportBlob;
     int recomputeChecksum = 0;
     SYMCRYPT_ERROR scError;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_STATE)) != NULL)
     {
-        if (!OSSL_PARAM_get_octet_string(p, (void *)&pbImportBlob, cbImportBlob, &cbImportParam))
+        if (!OSSL_PARAM_get_octet_string_ptr(p, (void *)&pbImportBlob, &cbImportBlob))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        if (cbImportParam != cbImportBlob)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_LENGTH);
             return SCOSSL_FAILURE;
         }
 
@@ -134,34 +99,6 @@ static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_digest_set_md5_state(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_digest_set_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCryptMd5StateImport,
-        SYMCRYPT_MD5_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_set_sha1_state(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_digest_set_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCryptSha1StateImport,
-        SYMCRYPT_SHA1_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_set_sha256_state(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_digest_set_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCryptSha256StateImport,
-        SYMCRYPT_SHA256_STATE_EXPORT_SIZE);
-}
-
-static SCOSSL_STATUS p_scossl_digest_set_sha512_state(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_digest_set_state_internal(ctx, params,
-        (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCryptSha512StateImport,
-        SYMCRYPT_SHA512_STATE_EXPORT_SIZE);
-}
-
 static SCOSSL_STATUS p_scossl_digest_generic_init(_Inout_ SCOSSL_DIGEST_CTX *ctx, ossl_unused const OSSL_PARAM params[])
 {
     SymCryptHashInit(ctx->pHash, ctx->pState);
@@ -185,13 +122,40 @@ static SCOSSL_STATUS p_scossl_digest_generic_final(_In_ SCOSSL_DIGEST_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
+#define IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(state_name, export_func, import_func, state_size)  \
+    static SCOSSL_STATUS p_scossl_digest_get_##state_name(_In_ SCOSSL_DIGEST_CTX *ctx,              \
+                                                          _Inout_ OSSL_PARAM params[])              \
+    {                                                                                               \
+        return p_scossl_digest_get_state_internal(ctx, params,                                      \
+            (PSYMCRYPT_DIGEST_STATE_EXPORT) export_func, state_size);                               \
+    }                                                                                               \
+                                                                                                    \
+    static SCOSSL_STATUS p_scossl_digest_set_##state_name(_Inout_ SCOSSL_DIGEST_CTX *ctx,           \
+                                                          _In_ const OSSL_PARAM params[])           \
+    {                                                                                               \
+        return p_scossl_digest_set_state_internal(ctx, params,                                      \
+            (PSYMCRYPT_DIGEST_STATE_IMPORT) import_func);                                           \
+    }                                                                                               \
+                                                                                                    \
+    static SCOSSL_STATUS p_scossl_digest_##state_name##_init(_Inout_ SCOSSL_DIGEST_CTX *ctx,        \
+                                                             _In_ const OSSL_PARAM params[])        \
+    {                                                                                               \
+        SymCryptHashInit(ctx->pHash, ctx->pState);                                                  \
+        return p_scossl_digest_set_##state_name(ctx, params);                                       \
+    }
+
+IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(md5_state, SymCryptMd5StateExport, SymCryptMd5StateImport, SYMCRYPT_MD5_STATE_EXPORT_SIZE)
+IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha1_state, SymCryptSha1StateExport, SymCryptSha1StateImport, SYMCRYPT_SHA1_STATE_EXPORT_SIZE)
+IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha256_state, SymCryptSha256StateExport, SymCryptSha256StateImport, SYMCRYPT_SHA256_STATE_EXPORT_SIZE)
+IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha512_state, SymCryptSha512StateExport, SymCryptSha512StateImport, SYMCRYPT_SHA512_STATE_EXPORT_SIZE)
+
 #define IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(alg, dispatch_name, state_name, flags)                       \
     SCOSSL_DIGEST_FUNCTIONS_COMMON(alg, dispatch_name, flags)                                           \
     {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void))p_scossl_digest_set_##state_name},                \
     {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_digest_export_settable_ctx_params}, \
     {OSSL_FUNC_DIGEST_GET_CTX_PARAMS, (void (*)(void))p_scossl_digest_get_##state_name},                \
     {OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_digest_export_gettable_ctx_params}, \
-    {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_digest_generic_init},                              \
+    {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_digest_##state_name##_init},                       \
     {OSSL_FUNC_DIGEST_FINAL, (void (*)(void))p_scossl_digest_generic_final},                            \
     SCOSSL_DIGEST_FUNCTIONS_END
 
