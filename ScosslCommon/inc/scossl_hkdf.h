@@ -6,6 +6,7 @@
 
 #include <openssl/kdf.h>
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,6 +38,12 @@ typedef struct
     SIZE_T cbKey;
     BYTE info[HKDF_MAXBUF];
     SIZE_T cbInfo;
+    PBYTE pbLabel;
+    SIZE_T cbLabel;
+    PBYTE pbPrefix;
+    SIZE_T cbPrefix;
+    PBYTE pbData;
+    SIZE_T cbData;
 } SCOSSL_HKDF_CTX;
 
 SCOSSL_HKDF_CTX *scossl_hkdf_newctx();
@@ -49,6 +56,9 @@ SCOSSL_STATUS scossl_hkdf_append_info(_Inout_ SCOSSL_HKDF_CTX *ctx,
                                       _In_reads_bytes_(cbInfo) PCBYTE pbInfo, SIZE_T cbInfo);
 
 SCOSSL_STATUS scossl_hkdf_derive(_In_ SCOSSL_HKDF_CTX *ctx,
+                                 _Out_writes_bytes_(keylen) PBYTE key, SIZE_T keylen);
+
+SCOSSL_STATUS scossl_tls13kdf_derive(_In_ SCOSSL_HKDF_CTX *ctx,
                                  _Out_writes_bytes_(keylen) PBYTE key, SIZE_T keylen);
 
 #ifdef __cplusplus
