@@ -428,7 +428,7 @@ const OSSL_PARAM *p_scossl_tls13kdf_settable_ctx_params(ossl_unused void *ctx, o
  return p_scossl_tls13kdf_settable_ctx_param_types;
 }
 
-SCOSSL_STATUS p_scossl_tls13kdf_get_ctx_params(_In_ SCOSSL_PROV_TLS13_KDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_tls13kdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
  if (!p_scossl_hkdf_get_ctx_params(ctx, params))
      return SCOSSL_FAILURE;
@@ -436,11 +436,10 @@ SCOSSL_STATUS p_scossl_tls13kdf_get_ctx_params(_In_ SCOSSL_PROV_TLS13_KDF_CTX *c
  return SCOSSL_SUCCESS;
 }
 
-SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS13_KDF_CTX *ctx, _In_ const OSSL_PARAM params[])
+SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
  const OSSL_PARAM *p;
- SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
+ 
  if (!p_scossl_hkdf_set_ctx_params(ctx, params))
      return SCOSSL_FAILURE;
  
