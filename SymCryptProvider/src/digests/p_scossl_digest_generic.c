@@ -13,6 +13,7 @@ extern "C" {
 
 #define SCOSSL_DIGEST_PARAM_STATE "state"
 #define SCOSSL_DIGEST_PARAM_RECOMPUTE_CHECKSUM "recompute_checksum"
+#define SCOSSL_MAX_STATE_EXPORT_BLOB_SIZE SYMCRYPT_SHA512_STATE_EXPORT_SIZE
 
 typedef VOID (SYMCRYPT_CALL * PSYMCRYPT_DIGEST_STATE_EXPORT) (PVOID pState, PBYTE pbBlob);
 typedef SYMCRYPT_ERROR (SYMCRYPT_CALL * PSYMCRYPT_DIGEST_STATE_IMPORT) (PVOID pState, PCBYTE pbBlob);
@@ -40,7 +41,7 @@ static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *
                                                         _In_ PSYMCRYPT_DIGEST_STATE_EXPORT pExportFunc,
                                                         SIZE_T cbExportBlob)
 {
-    BYTE pbExportBlob[cbExportBlob];
+    BYTE pbExportBlob[SCOSSL_MAX_STATE_EXPORT_BLOB_SIZE];
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, SCOSSL_DIGEST_PARAM_STATE)) != NULL)
