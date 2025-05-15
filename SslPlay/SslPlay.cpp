@@ -1178,6 +1178,7 @@ end:
 bool TestDigestImportExport(const char *digestname, const char *expected, size_t export_state_size)
 {
     bool result = false;
+    EVP_MD *md = NULL;
     EVP_MD_CTX *mdctx;
     char mess1[] = "Test Message1234567";
     char mess2[] = "Hello World";
@@ -1197,7 +1198,7 @@ bool TestDigestImportExport(const char *digestname, const char *expected, size_t
 
     printf("\nTestDigestImportExport: %s\n\n", digestname);
 
-    EVP_MD *md = EVP_MD_fetch(nullptr, digestname, "provider=symcryptprovider");
+    md = EVP_MD_fetch(nullptr, digestname, "provider=symcryptprovider");
     if (md == NULL)
     {
         printf("No Digest found for %s\n", digestname);
@@ -1285,6 +1286,8 @@ bool TestDigestImportExport(const char *digestname, const char *expected, size_t
         goto end;
     }
 
+    result = true;
+
 end:
     EVP_MD_free(md);
 
@@ -1332,13 +1335,13 @@ void TestDigests(bool useEngine)
         {"SHA512-256", "036dbd97db1e37aabe6ded8ef9ead203e9adb02ad5596ac5af072dd7374993a0",
             SYMCRYPT_SHA512_256_STATE_EXPORT_SIZE},
         {"SHA3-224", "489a032b8923a05eca5b40f2ed9838f218c65bd082acc48fa2067213",
-            0},
+            SYMCRYPT_SHA3_224_STATE_EXPORT_SIZE},
         {"SHA3-256", "375e793a6d4e4947658e78cb697789434b8279feb2ec9595d03e44473ac478f6",
-            0},
+            SYMCRYPT_SHA3_256_STATE_EXPORT_SIZE},
         {"SHA3-384", "1d47002a9e96d5b6bdd70d476fd2038e50ac3eb0d4202b4eb988f02185fbb9c85cb7ed62804ddaff894e84d62e5832f2",
-            0},
+            SYMCRYPT_SHA3_384_STATE_EXPORT_SIZE},
         {"SHA3-512", "bf63544ae59243a5419a3ff5f598352eb1409d41dc746c9e9d5f258cddaff4e7f7b9d9ae13e90eb07f27e4e157b3fcf796f6554732a2e78a621f7313aba827f3",
-            0},
+            SYMCRYPT_SHA3_512_STATE_EXPORT_SIZE},
 #endif
     };
 
@@ -1556,15 +1559,15 @@ void TestAesXts()
 {
     unsigned char plaintext[8192];
     int plaintext_len = 64;
-    unsigned char iv[8];
+    unsigned char iv[16];
     unsigned char key[64];
 
     while(!RAND_bytes(key, 64));
-    while(!RAND_bytes(iv, 8));
+    while(!RAND_bytes(iv, 16));
     while(!RAND_bytes(plaintext, plaintext_len));
 
-    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 32, iv, 8, plaintext, plaintext_len);
-    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 64, iv, 8, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 32, iv, 16, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 64, iv, 16, plaintext, plaintext_len);
 
     printf("%s", SeparatorLine);
     return;
@@ -2363,7 +2366,7 @@ void TestSshKdf(void)
         goto end;
     }
 
-    //f
+    //
     // Test both EVP_KDF_ctrl and EVP_KDF_ctrl_str functions.
     // bCtrlStrMode = 0 uses EVP_KDF_ctrl functions and
     // bCtrlStrMode = 1 uses EVP_KDF_ctrl_str functions
@@ -2535,7 +2538,7 @@ int main(int argc, char** argv)
             printf("  --err-level <err level>           Specify the SCOSSL error logging level\n");
 #if OPENSSL_VERSION_MAJOR == 3
             printf("  --provider-path <provider path>   Specify a directory to locate the symcrypt provider\n");
-            printf("  --no-engine                       Disable the SCOSSL engine for testing\n");
+            printf("  --no-engine                       Disable the SymCrypt engine for testing\n");
 #endif
             return 0;
         }

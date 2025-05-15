@@ -23,7 +23,7 @@ const OSSL_PARAM p_scossl_digest_export_settable_param_types[] = {
     OSSL_PARAM_END};
 
 const OSSL_PARAM p_scossl_digest_export_gettable_ctx_param_types[] = {
-    OSSL_PARAM_int(SCOSSL_DIGEST_PARAM_STATE, NULL),
+    OSSL_PARAM_octet_string(SCOSSL_DIGEST_PARAM_STATE, NULL, 0),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM *p_scossl_digest_export_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -99,12 +99,6 @@ static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_digest_generic_init(_Inout_ SCOSSL_DIGEST_CTX *ctx, ossl_unused const OSSL_PARAM params[])
-{
-    SymCryptHashInit(ctx->pHash, ctx->pState);
-    return SCOSSL_SUCCESS;
-}
-
 static SCOSSL_STATUS p_scossl_digest_generic_final(_In_ SCOSSL_DIGEST_CTX *ctx,
                                                    _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outlen)
 {
@@ -122,66 +116,55 @@ static SCOSSL_STATUS p_scossl_digest_generic_final(_In_ SCOSSL_DIGEST_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-#define IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(state_name, export_func, import_func, state_size)  \
-    static SCOSSL_STATUS p_scossl_digest_get_##state_name(_In_ SCOSSL_DIGEST_CTX *ctx,              \
-                                                          _Inout_ OSSL_PARAM params[])              \
-    {                                                                                               \
-        return p_scossl_digest_get_state_internal(ctx, params,                                      \
-            (PSYMCRYPT_DIGEST_STATE_EXPORT) export_func, state_size);                               \
-    }                                                                                               \
-                                                                                                    \
-    static SCOSSL_STATUS p_scossl_digest_set_##state_name(_Inout_ SCOSSL_DIGEST_CTX *ctx,           \
-                                                          _In_ const OSSL_PARAM params[])           \
-    {                                                                                               \
-        return p_scossl_digest_set_state_internal(ctx, params,                                      \
-            (PSYMCRYPT_DIGEST_STATE_IMPORT) import_func);                                           \
-    }                                                                                               \
-                                                                                                    \
-    static SCOSSL_STATUS p_scossl_digest_##state_name##_init(_Inout_ SCOSSL_DIGEST_CTX *ctx,        \
-                                                             _In_ const OSSL_PARAM params[])        \
-    {                                                                                               \
-        SymCryptHashInit(ctx->pHash, ctx->pState);                                                  \
-        return p_scossl_digest_set_##state_name(ctx, params);                                       \
-    }
-
-IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(md5_state, SymCryptMd5StateExport, SymCryptMd5StateImport, SYMCRYPT_MD5_STATE_EXPORT_SIZE)
-IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha1_state, SymCryptSha1StateExport, SymCryptSha1StateImport, SYMCRYPT_SHA1_STATE_EXPORT_SIZE)
-IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha256_state, SymCryptSha256StateExport, SymCryptSha256StateImport, SYMCRYPT_SHA256_STATE_EXPORT_SIZE)
-IMPLEMENT_SCOSSL_DIGEST_EXPORT_FUNCTIONS(sha512_state, SymCryptSha512StateExport, SymCryptSha512StateImport, SYMCRYPT_SHA512_STATE_EXPORT_SIZE)
-
-#define IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(alg, dispatch_name, state_name, flags)                       \
+#define IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(alg, dispatch_name, uc_name, flags)                          \
+    static SCOSSL_STATUS p_scossl_digest_set_##dispatch_name##_state(_Inout_ SCOSSL_DIGEST_CTX *ctx,    \
+                                                                     _In_ const OSSL_PARAM params[])    \
+    {                                                                                                   \
+        return p_scossl_digest_set_state_internal(ctx, params,                                          \
+            (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCrypt##alg##StateImport);                                \
+    }                                                                                                   \
+                                                                                                        \
+    static SCOSSL_STATUS p_scossl_digest_get_##dispatch_name##_state(_In_ SCOSSL_DIGEST_CTX *ctx,       \
+                                                                     _Inout_ OSSL_PARAM params[])       \
+    {                                                                                                   \
+        return p_scossl_digest_get_state_internal(ctx, params,                                          \
+            (PSYMCRYPT_DIGEST_STATE_EXPORT) SymCrypt##alg##StateExport,                                 \
+            SYMCRYPT_##uc_name##_STATE_EXPORT_SIZE);                                                    \
+    }                                                                                                   \
+                                                                                                        \
+    static SCOSSL_STATUS p_scossl_digest_##dispatch_name##_init(_Inout_ SCOSSL_DIGEST_CTX *ctx,         \
+                                                                _In_ const OSSL_PARAM params[])         \
+    {                                                                                                   \
+        SymCryptHashInit(ctx->pHash, ctx->pState);                                                      \
+        return p_scossl_digest_set_##dispatch_name##_state(ctx, params);                                \
+    }                                                                                                   \
+                                                                                                        \
     SCOSSL_DIGEST_FUNCTIONS_COMMON(alg, dispatch_name, flags)                                           \
-    {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void))p_scossl_digest_set_##state_name},                \
+    {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void))p_scossl_digest_set_##dispatch_name##_state},     \
     {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_digest_export_settable_ctx_params}, \
-    {OSSL_FUNC_DIGEST_GET_CTX_PARAMS, (void (*)(void))p_scossl_digest_get_##state_name},                \
+    {OSSL_FUNC_DIGEST_GET_CTX_PARAMS, (void (*)(void))p_scossl_digest_get_##dispatch_name##_state},     \
     {OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_digest_export_gettable_ctx_params}, \
-    {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_digest_##state_name##_init},                       \
+    {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_digest_##dispatch_name##_init},                    \
     {OSSL_FUNC_DIGEST_FINAL, (void (*)(void))p_scossl_digest_generic_final},                            \
     SCOSSL_DIGEST_FUNCTIONS_END
 
-#define IMPLEMENT_SCOSSL_DIGEST_GENERIC(alg, dispatch_name, flags)           \
-    SCOSSL_DIGEST_FUNCTIONS_COMMON(alg, dispatch_name, flags)                \
-    {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_digest_generic_init},   \
-    {OSSL_FUNC_DIGEST_FINAL, (void (*)(void))p_scossl_digest_generic_final}, \
-    SCOSSL_DIGEST_FUNCTIONS_END
-
 // MD5 and SHA1, supported for compatability
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Md5, md5, md5_state, 0)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha1, sha1, sha1_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Md5, md5, MD5, 0)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha1, sha1, SHA1, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
 
 // SHA2
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha224, sha224, sha256_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha256, sha256, sha256_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha384, sha384, sha512_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512, sha512, sha512_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512_224, sha512_224, sha512_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512_256, sha512_256, sha512_state, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha224, sha224, SHA224, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha256, sha256, SHA256, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha384, sha384, SHA384, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512, sha512, SHA512, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512_224, sha512_224, SHA512_224, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha512_256, sha512_256, SHA512_256, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
 
 //SHA3
-IMPLEMENT_SCOSSL_DIGEST_GENERIC(Sha3_224, sha3_224, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_GENERIC(Sha3_256, sha3_256, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_GENERIC(Sha3_384, sha3_384, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
-IMPLEMENT_SCOSSL_DIGEST_GENERIC(Sha3_512, sha3_512, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha3_224, sha3_224, SHA3_224, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha3_256, sha3_256, SHA3_256, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha3_384, sha3_384, SHA3_384, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
+IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(Sha3_512, sha3_512, SHA3_512, SCOSSL_DIGEST_FLAG_ALGID_ABSENT)
 
 #ifdef __cplusplus
 }
