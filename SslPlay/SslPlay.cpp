@@ -13,6 +13,10 @@
 #include <openssl/kdf.h>
 #include "e_scossl.h"
 
+#if OPENSSL_VERSION_MAJOR == 3
+#include <openssl/provider.h>
+#endif
+
 BIO *bio_err = NULL;
 
 // By default exit Sslplay application if an error is encountered
@@ -1356,10 +1360,12 @@ void TestDigests(bool useEngine)
 
         TestDigest(digest_test_cases[i].digestname, expected_md_value);
 
+#if OPENSSL_VERSION_MAJOR == 3
         if (!useEngine && digest_test_cases[i].export_state_size > 0)
         {
             TestDigestImportExport(digest_test_cases[i].digestname, expected_md_value, digest_test_cases[i].export_state_size);
         }
+#endif
     }
 
     unsigned char md1[SHA256_DIGEST_LENGTH]; // 32 bytes
