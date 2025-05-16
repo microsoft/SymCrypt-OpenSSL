@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 
 #include "scossl_helpers.h"
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 
 #include <openssl/core_names.h>
 #include <openssl/encoder.h>
@@ -50,12 +50,6 @@ typedef struct
 
 // Represents a provider to test and whether *provider is a
 // filepath or provider name.
-typedef struct
-{
-    bool isPath;
-    const char *providerName;
-} KEYSINUSE_TEST_PROVIDER;
-
 static void _test_log_err(const char *file, int line, const char *message, ...)
 {
     va_list args;
@@ -98,7 +92,7 @@ static const char *eccTestGroups[] = {
 static char *processName;
 static time_t processStartTime;
 
-static void keysinsue_test_cleanup()
+static void keysinuse_test_cleanup()
 {
     int nftwCleanupRes;
 
@@ -494,6 +488,7 @@ cleanup:
     return ret;
 }
 
+#if OPENSSL_VERSION_MAJOR >= 3
 SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], string providerName)
 {
     string propq;
@@ -911,6 +906,7 @@ cleanup:
 
     return ret;
 }
+#endif
 
 // Generates a key with the specified parameters. *ppbKey is set to the encoded
 // public key bytes, and pbKeyId is set to the expected keyId. The size of the
@@ -994,7 +990,7 @@ cleanup:
 }
 
 SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName, BOOL testSign,
-                                  vector<KEYSINUSE_TEST_PROVIDER> providers)
+                                  vector<PVOID> providers)
 {
     EVP_PKEY *pkey = NULL;
     PBYTE pbEncodedKey = NULL;
@@ -1034,16 +1030,17 @@ SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName,
     // the keysinuse info created in keysinuse_test_api_functions
     sleep(KEYSINUSE_TEST_LOG_DELAY);
 
-    for (KEYSINUSE_TEST_PROVIDER provider : providers)
+    for (PVOID provider : providers)
     {
-        printf("\tTesting provider (%s) functions\n", provider.providerName);
+        const char *providerName = OSSL_PROVIDER_get0_name((OSSL_PROVIDER *)provider);
+        printf("\tTesting provider (%s) functions\n", providerName);
         if (testSign)
         {
-            keysinuse_test_provider_sign(pkey, pbKeyId, string(provider.providerName));
+            keysinuse_test_provider_sign(pkey, pbKeyId, string(providerName));
         }
         else
         {
-            keysinuse_test_provider_decrypt(pkey, pbKeyId, string(provider.providerName));
+            keysinuse_test_provider_decrypt(pkey, pbKeyId, string(providerName));
         }
     }
 
@@ -1058,21 +1055,22 @@ cleanup:
 
 int main(int argc, char** argv)
 {
-    vector<KEYSINUSE_TEST_PROVIDER> providers;
+    vector<PVOID> providers;
     mode_t umaskOriginal;
-    EVP_PKEY *pkey = NULL;
-    PBYTE pbEncodedKey = NULL;
-    SIZE_T cbEncodedKey = 0;
     char keysinuseLogDir[sizeof(KEYSINUSE_LOG_DIR)];
     char pbKeyId[SCOSSL_KEYID_SIZE];
     OSSL_PARAM params[2] = { OSSL_PARAM_END };
     int ret = 0;
-    void * p = malloc(5);
 
-    OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, NULL);
+    OPENSSL_init_crypto(0, NULL);
 
     for (int i = 1; i < argc; i++)
     {
+        if (strcmp(argv[i], "--verbose") == 0)
+        {
+            logVerbose = true;
+        }
+#if OPENSSL_VERSION_MAJOR >= 3
         if (strcmp(argv[i], "--provider") == 0)
         {
             if (argc < ++i)
@@ -1081,14 +1079,14 @@ int main(int argc, char** argv)
                 goto cleanup;
             }
 
-            if (OSSL_PROVIDER_load(NULL, argv[i]) == NULL ||
-                !OSSL_PROVIDER_available(NULL, argv[i]))
+            OSSL_PROVIDER *provider = OSSL_PROVIDER_load(NULL, argv[i]);
+            if (provider == NULL)
             {
                 TEST_LOG_OPENSSL_ERROR("Provider %s not available", argv[i])
                 goto cleanup;
             }
 
-            providers.push_back({false, argv[i]});
+            providers.push_back(provider);
         }
         else if (strcmp(argv[i], "--provider-path") == 0)
         {
@@ -1100,17 +1098,16 @@ int main(int argc, char** argv)
                 }
             }
         }
-        else if (strcmp(argv[i], "--verbose") == 0)
-        {
-            logVerbose = true;
-        }
+#endif
         else if (strcmp(argv[i], "--help") == 0)
         {
             printf("Usage: KeysInUseTest <options>\n");
-            printf("Multiple providers can be specified for testing.\n");
             printf("Options:\n");
+#if OPENSSL_VERSION_MAJOR >= 3
             printf("  --provider-path <provider_path>  Specify a directory to locate providers with with keysinuse. Must come before provider\n");
             printf("  --provider <provider_name>       Specify a provider with keysinuse to test by name\n");
+#endif
+            printf("  --verbose                        Enable verbose output\n");
             return 0;
         }
         else
@@ -1118,13 +1115,6 @@ int main(int argc, char** argv)
             TEST_LOG_ERROR("Unknown argument: %s", argv[i])
             goto cleanup;
         }
-    }
-
-    if (OSSL_PROVIDER_load(NULL, "default") == NULL ||
-        !OSSL_PROVIDER_available(NULL, "default"))
-    {
-        TEST_LOG_OPENSSL_ERROR("Failed to load the default provider")
-        goto cleanup;
     }
 
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
@@ -1137,7 +1127,7 @@ int main(int argc, char** argv)
     // aren't written by keysinuse running on the system.
     umaskOriginal = umask(0);
 
-    keysinsue_test_cleanup();
+    keysinuse_test_cleanup();
     if (mkdir(KEYSINUSE_TEST_ROOT, 0777) == 0 ||
         errno == EEXIST)
     {
@@ -1235,10 +1225,14 @@ int main(int argc, char** argv)
     ret = 1;
 
 cleanup:
+    for (PVOID provider : providers)
+    {
+        OSSL_PROVIDER_unload((OSSL_PROVIDER *)provider);
+    }
+
     OPENSSL_free(processName);
-    OPENSSL_free(pbEncodedKey);
-    EVP_PKEY_free(pkey);
-    keysinsue_test_cleanup();
+    keysinuse_test_cleanup();
+    OPENSSL_cleanup();
 
     return ret;
 }

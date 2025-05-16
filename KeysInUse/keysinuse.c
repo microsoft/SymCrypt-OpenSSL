@@ -2,18 +2,23 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <linux/limits.h>
-#include <sys/stat.h>
+
+#ifdef KEYSINUSE_LOG_SYSLOG
+ #include <syslog.h>
+#else
+ #include <fcntl.h>
+ #include <sys/stat.h>
+#endif
 
 #include <openssl/lhash.h>
 #include <openssl/proverr.h>
 
 #include <scossl_helpers.h>
 
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,20 +67,27 @@ static CRYPTO_RWLOCK *lh_keysinuse_ctx_imp_lock = NULL;
 //
 
 static CRYPTO_ONCE keysinuse_init_once = CRYPTO_ONCE_STATIC_INIT;
+static BOOL keysinuse_enabled = FALSE;
+
 static off_t max_file_size = 5 << 10; // Default to 5KB
 static long logging_delay = 60 * 60; // Default to 1 hour
-static BOOL keysinuse_enabled = FALSE;
 
 //
 // Logging
 //
 
+#ifdef KEYSINUSE_LOG_SYSLOG
+ #define KEYSINUSE_SYSLOG_IDENT "keysinuse"
+#else
+ // Log files separated by UID.
+ // /var/log/keysinuse/keysinuse_<level>_<euid>.log
+ #define LOG_DIR       "/var/log/keysinuse"
+ #define LOG_PATH_TMPL LOG_DIR "/keysinuse_%.3s_%08x.log"
+#endif
+
 #define KEYSINUSE_ERR 0
 #define KEYSINUSE_NOTICE 1
-// Log files separated by UID.
-// /var/log/keysinuse/keysinuse_<level>_<euid>.log
-#define LOG_DIR       "/var/log/keysinuse"
-#define LOG_PATH_TMPL LOG_DIR "/keysinuse_%.3s_%08x.log"
+
 #define LOG_MSG_MAX 256
 static const char *default_prefix = "";
 static char *prefix = NULL;
@@ -121,8 +133,10 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 
 static void keysinuse_init_internal()
 {
+#ifndef KEYSINUSE_LOG_SYSLOG
     int mkdirResult;
     mode_t umaskOriginal;
+#endif
     pid_t pid = getpid();
     time_t initTime = time(NULL);
     char *symlinkPath = NULL;
@@ -174,6 +188,9 @@ static void keysinuse_init_internal()
         prefix = (char*)default_prefix;
     }
 
+#ifdef KEYSINUSE_LOG_SYSLOG
+    openlog(KEYSINUSE_SYSLOG_IDENT, LOG_NDELAY, LOG_USER);
+#else
     // Try to create /var/log/keysinuse if it isn't present.
     // This is a best attempt and only succeeds if the callers
     // has sufficient permissions
@@ -195,6 +212,7 @@ static void keysinuse_init_internal()
         keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
         goto cleanup;
     }
+#endif
 
     // Start the logging thread. Monotonic clock needs to be set to
     // prevent wall clock changes from affecting the logging delay sleep time
@@ -269,6 +287,10 @@ void keysinuse_teardown()
     {
         keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
     }
+
+#ifdef KEYSINUSE_LOG_SYSLOG
+    closelog();
+#endif
 
     if (prefix != default_prefix)
     {
@@ -656,25 +678,39 @@ static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
 //
 // Logging
 //
+
 _Use_decl_annotations_
 static void keysinuse_log_common(int level, const char *message, va_list args)
+#ifdef KEYSINUSE_LOG_SYSLOG
 {
-    char *level_str = "";
+    int syslog_priority = LOG_NOTICE;
+    char *level_str = "not";
+    char msg_buf[LOG_MSG_MAX];
+    int msg_len;
+
+    if (level == KEYSINUSE_ERR)
+    {
+        syslog_priority = LOG_WARNING;
+        level_str = "err";
+    }
+
+    if ((msg_len = vsnprintf(msg_buf, LOG_MSG_MAX, message, args)) > 0)
+    {
+        syslog(syslog_priority, "%s,%s!%s", prefix, level_str, msg_buf);
+    }
+}
+#else
+{
+    char *level_str = "not";
     // (Length of LOG_PATH_TMPL) - (8 for format specifiers)
     //  + (3 for level) + (8 for euid) + (1 for null terminator)
     char log_path[sizeof(LOG_PATH_TMPL) + 4];
     char msg_buf[LOG_MSG_MAX];
     int msg_len;
 
-    switch (level)
+    if (level == KEYSINUSE_ERR)
     {
-    case KEYSINUSE_ERR:
         level_str = "err";
-        break;
-    case KEYSINUSE_NOTICE:
-    default:
-        level_str = "not";
-        break;
     }
 
     uid_t euid = geteuid();
@@ -836,6 +872,8 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
         }
     }
 }
+#endif // KEYSINUSE_LOG_SYSLOG
+
 
 // Used for logging keysinuse related errors to a separate log file.
 // This avoids poluting the error stack with keysinuse related errors.
