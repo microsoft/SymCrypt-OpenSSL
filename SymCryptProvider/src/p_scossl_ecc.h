@@ -4,7 +4,7 @@
 
 #include "scossl_helpers.h"
 #ifdef KEYSINUSE_ENABLED
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 #endif
 
 #ifdef __cplusplus

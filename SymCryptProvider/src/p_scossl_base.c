@@ -8,7 +8,7 @@
 
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 #include "p_scossl_base.h"
 
 #ifdef __cplusplus
