@@ -52,51 +52,49 @@ set(SCOSSL_SOURCES
 )
 
 if (KEYSINUSE_ENABLED)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DKEYSINUSE_ENABLED")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKEYSINUSE_ENABLED")
-
-    list(APPEND SCOSSL_SOURCES ./src/p_scossl_keysinuse.c)
-
-    # Standalone keysinuse library
-    add_library(keysinuse SHARED ./src/p_scossl_keysinuse.c)
-    target_compile_definitions(keysinuse PRIVATE KEYSINUSE_STANDALONE)
-    target_include_directories(keysinuse PUBLIC ../ScosslCommon/inc)
-    target_link_libraries(keysinuse PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+    list(APPEND SCOSSL_SOURCES ../KeysInUse/keysinuse.c)
 endif()
 
-if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-    configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
 
-    find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
+find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
-    add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
-    add_dependencies(scossl_provider scossl_common)
+add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
+add_dependencies(scossl_provider scossl_common)
 
-    set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/p_scossl_base.h)
-    target_include_directories(scossl_provider PUBLIC ./inc)
-    target_include_directories(scossl_provider PRIVATE ./src)
-    # target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    target_include_directories(scossl_provider PUBLIC ../ScosslCommon/inc)
+set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/p_scossl_base.h)
+target_include_directories(scossl_provider PUBLIC ./inc)
+target_include_directories(scossl_provider PRIVATE ./src)
+# target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(scossl_provider PUBLIC ../ScosslCommon/inc)
 
-    # Remove default "lib" prefix from symcryptprovider.so as OpenSSL provider is not a generic Linux .so
-    set_target_properties(scossl_provider PROPERTIES PREFIX "")
-    set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
-
-    target_link_libraries(scossl_provider PRIVATE scossl_common)
-    target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
-    target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
-
-    if (NOT DEFINED OPENSSL_PROVIDERS)
-    set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
+if (KEYSINUSE_ENABLED)
+    if (KEYSINUSE_LOG_SYSLOG)
+        target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_LOG_SYSLOG)
     endif()
 
-    # Install the engine to the OpenSSL modules directory
-    # NB: this won't work if the distro has a custom modules directory that doesn't match
-    # the OpenSSL default.
-    install(
-        TARGETS scossl_provider
-        LIBRARY DESTINATION "${OPENSSL_PROVIDERS}"
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_ENABLED)
+    target_include_directories(scossl_provider PUBLIC ../KeysInUse)
 endif()
+
+# Remove default "lib" prefix from symcryptprovider.so as OpenSSL provider is not a generic Linux .so
+set_target_properties(scossl_provider PROPERTIES PREFIX "")
+set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
+
+target_link_libraries(scossl_provider PRIVATE scossl_common)
+target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
+target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+
+if (NOT DEFINED OPENSSL_PROVIDERS)
+set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
+endif()
+
+# Install the engine to the OpenSSL modules directory
+# NB: this won't work if the distro has a custom modules directory that doesn't match
+# the OpenSSL default.
+install(
+    TARGETS scossl_provider
+    LIBRARY DESTINATION "${OPENSSL_PROVIDERS}"
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
