@@ -212,7 +212,7 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
          ctx->cbSalt = keylen;
      } else {
          // Hash of empty string
-         PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(ctx->md);
+         PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(EVP_MD_type(ctx->md));
          SIZE_T cbHashSize = SymCryptHashResultSize(scosslHashAlgo);
          SymCryptHash(scosslHashAlgo, NULL, 0, hash_empty, cbHashSize);
  
