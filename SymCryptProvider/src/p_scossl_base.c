@@ -9,9 +9,11 @@
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
 #include "scossl_provider.h"
+#include "p_scossl_base.h"
 #include "p_scossl_bio.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
+#include "keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
