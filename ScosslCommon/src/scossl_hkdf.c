@@ -44,6 +44,39 @@ SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
             return NULL;
         }
         copyCtx->cbKey = ctx->cbKey;
+        
+        if (ctx->pbPrefix == NULL)
+        {
+            copyCtx->pbPrefix = NULL;
+        }
+        else if ((copyCtx->pbPrefix = OPENSSL_memdup(ctx->pbPrefix, ctx->cbPrefix)) == NULL)
+        {
+            scossl_hkdf_freectx(copyCtx);
+            return NULL;
+        }
+        copyCtx->cbPrefix = ctx->cbPrefix;
+        
+        if (ctx->pbLabel == NULL)
+        {
+            copyCtx->pbLabel = NULL;
+        }
+        else if ((copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel)) == NULL)
+        {
+            scossl_hkdf_freectx(copyCtx);
+            return NULL;
+        }
+        copyCtx->cbLabel = ctx->cbLabel;
+
+        if (ctx->pbData == NULL)
+        {
+            copyCtx->pbData = NULL;
+        }
+        else if ((copyCtx->pbData = OPENSSL_memdup(ctx->pbData, ctx->cbData)) == NULL)
+        {
+            scossl_hkdf_freectx(copyCtx);
+            return NULL;
+        }
+        copyCtx->cbData = ctx->cbData;
 
         copyCtx->md = ctx->md;
         copyCtx->mode = ctx->mode;
@@ -62,6 +95,9 @@ void scossl_hkdf_freectx(SCOSSL_HKDF_CTX *ctx)
 
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
+    OPENSSL_clear_free(ctx->pbPrefix, ctx->cbPrefix);
+    OPENSSL_clear_free(ctx->pbLabel, ctx->cbLabel);
+    OPENSSL_clear_free(ctx->pbData, ctx->cbData);
     OPENSSL_cleanse(ctx->info, ctx->cbInfo);
     OPENSSL_free(ctx);
 }
@@ -71,6 +107,9 @@ SCOSSL_STATUS scossl_hkdf_reset(SCOSSL_HKDF_CTX *ctx)
 {
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
+    OPENSSL_clear_free(ctx->pbPrefix, ctx->cbPrefix);
+    OPENSSL_clear_free(ctx->pbLabel, ctx->cbLabel);
+    OPENSSL_clear_free(ctx->pbData, ctx->cbData);
     OPENSSL_cleanse(ctx, sizeof(*ctx));
     return SCOSSL_SUCCESS;
 }
@@ -177,168 +216,165 @@ SCOSSL_STATUS scossl_hkdf_derive(SCOSSL_HKDF_CTX *ctx,
  * Refer to RFC 8446 section 7 for specific details.
  */
 
- static 
- SCOSSL_STATUS scossl_tls13kdf_generate_secret(SCOSSL_HKDF_CTX *ctx, PBYTE key, SIZE_T keylen)
- {
-     
-     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-     PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
-     SYMCRYPT_HKDF_EXPANDED_KEY scExpandedKey;
-     BYTE default_zeros[MAX_HASH_SIZE] = {0};
-     BYTE hash_empty[MAX_HASH_SIZE];
- 
-     if (ctx == NULL || ctx->md == NULL)
-     {
-         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-             "Missing Digest");
-         return SCOSSL_FAILURE;
-     }
- 
-     symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
-     if (symcryptHmacAlg == NULL)
-     {
-         return SCOSSL_FAILURE;
-     }
-     
-     // Handle NULL key (IKM)
-     if (ctx->pbKey == NULL) {
-         ctx->pbKey = default_zeros;
-         ctx->cbKey = keylen;
-     }
- 
-     // Handle NULL salt (prevsecret)
-     if (ctx->pbSalt == NULL) {
-         ctx->pbSalt = default_zeros;
-         ctx->cbSalt = keylen;
-     } else {
-         // Hash of empty string
-         PCSYMCRYPT_HASH scosslHashAlgo = scossl_get_symcrypt_hash_algorithm(EVP_MD_type(ctx->md));
-         SIZE_T cbHashSize = SymCryptHashResultSize(scosslHashAlgo);
-         SymCryptHash(scosslHashAlgo, NULL, 0, hash_empty, cbHashSize);
- 
-         // Build info = prefix || label || hash(empty)
-         if ((ctx->cbPrefix + ctx->cbLabel + keylen) > MAX_INFO_SIZE)
-         {
-             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                             "Total size exceeds maximum info size allowed");
-             return SCOSSL_FAILURE;
-         }
-         
-         ctx->cbInfo = 0;
-         memset(ctx->info, 0, MAX_INFO_SIZE);
- 
-         if (!scossl_hkdf_append_info(ctx, ctx->pbPrefix, ctx->cbPrefix) ||
-             !scossl_hkdf_append_info(ctx, ctx->pbLabel, ctx->cbLabel) ||
-             !scossl_hkdf_append_info(ctx, hash_empty, keylen))
-             return SCOSSL_FAILURE;
- 
-         scError = SymCryptHkdfPrkExpandKey(
-             &scExpandedKey,
-             symcryptHmacAlg,
-             ctx->pbSalt,
-             ctx->cbSalt);
-         if (scError != SYMCRYPT_NO_ERROR)
-             return SCOSSL_FAILURE;
- 
-         scError = SymCryptHkdfDerive(
-                 &scExpandedKey,
-                 ctx->info, ctx->cbInfo,
-                 key, keylen);
-         if (scError != SYMCRYPT_NO_ERROR)
-             return SCOSSL_FAILURE;
- 
-         ctx->pbSalt = key;
-         ctx->cbSalt = keylen;
-     }
- 
-     // Final extract
-     scError = SymCryptHkdfExtractPrk(
-         symcryptHmacAlg,
-         ctx->pbKey, ctx->cbKey,
-         ctx->pbSalt, ctx->cbSalt,
-         key, keylen);
-     if (scError != SYMCRYPT_NO_ERROR)
-         return SCOSSL_FAILURE;
- 
-     return SCOSSL_SUCCESS;
- }
- 
- static 
+ static
  SCOSSL_STATUS scossl_tls13_hkdf_expand(SCOSSL_HKDF_CTX *ctx, PBYTE key, SIZE_T keylen)
  {
      SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
      PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
      SYMCRYPT_HKDF_EXPANDED_KEY scExpandedKey;
  
-     if (ctx->md == NULL)
-     {
-         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-             "Missing Digest");
+     // Validate required inputs
+     if (ctx->md == NULL) {
+         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Digest");
          return SCOSSL_FAILURE;
      }
  
-     if (ctx->pbKey == NULL)
-     {
-         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-             "Missing Key");
+     if (ctx->pbKey == NULL) {
+         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Key");
          return SCOSSL_FAILURE;
      }
  
      symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
-     if (symcryptHmacAlg == NULL)
-     {
+     if (symcryptHmacAlg == NULL) {
          return SCOSSL_FAILURE;
      }
-     /*
-      * TLS 1.3 HKDF Label structure:
-      *
-      * struct {
-      *     uint16 length;          // desired length of output keying material
-      *     opaque label<7..255>;   // "tls13 " + label
-      *     opaque context<0..255>; // usually a hash
-      * } HkdfLabel;
-     */
-     // Reset info buffer
-     if ((ctx->cbPrefix + ctx->cbLabel + ctx->cbData) > MAX_INFO_SIZE)
-     {
+ 
+     SIZE_T labelLen = ctx->cbPrefix + ctx->cbLabel;
+     if (labelLen > 255)
+         return SCOSSL_FAILURE;
+
+     SIZE_T totalLen = 2 + 1 + labelLen + 1 + ctx->cbData;
+     // Check total info size
+     if (totalLen > MAX_INFO_SIZE) {
          SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
                           "Total size exceeds maximum info size allowed");
          return SCOSSL_FAILURE;
      }
-     ctx->cbInfo = 0;
-     memset(ctx->info, 0, MAX_INFO_SIZE);
-     // Append output length
-     if (!scossl_hkdf_append_info(ctx, key, keylen))
-         return SCOSSL_FAILURE;
-     // Append label: prefix || label
-     if (!scossl_hkdf_append_info(ctx, ctx->pbPrefix, ctx->cbPrefix) ||
-         !scossl_hkdf_append_info(ctx, ctx->pbLabel, ctx->cbLabel))
-         return SCOSSL_FAILURE;
-     // Append context (data)
-     if (ctx->cbData > 0 &&
-         !scossl_hkdf_append_info(ctx, ctx->pbData, ctx->cbData))
+ 
+     // Reset info buffer
+     ctx->cbInfo = totalLen;
+     memset(ctx->info, 0, totalLen);
+ 
+     printf("\n prefixlen %ld, labellen is %ld, datalen is %ld, totallen is %ld", ctx->cbPrefix, ctx->cbLabel, ctx->cbData, totalLen);
+     // Append 2-byte output length
+     BYTE outlen_bytes[2] = {
+         (BYTE)((keylen >> 8) & 0xFF),
+         (BYTE)(keylen & 0xFF)
+     };
+     if (!scossl_hkdf_append_info(ctx, outlen_bytes, sizeof(outlen_bytes)))
          return SCOSSL_FAILURE;
  
+     // Append 1-byte label length and label ("tls13 " + label)
+     BYTE labelLenByte = (BYTE)labelLen;
+     if (!scossl_hkdf_append_info(ctx, &labelLenByte, 1) ||
+         !scossl_hkdf_append_info(ctx, ctx->pbPrefix, ctx->cbPrefix) ||
+         !scossl_hkdf_append_info(ctx, ctx->pbLabel, ctx->cbLabel))
+         return SCOSSL_FAILURE;
+     
+     // Append 1-byte context length and context
+     BYTE contextLenByte = (BYTE)ctx->cbData;
+     if (!scossl_hkdf_append_info(ctx, &contextLenByte, 1) ||
+        (ctx->cbData > 0 && !scossl_hkdf_append_info(ctx, ctx->pbData, ctx->cbData)))
+         return SCOSSL_FAILURE;
+ 
+     // Expand PRK
+     printf("\n call SymCryptHkdfPrkExpandKey\n");
      scError = SymCryptHkdfPrkExpandKey(
          &scExpandedKey,
          symcryptHmacAlg,
          ctx->pbKey, ctx->cbKey);
      if (scError != SYMCRYPT_NO_ERROR)
-     {
          return SCOSSL_FAILURE;
-     }
- 
+     
+     printf("\n call SymCryptHkdfDerive\n");
      scError = SymCryptHkdfDerive(
          &scExpandedKey,
          ctx->info, ctx->cbInfo,
          key, keylen);
      if (scError != SYMCRYPT_NO_ERROR)
-     {
          return SCOSSL_FAILURE;
-     }
-     return SCOSSL_SUCCESS;
  
+     return SCOSSL_SUCCESS;
  }
+ 
+
+
+static 
+SCOSSL_STATUS scossl_tls13kdf_generate_secret(SCOSSL_HKDF_CTX *ctx, PBYTE key, SIZE_T keylen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
+    static BYTE default_zeros[EVP_MAX_MD_SIZE] = {0};
+    BYTE preextractsec[EVP_MAX_MD_SIZE];
+    SIZE_T mdlen;
+
+    if (ctx == NULL || ctx->md == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Missing Digest");
+        return SCOSSL_FAILURE;
+    }
+    mdlen = EVP_MD_get_size(ctx->md);
+    if (mdlen <= 0)
+       return SCOSSL_FAILURE;
+    
+    symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
+    if (symcryptHmacAlg == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+    printf("\n I am here, kenlen is %ld\n", keylen);
+    if (key) printf("\n key not NULL\n");
+    // Handle NULL key (IKM)
+    if (ctx->pbKey == NULL) {
+        printf("\n empty pbkey\n");
+        ctx->pbKey = default_zeros;
+        ctx->cbKey = mdlen;
+    }
+
+    // Handle NULL salt (prevsecret)
+    if (ctx->pbSalt == NULL) {
+       printf("\n empty salt\n");
+       ctx->pbSalt = default_zeros;
+       ctx->cbSalt = mdlen;
+    } else {
+       printf("\n empty hash\n");
+        
+       EVP_MD_CTX *mctx = EVP_MD_CTX_new();
+       BYTE hash[EVP_MAX_MD_SIZE];
+
+       /* The pre-extract derive step uses a hash of no messages */
+       if (mctx == NULL
+               || EVP_DigestInit_ex(mctx, ctx->md, NULL) <= 0
+               || EVP_DigestFinal_ex(mctx, hash, NULL) <= 0) {
+           EVP_MD_CTX_free(mctx);
+           return 0;
+       }
+       EVP_MD_CTX_free(mctx);
+
+       /* Generate the pre-extract secret */
+       if (!scossl_tls13_hkdf_expand(ctx, key, keylen))
+           return SCOSSL_FAILURE;
+
+       ctx->pbSalt = preextractsec;
+       ctx->cbSalt = mdlen;
+    }
+
+    // Final extract
+    printf("\n call SymCryptHkdfExtractPrk\n");
+    scError = SymCryptHkdfExtractPrk(
+       symcryptHmacAlg,
+       ctx->pbKey, ctx->cbKey,
+       ctx->pbSalt, ctx->cbSalt,
+       key, keylen);
+   if (scError != SYMCRYPT_NO_ERROR)
+   {
+       return SCOSSL_FAILURE;
+   }
+
+    return SCOSSL_SUCCESS;
+}
+
  
  _Use_decl_annotations_
  SCOSSL_STATUS scossl_tls13kdf_derive(SCOSSL_HKDF_CTX *ctx,
