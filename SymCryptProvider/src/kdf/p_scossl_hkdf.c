@@ -400,13 +400,6 @@ SCOSSL_STATUS p_scossl_tls13kdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
  {
      return SCOSSL_FAILURE;
  }
-
- if (ctx->hkdfCtx->pbKey == NULL)
- {
-     ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-     return SCOSSL_FAILURE;
- }
-
  if (keylen == 0)
  {
      ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
