@@ -25,6 +25,4 @@ if(NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES armv8l|ARM$|ARM32|aarch32 AND NOT SCO
 endif()
 
 add_compile_options(-D_ARM_)
-if (CMAKE_BUILD_TYPE MATCHES Release|RelWithDebInfo)
-    add_compile_options(-O3)
-endif()
+add_compile_options(-O3)

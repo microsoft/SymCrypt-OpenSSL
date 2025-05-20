@@ -32,6 +32,4 @@ endif()
 
 # Define _ARM64_ to set up the correct SymCrypt macros, e.g. SYMCRYPT_CPU_ARM64
 add_compile_options(-D_ARM64_)
-if (CMAKE_BUILD_TYPE MATCHES Release|RelWithDebInfo)
-    add_compile_options(-O3)
-endif()
+add_compile_options(-O3)

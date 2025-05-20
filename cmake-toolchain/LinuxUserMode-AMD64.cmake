@@ -7,9 +7,7 @@ set(CMAKE_SYSTEM_PROCESSOR AMD64)
 
 # Define _AMD64_ to set up the correct SymCrypt macros, e.g. SYMCRYPT_CPU_AMD64
 add_compile_options(-D_AMD64_)
-if (CMAKE_BUILD_TYPE MATCHES Release|RelWithDebInfo)
-    add_compile_options(-O3)
-endif()
+add_compile_options(-O3)
 
 # Enable a baseline of features for the compiler to support everywhere
 # Other than for SSSE3 we do not expect the compiler to generate these instructions anywhere other than with intrinsics

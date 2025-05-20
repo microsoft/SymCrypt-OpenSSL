@@ -143,4 +143,4 @@ separate section. This section must be referenced in the symcrypt provider secti
 | -                     | -                                                                                                                                             | -         |
 | enabled               | 0 or 1 to disable or enable keysinuse logging.                                                                                                | 0         |
 | max_file_size         | Maximum size of the file events are written to. May be written as raw byte size or suffixed with KB/MB/GB                                     | 5KB       |
-| logging_delay_seconds | Duration in seconds between events being written to the file. Any events that happen in between will be aggregate and logged as one event.    | 3600      |
+| logging_delay_seconds | Duration in seconds between events being written to the file. Any events that happen in between will be aggregate and logged as one event.    | error     |
