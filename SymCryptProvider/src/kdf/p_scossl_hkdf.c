@@ -353,6 +353,154 @@ const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[] = {
     {OSSL_FUNC_KDF_SET_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_set_ctx_params},
     {0, NULL}};
 
+/*
+ * TLS1.3KDF uses slight variations of the above,
+ * they need to be present here.
+ * Refer to RFC 8446 section 7 for specific details.
+ */
+
+
+#define HKDF_COMMON_SETTABLES                                       \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),           \
+    OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, NULL),                      \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),     \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),         \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),           \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0)
+
+/*
+* Gettable context parameters that are common across HKDF and the TLS KDF.
+*   OSSL_KDF_PARAM_KEY is not gettable because it is a secret value.
+*/
+#define HKDF_COMMON_GETTABLES                                       \
+    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),                   \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),           \
+    OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, NULL),                      \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),         \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),          \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0)
+
+static const OSSL_PARAM p_scossl_tls13kdf_gettable_ctx_param_types[] = {
+    HKDF_COMMON_GETTABLES,
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_tls13kdf_settable_ctx_param_types[] = {
+    HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_PREFIX, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_LABEL, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_DATA, NULL, 0),
+    OSSL_PARAM_END};
+
+
+SCOSSL_STATUS p_scossl_tls13kdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
+                                _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
+                                _In_ const OSSL_PARAM params[])
+{
+    if (!p_scossl_tls13kdf_set_ctx_params(ctx, params))
+    {
+        return SCOSSL_FAILURE;
+    }
+    if (keylen == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        return 0;
+    }
+
+    return scossl_tls13kdf_derive(ctx->hkdfCtx, key, keylen);
+}
+
+
+
+const OSSL_PARAM *p_scossl_tls13kdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_tls13kdf_gettable_ctx_param_types;
+}
+
+const OSSL_PARAM *p_scossl_tls13kdf_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_tls13kdf_settable_ctx_param_types;
+}
+
+SCOSSL_STATUS p_scossl_tls13kdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
+{
+    if (!p_scossl_hkdf_get_ctx_params(ctx, params))
+        return SCOSSL_FAILURE;
+
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
+{
+    const OSSL_PARAM *p;
+
+    if (!p_scossl_hkdf_set_ctx_params(ctx, params))
+        return SCOSSL_FAILURE;
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PREFIX)) != NULL)
+    {
+        PBYTE pbPrefix = NULL;
+        SIZE_T cbPrefix = 0;
+
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&pbPrefix, 0, &cbPrefix))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        OPENSSL_clear_free(ctx->hkdfCtx->pbPrefix, ctx->hkdfCtx->cbPrefix);
+        ctx->hkdfCtx->pbPrefix = pbPrefix;
+        ctx->hkdfCtx->cbPrefix = cbPrefix;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_LABEL)) != NULL)
+    {
+        PBYTE pbLabel = NULL;
+        SIZE_T cbLabel = 0;
+
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&pbLabel, 0, &cbLabel))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        OPENSSL_clear_free(ctx->hkdfCtx->pbLabel, ctx->hkdfCtx->cbLabel);
+        ctx->hkdfCtx->pbLabel = pbLabel;
+        ctx->hkdfCtx->cbLabel = cbLabel;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DATA)) != NULL)
+    {
+        PBYTE pbData = NULL;
+        SIZE_T cbData = 0;
+
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&pbData, 0, &cbData))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        OPENSSL_clear_free(ctx->hkdfCtx->pbData, ctx->hkdfCtx->cbData);
+        ctx->hkdfCtx->pbData= pbData;
+        ctx->hkdfCtx->cbData = cbData;
+    }
+    return SCOSSL_SUCCESS;
+}
+
+const OSSL_DISPATCH p_scossl_tls13kdf_kdf_functions[] = {
+    {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))p_scossl_hkdf_newctx},
+    {OSSL_FUNC_KDF_FREECTX, (void (*)(void))p_scossl_hkdf_freectx},
+    {OSSL_FUNC_KDF_DUPCTX, (void (*)(void))p_scossl_hkdf_dupctx},
+    {OSSL_FUNC_KDF_RESET, (void (*)(void))p_scossl_hkdf_reset},
+    {OSSL_FUNC_KDF_DERIVE, (void (*)(void))p_scossl_tls13kdf_derive},
+    {OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_gettable_ctx_params},
+    {OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_settable_ctx_params},
+    {OSSL_FUNC_KDF_GET_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_get_ctx_params},
+    {OSSL_FUNC_KDF_SET_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_set_ctx_params},
+    {0, NULL}};
+
 #ifdef __cplusplus
 }
 #endif

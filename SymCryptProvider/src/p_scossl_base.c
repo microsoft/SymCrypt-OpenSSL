@@ -310,6 +310,7 @@ extern const OSSL_DISPATCH p_scossl_srtcpkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_sshkdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_sskdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
+extern const OSSL_DISPATCH p_scossl_tls13kdf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_kdf_functions),
@@ -320,6 +321,7 @@ static const OSSL_ALGORITHM p_scossl_kdf[] = {
     ALG(SCOSSL_ALG_NAME_SSHKDF, p_scossl_sshkdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_SSKDF, p_scossl_sskdf_kdf_functions),
     ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_tls1prf_kdf_functions),
+    ALG(SCOSSL_ALG_NAME_TLS13_KDF, p_scossl_tls13kdf_kdf_functions),
     ALG_TABLE_END};
 
 // Rand

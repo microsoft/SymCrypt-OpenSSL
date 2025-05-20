@@ -67,6 +67,7 @@ extern "C" {
 #define SCOSSL_ALG_NAME_SSHKDF      SN_sshkdf
 #define SCOSSL_ALG_NAME_SSKDF       SN_sskdf
 #define SCOSSL_ALG_NAME_TLS1_PRF    SN_tls1_prf
+#define SCOSSL_ALG_NAME_TLS13_KDF   OSSL_KDF_NAME_TLS1_3_KDF
 
 // Rand
 #define SCOSSL_ALG_NAME_CTR_DBG "CTR-DRBG"
