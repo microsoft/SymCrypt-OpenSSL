@@ -494,18 +494,18 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     string propq;
     const char *keyType = EVP_PKEY_get0_type_name(pkeyBase);
     OSSL_PARAM *params = NULL;
+    EVP_PKEY_CTX *importCtx = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    EVP_PKEY_CTX *ctxCopy = NULL;
+    EVP_PKEY_CTX *ctxCopyByRef = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY *pkeyCopy = NULL;
     EVP_PKEY *pkeyCopyByRef = NULL;
-    EVP_PKEY_CTX *importCtx = NULL;
-    EVP_MD_CTX *ctx = NULL;
-    EVP_MD_CTX *ctxCopy = NULL;
-    EVP_MD_CTX *ctxCopyByRef = NULL;
-    BYTE pbPlainText[KEYSINUSE_TEST_SIGN_PLAINTEXT_SIZE];
-    SIZE_T cbPlainText = KEYSINUSE_TEST_SIGN_PLAINTEXT_SIZE;
+    BYTE pbPlainText[SHA256_DIGEST_LENGTH];
+    SIZE_T cbPlainText = SHA256_DIGEST_LENGTH;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
         {0, 0, 0},
@@ -545,38 +545,22 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if ((ctx = EVP_MD_CTX_new()) == NULL ||
-        (ctxCopy = EVP_MD_CTX_new()) == NULL ||
-        (ctxCopyByRef = EVP_MD_CTX_new()) == NULL)
+    if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, propq.c_str())) == NULL ||
+        (ctxCopy = EVP_PKEY_CTX_new_from_pkey(NULL, pkeyCopy, propq.c_str())) == NULL)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_MD_CTX_new failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
         goto cleanup;
     }
 
     // Sign init
-    if (!EVP_DigestSignInit_ex(ctx, NULL,
-            SN_sha256,
-            NULL,
-            propq.c_str(),
-            pkey,
-            NULL))
+    if (EVP_PKEY_sign_init(ctx) <= 0 ||
+        EVP_PKEY_sign_init(ctxCopy) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
         goto cleanup;
     }
 
-    if (!EVP_DigestSignInit_ex(ctxCopy, NULL,
-            SN_sha256,
-            NULL,
-            propq.c_str(),
-            pkeyCopy,
-            NULL))
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
-        goto cleanup;
-    }
-
-    // Duplicating the pkey object after EVP_DigestSignInit_ex
+    // Duplicating the pkey object after EVP_PKEY_sign_init
     // should trigger keysinuse_load_key_by_ctx
     if ((pkeyCopyByRef = EVP_PKEY_dup(pkey)) == NULL)
     {
@@ -584,21 +568,22 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if (!EVP_DigestSignInit_ex(ctxCopyByRef, NULL,
-            SN_sha256,
-            NULL,
-            propq.c_str(),
-            pkeyCopyByRef,
-            NULL))
+    if ((ctxCopyByRef = EVP_PKEY_CTX_new_from_pkey(NULL, pkeyCopyByRef, propq.c_str())) == NULL)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_sign_init(ctxCopyByRef) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
         goto cleanup;
     }
 
     // Sign
-    if (!EVP_DigestSign(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText))
+    if (!EVP_PKEY_sign(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText))
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
         goto cleanup;
     }
 
@@ -608,9 +593,9 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if (!EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    if (!EVP_PKEY_sign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
         goto cleanup;
     }
     expectedEvents[0].signCount = 1;
@@ -619,19 +604,19 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third sign. Only the first event should be logged.
-    if (!EVP_DigestSign(ctxCopy, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) ||
-        !EVP_DigestSign(ctxCopyByRef, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    if (!EVP_PKEY_sign(ctxCopy, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) ||
+        !EVP_PKEY_sign(ctxCopyByRef, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
         goto cleanup;
     }
     expectedEvents[1].signCount = 2;
 
     // Unload all references to the key. Pending events should still be logged
     // after the after the unload.
-    EVP_MD_CTX_free(ctx);
-    EVP_MD_CTX_free(ctxCopy);
-    EVP_MD_CTX_free(ctxCopyByRef);
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
     EVP_PKEY_free(pkey);
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
@@ -653,25 +638,20 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
         goto cleanup;
     }
 
-    if ((ctx = EVP_MD_CTX_new()) == NULL)
+    if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, propq.c_str())) == NULL)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_MD_CTX_new failed")
         goto cleanup;
     }
 
     // Test key use again, this event should be immediately logged
-    if (!EVP_DigestSignInit_ex(ctx, NULL,
-            SN_sha256,
-            NULL,
-            propq.c_str(),
-            pkey,
-            NULL))
+    if (EVP_PKEY_sign_init(ctx) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSignInit_ex failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
         goto cleanup;
     }
 
-    if (!EVP_DigestSign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    if (!EVP_PKEY_sign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
     {
         TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
@@ -686,9 +666,9 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
 cleanup:
     OSSL_PARAM_free(params);
     EVP_PKEY_CTX_free(importCtx);
-    EVP_MD_CTX_free(ctx);
-    EVP_MD_CTX_free(ctxCopy);
-    EVP_MD_CTX_free(ctxCopyByRef);
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
     EVP_PKEY_free(pkey);
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
@@ -713,7 +693,7 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[S
     SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
-    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
         {0, 0, 0},
@@ -792,8 +772,6 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[S
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new_from_pkey failed")
         goto cleanup;
     }
-
-    pkey = EVP_PKEY_CTX_get0_pkey(ctx);
 
     // Decrypt init
     if (EVP_PKEY_decrypt_init(ctx) <= 0 ||
@@ -908,6 +886,362 @@ cleanup:
 }
 #endif
 
+SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], ENGINE *engine)
+{
+    EVP_PKEY_CTX *ctx = NULL;
+    EVP_PKEY_CTX *ctxCopy = NULL;
+    EVP_PKEY_CTX *ctxCopyByRef = NULL;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY *pkeyCopy = NULL;
+    EVP_PKEY *pkeyCopyByRef = NULL;
+    BYTE pbPlainText[SHA256_DIGEST_LENGTH];
+    SIZE_T cbPlainText = SHA256_DIGEST_LENGTH;
+    PBYTE pbCipherText = NULL;
+    SIZE_T cbCipherText = 0;
+    SCOSSL_STATUS ret = SCOSSL_SUCCESS;
+
+    KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
+        {0, 0, 0},
+        {0, 0, KEYSINUSE_TEST_LOG_DELAY},
+        {0, 0, 0}};
+
+    // Same key material for distinct pkey objects should log with the same keysinuse info
+    if ((pkey = EVP_PKEY_dup(pkeyBase)) == NULL ||
+        (pkeyCopy = EVP_PKEY_dup(pkeyBase)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    if (RAND_bytes(pbPlainText, cbPlainText) != 1)
+    {
+        TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    if ((ctx = EVP_PKEY_CTX_new(pkey, engine)) == NULL ||
+        (ctxCopy = EVP_PKEY_CTX_new(pkeyCopy, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    // Sign init
+    if (EVP_PKEY_sign_init(ctx) <= 0 ||
+        EVP_PKEY_sign_init(ctxCopy) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
+        goto cleanup;
+    }
+
+    // Duplicating the pkey object after EVP_DigestSignInit
+    // should trigger keysinuse_load_key_by_ctx
+    if ((pkeyCopyByRef = EVP_PKEY_dup(pkey)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    if ((ctxCopyByRef = EVP_PKEY_CTX_new(pkeyCopyByRef, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_sign_init(ctx) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
+        goto cleanup;
+    }
+
+    // Sign
+    if (!EVP_PKEY_sign(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText))
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
+        goto cleanup;
+    }
+
+    if ((pbCipherText = (PBYTE)OPENSSL_malloc(cbCipherText)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
+        goto cleanup;
+    }
+
+    if (!EVP_PKEY_sign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
+        goto cleanup;
+    }
+    expectedEvents[0].signCount = 1;
+
+    // Wait a little to allow the logging thread to process the event
+    usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
+
+    // Test second and third sign. Only the first event should be logged.
+    if (!EVP_PKEY_sign(ctxCopy, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) ||
+        !EVP_PKEY_sign(ctxCopyByRef, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign failed")
+        goto cleanup;
+    }
+    expectedEvents[1].signCount = 2;
+
+    // Unload all references to the key. Pending events should still be logged
+    // after the after the unload.
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_free(pkeyCopy);
+    EVP_PKEY_free(pkeyCopyByRef);
+    ctx = NULL;
+    ctxCopy = NULL;
+    ctxCopyByRef = NULL;
+    pkey = NULL;
+    pkeyCopy = NULL;
+    pkeyCopyByRef = NULL;
+
+    // Wait for the logging delay to elapse so ensure events from unloaded
+    // keys are written.
+    sleep(KEYSINUSE_TEST_LOG_DELAY);
+
+    // Reload they key by bytes after original references were unloaded.
+    if ((pkey = EVP_PKEY_dup(pkeyBase)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    if ((ctx = EVP_PKEY_CTX_new(pkey, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    // Test key use again, this event should be immediately logged
+    if (EVP_PKEY_sign_init(ctx) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
+        goto cleanup;
+    }
+
+    if (!EVP_PKEY_sign(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText))
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        goto cleanup;
+    }
+    expectedEvents[2].signCount = 1;
+
+    usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
+
+    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    remove(KEYSINUSE_LOG_FILE);
+
+cleanup:
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_free(pkeyCopy);
+    EVP_PKEY_free(pkeyCopyByRef);
+    OPENSSL_free(pbCipherText);
+
+    return ret;
+}
+
+SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], ENGINE *engine)
+{
+    EVP_PKEY_CTX *ctx = NULL;
+    EVP_PKEY_CTX *ctxCopy = NULL;
+    EVP_PKEY_CTX *ctxCopyByRef = NULL;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY *pkeyCopy = NULL;
+    EVP_PKEY *pkeyCopyByRef = NULL;
+    BYTE pbPlainText[KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE];
+    SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
+    PBYTE pbCipherText = NULL;
+    SIZE_T cbCipherText = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
+        {0, 0, 0},
+        {0, 0, KEYSINUSE_TEST_LOG_DELAY},
+        {0, 0, 0}};
+
+    if (RAND_bytes(pbPlainText, cbPlainText) != 1)
+    {
+        TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    // Same key material for distinct pkey objects should log with the same keysinuse info
+    if ((pkey = EVP_PKEY_dup(pkeyBase)) == NULL ||
+        (pkeyCopy = EVP_PKEY_dup(pkeyBase)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    // Generate test ciphertext
+    if ((ctx = EVP_PKEY_CTX_new(pkeyBase, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_encrypt_init(ctx) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_encrypt_init failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_encrypt(ctx, NULL, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_encrypt failed")
+        goto cleanup;
+    }
+
+    if ((pbCipherText = (PBYTE)OPENSSL_malloc(cbCipherText)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_encrypt(ctx, pbCipherText, &cbCipherText, pbPlainText, cbPlainText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_encrypt failed")
+        goto cleanup;
+    }
+
+    EVP_PKEY_CTX_free(ctx);
+    ctx = NULL;
+
+    if ((ctx = EVP_PKEY_CTX_new(pkey, engine)) == NULL ||
+        (ctxCopy = EVP_PKEY_CTX_new(pkeyCopy, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    // Decrypt init
+    if (EVP_PKEY_decrypt_init(ctx) <= 0 ||
+        EVP_PKEY_decrypt_init(ctxCopy) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt_init failed")
+        goto cleanup;
+    }
+
+    // Duplicating the pkey object after EVP_PKEY_decrypt_init
+    // should trigger keysinuse_load_key_by_ctx
+    if ((pkeyCopyByRef = EVP_PKEY_dup(pkey)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    if ((ctxCopyByRef = EVP_PKEY_CTX_new(pkeyCopyByRef, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_decrypt_init(ctxCopyByRef) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt_init failed")
+        goto cleanup;
+    }
+
+    // Decrypt
+    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
+    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+    expectedEvents[0].decryptCount = 1;
+
+    // Wait a little to allow the logging thread to process the event
+    usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
+
+    // Test second and third decrypt. Only the first event should be logged.
+    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
+    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+
+    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
+    if (EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+    expectedEvents[1].decryptCount = 2;
+
+    // Unload all references to the key. Pending events should still be logged
+    // after the after the unload.
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_free(pkeyCopy);
+    EVP_PKEY_free(pkeyCopyByRef);
+    ctx = NULL;
+    ctxCopy = NULL;
+    ctxCopyByRef = NULL;
+    pkey = NULL;
+    pkeyCopy = NULL;
+    pkeyCopyByRef = NULL;
+
+    // Wait for the logging delay to elapse so ensure events from unloaded
+    // keys are written.
+    sleep(KEYSINUSE_TEST_LOG_DELAY);
+
+    // Reload they key by bytes after original references were unloaded.
+    if ((pkey = EVP_PKEY_dup(pkeyBase)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_dup failed")
+        goto cleanup;
+    }
+
+    if ((ctx = EVP_PKEY_CTX_new(pkey, engine)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new failed")
+        goto cleanup;
+    }
+
+    if (EVP_PKEY_decrypt_init(ctx) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt_init failed")
+        goto cleanup;
+    }
+
+    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
+    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+    expectedEvents[2].decryptCount = 1;
+
+    usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
+
+    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    remove(KEYSINUSE_LOG_FILE);
+
+cleanup:
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_CTX_free(ctxCopy);
+    EVP_PKEY_CTX_free(ctxCopyByRef);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_free(pkeyCopy);
+    EVP_PKEY_free(pkeyCopyByRef);
+    OPENSSL_free(pbCipherText);
+
+    return ret;
+}
+
 // Generates a key with the specified parameters. *ppbKey is set to the encoded
 // public key bytes, and pbKeyId is set to the expected keyId. The size of the
 // encoded public key bytes is returned, and 0 is returned on error. The default
@@ -990,7 +1324,7 @@ cleanup:
 }
 
 SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName, BOOL testSign,
-                                  vector<PVOID> providers)
+                                  vector<ENGINE *> engines, vector<PVOID> providers)
 {
     EVP_PKEY *pkey = NULL;
     PBYTE pbEncodedKey = NULL;
@@ -1030,6 +1364,22 @@ SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName,
     // the keysinuse info created in keysinuse_test_api_functions
     sleep(KEYSINUSE_TEST_LOG_DELAY);
 
+    for (ENGINE *engine : engines)
+    {
+        printf("\tTesting engine (%s) functions\n", ENGINE_get_id(engine));
+        if (testSign)
+        {
+            keysinuse_test_engine_sign(pkey, pbKeyId, engine);
+        }
+        else
+        {
+            keysinuse_test_engine_decrypt(pkey, pbKeyId, engine);
+        }
+    }
+
+    sleep(KEYSINUSE_TEST_LOG_DELAY);
+
+#if OPENSSL_VERSION_MAJOR >= 3
     for (PVOID provider : providers)
     {
         const char *providerName = OSSL_PROVIDER_get0_name((OSSL_PROVIDER *)provider);
@@ -1043,6 +1393,7 @@ SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName,
             keysinuse_test_provider_decrypt(pkey, pbKeyId, string(providerName));
         }
     }
+#endif
 
     ret = SCOSSL_SUCCESS;
 
@@ -1055,6 +1406,8 @@ cleanup:
 
 int main(int argc, char** argv)
 {
+    ENGINE *engine = NULL;
+    vector<ENGINE *> engines;
     vector<PVOID> providers;
     mode_t umaskOriginal;
     char keysinuseLogDir[sizeof(KEYSINUSE_LOG_DIR)];
@@ -1064,14 +1417,69 @@ int main(int argc, char** argv)
 
     OPENSSL_init_crypto(0, NULL);
 
+    ERR_set_mark();
+
     for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "--verbose") == 0)
+        if (strcmp(argv[i], "--help") == 0)
+        {
+            printf("Usage: KeysInUseTest <options>\n");
+            printf("Options:\n");
+            printf("  --engine-path <engine_path>       Specify the path of an engine to test.\n");
+            printf("  --engine <engine_name>            Specify an engine to use for key operations\n");
+#if OPENSSL_VERSION_MAJOR >= 3
+            printf("  --provider-dir <provider_path>    Specify a directory to locate providers with with keysinuse. Must come before provider\n");
+            printf("  --provider <provider_name>        Specify a provider with keysinuse to test by name\n");
+#endif
+            printf("  --verbose                         Enable verbose output\n");
+            return 0;
+        }
+        else if (strcmp(argv[i], "--verbose") == 0)
         {
             logVerbose = true;
         }
+        else if (strcmp(argv[i], "--engine-path") == 0)
+        {
+            if (argc < ++i)
+            {
+                TEST_LOG_ERROR("Missing engine path")
+                goto cleanup;
+            }
+            if ((engine = ENGINE_by_id("dynamic")) == NULL ||
+                !ENGINE_ctrl_cmd_string(engine, "SO_PATH", argv[i], 0) ||
+                !ENGINE_ctrl_cmd_string(engine, "LIST_ADD", "2", 0) ||
+                !ENGINE_ctrl_cmd_string(engine, "LOAD", NULL, 0))
+            {
+                TEST_LOG_OPENSSL_ERROR("Failed to load engine by path %s", argv[i]);
+                goto cleanup;
+            }
+        }
+        else if (strcmp(argv[i], "--engine") == 0)
+        {
+            if (argc < ++i)
+            {
+                TEST_LOG_ERROR("Missing engine name")
+                goto cleanup;
+            }
+
+            if ((engine = ENGINE_by_id(argv[i])) == NULL)
+            {
+                TEST_LOG_OPENSSL_ERROR("ENGINE_by_id failed")
+                goto cleanup;
+            }
+
+            if (!ENGINE_init(engine))
+            {
+                ENGINE_free(engine);
+                TEST_LOG_OPENSSL_ERROR("ENGINE_init failed")
+                goto cleanup;
+            }
+
+            engines.push_back(engine);
+            engine = NULL;
+        }
 #if OPENSSL_VERSION_MAJOR >= 3
-        if (strcmp(argv[i], "--provider") == 0)
+        else if (strcmp(argv[i], "--provider") == 0)
         {
             if (argc < ++i)
             {
@@ -1088,34 +1496,25 @@ int main(int argc, char** argv)
 
             providers.push_back(provider);
         }
-        else if (strcmp(argv[i], "--provider-path") == 0)
+        else if (strcmp(argv[i], "--provider-dir") == 0)
         {
             if (!OSSL_PROVIDER_set_default_search_path(NULL, argv[++i]))
             {
                 {
-                    TEST_LOG_OPENSSL_ERROR("Failed to set provider path %s", argv[i])
+                    TEST_LOG_OPENSSL_ERROR("Failed to set provider directory %s", argv[i])
                     goto cleanup;
                 }
             }
         }
 #endif
-        else if (strcmp(argv[i], "--help") == 0)
-        {
-            printf("Usage: KeysInUseTest <options>\n");
-            printf("Options:\n");
-#if OPENSSL_VERSION_MAJOR >= 3
-            printf("  --provider-path <provider_path>  Specify a directory to locate providers with with keysinuse. Must come before provider\n");
-            printf("  --provider <provider_name>       Specify a provider with keysinuse to test by name\n");
-#endif
-            printf("  --verbose                        Enable verbose output\n");
-            return 0;
-        }
         else
         {
             TEST_LOG_ERROR("Unknown argument: %s", argv[i])
             goto cleanup;
         }
     }
+
+    ERR_pop_to_mark();
 
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
     keysinuse_init();
@@ -1193,13 +1592,13 @@ int main(int argc, char** argv)
         printf("Testing RSA sign with size %d\n", rsaTestSizes[i]);
 
         params[0] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_BITS, (int *)&rsaTestSizes[i]);
-        if (keysinuse_run_tests(params, "RSA", TRUE, providers) != SCOSSL_SUCCESS)
+        if (keysinuse_run_tests(params, "RSA", TRUE, engines, providers) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
         printf("\nTesting RSA decrypt with size %d\n", rsaTestSizes[i]);
-        if (keysinuse_run_tests(params, "RSA", FALSE, providers) != SCOSSL_SUCCESS)
+        if (keysinuse_run_tests(params, "RSA", FALSE, engines, providers) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -1213,7 +1612,7 @@ int main(int argc, char** argv)
         printf("Testing ECDSA sign with group %s\n", eccTestGroups[i]);
 
         params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)eccTestGroups[i], sizeof(eccTestGroups[i]));
-        if (keysinuse_run_tests(params, "EC", TRUE, providers) != SCOSSL_SUCCESS)
+        if (keysinuse_run_tests(params, "EC", TRUE, engines, providers) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -1228,6 +1627,12 @@ cleanup:
     for (PVOID provider : providers)
     {
         OSSL_PROVIDER_unload((OSSL_PROVIDER *)provider);
+    }
+
+    for (ENGINE *e : engines)
+    {
+        ENGINE_finish(e);
+        ENGINE_free(e);
     }
 
     OPENSSL_free(processName);
