@@ -129,12 +129,12 @@ The SymCrypt provider can be configured in the SymCrypt provider section of the 
 ### Debug Logging
 | Key           | Description                                                                                                                                   | Default   |
 | -             | -                                                                                                                                             | -         |
-| logging_file  | Location to write debug logging events to.                                                                                                     | NULL      |
+| logging_file  | Location to write debug logging events to.                                                                                                    | NULL      |
 | logging_level | Maximum level to log to logging file. In order, can be <ul><li>off</li><li>error</li><li>info</li><li>debug</li></ul>                         | off       |
 | error_level   | Maximum level to push logging events to OpenSSL error stack. In order, can be <ul><li>off</li><li>error</li><li>info</li><li>debug</li></ul>  | error     |
 
 ### KeysInUse Logging
-The SymCrypt provider optionally supports [KeysInUse logging](https://github.com/microsoft/KeysInUse-OpenSSL) for monitoring private key usage.
+The SymCrypt provider optionally supports [KeysInUse logging](../KeysInUse/README.md) for monitoring private key usage.
 The primary motivation is for application owners to keep inventory of which certificates and keys are actively being used on their machine.
 The feature is off by default and must be enabled by config. If you are building the SymCrypt provider from scratch, the feature also needs
 to be enabled at compile time by adding the `-DKEYSINUSE_ENABLED=1` to the cmake configuration step. KeysInUse configuration is placed in a
@@ -143,4 +143,4 @@ separate section. This section must be referenced in the symcrypt provider secti
 | -                     | -                                                                                                                                             | -         |
 | enabled               | 0 or 1 to disable or enable keysinuse logging.                                                                                                | 0         |
 | max_file_size         | Maximum size of the file events are written to. May be written as raw byte size or suffixed with KB/MB/GB                                     | 5KB       |
-| logging_delay_seconds | Duration in seconds between events being written to the file. Any events that happen in between will be aggregate and logged as one event.    | error     |
+| logging_delay_seconds | Duration in seconds between events being written to the file. Any events that happen in between will be aggregate and logged as one event.    | 3600      |
