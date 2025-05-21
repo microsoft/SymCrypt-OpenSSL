@@ -2488,6 +2488,9 @@ end:
 
 int main(int argc, char** argv)
 {
+#if OPENSSL_VERSION_MAJOR == 3
+    OSSL_PROVIDER *symcrypt_provider = NULL;
+#endif
     int scossl_log_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
     int scossl_ossl_ERR_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
     bool useEngine = true;
@@ -2530,6 +2533,12 @@ int main(int argc, char** argv)
                     return 0;
                 }
             }
+
+            if ((symcrypt_provider = OSSL_PROVIDER_load(NULL, "symcryptprovider")) == NULL)
+            {
+                handleOpenSSLError("Failed to load symcrypt provider");
+                return 0;
+            }
         }
         else if (strcmp(argv[i], "--no-engine") == 0)
         {
@@ -2549,12 +2558,7 @@ int main(int argc, char** argv)
             return 0;
         }
     }
-    if (argc >= 2) {
-        scossl_log_level = atoi(argv[1]);
-    }
-    if (argc >= 3) {
-        scossl_ossl_ERR_level = atoi(argv[2]);
-    }
+
     SCOSSL_set_trace_level(scossl_log_level, scossl_ossl_ERR_level);
     if (useEngine)
     {
@@ -2573,6 +2577,10 @@ int main(int argc, char** argv)
 
 #ifdef SCOSSL_SSHKDF
     TestSshKdf();
+#endif
+
+#if OPENSSL_VERSION_MAJOR == 3
+    OSSL_PROVIDER_unload(symcrypt_provider);
 #endif
 
     BIO_free(bio_err);
