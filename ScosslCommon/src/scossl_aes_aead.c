@@ -39,13 +39,17 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
     ctx->operationInProgress = 0;
     if (iv != NULL)
     {
-        if (!scossl_aes_gcm_set_iv_len(ctx, ivlen) ||
-            (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+        if (!scossl_aes_gcm_set_iv_len(ctx, ivlen))
         {
             return SCOSSL_FAILURE;
         }
 
-        ctx->ivlen = ivlen;
+        OPENSSL_free(ctx->iv);
+
+        if ((ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+        {
+            return SCOSSL_FAILURE;
+        }
     }
     if (key != NULL)
     {
