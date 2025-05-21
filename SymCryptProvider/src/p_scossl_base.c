@@ -8,10 +8,8 @@
 
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
-#include "scossl_provider.h"
-#include "p_scossl_bio.h"
-#include "p_scossl_names.h"
-#include "kem/p_scossl_mlkem.h"
+#include "p_scossl_keysinuse.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,60 +29,22 @@ extern "C" {
 #define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
 #endif
 
-#define SCOSSL_TLS_GROUP_ID_secp192r1           0x0013
-#define SCOSSL_TLS_GROUP_ID_secp224r1           0x0015
-#define SCOSSL_TLS_GROUP_ID_secp256r1           0x0017
-#define SCOSSL_TLS_GROUP_ID_secp384r1           0x0018
-#define SCOSSL_TLS_GROUP_ID_secp521r1           0x0019
-#define SCOSSL_TLS_GROUP_ID_x25519              0x001d
-#define SCOSSL_TLS_GROUP_ID_ffdhe2048           0x0100
-#define SCOSSL_TLS_GROUP_ID_ffdhe3072           0x0101
-#define SCOSSL_TLS_GROUP_ID_ffdhe4096           0x0102
-#define SCOSSL_TLS_GROUP_ID_mlkem512            0x0200
-#define SCOSSL_TLS_GROUP_ID_mlkem768            0x0201
-#define SCOSSL_TLS_GROUP_ID_mlkem1024           0x0202
-#define SCOSSL_TLS_GROUP_ID_secp256r1mlkem768   0x11eb
-#define SCOSSL_TLS_GROUP_ID_x25519mlkem768      0x11ec
-#define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024  0x11ed
+#define OSSL_TLS_GROUP_ID_secp192r1        0x0013
+#define OSSL_TLS_GROUP_ID_secp224r1        0x0015
+#define OSSL_TLS_GROUP_ID_secp256r1        0x0017
+#define OSSL_TLS_GROUP_ID_secp384r1        0x0018
+#define OSSL_TLS_GROUP_ID_secp521r1        0x0019
+#define OSSL_TLS_GROUP_ID_x25519           0x001D
+#define OSSL_TLS_GROUP_ID_ffdhe2048        0x0100
+#define OSSL_TLS_GROUP_ID_ffdhe3072        0x0101
+#define OSSL_TLS_GROUP_ID_ffdhe4096        0x0102
 
-#define ALG(names, funcs) {     \
-    names,                      \
-    "provider="P_SCOSSL_NAME    \
-    ",fips=yes",                \
-    funcs,                      \
-    NULL}
-
-#define ALG_DECODER(algNames, name, decoderType) {      \
-    algNames,                                           \
-    "provider="P_SCOSSL_NAME                            \
-    ",fips=yes"                                         \
-    ",input=der"                                        \
-    ",structure="#decoderType,                          \
-    p_scossl_der_to_##name##_##decoderType##_functions, \
-    NULL}
-
-#define ALG_ENCODER(algNames, name, encoderType, format) {      \
-    algNames,                                                   \
-    "provider="P_SCOSSL_NAME                                    \
-    ",fips=yes"                                                 \
-    ",output="#format                                           \
-    ",structure="#encoderType,                                  \
-    p_scossl_##name##_to_##encoderType##_##format##_functions,  \
-    NULL}
-
-#define ALG_TEXT_ENCODER(algNames, name) { \
-    algNames,                              \
-    "provider="P_SCOSSL_NAME               \
-    ",fips=yes,output=text",               \
-    p_scossl_##name##_to_text_functions,   \
-    NULL}
-
+#define ALG(names, funcs) {names, "provider="P_SCOSSL_NAME",fips=yes", funcs, NULL}
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
 typedef struct {
     unsigned int groupId;
     unsigned int securityBits;
-    int is_kem;
     int minTls;
     int maxTls;
     int minDtls;
@@ -92,99 +52,67 @@ typedef struct {
 } SCOSSL_TLS_GROUP_INFO;
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p192 = {
-    SCOSSL_TLS_GROUP_ID_secp192r1, 80, 0,
+    OSSL_TLS_GROUP_ID_secp192r1, 80,
     TLS1_VERSION, TLS1_2_VERSION,
     DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p224 = {
-    SCOSSL_TLS_GROUP_ID_secp224r1, 112, 0,
+    OSSL_TLS_GROUP_ID_secp224r1, 112,
     TLS1_VERSION, TLS1_2_VERSION,
     DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p256 = {
-    SCOSSL_TLS_GROUP_ID_secp256r1, 128, 0,
+    OSSL_TLS_GROUP_ID_secp256r1, 128,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p384 = {
-    SCOSSL_TLS_GROUP_ID_secp384r1, 192, 0,
+    OSSL_TLS_GROUP_ID_secp384r1, 192,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p521 = {
-    SCOSSL_TLS_GROUP_ID_secp521r1, 256, 0,
+    OSSL_TLS_GROUP_ID_secp521r1, 256,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
-    SCOSSL_TLS_GROUP_ID_x25519, 128, 0,
+    OSSL_TLS_GROUP_ID_x25519, 128,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe2048 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe2048, 112, 0,
+    OSSL_TLS_GROUP_ID_ffdhe2048, 112,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe3072 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe3072, 128, 0,
+    OSSL_TLS_GROUP_ID_ffdhe3072, 128,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
-    SCOSSL_TLS_GROUP_ID_ffdhe4096, 128, 0,
+    OSSL_TLS_GROUP_ID_ffdhe4096, 128,
     TLS1_3_VERSION, 0,
     -1, -1};
 
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem512 = {
-    SCOSSL_TLS_GROUP_ID_mlkem512, 128, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_mlkem768, 192, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem1024 = {
-    SCOSSL_TLS_GROUP_ID_mlkem1024, 256, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp256r1mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_secp256r1mlkem768, 192, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519mlkem768 = {
-    SCOSSL_TLS_GROUP_ID_x25519mlkem768, 192, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
-    SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024, 256, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
-
-#define NUM_PARAMS_TLS_GROUP_ENTRY 11
-#define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) {                                     \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)),                   \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)),        \
-    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_ALG, algorithm, sizeof(algorithm)),                \
-    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_ID, (unsigned int *)&group_info.groupId),                 \
+#define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) { \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)), \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME_INTERNAL, realname, sizeof(realname)), \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_ALG, algorithm, sizeof(algorithm)), \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_ID, (unsigned int *)&group_info.groupId), \
     OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_GROUP_SECURITY_BITS, (unsigned int *)&group_info.securityBits), \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls),                       \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls),                       \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minDtls),                     \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxDtls),                     \
-    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),                        \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_TLS, (int *)&group_info.minTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_TLS, (int *)&group_info.maxTls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MIN_DTLS, (int *)&group_info.minDtls), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_MAX_DTLS, (int *)&group_info.maxDtls), \
     OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;
 
 static OSSL_FUNC_core_get_params_fn *core_get_params;
 
-static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENTRY] = {
+static const OSSL_PARAM p_scossl_supported_group_list[][11] = {
     TLS_GROUP_ENTRY("secp192r1", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("P-192", SN_X9_62_prime192v1, "EC", scossl_tls_group_info_p192),
     TLS_GROUP_ENTRY("secp224r1", SN_secp224r1, "EC", scossl_tls_group_info_p224),
@@ -198,13 +126,7 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519),
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
-    TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),
-    TLS_GROUP_ENTRY("MLKEM512", SCOSSL_SN_MLKEM512, "MLKEM", scossl_tls_group_info_mlkem512),
-    TLS_GROUP_ENTRY("MLKEM768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
-    TLS_GROUP_ENTRY("MLKEM1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
-    TLS_GROUP_ENTRY("SecP256r1MLKEM768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
-    TLS_GROUP_ENTRY("X25519MLKEM768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
-    TLS_GROUP_ENTRY("SecP384r1MLKEM1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
+    TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -225,22 +147,22 @@ extern const OSSL_DISPATCH p_scossl_cshake_128_functions[];
 extern const OSSL_DISPATCH p_scossl_cshake_256_functions[];
 
 static const OSSL_ALGORITHM p_scossl_digest[] = {
-    ALG(SCOSSL_ALG_NAME_MD5, p_scossl_md5_functions),
-    ALG(SCOSSL_ALG_NAME_SHA1, p_scossl_sha1_functions),
-    ALG(SCOSSL_ALG_NAME_SHA224, p_scossl_sha224_functions),
-    ALG(SCOSSL_ALG_NAME_SHA256, p_scossl_sha256_functions),
-    ALG(SCOSSL_ALG_NAME_SHA384, p_scossl_sha384_functions),
-    ALG(SCOSSL_ALG_NAME_SHA512, p_scossl_sha512_functions),
-    ALG(SCOSSL_ALG_NAME_SHA512_224, p_scossl_sha512_224_functions),
-    ALG(SCOSSL_ALG_NAME_SHA512_256, p_scossl_sha512_256_functions),
-    ALG(SCOSSL_ALG_NAME_SHA3_224, p_scossl_sha3_224_functions),
-    ALG(SCOSSL_ALG_NAME_SHA3_256, p_scossl_sha3_256_functions),
-    ALG(SCOSSL_ALG_NAME_SHA3_384, p_scossl_sha3_384_functions),
-    ALG(SCOSSL_ALG_NAME_SHA3_512, p_scossl_sha3_512_functions),
-    ALG(SCOSSL_ALG_NAME_SHAKE128, p_scossl_shake_128_functions),
-    ALG(SCOSSL_ALG_NAME_SHAKE256, p_scossl_shake_256_functions),
-    ALG(SCOSSL_ALG_NAME_CSHAKE128, p_scossl_cshake_128_functions),
-    ALG(SCOSSL_ALG_NAME_CSHAKE256, p_scossl_cshake_256_functions),
+    ALG("MD5:SSL3-MD5:1.2.840.113549.2.5", p_scossl_md5_functions),
+    ALG("SHA1:SHA-1:SSL3-SHA1:1.3.14.3.2.26", p_scossl_sha1_functions),
+    ALG("SHA2-224:SHA-224:SHA224:2.16.840.1.101.3.4.2.4", p_scossl_sha224_functions),
+    ALG("SHA2-256:SHA-256:SHA256:2.16.840.1.101.3.4.2.1", p_scossl_sha256_functions),
+    ALG("SHA2-384:SHA-384:SHA384:2.16.840.1.101.3.4.2.2", p_scossl_sha384_functions),
+    ALG("SHA2-512:SHA-512:SHA512:2.16.840.1.101.3.4.2.3", p_scossl_sha512_functions),
+    ALG("SHA2-512/224:SHA-512/224:SHA512-224:2.16.840.1.101.3.4.2.5", p_scossl_sha512_224_functions),
+    ALG("SHA2-512/256:SHA-512/256:SHA512-256:2.16.840.1.101.3.4.2.6", p_scossl_sha512_256_functions),
+    ALG("SHA3-224:2.16.840.1.101.3.4.2.7", p_scossl_sha3_224_functions),
+    ALG("SHA3-256:2.16.840.1.101.3.4.2.8", p_scossl_sha3_256_functions),
+    ALG("SHA3-384:2.16.840.1.101.3.4.2.9", p_scossl_sha3_384_functions),
+    ALG("SHA3-512:2.16.840.1.101.3.4.2.10", p_scossl_sha3_512_functions),
+    ALG("SHAKE-128:SHAKE128:2.16.840.1.101.3.4.2.11", p_scossl_shake_128_functions),
+    ALG("SHAKE-256:SHAKE256:2.16.840.1.101.3.4.2.12", p_scossl_shake_256_functions),
+    ALG("CSHAKE-128:CSHAKE128", p_scossl_cshake_128_functions),
+    ALG("CSHAKE-256:CSHAKE256", p_scossl_cshake_256_functions),
     ALG_TABLE_END};
 
 // Cipher
@@ -266,26 +188,26 @@ extern const OSSL_DISPATCH p_scossl_aes128xts_functions[];
 extern const OSSL_DISPATCH p_scossl_aes256xts_functions[];
 
 static const OSSL_ALGORITHM p_scossl_cipher[] = {
-    ALG(SCOSSL_ALG_NAME_AES_128_CBC, p_scossl_aes128cbc_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_CBC, p_scossl_aes192cbc_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_CBC, p_scossl_aes256cbc_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_ECB, p_scossl_aes128ecb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_ECB, p_scossl_aes192ecb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_ECB, p_scossl_aes256ecb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_CFB, p_scossl_aes128cfb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_CFB, p_scossl_aes192cfb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_CFB, p_scossl_aes256cfb_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_CFB8, p_scossl_aes128cfb8_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_CFB8, p_scossl_aes192cfb8_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_CFB8, p_scossl_aes256cfb8_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_GCM, p_scossl_aes128gcm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_GCM, p_scossl_aes192gcm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_GCM, p_scossl_aes256gcm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_CCM, p_scossl_aes128ccm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_192_CCM, p_scossl_aes192ccm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_CCM, p_scossl_aes256ccm_functions),
-    ALG(SCOSSL_ALG_NAME_AES_128_XTS, p_scossl_aes128xts_functions),
-    ALG(SCOSSL_ALG_NAME_AES_256_XTS, p_scossl_aes256xts_functions),
+    ALG("AES-128-CBC:AES128:2.16.840.1.101.3.4.1.2", p_scossl_aes128cbc_functions),
+    ALG("AES-192-CBC:AES192:2.16.840.1.101.3.4.1.22", p_scossl_aes192cbc_functions),
+    ALG("AES-256-CBC:AES256:2.16.840.1.101.3.4.1.42", p_scossl_aes256cbc_functions),
+    ALG("AES-128-ECB:2.16.840.1.101.3.4.1.1", p_scossl_aes128ecb_functions),
+    ALG("AES-192-ECB:2.16.840.1.101.3.4.1.21", p_scossl_aes192ecb_functions),
+    ALG("AES-256-ECB:2.16.840.1.101.3.4.1.41", p_scossl_aes256ecb_functions),
+    ALG("AES-128-CFB:2.16.840.1.101.3.4.1.4", p_scossl_aes128cfb_functions),
+    ALG("AES-192-CFB:2.16.840.1.101.3.4.1.24", p_scossl_aes192cfb_functions),
+    ALG("AES-256-CFB:2.16.840.1.101.3.4.1.44", p_scossl_aes256cfb_functions),
+    ALG("AES-128-CFB8", p_scossl_aes128cfb8_functions),
+    ALG("AES-192-CFB8", p_scossl_aes192cfb8_functions),
+    ALG("AES-256-CFB8", p_scossl_aes256cfb8_functions),
+    ALG("AES-128-GCM:id-aes128-GCM:2.16.840.1.101.3.4.1.6", p_scossl_aes128gcm_functions),
+    ALG("AES-192-GCM:id-aes192-GCM:2.16.840.1.101.3.4.1.26", p_scossl_aes192gcm_functions),
+    ALG("AES-256-GCM:id-aes256-GCM:2.16.840.1.101.3.4.1.46", p_scossl_aes256gcm_functions),
+    ALG("AES-128-CCM:id-aes128-CCM:2.16.840.1.101.3.4.1.7", p_scossl_aes128ccm_functions),
+    ALG("AES-192-CCM:id-aes192-CCM:2.16.840.1.101.3.4.1.27", p_scossl_aes192ccm_functions),
+    ALG("AES-256-CCM:id-aes256-CCM:2.16.840.1.101.3.4.1.47", p_scossl_aes256ccm_functions),
+    ALG("AES-128-XTS:1.3.111.2.1619.0.1.1", p_scossl_aes128xts_functions),
+    ALG("AES-256-XTS:1.3.111.2.1619.0.1.2", p_scossl_aes256xts_functions),
     ALG_TABLE_END};
 
 // MAC
@@ -295,10 +217,10 @@ extern const OSSL_DISPATCH p_scossl_kmac128_functions[];
 extern const OSSL_DISPATCH p_scossl_kmac256_functions[];
 
 static const OSSL_ALGORITHM p_scossl_mac[] = {
-    ALG(SCOSSL_ALG_NAME_CMAC, p_scossl_cmac_functions),
-    ALG(SCOSSL_ALG_NAME_HMAC, p_scossl_hmac_functions),
-    ALG(SCOSSL_ALG_NAME_KMAC128, p_scossl_kmac128_functions),
-    ALG(SCOSSL_ALG_NAME_KMAC256, p_scossl_kmac256_functions),
+    ALG("CMAC", p_scossl_cmac_functions),
+    ALG("HMAC", p_scossl_hmac_functions),
+    ALG("KMAC-128:KMAC128:2.16.840.1.101.3.4.2.19", p_scossl_kmac128_functions),
+    ALG("KMAC-256:KMAC256:2.16.840.1.101.3.4.2.20", p_scossl_kmac256_functions),
     ALG_TABLE_END};
 
 // KDF
@@ -312,21 +234,21 @@ extern const OSSL_DISPATCH p_scossl_sskdf_kdf_functions[];
 extern const OSSL_DISPATCH p_scossl_tls1prf_kdf_functions[];
 
 static const OSSL_ALGORITHM p_scossl_kdf[] = {
-    ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_KBKDF, p_scossl_kbkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_PBKDF2, p_scossl_pbkdf2_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_SRTPKDF, p_scossl_srtpkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_SRTCPKDF, p_scossl_srtcpkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_SSHKDF, p_scossl_sshkdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_SSKDF, p_scossl_sskdf_kdf_functions),
-    ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_tls1prf_kdf_functions),
+    ALG("HKDF", p_scossl_hkdf_kdf_functions),
+    ALG("KBKDF", p_scossl_kbkdf_kdf_functions),
+    ALG("PBKDF2:1.2.840.113549.1.5.12", p_scossl_pbkdf2_kdf_functions),
+    ALG("SRTPKDF", p_scossl_srtpkdf_kdf_functions),
+    ALG("SRTCPKDF", p_scossl_srtcpkdf_kdf_functions),
+    ALG("SSHKDF", p_scossl_sshkdf_kdf_functions),
+    ALG("SSKDF", p_scossl_sskdf_kdf_functions),
+    ALG("TLS1-PRF", p_scossl_tls1prf_kdf_functions),
     ALG_TABLE_END};
 
 // Rand
 extern const OSSL_DISPATCH p_scossl_rand_functions[];
 
 static const OSSL_ALGORITHM p_scossl_rand[] = {
-    ALG(SCOSSL_ALG_NAME_CTR_DBG, p_scossl_rand_functions),
+    ALG("CTR-DRBG", p_scossl_rand_functions),
     ALG_TABLE_END};
 
 // Key management
@@ -336,17 +258,15 @@ extern const OSSL_DISPATCH p_scossl_kdf_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
-    ALG(SCOSSL_ALG_NAME_DH, p_scossl_dh_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_EC, p_scossl_ecc_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_kdf_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_MLKEM, p_scossl_mlkem_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_RSA_PSS, p_scossl_rsapss_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_kdf_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_X25519, p_scossl_x25519_keymgmt_functions),
+    ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_keymgmt_functions),
+    ALG("EC:id-ecPublicKey:1.2.840.10045.2.1", p_scossl_ecc_keymgmt_functions),
+    ALG("HKDF", p_scossl_kdf_keymgmt_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1:", p_scossl_rsa_keymgmt_functions),
+    ALG("RSA-PSS:RSASSA-PSS:1.2.840.113549.1.1.10", p_scossl_rsapss_keymgmt_functions),
+    ALG("TLS1-PRF", p_scossl_kdf_keymgmt_functions),
+    ALG("X25519:1.3.101.110", p_scossl_x25519_keymgmt_functions),
     ALG_TABLE_END};
 
 // Key exchange
@@ -357,68 +277,28 @@ extern const OSSL_DISPATCH p_scossl_tls1prf_keyexch_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keyexch[] = {
-    ALG(SCOSSL_ALG_NAME_DH, p_scossl_dh_functions),
-    ALG(SCOSSL_ALG_NAME_ECDH, p_scossl_ecdh_functions),
-    ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_hkdf_keyexch_functions),
-    ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_tls1prf_keyexch_functions),
-    ALG(SCOSSL_ALG_NAME_X25519, p_scossl_ecdh_functions),
+    ALG("DH:dhKeyAgreement:1.2.840.113549.1.3.1", p_scossl_dh_functions),
+    ALG("ECDH", p_scossl_ecdh_functions),
+    ALG("HKDF", p_scossl_hkdf_keyexch_functions),
+    ALG("TLS1-PRF", p_scossl_tls1prf_keyexch_functions),
+    ALG("X25519:1.3.101.110", p_scossl_ecdh_functions),
     ALG_TABLE_END};
 
 // Signature
-extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
-    ALG(SCOSSL_ALG_NAME_ECDSA, p_scossl_ecdsa_signature_functions),
-    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_signature_functions),
+    ALG("ECDSA", p_scossl_ecdsa_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher
 extern const OSSL_DISPATCH p_scossl_rsa_cipher_functions[];
 
 static const OSSL_ALGORITHM p_scossl_asym_cipher[] = {
-    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_cipher_functions),
+    ALG("RSA:rsaEncryption:1.2.840.113549.1.1.1", p_scossl_rsa_cipher_functions),
     ALG_TABLE_END};
-
-// Key encapsulation
-extern const OSSL_DISPATCH p_scossl_mlkem_functions[];
-
-static const OSSL_ALGORITHM p_scossl_kem[] = {
-    ALG(SCOSSL_ALG_NAME_MLKEM, p_scossl_mlkem_functions),
-    ALG_TABLE_END};
-
-// Decoders
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem_PrivateKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem_SubjectPublicKeyInfo_functions[];
-
-static const OSSL_ALGORITHM p_scossl_decoder[] = {
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, PrivateKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, SubjectPublicKeyInfo),
-    ALG_TABLE_END};
-
-// Encoders
-extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_der_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_pem_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_der_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_pem_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_der_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_pem_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_to_text_functions[];
-
-static const OSSL_ALGORITHM p_scossl_encoder[] = {
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, der),
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, pem),
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, der),
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, pem),
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, der),
-    ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, pem),
-    ALG_TEXT_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem),
-    ALG_TABLE_END};
-
-static SCOSSL_STATUS p_scossl_register_extended_algorithms()
-{
-    return p_scossl_mlkem_register_algorithms();
-}
 
 static int p_scossl_get_status()
 {
@@ -430,12 +310,11 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-    #ifdef KEYSINUSE_ENABLED
+#ifdef KEYSINUSE_ENABLED
     p_scossl_keysinuse_teardown();
-    #endif
+#endif
     if (provctx != NULL)
     {
-        BIO_meth_free(provctx->coreBioMeth);
         OSSL_LIB_CTX_free(provctx->libctx);
         OPENSSL_free(provctx);
     }
@@ -502,12 +381,6 @@ static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx,
         return p_scossl_signature;
     case OSSL_OP_ASYM_CIPHER:
         return p_scossl_asym_cipher;
-    case OSSL_OP_KEM:
-        return p_scossl_kem;
-    case OSSL_OP_DECODER:
-        return p_scossl_decoder;
-    case OSSL_OP_ENCODER:
-        return p_scossl_encoder;
     }
 
     return NULL;
@@ -715,13 +588,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     p_ctx->handle = handle;
     p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
-    p_scossl_set_core_bio(in);
-    if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
-    {
-        OPENSSL_free(p_ctx);
-        goto cleanup;
-    }
-
     for (; in->function_id != 0; in++)
     {
         switch(in->function_id)
@@ -738,8 +604,7 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     {
         SymCryptModuleInit(P_SCOSSL_SYMCRYPT_MINIMUM_MAJOR, P_SCOSSL_SYMCRYPT_MINIMUM_MINOR);
         if (!scossl_dh_init_static() ||
-            !scossl_ecc_init_static() ||
-            !p_scossl_register_extended_algorithms())
+            !scossl_ecc_init_static())
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
             goto cleanup;
