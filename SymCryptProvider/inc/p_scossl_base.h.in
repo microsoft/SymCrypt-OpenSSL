@@ -4,11 +4,9 @@
 
 #pragma once
 
-#include "scossl_helpers.h"
-
-#include <openssl/bio.h>
 #include <openssl/core_names.h>
 #include <openssl/params.h>
+#include "scossl_helpers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +22,6 @@ typedef struct
 {
     OSSL_LIB_CTX *libctx;
     const OSSL_CORE_HANDLE *handle;
-    BIO_METHOD *coreBioMeth;
 } SCOSSL_PROVCTX;
 
 static const OSSL_PARAM p_scossl_param_types[] = {

@@ -240,7 +240,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
     }
 
 #ifdef KEYSINUSE_ENABLED
-    copyCtx->isImported = keyCtx->isImported;
     copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
 
     if (keyCtx->keysinuseInfo == NULL ||

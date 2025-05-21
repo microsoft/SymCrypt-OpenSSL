@@ -2,9 +2,9 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
 #include "p_scossl_base.h"
-#include "p_scossl_ecdh.h"
 
 #include <openssl/proverr.h>
 
@@ -12,13 +12,19 @@
 extern "C" {
 #endif
 
+typedef struct
+{
+    OSSL_LIB_CTX *libctx;
+    SCOSSL_ECC_KEY_CTX *keyCtx;
+    SCOSSL_ECC_KEY_CTX *peerKeyCtx;
+} SCOSSL_ECDH_CTX;
+
 static const OSSL_PARAM p_scossl_ecdh_ctx_param_types[] = {
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-_Use_decl_annotations_
-SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(SCOSSL_PROVCTX *provctx)
+static SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_ECDH_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (ctx != NULL)
@@ -31,14 +37,12 @@ SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(SCOSSL_PROVCTX *provctx)
     return ctx;
 }
 
-_Use_decl_annotations_
-void p_scossl_ecdh_freectx(SCOSSL_ECDH_CTX *ctx)
+static void p_scossl_ecdh_freectx(_In_ SCOSSL_ECDH_CTX *ctx)
 {
     OPENSSL_free(ctx);
 }
 
-_Use_decl_annotations_
-SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(SCOSSL_ECDH_CTX *ctx)
+static SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
 {
     SCOSSL_ECDH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (copyCtx != NULL)
@@ -51,9 +55,8 @@ SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(SCOSSL_ECDH_CTX *ctx)
     return copyCtx;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecdh_init(SCOSSL_ECDH_CTX *ctx, SCOSSL_ECC_KEY_CTX *keyCtx,
-                                 ossl_unused const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                        ossl_unused const OSSL_PARAM params[])
 {
     if (ctx == NULL || keyCtx == NULL)
     {
@@ -66,8 +69,7 @@ SCOSSL_STATUS p_scossl_ecdh_init(SCOSSL_ECDH_CTX *ctx, SCOSSL_ECC_KEY_CTX *keyCt
     return SCOSSL_SUCCESS;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecdh_set_peer(SCOSSL_ECDH_CTX *ctx, SCOSSL_ECC_KEY_CTX *peerKeyCtx)
+static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *peerKeyCtx)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -91,17 +93,16 @@ cleanup:
     return ret;
 }
 
-_Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
-                                   unsigned char *secret, size_t *secretlen,
-                                   size_t outlen)
+static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
+                                          _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen,
+                                          size_t outlen)
 {
     PBYTE pbSecret = secret;
     PBYTE pbSecretBuf = NULL;
     SIZE_T cbSecretBuf = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SYMCRYPT_NUMBER_FORMAT numberFormat;
+    SYMCRYPT_NUMBER_FORMAT numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (ctx == NULL || secretlen == NULL)
     {
@@ -109,8 +110,7 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->keyCtx == NULL ||
-        (secret != NULL && ctx->peerKeyCtx == NULL)) {
+    if (ctx->keyCtx == NULL || ctx->peerKeyCtx == NULL) {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
     }
@@ -121,8 +121,6 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         *secretlen = cbSecretBuf;
         return SCOSSL_SUCCESS;
     }
-
-    numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
 
     if (outlen < cbSecretBuf)
     {
