@@ -14,24 +14,32 @@ extern "C" {
 #define HKDF_MODE_EXTRACT_ONLY       "EXTRACT_ONLY"
 #define HKDF_MODE_EXPAND_ONLY        "EXPAND_ONLY"
 
+#define HKDF_COMMON_SETTABLES                                       \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),           \
+    OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, NULL),                      \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),     \
+    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),         \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),           \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0)
+
 static const OSSL_PARAM p_scossl_hkdf_gettable_ctx_param_types[] = {
-    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),
-    OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, NULL),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0),
+    HKDF_COMMON_SETTABLES,
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_hkdf_settable_ctx_param_types[] = {
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_MODE, NULL, 0),
-    OSSL_PARAM_int(OSSL_KDF_PARAM_MODE, NULL),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0),
+    HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_END};
+
+/*
+ * TLS1.3KDF uses slight variations of the above,
+ * they need to be present here.
+ * Refer to RFC 8446 section 7 for specific details.
+ */
+static const OSSL_PARAM p_scossl_tls13kdf_settable_ctx_param_types[] = {
+    HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_PREFIX, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_LABEL, NULL, 0),
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_DATA, NULL, 0),
     OSSL_PARAM_END};
 
 SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
@@ -87,30 +95,6 @@ static SCOSSL_STATUS p_scossl_hkdf_reset(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
     return scossl_hkdf_reset(ctx->hkdfCtx);
 }
 
-SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
-                                   _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
-                                   _In_ const OSSL_PARAM params[])
-{
-    if (!p_scossl_hkdf_set_ctx_params(ctx, params))
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->hkdfCtx->pbKey == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
-        return SCOSSL_FAILURE;
-    }
-
-    if (keylen == 0)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
-        return 0;
-    }
-
-    return scossl_hkdf_derive(ctx->hkdfCtx, key, keylen);
-}
-
 const OSSL_PARAM *p_scossl_hkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     return p_scossl_hkdf_gettable_ctx_param_types;
@@ -119,6 +103,11 @@ const OSSL_PARAM *p_scossl_hkdf_gettable_ctx_params(ossl_unused void *ctx, ossl_
 const OSSL_PARAM *p_scossl_hkdf_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     return p_scossl_hkdf_settable_ctx_param_types;
+}
+
+const OSSL_PARAM *p_scossl_tls13kdf_settable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_tls13kdf_settable_ctx_param_types;
 }
 
 SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
@@ -341,6 +330,367 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
     return SCOSSL_SUCCESS;
 }
 
+static
+SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
+{
+    const OSSL_PARAM *p;
+
+    if (!p_scossl_hkdf_set_ctx_params(ctx, params))
+        return SCOSSL_FAILURE;
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PREFIX)) != NULL)
+    {
+        OPENSSL_clear_free(ctx->hkdfCtx->pbPrefix, ctx->hkdfCtx->cbPrefix);
+        ctx->hkdfCtx->pbPrefix = NULL;
+        ctx->hkdfCtx->cbPrefix = 0;
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbPrefix, 0, &ctx->hkdfCtx->cbPrefix))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_LABEL)) != NULL)
+    {
+        OPENSSL_clear_free(ctx->hkdfCtx->pbLabel, ctx->hkdfCtx->cbLabel);
+        ctx->hkdfCtx->pbLabel = NULL;
+        ctx->hkdfCtx->cbLabel = 0;
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbLabel, 0, &ctx->hkdfCtx->cbLabel))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DATA)) != NULL)
+    {
+        OPENSSL_clear_free(ctx->hkdfCtx->pbData, ctx->hkdfCtx->cbData);
+        ctx->hkdfCtx->pbData = NULL;
+        ctx->hkdfCtx->cbData = 0;
+        if (p->data_size > 0 &&
+            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbData, 0, &ctx->hkdfCtx->cbData))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+    }
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS p_scossl_hkdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
+                                   _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
+                                   _In_ const OSSL_PARAM params[])
+{
+    if (!p_scossl_hkdf_set_ctx_params(ctx, params))
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->hkdfCtx->pbKey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (keylen == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        return SCOSSL_FAILURE;
+    }
+
+    return scossl_hkdf_derive(ctx->hkdfCtx, key, keylen);
+}
+
+/*
+ * HKDF-Expand-Label is a TLS 1.3-specific key derivation function defined in RFC 8446, Section 7.1.
+ * It wraps the standard HKDF-Expand function with a structured label format to ensure domain separation.
+ *
+ * The structure of the HkdfLabel is as follows:
+ *
+ * struct {
+ *     uint16 length;             // Desired length of the output keying material (2 bytes, big-endian)
+ *     opaque label<7..255>;      // A variable-length label prefixed with "tls13 " followed by a custom label
+ *     opaque context<0..255>;    // A variable-length context (e.g., handshake transcript hash)
+ * } HkdfLabel;
+ *
+ */
+static
+SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx, 
+                                         _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
+    SYMCRYPT_HKDF_EXPANDED_KEY scExpandedKey;
+    SIZE_T labelLen = 0;
+    SIZE_T totalLen = 0;
+        
+    BYTE hkdflabel[HKDF_MAXBUF];
+    SIZE_T hkdflabellen = 0;
+    
+    if (ctx->md == NULL) 
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Digest");
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->pbKey == NULL) 
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
+    if (symcryptHmacAlg == NULL) 
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    labelLen = ctx->cbPrefix + ctx->cbLabel;
+    
+    // Ensure this value does not exceed 0xFF, as only the least-significant byte is copied into hkdflabel.
+    // If the value exceeds 0xFF, it will overflow and corrupt the label encoding.
+    if (labelLen > 0xFF)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Label+Prefix length exceeds limit");
+        return SCOSSL_FAILURE;
+    }
+    
+    // 2 bytes for output length, 1 byte for label length, and 1 byte for context length
+    totalLen = 2 + 1 + labelLen + 1 + ctx->cbData;
+    if (totalLen > HKDF_MAXBUF) 
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+                         "Total size exceeds maximum buffer size allowed");
+        return SCOSSL_FAILURE;
+    }
+
+    // Output length (2 bytes) in big endian format
+    SYMCRYPT_STORE_MSBFIRST16(&hkdflabel[hkdflabellen], keylen);
+    hkdflabellen += 2;
+
+    // Label length
+    hkdflabel[hkdflabellen++] = (BYTE)labelLen;
+
+    // Label = prefix + label
+    memcpy(hkdflabel + hkdflabellen, ctx->pbPrefix, ctx->cbPrefix);
+    hkdflabellen += ctx->cbPrefix;
+    memcpy(hkdflabel + hkdflabellen, ctx->pbLabel, ctx->cbLabel);
+    hkdflabellen += ctx->cbLabel;
+    
+    if (ctx->cbData > 0xFF)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "context length exceeds limit");
+        return SCOSSL_FAILURE;
+    }
+    // Context length
+    hkdflabel[hkdflabellen++] = (BYTE)ctx->cbData;
+
+    // Context
+    if (ctx->cbData > 0) 
+    {
+        memcpy(hkdflabel + hkdflabellen, ctx->pbData, ctx->cbData);
+        hkdflabellen += ctx->cbData;
+    }
+
+    // Expand PRK
+    scError = SymCryptHkdfPrkExpandKey(
+        &scExpandedKey,
+        symcryptHmacAlg,
+        ctx->pbKey, ctx->cbKey);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt expand failed");
+        return SCOSSL_FAILURE;
+    }
+    scError = SymCryptHkdfDerive(
+        &scExpandedKey,
+        hkdflabel, hkdflabellen,
+        key, keylen);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt derive failed");
+        return SCOSSL_FAILURE;
+    }
+    return SCOSSL_SUCCESS;
+}
+
+static
+SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx, 
+                                                _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
+    BYTE *default_zeros = NULL;
+    BYTE empty_hash[EVP_MAX_MD_SIZE]; 
+    BYTE expanded_secret[EVP_MAX_MD_SIZE];
+    EVP_MD_CTX *mdctx = NULL;
+    SCOSSL_HKDF_CTX *dupCtx = NULL;
+    BOOL key_need_reset =  FALSE;
+
+    if (ctx == NULL || ctx->md == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Digest");
+        return SCOSSL_FAILURE;
+    }
+    
+    symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
+    if (symcryptHmacAlg == NULL) 
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Invalid HMAC algorithm");
+        scError = SCOSSL_FAILURE;
+        goto cleanup;
+    }
+ 
+    SIZE_T mdlen = EVP_MD_get_size(ctx->md);
+    if (mdlen <= 0)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Invalid digest size");
+        return SCOSSL_FAILURE;
+    }
+
+    // duplicate a ctx to use as pass-in parameter for Symcrypt
+    dupCtx = OPENSSL_zalloc(sizeof(*ctx));
+    if (!dupCtx) 
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Failed to allocate new context");
+        return SCOSSL_FAILURE;
+    }
+    memcpy(dupCtx, ctx, sizeof(*ctx));
+    
+    default_zeros = OPENSSL_zalloc(EVP_MAX_MD_SIZE);
+    if (default_zeros == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Failed to allocate default_zeros");
+        return SCOSSL_FAILURE;
+    }
+   
+    if (dupCtx->pbKey == NULL) 
+    {
+        dupCtx->pbKey = default_zeros;
+        dupCtx->cbKey = mdlen;
+        ctx->pbKey = default_zeros; //SymCryptHkdfExtractPrk uses original ctx, have to set pbKey as well
+        ctx->cbKey = mdlen;
+        key_need_reset = TRUE;
+    }
+
+    if (dupCtx->pbSalt == NULL) 
+    {
+        dupCtx->pbSalt = default_zeros;
+        dupCtx->cbSalt = mdlen;
+    } else {
+        mdctx = EVP_MD_CTX_new();
+        if (mdctx == NULL ||
+            EVP_DigestInit_ex(mdctx, dupCtx->md, NULL) <= 0 ||
+            EVP_DigestFinal_ex(mdctx, empty_hash, NULL) <= 0) 
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Digest computation of empty hash failed");
+            scError = SCOSSL_FAILURE;
+            goto cleanup;
+        }
+
+        dupCtx->pbData = empty_hash;
+        dupCtx->cbData = mdlen;
+
+        //scossl_tls13_hkdf_expand uses pbKey, so set it as pbSalt
+        dupCtx->pbKey = dupCtx->pbSalt;
+        dupCtx->cbKey = dupCtx->cbSalt;
+
+        if (SCOSSL_SUCCESS != p_scossl_tls13_hkdf_expand(dupCtx, expanded_secret, keylen)) 
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "HKDF expand failed");
+            scError = SCOSSL_FAILURE;
+            goto cleanup;
+        }
+        //restore pbKey/cbKey
+        dupCtx->pbKey = ctx->pbKey;
+        dupCtx->cbKey = ctx->cbKey;
+
+        scError = SymCryptHkdfExtractPrk(
+            symcryptHmacAlg,
+            dupCtx->pbKey, dupCtx->cbKey,
+            expanded_secret, keylen,
+            key, keylen);
+        if (scError != SYMCRYPT_NO_ERROR) 
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt extract failed");
+            scError = SCOSSL_FAILURE;
+            goto cleanup;
+        }
+        scError = SCOSSL_SUCCESS;
+        goto cleanup;
+    }
+
+    scError = SymCryptHkdfExtractPrk(
+        symcryptHmacAlg,
+        dupCtx->pbKey, dupCtx->cbKey,
+        dupCtx->pbSalt, dupCtx->cbSalt,
+        key, keylen);
+    if (scError != SYMCRYPT_NO_ERROR) 
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt extract failed");
+        scError = SCOSSL_FAILURE;
+        goto cleanup;
+    }
+
+    scError = SCOSSL_SUCCESS;
+
+cleanup:
+    //restore original key
+    if (key_need_reset == TRUE) {
+        ctx->pbKey = NULL;
+        ctx->cbKey = 0;
+    }
+    OPENSSL_free(dupCtx);
+    OPENSSL_free(default_zeros);
+    if (mdctx != NULL)
+        EVP_MD_CTX_free(mdctx);
+    
+    return scError;
+}
+
+static
+SCOSSL_STATUS p_scossl_tls13kdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
+                                       _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen,
+                                       _In_ const OSSL_PARAM params[])
+{
+    if (ctx == NULL || ctx->hkdfCtx == NULL)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Ctx/hkdfCtx is NULL");
+        return SCOSSL_FAILURE;
+    }
+    
+    if (!p_scossl_tls13kdf_set_ctx_params(ctx, params))
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Failed to set TLS13KDF parameters");
+        return SCOSSL_FAILURE;
+    }
+    if (keylen == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+        return 0;
+    }
+
+    switch (ctx->hkdfCtx->mode)
+    {
+    case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
+        return p_scossl_tls13kdf_generate_secret(ctx->hkdfCtx, key, keylen);
+        break;
+    case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
+        return p_scossl_tls13_hkdf_expand(ctx->hkdfCtx, key, keylen);
+        break;
+    default:
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
+            "Invalid Mode: %d", ctx->hkdfCtx->mode);
+        return SCOSSL_FAILURE;
+    }
+    return SCOSSL_SUCCESS;
+   
+}
+
 const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[] = {
     {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))p_scossl_hkdf_newctx},
     {OSSL_FUNC_KDF_FREECTX, (void (*)(void))p_scossl_hkdf_freectx},
@@ -351,6 +701,18 @@ const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[] = {
     {OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_settable_ctx_params},
     {OSSL_FUNC_KDF_GET_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_get_ctx_params},
     {OSSL_FUNC_KDF_SET_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_set_ctx_params},
+    {0, NULL}};
+
+const OSSL_DISPATCH p_scossl_tls13kdf_kdf_functions[] = {
+    {OSSL_FUNC_KDF_NEWCTX, (void (*)(void))p_scossl_hkdf_newctx},
+    {OSSL_FUNC_KDF_FREECTX, (void (*)(void))p_scossl_hkdf_freectx},
+    {OSSL_FUNC_KDF_DUPCTX, (void (*)(void))p_scossl_hkdf_dupctx},
+    {OSSL_FUNC_KDF_RESET, (void (*)(void))p_scossl_hkdf_reset},
+    {OSSL_FUNC_KDF_DERIVE, (void (*)(void))p_scossl_tls13kdf_derive},
+    {OSSL_FUNC_KDF_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_gettable_ctx_params},
+    {OSSL_FUNC_KDF_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_settable_ctx_params},
+    {OSSL_FUNC_KDF_GET_CTX_PARAMS, (void (*)(void))p_scossl_hkdf_get_ctx_params},
+    {OSSL_FUNC_KDF_SET_CTX_PARAMS, (void (*)(void))p_scossl_tls13kdf_set_ctx_params},
     {0, NULL}};
 
 #ifdef __cplusplus
