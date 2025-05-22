@@ -107,7 +107,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
         ctx->keyCtx = keyCtx;
 
 #ifdef KEYSINUSE_ENABLED
-        if (keysinuse_is_enabled() &&
+        if (keysinuse_is_running() &&
             operation == EVP_PKEY_OP_DECRYPT)
         {
             p_scossl_rsa_init_keysinuse(keyCtx);

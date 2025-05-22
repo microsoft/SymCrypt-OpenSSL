@@ -1580,7 +1580,7 @@ int main(int argc, char** argv)
 
     umask(umaskOriginal);
 
-    if (!keysinuse_is_enabled())
+    if (!keysinuse_is_running())
     {
         TEST_LOG_ERROR("KeysInUse is not enabled")
         goto cleanup;

@@ -20,12 +20,16 @@ typedef VOID SCOSSL_KEYSINUSE_CTX;  // Exported opaque type
 // KeysInUse initialization to happen earlier (e.g. during provider init)
 void keysinuse_init();
 
+// Disables KeysInUse for the running process. If KeysInUse is
+// already initialized, this function will also tear down KeysInUse
+void keysinuse_disable();
+
 // Quick check for callers to see if keysinuse is enabled.
 // KeysInUse may be disabled between checking this and calling
 // additional keysinuse functions, but callers can use this
 // to avoid unnecessary work (e.g. encoding the public key) if
 // KeysInUse is already disabled.
-BOOL keysinuse_is_enabled();
+BOOL keysinuse_is_running();
 
 // Configuration
 

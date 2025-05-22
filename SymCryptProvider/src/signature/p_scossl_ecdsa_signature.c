@@ -122,7 +122,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
 
         ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
-        if (keysinuse_is_enabled() &&
+        if (keysinuse_is_running() &&
             operation == EVP_PKEY_OP_SIGN)
         {
             p_scossl_ecc_init_keysinuse(keyCtx);
