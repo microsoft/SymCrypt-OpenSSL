@@ -67,7 +67,8 @@ static CRYPTO_RWLOCK *lh_keysinuse_ctx_imp_lock = NULL;
 //
 
 static CRYPTO_ONCE keysinuse_init_once = CRYPTO_ONCE_STATIC_INIT;
-static BOOL keysinuse_enabled = FALSE;
+static BOOL keysinuse_enabled = TRUE;
+static BOOL keysinuse_running = FALSE;
 
 static off_t max_file_size = 5 << 10; // Default to 5KB
 static long logging_delay = 60 * 60; // Default to 1 hour
@@ -147,6 +148,9 @@ static void keysinuse_init_internal()
     pthread_condattr_t attr;
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if (!keysinuse_enabled)
+        return;
 
     lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
@@ -233,7 +237,7 @@ static void keysinuse_init_internal()
         goto cleanup;
     }
 
-    keysinuse_enabled = TRUE;
+    keysinuse_running = TRUE;
     status = SCOSSL_SUCCESS;
 
 cleanup:
@@ -257,7 +261,7 @@ void keysinuse_teardown()
 {
     int pthreadErr;
 
-    keysinuse_enabled = FALSE;
+    keysinuse_running = FALSE;
 
     // Finish logging thread. The logging thread will call keysinuse_cleanup
     // and free all references to any keysinuse contexts it still has a reference to.
@@ -310,11 +314,22 @@ void keysinuse_teardown()
     lh_keysinuse_ctx_imp_lock = NULL;
 }
 
-BOOL keysinuse_is_enabled()
+void keysinuse_disable()
+{
+    keysinuse_enabled = FALSE;
+
+    // Ensure keysinuse_init has completed in case another
+    // thread is in the middle of keysinuse_init
+    keysinuse_init();
+
+    keysinuse_teardown();
+}
+
+BOOL keysinuse_is_running()
 {
     // Try to initialize keysinuse if it hasn't been already
     keysinuse_init();
-    return keysinuse_enabled;
+    return keysinuse_enabled && keysinuse_running;
 }
 
 //
@@ -404,7 +419,7 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKe
     int lhErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    if (!keysinuse_is_enabled() ||
+    if (!keysinuse_is_running() ||
         pbEncodedKey == NULL ||
         cbEncodedKey == 0)
     {
@@ -514,7 +529,7 @@ cleanup:
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    if (keysinuse_is_enabled() && ctx != NULL &&
+    if (keysinuse_is_running() && ctx != NULL &&
         keysinuse_ctx_upref(ctx, NULL) == SCOSSL_SUCCESS)
     {
         return ctx;
@@ -526,7 +541,7 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
 _Use_decl_annotations_
 void keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
 {
-    if (keysinuse_is_enabled() && ctx != NULL)
+    if (keysinuse_is_running() && ctx != NULL)
     {
         // Don't free the key context here. The logging thread will free the context
         // and remove it from the hash table after logging any pending usage events.
@@ -554,7 +569,7 @@ void keysinuse_on_use(SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
     int pthreadErr;
     BOOL wakeLoggingThread = FALSE;
 
-    if (!keysinuse_is_enabled() ||
+    if (!keysinuse_is_running() ||
         ctxImp == NULL)
         return;
 
@@ -997,7 +1012,7 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg)
 
 cleanup:
     is_logging = FALSE;
-    keysinuse_enabled = FALSE;
+    keysinuse_running = FALSE;
     logging_thread_exit_status = SCOSSL_SUCCESS;
 
     return NULL;
