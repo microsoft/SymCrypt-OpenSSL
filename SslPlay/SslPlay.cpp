@@ -13,6 +13,10 @@
 #include <openssl/kdf.h>
 #include "e_scossl.h"
 
+#if OPENSSL_VERSION_MAJOR == 3
+#include <openssl/provider.h>
+#endif
+
 BIO *bio_err = NULL;
 
 // By default exit Sslplay application if an error is encountered
@@ -1126,7 +1130,7 @@ void TestRsaEvpAll()
 
 }
 
-bool TestDigest(const char* digestname)
+bool TestDigest(const char* digestname, const char *expected)
 {
     bool result = false;
     EVP_MD_CTX *mdctx;
@@ -1161,24 +1165,208 @@ bool TestDigest(const char* digestname)
     for (i = 0; i < md_len; i++)
          printf("%02x", md_value[i]);
     printf("\n");
+
+    if (memcmp(md_value, expected, md_len) != 0)
+    {
+        handleError("Result does not match expected value");
+        goto end;
+    }
+
     result = true;
 end:
     printf("%s", SeparatorLine);
     return result;
 }
 
-void TestDigests()
+#if OPENSSL_VERSION_MAJOR == 3
+bool TestDigestImportExport(const char *digestname, const char *expected, size_t export_state_size)
+{
+    bool result = false;
+    EVP_MD *md = NULL;
+    EVP_MD_CTX *mdctx;
+    char mess1[] = "Test Message1234567";
+    char mess2[] = "Hello World";
+    unsigned char md_value[EVP_MAX_MD_SIZE];
+    unsigned int md_len, i;
+
+    const OSSL_PROVIDER *provider;
+    const char *providername;
+    const OSSL_PARAM *capableParams = NULL;
+    BYTE exported_state[export_state_size];
+    int recompute_checksum = 0;
+    OSSL_PARAM params[3] = {
+        OSSL_PARAM_construct_octet_string("state", exported_state, export_state_size),
+        OSSL_PARAM_construct_int("recompute_checksum", &recompute_checksum),
+        OSSL_PARAM_construct_end()
+    };
+
+    printf("\nTestDigestImportExport: %s\n\n", digestname);
+
+    md = EVP_MD_fetch(nullptr, digestname, "provider=symcryptprovider");
+    if (md == NULL)
+    {
+        printf("No Digest found for %s\n", digestname);
+        goto end;
+    }
+
+    printf("Command EVP_MD_CTX_new\n");
+    mdctx = EVP_MD_CTX_new();
+    printf("Command EVP_DigestInit_ex\n");
+    EVP_DigestInit_ex2(mdctx, md, NULL);
+
+    // Check capabilities
+    capableParams = EVP_MD_CTX_gettable_params(mdctx);
+    if (OSSL_PARAM_locate_const(capableParams, "state") == NULL)
+    {
+        handleError("state parameter not gettable");
+        goto end;
+    }
+
+    capableParams = EVP_MD_CTX_settable_params(mdctx);
+    if (OSSL_PARAM_locate_const(capableParams, "state") == NULL ||
+        OSSL_PARAM_locate_const(capableParams, "recompute_checksum") == NULL)
+    {
+        handleError("state parameter not settable");
+        goto end;
+    }
+
+    printf("Command EVP_DigestUpdate\n");
+    EVP_DigestUpdate(mdctx, mess1, strlen(mess1));
+
+    // Export state
+    printf("Command EVP_MD_CTX_get_params\n");
+    EVP_MD_CTX_get_params(mdctx, params);
+    printf("Command EVP_MD_CTX_free\n");
+    EVP_MD_CTX_free(mdctx);
+
+    // New context with imported state supplied
+    printf("Command EVP_MD_CTX_new\n");
+    mdctx = EVP_MD_CTX_new();
+    printf("Command EVP_DigestInit_ex\n");
+    EVP_DigestInit_ex2(mdctx, md, params);
+
+    printf("Command EVP_DigestUpdate\n");
+    EVP_DigestUpdate(mdctx, mess2, strlen(mess2));
+    printf("Command EVP_DigestFinal_ex\n");
+    EVP_DigestFinal_ex(mdctx, md_value, &md_len);
+    printf("Command EVP_MD_CTX_free\n");
+    EVP_MD_CTX_free(mdctx);
+
+    printf("Digest (Original checksum) (%s)  : \t", digestname);
+    for (i = 0; i < md_len; i++)
+         printf("%02x", md_value[i]);
+    printf("\n");
+
+    if (memcmp(md_value, expected, md_len) != 0)
+    {
+        handleError("Result does not match expected value");
+        goto end;
+    }
+
+    // Clear last 8 bytes of state (Marvin32 checksum of SymCrypt export)
+    OPENSSL_cleanse(exported_state + export_state_size - 8, 8);
+    recompute_checksum = 1;
+
+    printf("Command EVP_MD_CTX_new\n");
+    mdctx = EVP_MD_CTX_new();
+    printf("Command EVP_DigestInit_ex\n");
+    EVP_DigestInit_ex2(mdctx, md, params);
+
+    printf("Command EVP_DigestUpdate\n");
+    EVP_DigestUpdate(mdctx, mess2, strlen(mess2));
+    printf("Command EVP_DigestFinal_ex\n");
+    EVP_DigestFinal_ex(mdctx, md_value, &md_len);
+    printf("Command EVP_MD_CTX_free\n");
+    EVP_MD_CTX_free(mdctx);
+
+    printf("Digest (Recomputed checksum) (%s)  : \t", digestname);
+    for (i = 0; i < md_len; i++)
+         printf("%02x", md_value[i]);
+    printf("\n");
+
+    if (memcmp(md_value, expected, md_len) != 0)
+    {
+        handleError("Result does not match expected value");
+        goto end;
+    }
+
+    result = true;
+
+end:
+    EVP_MD_free(md);
+
+    printf("%s", SeparatorLine);
+    return result;
+}
+#endif
+
+typedef struct {
+    const char *digestname;
+    const char *expected;
+    size_t export_state_size;
+} SCOSSL_DIGEST_TEST_CASE;
+
+// TestDigests tests hash state export and import if supported.
+// This functionality is added by the SymCrypt provider and is
+// only available when the engine is not loaded. If the engine
+// is loaded, OpenSSL will use it for digests and the import/export
+// functionality will not be available.
+void TestDigests(bool useEngine)
 {
     char mess1[] = "Test Message1234567";
     char mess2[] = "Hello World";
-    unsigned int md_len=32, i;
+    char expected_md_value[EVP_MAX_MD_SIZE];
+    unsigned int md_len=32, i, j;
+    const char *digestname, *expected;
 
-    TestDigest("MD5");
-    TestDigest("SHA1");
-    TestDigest("SHA224");
-    TestDigest("SHA256");
-    TestDigest("SHA384");
-    TestDigest("SHA512");
+    const SCOSSL_DIGEST_TEST_CASE digest_test_cases[] =
+    {
+        {"MD5", "4d1074949b1b41311eff270f84804433",
+            SYMCRYPT_MD5_STATE_EXPORT_SIZE},
+        {"SHA1", "fc5f088a0395c8ad887ff531333b0405a7dbb098",
+            SYMCRYPT_SHA1_STATE_EXPORT_SIZE},
+        {"SHA224", "6fe30848035b96665e1f02eae7b2bcafa600e466d80bc1b93b6094cc",
+            SYMCRYPT_SHA224_STATE_EXPORT_SIZE},
+        {"SHA256", "6810f8a56670662c0e7a10ca415f270eae0aeb1f7b153d02668ae5e7143fcc40",
+            SYMCRYPT_SHA256_STATE_EXPORT_SIZE},
+        {"SHA384", "1f051f47c1b29006383bbc07f0f14b4cb81bac3c78604e2164e89acddf701264f9b5664686412b17624f67baf3af28a7",
+            SYMCRYPT_SHA384_STATE_EXPORT_SIZE},
+        {"SHA512", "070820b341fd2a45d28b390e67e3f3e4ce30c5b345540e1f587ccfbe94e22c3079f6c28e906b95871a21d1871a198c581ee9a71b7bcaec5f542d026f5dc87183",
+            SYMCRYPT_SHA512_STATE_EXPORT_SIZE},
+#if OPENSSL_VERSION_MAJOR == 3
+        {"SHA512-224", "ff3da53a61923d460f85f98de06c6312092d0be3712ee611c4fe0a19",
+            SYMCRYPT_SHA512_224_STATE_EXPORT_SIZE},
+        {"SHA512-256", "036dbd97db1e37aabe6ded8ef9ead203e9adb02ad5596ac5af072dd7374993a0",
+            SYMCRYPT_SHA512_256_STATE_EXPORT_SIZE},
+        {"SHA3-224", "489a032b8923a05eca5b40f2ed9838f218c65bd082acc48fa2067213",
+            SYMCRYPT_SHA3_224_STATE_EXPORT_SIZE},
+        {"SHA3-256", "375e793a6d4e4947658e78cb697789434b8279feb2ec9595d03e44473ac478f6",
+            SYMCRYPT_SHA3_256_STATE_EXPORT_SIZE},
+        {"SHA3-384", "1d47002a9e96d5b6bdd70d476fd2038e50ac3eb0d4202b4eb988f02185fbb9c85cb7ed62804ddaff894e84d62e5832f2",
+            SYMCRYPT_SHA3_384_STATE_EXPORT_SIZE},
+        {"SHA3-512", "bf63544ae59243a5419a3ff5f598352eb1409d41dc746c9e9d5f258cddaff4e7f7b9d9ae13e90eb07f27e4e157b3fcf796f6554732a2e78a621f7313aba827f3",
+            SYMCRYPT_SHA3_512_STATE_EXPORT_SIZE},
+#endif
+    };
+
+    for (i = 0; i < sizeof(digest_test_cases)/sizeof(digest_test_cases[0]); i++)
+    {
+        // Convert expected hex string to binary
+        for (int j = 0; digest_test_cases[i].expected[j] != '\0' && digest_test_cases[i].expected[j + 1] != '\0'; j += 2)
+        {
+            expected_md_value[j / 2] = OPENSSL_hexchar2int(digest_test_cases[i].expected[j]) << 4 |
+                                       OPENSSL_hexchar2int(digest_test_cases[i].expected[j + 1]);
+        }
+
+        TestDigest(digest_test_cases[i].digestname, expected_md_value);
+
+#if OPENSSL_VERSION_MAJOR == 3
+        if (!useEngine && digest_test_cases[i].export_state_size > 0)
+        {
+            TestDigestImportExport(digest_test_cases[i].digestname, expected_md_value, digest_test_cases[i].export_state_size);
+        }
+#endif
+    }
 
     unsigned char md1[SHA256_DIGEST_LENGTH]; // 32 bytes
     SHA256_CTX context;
@@ -1377,15 +1565,15 @@ void TestAesXts()
 {
     unsigned char plaintext[8192];
     int plaintext_len = 64;
-    unsigned char iv[8];
+    unsigned char iv[16];
     unsigned char key[64];
 
     while(!RAND_bytes(key, 64));
-    while(!RAND_bytes(iv, 8));
+    while(!RAND_bytes(iv, 16));
     while(!RAND_bytes(plaintext, plaintext_len));
 
-    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 32, iv, 8, plaintext, plaintext_len);
-    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 64, iv, 8, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_128_xts", EVP_aes_128_xts(), key, 32, iv, 16, plaintext, plaintext_len);
+    TestAesCipher("EVP_aes_256_xts", EVP_aes_256_xts(), key, 64, iv, 16, plaintext, plaintext_len);
 
     printf("%s", SeparatorLine);
     return;
@@ -2300,19 +2488,85 @@ end:
 
 int main(int argc, char** argv)
 {
+#if OPENSSL_VERSION_MAJOR == 3
+    OSSL_PROVIDER *symcrypt_provider = NULL;
+#endif
     int scossl_log_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
     int scossl_ossl_ERR_level = SCOSSL_LOG_LEVEL_NO_CHANGE;
-    if (argc >= 2) {
-        scossl_log_level = atoi(argv[1]);
+    bool useEngine = true;
+
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "--log-level") == 0)
+        {
+            if (argc < ++i)
+            {
+                printf("Missing log level");
+                return 0;
+            }
+
+            scossl_log_level = atoi(argv[i]);
+        }
+        else if (strcmp(argv[i], "--err-level") == 0)
+        {
+            if (argc < ++i)
+            {
+                printf("Missing log level");
+                return 0;
+            }
+
+            scossl_ossl_ERR_level = atoi(argv[i]);
+        }
+#if OPENSSL_VERSION_MAJOR == 3
+        else if (strcmp(argv[i], "--provider-path") == 0)
+        {
+            if (argc < ++i)
+            {
+                printf("Missing provider path");
+                return 0;
+            }
+
+            if (!OSSL_PROVIDER_set_default_search_path(NULL, argv[i]))
+            {
+                {
+                    handleOpenSSLError("Failed to set provider path");
+                    return 0;
+                }
+            }
+
+            if ((symcrypt_provider = OSSL_PROVIDER_load(NULL, "symcryptprovider")) == NULL)
+            {
+                handleOpenSSLError("Failed to load symcrypt provider");
+                return 0;
+            }
+        }
+        else if (strcmp(argv[i], "--no-engine") == 0)
+        {
+            useEngine = false;
+        }
+#endif
+        else if (strcmp(argv[i], "--help") == 0)
+        {
+            printf("Usage: SslPlay <options>\n");
+            printf("Options:\n");
+            printf("  --log-level <log level>           Specify the SCOSSL logging level\n");
+            printf("  --err-level <err level>           Specify the SCOSSL error logging level\n");
+#if OPENSSL_VERSION_MAJOR == 3
+            printf("  --provider-path <provider path>   Specify a directory to locate the symcrypt provider\n");
+            printf("  --no-engine                       Disable the SymCrypt engine for testing\n");
+#endif
+            return 0;
+        }
     }
-    if (argc >= 3) {
-        scossl_ossl_ERR_level = atoi(argv[2]);
-    }
+
     SCOSSL_set_trace_level(scossl_log_level, scossl_ossl_ERR_level);
-    SCOSSL_ENGINE_Initialize();
+    if (useEngine)
+    {
+        SCOSSL_ENGINE_Initialize();
+    }
     bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
 
-    TestDigests();
+    TestDigests(useEngine);
     TestCiphers();
     TestHKDF();
     TestTls1Prf();
@@ -2323,6 +2577,10 @@ int main(int argc, char** argv)
 
 #ifdef SCOSSL_SSHKDF
     TestSshKdf();
+#endif
+
+#if OPENSSL_VERSION_MAJOR == 3
+    OSSL_PROVIDER_unload(symcrypt_provider);
 #endif
 
     BIO_free(bio_err);

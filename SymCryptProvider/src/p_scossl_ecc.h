@@ -1,8 +1,7 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
-
-#include "scossl_helpers.h"
+#include "p_scossl_base.h"
 #ifdef KEYSINUSE_ENABLED
 #include "p_scossl_keysinuse.h"
 #endif
@@ -40,10 +39,21 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
-// Helper function for retrieving the properly formatted encoded public key.
-// The format differs for x25519 keys. Caller is responsible for freeing *ppbEncodedKey.
-SCOSSL_STATUS p_scossl_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                  _Inout_ PBYTE *ppbEncodedKey, _Inout_ SIZE_T *pcbEncodedKey);
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(_In_ SCOSSL_PROVCTX *provctx);
+void p_scossl_ecc_free_ctx(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
+SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
+
+SCOSSL_STATUS p_scossl_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const char *groupName);
+
+SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
+
+SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL isEcdh);
+SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
+SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
+                                           _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+SCOSSL_STATUS p_scossl_ecc_set_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+                                           _In_reads_bytes_opt_(cbEncodedPublicKey) PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
+                                           _In_reads_bytes_opt_(cbEncodedPrivateKey) PCBYTE pbEncodedPrivateKey, SIZE_T cbEncodedPrivateKey);
 
 #ifdef KEYSINUSE_ENABLED
 void p_scossl_ecc_init_keysinuse(_In_ SCOSSL_ECC_KEY_CTX *keyCtx);
