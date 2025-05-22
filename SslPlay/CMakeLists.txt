@@ -13,6 +13,11 @@ add_executable (SslPlay
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fhardened")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhardened")
+endif()
+
 if (SCOSSL_SSHKDF)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
