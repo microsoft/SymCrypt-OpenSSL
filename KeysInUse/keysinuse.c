@@ -14,7 +14,6 @@
 #endif
 
 #include <openssl/lhash.h>
-#include <openssl/proverr.h>
 
 #include <scossl_helpers.h>
 
@@ -42,10 +41,15 @@ typedef struct
 static unsigned long scossl_keysinuse_ctx_hash(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx);
 static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx1, _In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx2);
 
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
-    DEFINE_LHASH_OF(SCOSSL_KEYSINUSE_CTX_IMP);
-#else
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR > 0
     DEFINE_LHASH_OF_EX(SCOSSL_KEYSINUSE_CTX_IMP);
+#else
+    DEFINE_LHASH_OF(SCOSSL_KEYSINUSE_CTX_IMP);
+#endif
+
+#if OPENSSL_VERSION_MAJOR < 3
+    IMPLEMENT_LHASH_DOALL_ARG(SCOSSL_KEYSINUSE_CTX_IMP, VOID);
+    #define lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_void
 #endif
 
 // All keysinuse contexts are created and destroyed by the keysinuse module.
@@ -411,12 +415,11 @@ SCOSSL_STATUS keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_
 _Use_decl_annotations_
 SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
 {
-    EVP_MD *md = NULL;
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
     UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
     SCOSSL_KEYSINUSE_CTX_IMP *ctx = NULL;
-    int lhErr;
+    int lhErr = 0;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (!keysinuse_is_running() ||
@@ -426,13 +429,7 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKe
         return NULL;
     }
 
-    if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
-    {
-        keysinuse_log_error("EVP_MD_fetch failed,OPENSSL_%d", ERR_get_error());
-        goto cleanup;
-    }
-
-    if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, md, NULL) <= 0)
+    if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, EVP_sha256(), NULL) <= 0)
     {
         keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
         goto cleanup;
@@ -515,8 +512,6 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKe
     status = SCOSSL_SUCCESS;
 
 cleanup:
-    EVP_MD_free(md);
-
     if (status != SCOSSL_SUCCESS)
     {
         keysinuse_free_key_ctx(ctx);
