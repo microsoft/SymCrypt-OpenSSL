@@ -62,7 +62,7 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
 
 ### Key Exchange
 - DH (Named groups only)
-    - ffdhe2048, ffdhe3072, ffdhe4096
+    - ffdhe2048, ffdhe3072, ffdhe4096, ffdhe6144, ffdhe8192
     - modp2048, modp3072, modp4096
 - ECDH (Named curves only)
     - P-192, P-224, P-256, P-384, P-521
