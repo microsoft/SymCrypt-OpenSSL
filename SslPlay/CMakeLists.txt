@@ -13,12 +13,6 @@ add_executable (SslPlay
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
-if (CMAKE_SYSTEM_PROCESSOR MATCHES AMD64)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wl,-z,now -fstack-protector-strong -fstack-clash-protection")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -Wl,-z,now -fstack-protector-strong -fstack-clash-protection")
-    target_compile_definitions(SslPlay PUBLIC _FORTIFY_SOURCE=2)
-endif()
-
 if (SCOSSL_SSHKDF)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSCOSSL_SSHKDF")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSCOSSL_SSHKDF")
