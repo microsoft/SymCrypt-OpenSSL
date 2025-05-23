@@ -7,29 +7,39 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <ftw.h>
 #include <stdio.h>
 #include <sys/stat.h>
+
+#ifndef KEYSINUSE_LOG_SYSLOG
+    #include <ftw.h>
+#endif
 
 #include "scossl_helpers.h"
 #include "keysinuse.h"
 
-#include <openssl/core_names.h>
-#include <openssl/encoder.h>
-#include <openssl/provider.h>
 #include <openssl/evp.h>
+
+#if OPENSSL_VERSION_MAJOR >= 3
+    #include <openssl/core_names.h>
+    #include <openssl/provider.h>
+#endif
 
 #define KEYSINUSE_TEST_LOG_DELAY 2 // seconds
 // Time to wait for the log thread to finish writing
 #define KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME 200 * 1000 // 200 milliseconds
-#define KEYSINUSE_TEST_ROOT "keysinuse_test_root"
-#define KEYSINUSE_LOG_DIR "/var/log/keysinuse"
-#define KEYSINUSE_LOG_FILE KEYSINUSE_LOG_DIR "/keysinuse_not_00000000.log"
+
 #define KEYSINUSE_TEST_SIGN_PLAINTEXT_SIZE 256
 #define KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE 64
 #define SCOSSL_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
 
+#ifndef KEYSINUSE_LOG_SYSLOG
+    #define KEYSINUSE_TEST_ROOT "keysinuse_test_root"
+    #define KEYSINUSE_LOG_DIR "/var/log/keysinuse"
+    #define KEYSINUSE_LOG_FILE KEYSINUSE_LOG_DIR "/keysinuse_not_00000000.log"
+#endif
+
 static bool logVerbose = false;
+static bool checkSyslog = false;
 
 using namespace std;
 
@@ -76,24 +86,64 @@ static void _test_log_openssl_err(const char *file, int line, const char *messag
 #define TEST_LOG_OPENSSL_ERROR(...) _test_log_openssl_err(__FILE__, __LINE__, __VA_ARGS__);
 #define TEST_LOG_VERBOSE(...) if (logVerbose) printf(__VA_ARGS__);
 
-static const UINT32 rsaTestSizes[] = {
-    2048,
-    3072,
-    4096};
+typedef struct
+{
+    const int keyType;
+    const int keygenParams; // Type specific keygen params. Key size for RSA, group nid for ECDSA
+    EVP_PKEY *pkey;
+    PBYTE pbEncodedKey;
+    SIZE_T cbEncodedKey;
+    char pbKeyId[SCOSSL_KEYID_SIZE];
+} KEYSINUSE_TEST_KEY;
 
-static const char *eccTestGroups[] = {
-    SN_X9_62_prime192v1,
-    SN_secp224r1,
-    SN_X9_62_prime256v1,
-    SN_secp384r1,
-    SN_secp521r1,
-    SN_X25519};
+static KEYSINUSE_TEST_KEY testKeys[] = {
+    {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
+#if OPENSSL_VERSION_MAJOR >= 3
+    {EVP_PKEY_X25519,   0,                      nullptr, nullptr, 0, {}},
+#endif
+    {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp521r1,          nullptr, nullptr, 0, {}}};
 
 static char *processName;
 static time_t processStartTime;
 
+#if OPENSSL_VERSION_MAJOR < 3
+// OpenSSL 1.1.1 doesn't natively support EVP_PKEY duplication.
+// This function duplicates the EVP_PKEY by exporting and re-importing
+// the key into a new EVP_PKEY structure.
+EVP_PKEY *EVP_PKEY_dup(EVP_PKEY *pkey)
+{
+    EVP_PKEY *pkeyCopy = nullptr;
+    unsigned char *pbKey = nullptr;
+    SIZE_T cbKey = 0;
+
+    if (!i2d_PrivateKey(pkey, &pbKey))
+    {
+        TEST_LOG_OPENSSL_ERROR("Failed to convert private key to DER format")
+        goto cleanup;
+    }
+
+    if (!d2i_PrivateKey(EVP_PKEY_id(pkey), &pkeyCopy, (const unsigned char **)&pbKey, cbKey))
+    {
+        TEST_LOG_OPENSSL_ERROR("Failed to convert DER format to private key")
+        goto cleanup;
+    }
+
+cleanup:
+    OPENSSL_free(pbKey);
+
+    return pkeyCopy;
+}
+#endif
+
 static void keysinuse_test_cleanup()
 {
+#ifndef KEYSINUSE_LOG_SYSLOG
     int nftwCleanupRes;
 
     nftwCleanupRes = nftw(KEYSINUSE_TEST_ROOT,
@@ -113,6 +163,13 @@ static void keysinuse_test_cleanup()
     {
         TEST_LOG_ERROR("Failed to cleanup testing root: %d", nftwCleanupRes)
     }
+#endif
+
+    for (int i = 0; i < sizeof(testKeys) / sizeof(testKeys[0]); i++)
+    {
+        EVP_PKEY_free(testKeys[i].pkey);
+        OPENSSL_free(testKeys[i].pbEncodedKey);
+    }
 }
 
 static bool isNumeric(const char *str)
@@ -129,9 +186,12 @@ static bool isNumeric(const char *str)
 
 static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], KEYSINUSE_EXPECTED_EVENT expectedEvents[], int numExpectedEvents)
 {
+    FILE *logOutput = nullptr;
     struct stat sb;
-    ifstream logFile(KEYSINUSE_LOG_FILE);
-    string curLine;
+    char *pbLine = nullptr;
+    char *curLine = nullptr;
+    SIZE_T cbLine = 0;
+    ssize_t cbRead = 0;
     char *pbExpectedHeader = nullptr;
     char *pbHeader;
     char *pbBody;
@@ -142,7 +202,29 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
 
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-    if (!logFile.is_open() ||
+#ifdef KEYSINUSE_LOG_SYSLOG
+    char journalCtlCommand[64];
+
+    if (sprintf(journalCtlCommand, "/usr/bin/journalctl -t keysinuse -n %d", numExpectedEvents) < 0)
+    {
+        TEST_LOG_ERROR("Failed to create journalctl command")
+        goto cleanup;
+    }
+
+    if ((logOutput = popen(journalCtlCommand, "r")) == NULL)
+    {
+        TEST_LOG_ERROR("Failed to run journalctl: %d", errno)
+        goto cleanup;
+    }
+
+    // First line of journalctl is informational and should be skipped
+    if (getline(&pbLine, &cbLine, logOutput) < 0)
+    {
+        TEST_LOG_ERROR("No output from journalctl")
+        goto cleanup;
+    }
+#else
+    if ((logOutput = fopen(KEYSINUSE_LOG_FILE, "r")) == NULL ||
         stat(KEYSINUSE_LOG_FILE, &sb) == -1)
     {
         TEST_LOG_ERROR("Failed to open log file: %d", errno)
@@ -154,19 +236,31 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
         TEST_LOG_ERROR("Log file permissions are not 0200: %o", (sb.st_mode & 0777))
         goto cleanup;
     }
+#endif
 
     // Read and validate the first line's header. The rest of the lines
     // should match exactly.
-    if (!getline(logFile, curLine))
+    if ((cbRead = getline(&pbLine, &cbLine, logOutput)) < 0)
     {
-        TEST_LOG_ERROR("Failed to read line 0 of log file")
+        TEST_LOG_ERROR("Reached end of log file before expected.")
         goto cleanup;
     }
+    curLine = pbLine;
 
-    TEST_LOG_VERBOSE("\t\t1: %s\n", curLine.c_str());
+    pbLine[cbRead - 1] = '\0'; // Remove the newline character
+    TEST_LOG_VERBOSE("\t\t1: %s\n", curLine);
 
-    pbHeader = strtok((char *)curLine.c_str(), "!");
+#ifdef KEYSINUSE_LOG_SYSLOG
+    // Skip past the syslog header first
+    pbHeader = strpbrk(curLine, "]");
+    pbHeader += 3;
+    pbHeader = strtok(pbHeader, "!");
+#else
+    pbHeader = strtok(curLine, "!");
+#endif
     pbBody = strtok(nullptr, "");
+
+
     if (pbHeader == NULL || pbBody == NULL)
     {
         TEST_LOG_ERROR("Failed to parse log file header")
@@ -218,16 +312,23 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
     {
         if (i != 0)
         {
-            if (!getline(logFile, curLine))
+            if ((cbRead = getline(&curLine, &cbLine, logOutput)) < 0)
             {
-                TEST_LOG_ERROR("Expected to read line %d of log file but reached end of log.", i + 1)
+                TEST_LOG_ERROR("Reached end of log file before expected.")
                 goto cleanup;
             }
 
-            TEST_LOG_VERBOSE("\t\t%d: %s\n", i + 1, curLine.c_str())
+            pbLine[cbRead - 1] = '\0'; // Remove the newline character
+            TEST_LOG_VERBOSE("\t\t1: %s\n", curLine);
 
-            pbHeader = strtok((char *)curLine.c_str(), "!");
-            pbBody = strtok(nullptr, "");
+#ifdef KEYSINUSE_LOG_SYSLOG
+            // Skip past the syslog header first
+            pbHeader = strpbrk(curLine, "]");
+            pbHeader += 3;
+            pbHeader = strtok(pbHeader, "!");
+#else
+            pbHeader = strtok(curLine, "!");
+#endif
 
             if (pbHeader == NULL || pbBody == NULL)
             {
@@ -316,7 +417,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
         }
 
         // Check last log time
-        if ((pbCurToken = strtok(nullptr, ",")) == NULL)
+        if ((pbCurToken = strtok(nullptr, "")) == NULL)
         {
             TEST_LOG_ERROR("Failed to parse last log time.");
             goto cleanup;
@@ -352,7 +453,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
         }
     }
 
-    if (getline(logFile, curLine))
+    if (getline(&curLine, &cbLine, logOutput) >= 0)
     {
         TEST_LOG_ERROR("Log file has more lines than expected.")
         goto cleanup;
@@ -362,12 +463,22 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
 
 cleanup:
 
+    if (logOutput != NULL)
+    {
+#ifdef KEYSINUSE_LOG_SYSLOG
+        pclose(logOutput);
+#else
+        fclose(logOutput);
+#endif
+    }
+
     free(pbExpectedHeader);
+    free(pbLine);
 
     return ret;
 }
 
-SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicKey, char pbKeyId[SCOSSL_KEYID_SIZE], BOOL testSign)
+SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicKey, char pbKeyId[SCOSSL_KEYID_SIZE], keysinuse_operation operation)
 {
     SCOSSL_KEYSINUSE_CTX *keysinuseCtx = NULL;
     // Second keysinuse context loaded with the same key bytes
@@ -415,34 +526,14 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
 
     // Test three consecutive uses. The first event should be logged.
     // The second event should only be logged after the elapsed wait time.
-    if (testSign)
-    {
-        // Test sign
-        keysinuse_on_use(keysinuseCtx, KEYSINUSE_SIGN);
-        expectedEvents[0].signCount = 1;
+    keysinuse_on_use(keysinuseCtx, operation);
 
-        // Wait a little to allow the logging thread to process the event
-        usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
+    // Wait a little to allow the logging thread to process the event
+    usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-        // Test second sign. Only the first event should be logged.
-        keysinuse_on_use(keysinuseCtx, KEYSINUSE_SIGN);
-        keysinuse_on_use(keysinuseCtxCopyByRef, KEYSINUSE_SIGN);
-        expectedEvents[1].signCount = 2;
-    }
-    else
-    {
-        // Test decrypt
-        keysinuse_on_use(keysinuseCtx, KEYSINUSE_DECRYPT);
-        expectedEvents[0].decryptCount = 1;
-
-        // Wait a little to allow the logging thread to process the event
-        usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
-
-        // Test second decrypt. Only the first event should be logged.
-        keysinuse_on_use(keysinuseCtx, KEYSINUSE_DECRYPT);
-        keysinuse_on_use(keysinuseCtxCopyByRef, KEYSINUSE_DECRYPT);
-        expectedEvents[1].decryptCount = 2;
-    }
+    // Test second sign. Only the first event should be logged.
+    keysinuse_on_use(keysinuseCtx, operation);
+    keysinuse_on_use(keysinuseCtxCopyByRef, operation);
 
     // Unload all references to the key. Pending events should still be logged
     // after the after the unload.
@@ -464,21 +555,27 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
     }
 
     // Test key use again, this event should be immediately logged
-    if (testSign)
+    keysinuse_on_use(keysinuseCtxCopy, operation);
+
+    if (operation == KEYSINUSE_SIGN)
     {
-        keysinuse_on_use(keysinuseCtxCopy, KEYSINUSE_SIGN);
+        expectedEvents[0].signCount = 1;
+        expectedEvents[1].signCount = 2;
         expectedEvents[2].signCount = 1;
     }
     else
     {
-        keysinuse_on_use(keysinuseCtxCopy, KEYSINUSE_DECRYPT);
+        expectedEvents[0].decryptCount = 1;
+        expectedEvents[1].decryptCount = 2;
         expectedEvents[2].decryptCount = 1;
     }
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+#ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
+#endif
 
 cleanup:
     keysinuse_unload_key(keysinuseCtx);
@@ -661,7 +758,9 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+#ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
+#endif
 
 cleanup:
     OSSL_PARAM_free(params);
@@ -869,7 +968,9 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[S
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+#ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
+#endif
 
 cleanup:
     OSSL_PARAM_free(params);
@@ -948,7 +1049,7 @@ SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL
         goto cleanup;
     }
 
-    if (EVP_PKEY_sign_init(ctx) <= 0)
+    if (EVP_PKEY_sign_init(ctxCopyByRef) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_sign_init failed")
         goto cleanup;
@@ -1035,7 +1136,9 @@ SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+#ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
+#endif
 
 cleanup:
     EVP_PKEY_CTX_free(ctx);
@@ -1165,16 +1268,10 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCO
 
     // Test second and third decrypt. Only the first event should be logged.
     cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0 ||
+        EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
-        goto cleanup;
-    }
-
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
         goto cleanup;
     }
     expectedEvents[1].decryptCount = 2;
@@ -1228,7 +1325,9 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCO
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+#ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
+#endif
 
 cleanup:
     EVP_PKEY_CTX_free(ctx);
@@ -1247,118 +1346,111 @@ cleanup:
 // encoded public key bytes is returned, and 0 is returned on error. The default
 // provider will be explicitly used for this step to ensure any regressions in
 // the tested provider(s) key encoding logic are caught by the tests.
-SIZE_T keysinuse_test_generate_key(_In_ const char *algName, _In_ const OSSL_PARAM params[],
-                                   _Out_ EVP_PKEY **ppkey,
-                                   _Out_ PBYTE *ppbKey, _Out_ char pbKeyId[SCOSSL_KEYID_SIZE])
+SCOSSL_STATUS keysinuse_test_generate_keys()
 {
+    unsigned char pbKeyHash[SYMCRYPT_SHA256_RESULT_SIZE];
+    int cbPublicKey = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     EVP_PKEY_CTX *ctx = NULL;
-    EVP_PKEY *pkey = NULL;
-    EVP_MD *md = NULL;
-    OSSL_ENCODER_CTX *encoderCtx = NULL;
-    BYTE pbKeyIdBytes[SYMCRYPT_SHA256_RESULT_SIZE];
-    PBYTE pbKey = NULL;
-    SIZE_T cbKey = 0;
 
-    // Generate key with parameters
-    if ((ctx = EVP_PKEY_CTX_new_from_name(NULL, algName, "provider=default")) == NULL)
+    for (int i = 0; i < sizeof(testKeys) / sizeof(testKeys[0]); i++)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new_from_name failed")
-        goto cleanup;
+        if ((ctx = EVP_PKEY_CTX_new_id(testKeys[i].keyType, NULL)) == NULL)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_new_id failed")
+            goto cleanup;
+        }
+        
+        if (EVP_PKEY_keygen_init(ctx) <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen_init failed")
+            goto cleanup;
+        }
+
+        if (testKeys[i].keyType == EVP_PKEY_RSA)
+        {
+            if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, testKeys[i].keygenParams) <= 0)
+            {
+                TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_rsa_keygen_bits failed")
+                goto cleanup;
+            }
+        }
+        else if (testKeys[i].keyType == EVP_PKEY_EC)
+        {
+            if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, testKeys[i].keygenParams) <= 0)
+            {
+                TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_ec_paramgen_curve_nid failed")
+                goto cleanup;
+            }
+        }
+        
+        if (EVP_PKEY_keygen(ctx, &testKeys[i].pkey) <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen failed")
+            goto cleanup;
+        }
+        
+        // Encode the public key
+        cbPublicKey = i2d_PublicKey(testKeys[i].pkey, &testKeys[i].pbEncodedKey);
+        if (cbPublicKey <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("i2d_PublicKey failed")
+            goto cleanup;
+        }
+        testKeys[i].cbEncodedKey = cbPublicKey;
+
+        if (EVP_Digest(testKeys[i].pbEncodedKey, testKeys[i].cbEncodedKey, pbKeyHash, NULL, EVP_sha256(), NULL) <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_Digest failed")
+            goto cleanup;
+        }
+
+        for (int j = 0; j < SYMCRYPT_SHA256_RESULT_SIZE / 2; j++)
+        {
+            sprintf(&testKeys[i].pbKeyId[j*2], "%02x", pbKeyHash[j]);
+        }
+        testKeys[i].pbKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
+    
+        EVP_PKEY_CTX_free(ctx);
+        ctx = NULL;
     }
 
-    if (EVP_PKEY_keygen_init(ctx) <= 0)
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen_init failed")
-        goto cleanup;
-    }
-
-    if (!EVP_PKEY_CTX_set_params(ctx, params))
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_params failed")
-        goto cleanup;
-    }
-
-    if (EVP_PKEY_keygen(ctx, &pkey) <= 0)
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen failed")
-        goto cleanup;
-    }
-
-    if ((cbKey = i2d_PublicKey(pkey, &pbKey)) <= 0)
-    {
-        TEST_LOG_OPENSSL_ERROR("i2d_PublicKey failed")
-        goto cleanup;
-    }
-
-    if ((md = EVP_MD_fetch(NULL, "SHA256", "provider=default")) == NULL)
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_MD_fetch failed")
-        goto cleanup;
-    }
-
-    if (EVP_Digest(pbKey, cbKey, pbKeyIdBytes, NULL, md, NULL) <= 0)
-    {
-        TEST_LOG_OPENSSL_ERROR("EVP_Digest failed")
-        goto cleanup;
-    }
-
-    for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
-    {
-        sprintf(&pbKeyId[i*2], "%02x", pbKeyIdBytes[i]);
-    }
-    pbKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
-
-    *ppkey = pkey;
-    *ppbKey = pbKey;
-    pbKey = NULL;
-    pkey = NULL;
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
-    OSSL_ENCODER_CTX_free(encoderCtx);
-    EVP_MD_free(md);
-    OPENSSL_free(pbKey);
-
-    return pbKey == NULL ? cbKey : 0;
+    return ret;
 }
 
-SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName, BOOL testSign,
-                                  vector<ENGINE *> engines, vector<PVOID> providers)
+SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, keysinuse_operation operation,
+                                       vector<ENGINE *> engines, vector<PVOID> providers)
 {
-    EVP_PKEY *pkey = NULL;
-    PBYTE pbEncodedKey = NULL;
-    SIZE_T cbEncodedKey = 0;
-    char pbKeyId[SCOSSL_KEYID_SIZE];
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
-    // Generate key
-    if ((cbEncodedKey = keysinuse_test_generate_key("RSA", params, &pkey, &pbEncodedKey, pbKeyId)) == 0)
-    {
-        goto cleanup;
-    }
 
     if (logVerbose)
     {
-        for(SIZE_T i = 0; i < cbEncodedKey; i++)
+        for(SIZE_T i = 0; i < testKey.cbEncodedKey; i++)
         {
             if (i % 15 == 0)
             {
                 printf("\t");
             }
 
-            printf("%02x%s", pbEncodedKey[i], (i < cbEncodedKey - 1) ? ":" : "\n");
+            printf("%02x%s", testKey.pbEncodedKey[i], (i < testKey.cbEncodedKey - 1) ? ":" : "\n");
 
-            if (i % 15 == 14 && i < cbEncodedKey - 1)
+            if (i % 15 == 14 && i < testKey.cbEncodedKey - 1)
             {
                 printf("\n");
             }
         }
     }
-    TEST_LOG_VERBOSE("\n\tKeyId: %s\n\n", pbKeyId)
+    TEST_LOG_VERBOSE("\n\tKeyId: %s\n\n", testKey.pbKeyId)
 
     printf("\tTesting KeysInUse API functions\n");
-    keysinuse_test_api_functions(pbEncodedKey, cbEncodedKey, pbKeyId, testSign);
+    if (keysinuse_test_api_functions(testKey.pbEncodedKey, testKey.cbEncodedKey, testKey.pbKeyId, operation) == SCOSSL_FAILURE)
+    {
+        return SCOSSL_FAILURE;
+    }
 
     // Wait for logging delay to ensure the logging thread has cleaned up
     // the keysinuse info created in keysinuse_test_api_functions
@@ -1367,13 +1459,19 @@ SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName,
     for (ENGINE *engine : engines)
     {
         printf("\tTesting engine (%s) functions\n", ENGINE_get_id(engine));
-        if (testSign)
+        if (operation == KEYSINUSE_SIGN)
         {
-            keysinuse_test_engine_sign(pkey, pbKeyId, engine);
+            if (keysinuse_test_engine_sign(testKey.pkey, testKey.pbKeyId, engine) == SCOSSL_FAILURE)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
         else
         {
-            keysinuse_test_engine_decrypt(pkey, pbKeyId, engine);
+            if (keysinuse_test_engine_decrypt(testKey.pkey, testKey.pbKeyId, engine) == SCOSSL_FAILURE)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
     }
 
@@ -1384,24 +1482,98 @@ SCOSSL_STATUS keysinuse_run_tests(const OSSL_PARAM *params, const char *algName,
     {
         const char *providerName = OSSL_PROVIDER_get0_name((OSSL_PROVIDER *)provider);
         printf("\tTesting provider (%s) functions\n", providerName);
-        if (testSign)
+        if (operation == KEYSINUSE_SIGN)
         {
-            keysinuse_test_provider_sign(pkey, pbKeyId, string(providerName));
+            if (keysinuse_test_provider_sign(testKey.pkey, testKey.pbKeyId, string(providerName)) == SCOSSL_FAILURE)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
         else
         {
-            keysinuse_test_provider_decrypt(pkey, pbKeyId, string(providerName));
+            if (keysinuse_test_provider_decrypt(testKey.pkey, testKey.pbKeyId, string(providerName)) == SCOSSL_FAILURE)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
     }
 #endif
 
+    return SCOSSL_SUCCESS;
+}
+
+SCOSSL_STATUS keysinuse_test_create_fakeroot()
+{
+#ifdef KEYSINUSE_LOG_SYSLOG
+    // No need to create a fake root for syslog logging
+    return SCOSSL_SUCCESS;
+#else
+    mode_t umaskOriginal;
+    char keysinuseLogDir[sizeof(KEYSINUSE_LOG_DIR)];
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    // Create fake root directory for testing. This ensures the log files
+    // aren't written by keysinuse running on the system.
+    umaskOriginal = umask(0);
+
+    if (mkdir(KEYSINUSE_TEST_ROOT, 0777) == 0 ||
+        errno == EEXIST)
+    {
+        if (chroot(KEYSINUSE_TEST_ROOT) == -1)
+        {
+            TEST_LOG_ERROR("Failed to chroot to testing root: %d", errno)
+            rmdir(KEYSINUSE_TEST_ROOT);
+            goto cleanup;
+        }
+    }
+    else
+    {
+        TEST_LOG_ERROR("Failed to create testing root: %d", errno)
+        goto cleanup;
+    }
+
+    // Create the keysinuse logging parent directories
+    for (int i = 0; i < sizeof(KEYSINUSE_LOG_DIR); i++)
+    {
+        keysinuseLogDir[i] = KEYSINUSE_LOG_DIR[i];
+        if (i > 0 && keysinuseLogDir[i] == '/')
+        {
+            keysinuseLogDir[i] = '\0';
+
+            if (mkdir(keysinuseLogDir, 0755) == -1 &&
+                errno != EACCES &&
+                errno != EEXIST)
+            {
+                TEST_LOG_ERROR("Failed to create parent of logging directory %s: %d", keysinuseLogDir, errno)
+                goto cleanup;
+            }
+            keysinuseLogDir[i] = '/';
+        }
+    }
+
+    // Create the keysinuse logging directory with expected permissions
+    if (mkdir(KEYSINUSE_LOG_DIR, 01733) == 0)
+    {
+        if (chown(KEYSINUSE_LOG_DIR, 0, 0) == -1)
+        {
+            TEST_LOG_ERROR("Failed to set ownership of logging directory: %d", errno)
+            rmdir(KEYSINUSE_LOG_DIR);
+            goto cleanup;
+        }
+    }
+    else if (errno != EACCES && errno != EEXIST)
+    {
+        TEST_LOG_ERROR("Failed to create logging directory: %d", errno)
+        goto cleanup;
+    }
+
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_free(pbEncodedKey);
-    EVP_PKEY_free(pkey);
+    umask(umaskOriginal);
 
     return ret;
+#endif
 }
 
 int main(int argc, char** argv)
@@ -1409,14 +1581,22 @@ int main(int argc, char** argv)
     ENGINE *engine = NULL;
     vector<ENGINE *> engines;
     vector<PVOID> providers;
-    mode_t umaskOriginal;
-    char keysinuseLogDir[sizeof(KEYSINUSE_LOG_DIR)];
+
     char pbKeyId[SCOSSL_KEYID_SIZE];
-    OSSL_PARAM params[2] = { OSSL_PARAM_END };
     int ret = 0;
+
+    keysinuse_test_cleanup();
 
     OPENSSL_init_crypto(0, NULL);
 
+    if (keysinuse_test_generate_keys() != SCOSSL_SUCCESS)
+    {
+        TEST_LOG_ERROR("Failed to generate keys")
+        goto cleanup;
+    }
+
+    // Loading engines and providers may push errors to the error stack
+    // that are not test failures and may lead to misleading error messages.
     ERR_set_mark();
 
     for (int i = 1; i < argc; i++)
@@ -1522,63 +1702,11 @@ int main(int argc, char** argv)
     processName = realpath(argv[0], NULL);
     processStartTime = time(NULL);
 
-    // Create fake root directory for testing. This ensures the log files
-    // aren't written by keysinuse running on the system.
-    umaskOriginal = umask(0);
-
-    keysinuse_test_cleanup();
-    if (mkdir(KEYSINUSE_TEST_ROOT, 0777) == 0 ||
-        errno == EEXIST)
+    if (keysinuse_test_create_fakeroot() == SCOSSL_FAILURE)
     {
-        if (chroot(KEYSINUSE_TEST_ROOT) == -1)
-        {
-            TEST_LOG_ERROR("Failed to chroot to testing root: %d", errno)
-            rmdir(KEYSINUSE_TEST_ROOT);
-            goto cleanup;
-        }
-    }
-    else
-    {
-        TEST_LOG_ERROR("Failed to create testing root: %d", errno)
+        TEST_LOG_ERROR("Failed to create fake root")
         goto cleanup;
     }
-
-    // Create the keysinuse logging parent directories
-    for (int i = 0; i < sizeof(KEYSINUSE_LOG_DIR); i++)
-    {
-        keysinuseLogDir[i] = KEYSINUSE_LOG_DIR[i];
-        if (i > 0 && keysinuseLogDir[i] == '/')
-        {
-            keysinuseLogDir[i] = '\0';
-
-            if (mkdir(keysinuseLogDir, 0755) == -1 &&
-                errno != EACCES &&
-                errno != EEXIST)
-            {
-                TEST_LOG_ERROR("Failed to create parent of logging directory %s: %d", keysinuseLogDir, errno)
-                goto cleanup;
-            }
-            keysinuseLogDir[i] = '/';
-        }
-    }
-
-    // Create the keysinuse logging directory with expected permissions
-    if (mkdir(KEYSINUSE_LOG_DIR, 01733) == 0)
-    {
-        if (chown(KEYSINUSE_LOG_DIR, 0, 0) == -1)
-        {
-            TEST_LOG_ERROR("Failed to set ownership of logging directory: %d", errno)
-            rmdir(KEYSINUSE_LOG_DIR);
-            goto cleanup;
-        }
-    }
-    else if (errno != EACCES && errno != EEXIST)
-    {
-        TEST_LOG_ERROR("Failed to create logging directory: %d", errno)
-        goto cleanup;
-    }
-
-    umask(umaskOriginal);
 
     if (!keysinuse_is_running())
     {
@@ -1586,35 +1714,33 @@ int main(int argc, char** argv)
         goto cleanup;
     }
 
-    // Test RSA sign
-    for (int i = 0; i < sizeof(rsaTestSizes) / sizeof(rsaTestSizes[0]); i++)
+    for (KEYSINUSE_TEST_KEY testKey : testKeys)
     {
-        printf("Testing RSA sign with size %d\n", rsaTestSizes[i]);
+        if (testKey.keyType == EVP_PKEY_RSA)
+        {
+            printf("Testing RSA sign with size %d\n", testKey.keygenParams);
+        }
+        else if (testKey.keyType == EVP_PKEY_EC)
+        {
+            printf("Testing ECDSA sign with curve %s\n", OBJ_nid2sn(testKey.keygenParams));
+        }
+        else if (testKey.keyType == EVP_PKEY_X25519)
+        {
+            printf("Testing X25519 sign\n");
+        }
 
-        params[0] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_BITS, (int *)&rsaTestSizes[i]);
-        if (keysinuse_run_tests(params, "RSA", TRUE, engines, providers) != SCOSSL_SUCCESS)
+        if (keysinuse_test_run_tests(testKey, KEYSINUSE_SIGN, engines, providers) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        printf("\nTesting RSA decrypt with size %d\n", rsaTestSizes[i]);
-        if (keysinuse_run_tests(params, "RSA", FALSE, engines, providers) != SCOSSL_SUCCESS)
+        if (testKey.keyType == EVP_PKEY_RSA)
         {
-            goto cleanup;
-        }
-
-        printf("\n");
-    }
-
-    // Test ECDSA/X25519 sign
-    for (int i = 0; i < sizeof(eccTestGroups) / sizeof(eccTestGroups[0]); i++)
-    {
-        printf("Testing ECDSA sign with group %s\n", eccTestGroups[i]);
-
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)eccTestGroups[i], sizeof(eccTestGroups[i]));
-        if (keysinuse_run_tests(params, "EC", TRUE, engines, providers) != SCOSSL_SUCCESS)
-        {
-            goto cleanup;
+            printf("\nTesting RSA decrypt with size %d\n", testKey.keygenParams);
+            if (keysinuse_test_run_tests(testKey, KEYSINUSE_DECRYPT, engines, providers) != SCOSSL_SUCCESS)
+            {
+                goto cleanup;
+            }
         }
 
         printf("\n");
@@ -1624,10 +1750,12 @@ int main(int argc, char** argv)
     ret = 1;
 
 cleanup:
+#if OPENSSL_VERSION_MAJOR >= 3
     for (PVOID provider : providers)
     {
         OSSL_PROVIDER_unload((OSSL_PROVIDER *)provider);
     }
+#endif
 
     for (ENGINE *e : engines)
     {
