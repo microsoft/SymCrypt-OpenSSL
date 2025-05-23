@@ -1121,6 +1121,7 @@ end:
 
 void TestRsaEvpAll()
 {
+    TestRsaEvp(512, 65537);
     TestRsaEvp(1024, 65537);
     TestRsaEvp(2048, 65537);
     TestRsaEvp(2049, 65537);
