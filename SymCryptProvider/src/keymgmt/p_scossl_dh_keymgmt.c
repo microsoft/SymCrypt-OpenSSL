@@ -560,6 +560,12 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
             case 4096:
                 dlGroupNid = NID_ffdhe4096;
                 break;
+            case 6144:
+                dlGroupNid = NID_ffdhe6144;
+                break;
+            case 8192:
+                dlGroupNid = NID_ffdhe8192;
+                break;
         }
 
         if (scossl_dh_get_group_by_nid(dlGroupNid, NULL, &genCtx->pDlGroup) != SCOSSL_SUCCESS)

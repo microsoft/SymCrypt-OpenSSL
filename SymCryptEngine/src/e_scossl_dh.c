@@ -11,8 +11,8 @@ extern "C" {
 
 int e_scossl_dh_idx = -1;
 
-// Largest supported safe-prime group is 4096b => 512 byte Public key
-#define SCOSSL_DH_MAX_PUBLIC_KEY_LEN (512)
+// Largest supported safe-prime group is 8192b => 1024 byte Public key
+#define SCOSSL_DH_MAX_PUBLIC_KEY_LEN (1024)
 
 typedef int (*PFN_DH_meth_generate_key) (DH*);
 typedef int (*PFN_DH_meth_compute_key)(unsigned char* key, const BIGNUM* pub_key, DH* dh);

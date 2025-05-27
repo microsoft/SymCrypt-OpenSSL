@@ -40,6 +40,8 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_ffdhe2048           0x0100
 #define SCOSSL_TLS_GROUP_ID_ffdhe3072           0x0101
 #define SCOSSL_TLS_GROUP_ID_ffdhe4096           0x0102
+#define SCOSSL_TLS_GROUP_ID_ffdhe6144           0x0103
+#define SCOSSL_TLS_GROUP_ID_ffdhe8192           0x0104
 #define SCOSSL_TLS_GROUP_ID_mlkem512            0x0200
 #define SCOSSL_TLS_GROUP_ID_mlkem768            0x0201
 #define SCOSSL_TLS_GROUP_ID_mlkem1024           0x0202
