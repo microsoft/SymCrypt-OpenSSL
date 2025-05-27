@@ -387,6 +387,13 @@ void TestRsaEncryptDecrypt(
         plaintext[0] &= 0xff >> (8 - ((EVP_PKEY_bits(encryptionKey) - 1) & 7));
     }
 
+    if (EVP_PKEY_bits(encryptionKey) <= 512 &&
+        padding == RSA_PKCS1_OAEP_PADDING)
+    {
+        printf("Skipping test: RSA key size ≤ 512 bits is not supported with OAEP padding\n");
+        goto end;
+    }
+
     //
     // Encrypt
     //
@@ -517,8 +524,14 @@ void TestRsaSignVerify(
     size_t message_digest_len = digest_length;
     int ret = 0;
 
-    while(!RAND_bytes(message_digest, digest_length));
+    if (EVP_PKEY_bits(signingKey) <= 512 &&
+        EVP_MD_size(digest) >= 32)
+    {
+        printf("Skipping test: key size ≤ 512 bits is not supported with SHA-256 or stronger digests\n");
+        goto end;
+    }
 
+    while(!RAND_bytes(message_digest, digest_length));
     printf("\nTesting EVP_PKEY_sign* Functions - PKCS1 PADDING\n\n");
     printf("Command EVP_PKEY_CTX_new\n");
     pSignContext = EVP_PKEY_CTX_new(signingKey, NULL);
@@ -653,6 +666,13 @@ void TestRsaDigestSignVerify(
     int AuthStatus = 0;
     EVP_PKEY_CTX *pSigningKeyContext = NULL;
     EVP_PKEY_CTX *pVerificationKeyContext = NULL;
+
+    if (EVP_PKEY_bits(signingKey) <= 512 &&
+        EVP_MD_size(digest) >= 32)
+    {
+        printf("Skipping test: key size ≤ 512 bits is not supported with SHA-256 or stronger digests\n");
+        goto end;
+    }
 
     printf("\nTesting DigestSign* Functions\n\n");
 
