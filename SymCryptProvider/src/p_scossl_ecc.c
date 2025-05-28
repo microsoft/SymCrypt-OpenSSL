@@ -203,8 +203,7 @@ SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx)
 
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
-    keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-    keyCtx->keysinuseInfo = NULL;
+    keyCtx->keysinuseCtx = NULL;
 #endif
 
     if (keyCtx->key != NULL)
@@ -618,14 +617,13 @@ cleanup:
 
 #ifdef KEYSINUSE_ENABLED
 _Use_decl_annotations_
-// TODO: Update to new APIs
 void p_scossl_ecc_init_keysinuse(SCOSSL_ECC_KEY_CTX *keyCtx)
 {
-    // Initialize keysinuse for private keys. Generated keys are
-    // ignored to avoid noise from ephemeral keys.
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey;
 
+    // Initialize keysinuse for private keys. Generated keys are
+    // ignored to avoid noise from ephemeral keys.
     if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
     {
         // KeysInUse related errors shouldn't surface to caller, including errors

@@ -166,8 +166,8 @@ void TestEcc()
     printf("%s", SeparatorLine);
 }
 
-// Largest supported dlgroup is ffdhe4096/MODP4096 => 512 byte shared secret is largest secret that can be generated
-#define SCOSSL_DH_SHARED_SECRET_MAX_LEN (512)
+// Largest supported dlgroup is ffdhe8192 => 1024 byte shared secret is largest secret that can be generated
+#define SCOSSL_DH_SHARED_SECRET_MAX_LEN (1024)
 
 void TestDhDlgroup(const BIGNUM* p)
 {
@@ -307,7 +307,14 @@ void TestDh()
     DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
     TestDhDlgroup(p_ffdhe);
     DH_free(dh_ffdhe);
-
+    dh_ffdhe = DH_new_by_nid(NID_ffdhe6144);
+    DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
+    TestDhDlgroup(p_ffdhe);
+    DH_free(dh_ffdhe);
+    dh_ffdhe = DH_new_by_nid(NID_ffdhe8192);
+    DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
+    TestDhDlgroup(p_ffdhe);
+    DH_free(dh_ffdhe);
     // Test an unsupported DH group
     TestDhDlgroup(NULL);
 
@@ -385,6 +392,13 @@ void TestRsaEncryptDecrypt(
         // PlainText value has to be less than RSA public modulus
         // We can just mask out the most significant bit
         plaintext[0] &= 0xff >> (8 - ((EVP_PKEY_bits(encryptionKey) - 1) & 7));
+    }
+
+    if (EVP_PKEY_bits(encryptionKey) <= 512 &&
+        padding == RSA_PKCS1_OAEP_PADDING)
+    {
+        printf("Skipping test: RSA key size ≤ 512 bits is not supported with OAEP padding\n");
+        goto end;
     }
 
     //
@@ -517,8 +531,14 @@ void TestRsaSignVerify(
     size_t message_digest_len = digest_length;
     int ret = 0;
 
-    while(!RAND_bytes(message_digest, digest_length));
+    if (EVP_PKEY_bits(signingKey) <= 512 &&
+        EVP_MD_size(digest) >= 32)
+    {
+        printf("Skipping test: key size ≤ 512 bits is not supported with SHA-256 or stronger digests\n");
+        goto end;
+    }
 
+    while(!RAND_bytes(message_digest, digest_length));
     printf("\nTesting EVP_PKEY_sign* Functions - PKCS1 PADDING\n\n");
     printf("Command EVP_PKEY_CTX_new\n");
     pSignContext = EVP_PKEY_CTX_new(signingKey, NULL);
@@ -653,6 +673,13 @@ void TestRsaDigestSignVerify(
     int AuthStatus = 0;
     EVP_PKEY_CTX *pSigningKeyContext = NULL;
     EVP_PKEY_CTX *pVerificationKeyContext = NULL;
+
+    if (EVP_PKEY_bits(signingKey) <= 512 &&
+        EVP_MD_size(digest) >= 32)
+    {
+        printf("Skipping test: key size ≤ 512 bits is not supported with SHA-256 or stronger digests\n");
+        goto end;
+    }
 
     printf("\nTesting DigestSign* Functions\n\n");
 
@@ -1121,6 +1148,7 @@ end:
 
 void TestRsaEvpAll()
 {
+    TestRsaEvp(512, 65537);
     TestRsaEvp(1024, 65537);
     TestRsaEvp(2048, 65537);
     TestRsaEvp(2049, 65537);

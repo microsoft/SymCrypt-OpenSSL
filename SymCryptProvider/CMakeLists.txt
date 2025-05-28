@@ -7,8 +7,14 @@ set(DEFAULT_BUILD_TYPE "Release")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unknown-pragmas")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra")
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
+
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
+
+find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 set(SCOSSL_SOURCES
     ./src/asymcipher/p_scossl_rsa_cipher.c
@@ -54,12 +60,6 @@ set(SCOSSL_SOURCES
 if (KEYSINUSE_ENABLED)
     list(APPEND SCOSSL_SOURCES ../KeysInUse/keysinuse.c)
 endif()
-
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
-
-find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
 add_dependencies(scossl_provider scossl_common)

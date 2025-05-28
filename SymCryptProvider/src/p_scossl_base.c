@@ -547,8 +547,6 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
 }
 
 #ifdef KEYSINUSE_ENABLED
-// TODO: Move config read to keysinuse_init
-// Always put keysinsue config in "/openssldir/keysinuse.conf"?.
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
     BOOL keysinuseEnabled = FALSE;

@@ -53,5 +53,6 @@ if (SYMCRYPT_FOUND)
     endif()
 endif()
 
+# SymCrypt not needed for just building the KeysInUse standalone library and test
 add_subdirectory (KeysInUse)
 add_subdirectory (test/KeysInUseTest)
