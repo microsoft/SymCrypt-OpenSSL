@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.13.0)
+include(CheckIncludeFile)
 
 project(SymCrypt-OpenSSL
     VERSION 1.10.0
@@ -14,15 +15,35 @@ if (SYMCRYPT_ROOT_DIR)
     set(SYMCRYPT_FOUND TRUE)
     include_directories(${SYMCRYPT_ROOT_DIR}/inc)
 else()
+    # Try to load SymCrypt from pkg-config
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
         pkg_check_modules(SYMCRYPT symcrypt>=${SYMCRYPT_MINIMUM_MAJOR}.${SYMCRYPT_MINIMUM_MINOR})
-        message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
-        include_directories(${SYMCRYPT_INCLUDE_DIRS})
-    else()
-        message(WARNING "Provide symcrypt pkg-config or set SYMCRYPT_ROOT_DIR variable")
+
+        if (SYMCRYPT_FOUND)
+            message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
+            include_directories(${SYMCRYPT_INCLUDE_DIRS})
+        endif()            
     endif()
-endif (SYMCRYPT_ROOT_DIR)
+
+    # Try to find installed SymCrypt
+    if (NOT SYMCRYPT_FOUND)
+        find_file(SYMCRYPT_HEADER "symcrypt.h" PATHS ${CMAKE_SOURCE_DIR})
+
+        # SymCrypt headers required for all projects, including KeysInUse
+        if (NOT SYMCRYPT_HEADER)
+            message(FATAL_ERROR "SymCrypt header file not found. Please set SYMCRYPT_ROOT_DIR or install SymCrypt headers.")
+        endif()
+        
+        find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
+        if (SYMCRYPT_LIBRARY)
+        set(SYMCRYPT_FOUND TRUE)
+            message(STATUS "Found installed SymCrypt library: ${SYMCRYPT_LIBRARY}")
+        else()
+            message(WARNING "SymCrypt library not found. Only KeysInUse will be built. Please set SYMCRYPT_ROOT_DIR or install SymCrypt library.")
+        endif()
+    endif()
+endif()
 
 # In Sanitize version, enable sanitizers
 if (CMAKE_BUILD_TYPE MATCHES Sanitize)
