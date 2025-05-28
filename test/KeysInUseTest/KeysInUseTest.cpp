@@ -202,7 +202,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
 #ifdef KEYSINUSE_LOG_SYSLOG
     char journalCtlCommand[64];
 
-    if (sprintf(journalCtlCommand, "/usr/bin/journalctl -t keysinuse -n %d", numExpectedEvents) < 0)
+    if (sprintf(journalCtlCommand, "/usr/bin/journalctl -t keysinuse -n %d -q", numExpectedEvents) < 0)
     {
         TEST_LOG_ERROR("Failed to create journalctl command")
         goto cleanup;
