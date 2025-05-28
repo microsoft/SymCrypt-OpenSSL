@@ -2,6 +2,8 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#include "keysinuse.h"
+
 #include <pthread.h>
 #include <unistd.h>
 #include <linux/limits.h>
@@ -14,10 +16,6 @@
 #endif
 
 #include <openssl/lhash.h>
-
-#include <scossl_helpers.h>
-
-#include "keysinuse.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,9 +101,11 @@ static int prefix_size = 0;
 //
 
 // To minimize any overhead to crypto operations, all file writes are handled by
-// logging_thread. This thread periodically pops all pending usage data from
-// sk_keysinuse_info, and writes to the log file. The thread is signalled to
-// wake early by logging_thread_cond_wake_early when a key is first used.
+// logging_thread. This thread periodically looks at all of the contexts in
+// lh_keysinuse_ctx_imp and logs any usage events that have occurred since the
+// last time it logged. The thread sleeps for logging_delay seconds between
+// iterations. The thread can be woken up early by signalling
+// logging_thread_cond_wake_early when a key is first used.
 static pthread_t logging_thread;
 static pthread_cond_t logging_thread_cond_wake_early;
 static pthread_mutex_t logging_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -113,14 +113,15 @@ static pthread_mutex_t logging_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
 // were first used while the logging thread was logging are handled before
 // the logging thread tries to sleep again. Only modify under logging_thread_mutex.
 static BOOL first_use_pending = FALSE;
-static SCOSSL_STATUS logging_thread_exit_status = SCOSSL_FAILURE;
 static BOOL is_logging = FALSE;
+static SCOSSL_STATUS logging_thread_exit_status = SCOSSL_FAILURE;
 
 //
 // Internal function declarations
 //
 
 static void keysinuse_init_internal();
+static void keysinuse_cleanup_internal();
 static void keysinuse_teardown();
 
 static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
@@ -155,6 +156,13 @@ static void keysinuse_init_internal()
 
     if (!keysinuse_enabled)
         return;
+
+    if (!OPENSSL_atexit(keysinuse_cleanup_internal) ||
+        !OPENSSL_atexit(keysinuse_teardown))
+    {
+        keysinuse_log_error("OPENSSL_at_exit failed,OPENSSL_%d", ERR_get_error());
+        goto cleanup;
+    }
 
     lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
@@ -235,12 +243,6 @@ static void keysinuse_init_internal()
         goto cleanup;
     }
 
-    if (!OPENSSL_atexit(keysinuse_teardown))
-    {
-        keysinuse_log_error("OPENSSL_at_exit failed,OPENSSL_%d", ERR_get_error());
-        goto cleanup;
-    }
-
     keysinuse_running = TRUE;
     status = SCOSSL_SUCCESS;
 
@@ -254,6 +256,29 @@ cleanup:
 
     OPENSSL_free(symlinkPath);
     OPENSSL_free(procPath);
+}
+
+// DO NOT call this function directly. It is registered
+// to be called by OPENSSL_at_exit and cleans up the
+// global keysinuse objects
+static void keysinuse_cleanup_internal()
+{
+    if (prefix != default_prefix)
+    {
+        OPENSSL_free(prefix);
+        prefix = (char*)default_prefix;
+        prefix_size = 0;
+    }
+
+    if (lh_keysinuse_ctx_imp != NULL)
+    {
+        lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
+        lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
+        lh_keysinuse_ctx_imp = NULL;
+    }
+
+    CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
+    lh_keysinuse_ctx_imp_lock = NULL;
 }
 
 void keysinuse_init()
@@ -299,23 +324,6 @@ void keysinuse_teardown()
 #ifdef KEYSINUSE_LOG_SYSLOG
     closelog();
 #endif
-
-    if (prefix != default_prefix)
-    {
-        OPENSSL_free(prefix);
-        prefix = (char*)default_prefix;
-        prefix_size = 0;
-    }
-
-    if (lh_keysinuse_ctx_imp != NULL)
-    {
-        lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
-        lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
-        lh_keysinuse_ctx_imp = NULL;
-    }
-
-    CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
-    lh_keysinuse_ctx_imp_lock = NULL;
 }
 
 void keysinuse_disable()
@@ -367,8 +375,22 @@ static unsigned long scossl_keysinuse_ctx_hash(const SCOSSL_KEYSINUSE_CTX_IMP *c
 _Use_decl_annotations_
 static int scossl_keysinuse_ctx_cmp(const SCOSSL_KEYSINUSE_CTX_IMP *ctx1, const SCOSSL_KEYSINUSE_CTX_IMP *ctx2)
 {
-    return ctx1 == NULL  && ctx2 != NULL &&
-        memcmp(ctx1->keyIdentifier, ctx2->keyIdentifier, sizeof(ctx1->keyIdentifier)) == 0;
+    if (ctx1 == ctx2)
+    {
+        return 0;
+    }
+
+    if (ctx1 != NULL && ctx2 == NULL)
+    {
+        return 1;
+    }
+
+    if (ctx2 != NULL && ctx1 == NULL)
+    {
+        return -1;
+    }
+
+    return memcmp(ctx1->keyIdentifier, ctx2->keyIdentifier, sizeof(ctx1->keyIdentifier));
 }
 
 //
@@ -506,6 +528,7 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKe
     }
     else if (keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
     {
+        ctx = NULL;
         goto cleanup;
     }
 
@@ -602,6 +625,8 @@ void keysinuse_on_use(SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
     {
         if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) == 0)
         {
+            first_use_pending = TRUE;
+
             if ((pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
             {
                 keysinuse_log_error("Failed to signal logging thread in keysinuse_on_use,SYS_%d", pthreadErr);
@@ -731,13 +756,7 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
     {
         int len = prefix_size + msg_len + 6;
         char prefixed_msg[len + 1];
-        strcpy(prefixed_msg, "");
-        strcat(prefixed_msg, prefix);
-        strcat(prefixed_msg, ",");
-        strcat(prefixed_msg, level_str);
-        strcat(prefixed_msg, "!");
-        strcat(prefixed_msg, msg_buf);
-        strcat(prefixed_msg, "\n");
+        snprintf(prefixed_msg, len + 1, "%s,%s!%s\n", prefix, level_str, msg_buf);
 
         // Check the log file to make sure:
         // 1. File isn't a symlink
@@ -893,6 +912,7 @@ static void keysinuse_log_error(const char *message, ...)
     va_list args;
     va_start(args, message);
     keysinuse_log_common(KEYSINUSE_ERR, message, args);
+    va_end(args);
 }
 
 _Use_decl_annotations_
@@ -901,6 +921,7 @@ static void keysinuse_log_notice(const char *message, ...)
     va_list args;
     va_start(args, message);
     keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
+    va_end(args);
 }
 
 // The logging thread runs in a loop. It pops all pending usage from sk_keysinuse_info,
