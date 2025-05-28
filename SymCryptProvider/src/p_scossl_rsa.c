@@ -194,8 +194,6 @@ void p_scossl_rsa_pss_restrictions_get_defaults(SCOSSL_RSA_PSS_RESTRICTIONS* pss
 }
 
 #ifdef KEYSINUSE_ENABLED
-// TODO: Switch to new APIS
-
 // KeyInUse requires the public key encoded in the same format as subjectPublicKey in a certificate.
 // This was done with i2d_RSAPublicKey for OpenSSL 1.1.1, but now must be done by the provider.
 ASN1_NDEF_SEQUENCE(SymcryptRsaPublicKey) = {
@@ -249,11 +247,11 @@ cleanup:
 _Use_decl_annotations_
 void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
-    // Initialize keysinuse for private keys. Generated keys are
-    // ignored to avoid noise from ephemeral keys.
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey;
 
+    // Initialize keysinuse for private keys. Generated keys are
+    // ignored to avoid noise from ephemeral keys.
     if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
     {
         // KeysInUse related errors shouldn't surface to caller, including errors

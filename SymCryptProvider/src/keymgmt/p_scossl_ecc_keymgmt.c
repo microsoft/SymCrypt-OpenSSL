@@ -93,15 +93,7 @@ static point_conversion_form_t p_scossl_ecc_keymgmt_conversion_name_to_id(_In_ c
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_new_ctx(provctx);
-    if (keyCtx != NULL)
-    {
-        keyCtx->libctx = provctx->libctx;
-        keyCtx->includePublic = 1;
-        keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
-    }
-
-    return keyCtx;
+    return p_scossl_ecc_new_ctx(provctx);
 }
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
@@ -272,10 +264,6 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->libctx = genCtx->libctx;
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
-#ifdef KEYSINUSE_ENABLED
-    keyCtx->isImported = FALSE;
-    keyCtx->keysinuseCtx = NULL;
-#endif
     keyCtx->conversionFormat = genCtx->conversionFormat;
     keyCtx->key = NULL;
 
