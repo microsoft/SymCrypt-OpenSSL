@@ -157,13 +157,6 @@ static void keysinuse_init_internal()
     if (!keysinuse_enabled)
         return;
 
-    if (!OPENSSL_atexit(keysinuse_cleanup_internal) ||
-        !OPENSSL_atexit(keysinuse_teardown))
-    {
-        keysinuse_log_error("OPENSSL_at_exit failed,OPENSSL_%d", ERR_get_error());
-        goto cleanup;
-    }
-
     lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
 
@@ -204,9 +197,7 @@ static void keysinuse_init_internal()
         prefix = (char*)default_prefix;
     }
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    openlog(KEYSINUSE_SYSLOG_IDENT, LOG_NDELAY, LOG_USER);
-#else
+#ifndef KEYSINUSE_LOG_SYSLOG
     // Try to create /var/log/keysinuse if it isn't present.
     // This is a best attempt and only succeeds if the callers
     // has sufficient permissions
@@ -261,8 +252,10 @@ cleanup:
 // DO NOT call this function directly. It is registered
 // to be called by OPENSSL_at_exit and cleans up the
 // global keysinuse objects
-static void keysinuse_cleanup_internal()
+__attribute__((destructor)) static void keysinuse_cleanup_internal()
 {
+    keysinuse_teardown();
+
     if (prefix != default_prefix)
     {
         OPENSSL_free(prefix);
@@ -320,10 +313,6 @@ void keysinuse_teardown()
     {
         keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
     }
-
-#ifdef KEYSINUSE_LOG_SYSLOG
-    closelog();
-#endif
 }
 
 void keysinuse_disable()
@@ -731,7 +720,7 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
 
     if ((msg_len = vsnprintf(msg_buf, LOG_MSG_MAX, message, args)) > 0)
     {
-        syslog(syslog_priority, "%s,%s!%s", prefix, level_str, msg_buf);
+        syslog(syslog_priority, "[keysinuse] %s,%s!%s", prefix, level_str, msg_buf);
     }
 }
 #else
