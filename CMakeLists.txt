@@ -64,7 +64,7 @@ else()
     add_compile_options(-DDBG=1)
 endif()
 
-if (SYMCRYPT_FOUND)
+if (SYMCRYPT_FOUND AND NOT KEYSINUSE_STANDALONE)
     add_subdirectory (ScosslCommon)
     add_subdirectory (SymCryptEngine/static)
     add_subdirectory (SymCryptEngine/dynamic)
