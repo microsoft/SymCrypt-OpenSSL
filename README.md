@@ -33,6 +33,9 @@ released publicly in the future.
 4. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
     * If you have not installed SymCrypt header files, you can also specify the root directory `-DSYMCRYPT_ROOT_DIR=<SymCryptRepo>`
     * If you want to link to a specific OpenSSL installation, you can also specify `-DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>`
+    * If you want to enable keysinuse in the symcrypt provider, specify `-DKEYSINUSE_ENABLED=1`
+    * If you want to only build the standalone keysinsue library, specify `-DKEYSINUSE_STANDALONE=1`
+    * If you want keysinuse to log to syslog instead of a file, specify `-DKEYSINUSE_LOG_SYSLOG=1`
     * Optionally, for a release build, specify `-DCMAKE_BUILD_TYPE=Release`
 5. `cmake --build .`
     * Optionally specify `-jN` where N is the number of processes you wish to spawn for the build
