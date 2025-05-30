@@ -93,15 +93,7 @@ static point_conversion_form_t p_scossl_ecc_keymgmt_conversion_name_to_id(_In_ c
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    SCOSSL_ECC_KEY_CTX *keyCtx = p_scossl_ecc_new_ctx(provctx);
-    if (keyCtx != NULL)
-    {
-#ifdef KEYSINUSE_ENABLED
-        keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
-#endif
-    }
-
-    return keyCtx;
+    return p_scossl_ecc_new_ctx(provctx);
 }
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_x25519_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provctx)

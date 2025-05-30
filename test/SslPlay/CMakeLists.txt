@@ -23,7 +23,7 @@ add_dependencies(SslPlay scossl_common)
 
 target_link_directories(SslPlay PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_LIBDIR})
 target_include_directories(SslPlay PUBLIC ${CMAKE_SOURCE_DIR}/SymCryptEngine/inc)
-target_include_directories(SslPlay PUBLIC ../ScosslCommon/inc)
+target_include_directories(SslPlay PUBLIC ${CMAKE_SOURCE_DIR}/ScosslCommon/inc)
 
 target_link_libraries(SslPlay PUBLIC scossl_dynamic ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(SslPlay PRIVATE scossl_common)
