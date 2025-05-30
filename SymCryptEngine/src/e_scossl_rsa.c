@@ -258,8 +258,9 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     if (bits < SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS)
     {
         genFlags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
-        SCOSSL_PROV_LOG_SYMCRYPT_INFO("Generating RSA key with size < %u bits. This operation is not FIPS compliant.", 
-                                       SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS);
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Generating RSA key with size < %u bits. This operation is not FIPS compliant.", 
+            SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS);
     }
 
     scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, genFlags);
