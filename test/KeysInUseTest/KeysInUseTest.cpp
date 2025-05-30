@@ -10,7 +10,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#ifndef KEYSINUSE_LOG_SYSLOG
+#ifdef KEYSINUSE_LOG_SYSLOG
+    #include <syslog.h>
+#else
     #include <ftw.h>
 #endif
 
@@ -250,8 +252,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
 
 #ifdef KEYSINUSE_LOG_SYSLOG
     // Skip past the syslog header first
-    pbHeader = strpbrk(curLine, "]");
-    pbHeader += 3;
+    pbHeader = strrchr(curLine, ']');
+    pbHeader++;;
     pbHeader = strtok(pbHeader, "!");
 #else
     pbHeader = strtok(curLine, "!");
@@ -321,8 +323,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
 
 #ifdef KEYSINUSE_LOG_SYSLOG
             // Skip past the syslog header first
-            pbHeader = strpbrk(curLine, "]");
-            pbHeader += 3;
+            pbHeader = strrchr(curLine, ']');
+            pbHeader++;
             pbHeader = strtok(pbHeader, "!");
 #else
             pbHeader = strtok(curLine, "!");
@@ -1713,6 +1715,10 @@ int main(int argc, char** argv)
 
     ERR_pop_to_mark();
 
+#ifdef KEYSINUSE_LOG_SYSLOG
+    openlog("keysinuse", LOG_PID | LOG_NDELAY, LOG_USER);
+#endif
+
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
     keysinuse_init();
 
@@ -1783,6 +1789,10 @@ cleanup:
     OPENSSL_free(processName);
     keysinuse_test_cleanup();
     OPENSSL_cleanup();
+
+#ifdef KEYSINUSE_LOG_SYSLOG
+    closelog();
+#endif
 
     return ret;
 }
