@@ -218,6 +218,7 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SCOSSL_RSA_KEY_CONTEXT *keyCtx = RSA_get_ex_data(rsa, e_scossl_rsa_idx);
     SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
+    UINT32 genFlags = SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT;
 
     if( keyCtx == NULL )
     {
@@ -253,7 +254,16 @@ SCOSSL_STATUS e_scossl_rsa_keygen(_Out_ RSA* rsa, int bits, _In_ BIGNUM* e,
             "SymCryptLoadMsbFirstUint64 failed");
         goto cleanup;
     }
-    scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
+
+    if (bits < SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS)
+    {
+        genFlags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+        SCOSSL_LOG_INFO(SCOSSL_ERR_F_ENG_RSA_KEYGEN, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "Generating RSA key with size < %u bits. This operation is not FIPS compliant.", 
+            SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS);
+    }
+
+    scError = SymCryptRsakeyGenerate(keyCtx->key, &pubExp64, 1, genFlags);
     if( scError != SYMCRYPT_NO_ERROR )
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ENG_RSA_KEYGEN,
