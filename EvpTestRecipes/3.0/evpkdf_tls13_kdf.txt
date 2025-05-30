@@ -4933,5 +4933,5 @@ Title = TLS13-KDF bad mode test
 KDF = TLS13-KDF
 Ctrl.mode = mode:EXTRACT_AND_EXPAND
 Ctrl.digest = digest:SHA256
-Result = KDF_DERIVE_ERROR
+Result = KDF_CTRL_ERROR
 

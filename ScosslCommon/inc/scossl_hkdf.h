@@ -6,7 +6,6 @@
 
 #include <openssl/kdf.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif

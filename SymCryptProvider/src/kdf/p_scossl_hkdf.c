@@ -267,6 +267,7 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
         if (md == NULL ||
             !scossl_is_md_supported(EVP_MD_type(md)))
         {
+            EVP_MD_free(md);
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
@@ -338,13 +339,17 @@ SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx
     if (!p_scossl_hkdf_set_ctx_params(ctx, params))
         return SCOSSL_FAILURE;
 
+    if (ctx->hkdfCtx->mode == EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PREFIX)) != NULL)
     {
-        OPENSSL_clear_free(ctx->hkdfCtx->pbPrefix, ctx->hkdfCtx->cbPrefix);
+        OPENSSL_free(ctx->hkdfCtx->pbPrefix);
         ctx->hkdfCtx->pbPrefix = NULL;
         ctx->hkdfCtx->cbPrefix = 0;
-        if (p->data_size > 0 &&
-            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbPrefix, 0, &ctx->hkdfCtx->cbPrefix))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbPrefix, 0, &ctx->hkdfCtx->cbPrefix))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -353,11 +358,10 @@ SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_LABEL)) != NULL)
     {
-        OPENSSL_clear_free(ctx->hkdfCtx->pbLabel, ctx->hkdfCtx->cbLabel);
+        OPENSSL_free(ctx->hkdfCtx->pbLabel);
         ctx->hkdfCtx->pbLabel = NULL;
         ctx->hkdfCtx->cbLabel = 0;
-        if (p->data_size > 0 &&
-            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbLabel, 0, &ctx->hkdfCtx->cbLabel))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbLabel, 0, &ctx->hkdfCtx->cbLabel))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -369,8 +373,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx
         OPENSSL_clear_free(ctx->hkdfCtx->pbData, ctx->hkdfCtx->cbData);
         ctx->hkdfCtx->pbData = NULL;
         ctx->hkdfCtx->cbData = 0;
-        if (p->data_size > 0 &&
-            !OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbData, 0, &ctx->hkdfCtx->cbData))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->hkdfCtx->pbData, 0, &ctx->hkdfCtx->cbData))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -431,7 +434,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
     
     if (ctx->md == NULL) 
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Digest");
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -453,7 +456,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
     // If the value exceeds 0xFF, it will overflow and corrupt the label encoding.
     if (labelLen > 0xFF)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Label+Prefix length exceeds limit");
+        ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
         return SCOSSL_FAILURE;
     }
     
@@ -461,8 +464,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
     totalLen = 2 + 1 + labelLen + 1 + ctx->cbData;
     if (totalLen > HKDF_MAXBUF) 
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-                         "Total size exceeds maximum buffer size allowed");
+        ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
         return SCOSSL_FAILURE;
     }
 
@@ -481,7 +483,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
     
     if (ctx->cbData > 0xFF)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "context length exceeds limit");
+        ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
         return SCOSSL_FAILURE;
     }
     // Context length
@@ -501,7 +503,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
         ctx->pbKey, ctx->cbKey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt expand failed");
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfPrkExpandKey failed", scError);
         return SCOSSL_FAILURE;
     }
     scError = SymCryptHkdfDerive(
@@ -510,7 +512,7 @@ SCOSSL_STATUS p_scossl_tls13_hkdf_expand(_In_ SCOSSL_HKDF_CTX *ctx,
         key, keylen);
     if (scError != SYMCRYPT_NO_ERROR)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt derive failed");
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfDerive failed", scError);
         return SCOSSL_FAILURE;
     }
     return SCOSSL_SUCCESS;
@@ -521,32 +523,32 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
                                                 _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_STATUS status = SCOSSL_SUCCESS;
     PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
     BYTE *default_zeros = NULL;
     BYTE empty_hash[EVP_MAX_MD_SIZE]; 
     BYTE expanded_secret[EVP_MAX_MD_SIZE];
     EVP_MD_CTX *mdctx = NULL;
-    SCOSSL_HKDF_CTX *dupCtx = NULL;
+    SCOSSL_HKDF_CTX *dupCtx;
     BOOL key_need_reset =  FALSE;
+    SIZE_T mdlen = 0;
 
     if (ctx == NULL || ctx->md == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Missing Digest");
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
     
     symcryptHmacAlg = scossl_get_symcrypt_hmac_algorithm(EVP_MD_type(ctx->md));
     if (symcryptHmacAlg == NULL) 
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Invalid HMAC algorithm");
-        scError = SCOSSL_FAILURE;
-        goto cleanup;
+        return SCOSSL_FAILURE;
     }
  
-    SIZE_T mdlen = EVP_MD_get_size(ctx->md);
+    mdlen = EVP_MD_get_size(ctx->md);
     if (mdlen <= 0)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Invalid digest size");
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
         return SCOSSL_FAILURE;
     }
 
@@ -554,7 +556,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     dupCtx = OPENSSL_zalloc(sizeof(*ctx));
     if (!dupCtx) 
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Failed to allocate new context");
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return SCOSSL_FAILURE;
     }
     memcpy(dupCtx, ctx, sizeof(*ctx));
@@ -562,8 +564,9 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     default_zeros = OPENSSL_zalloc(EVP_MAX_MD_SIZE);
     if (default_zeros == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Failed to allocate default_zeros");
-        return SCOSSL_FAILURE;
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        status = SCOSSL_FAILURE;
+        goto cleanup;
     }
    
     if (dupCtx->pbKey == NULL) 
@@ -579,14 +582,16 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     {
         dupCtx->pbSalt = default_zeros;
         dupCtx->cbSalt = mdlen;
-    } else {
+    }
+    else
+    {
         mdctx = EVP_MD_CTX_new();
         if (mdctx == NULL ||
             EVP_DigestInit_ex(mdctx, dupCtx->md, NULL) <= 0 ||
             EVP_DigestFinal_ex(mdctx, empty_hash, NULL) <= 0) 
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "Digest computation of empty hash failed");
-            scError = SCOSSL_FAILURE;
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            status = SCOSSL_FAILURE;
             goto cleanup;
         }
 
@@ -599,8 +604,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
 
         if (SCOSSL_SUCCESS != p_scossl_tls13_hkdf_expand(dupCtx, expanded_secret, keylen)) 
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "HKDF expand failed");
-            scError = SCOSSL_FAILURE;
+            status = SCOSSL_FAILURE;
             goto cleanup;
         }
         //restore pbKey/cbKey
@@ -614,8 +618,8 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
             key, keylen);
         if (scError != SYMCRYPT_NO_ERROR) 
         {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt extract failed");
-            scError = SCOSSL_FAILURE;
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfExtractPrk failed", scError);
+            status = SCOSSL_FAILURE;
             goto cleanup;
         }
         scError = SCOSSL_SUCCESS;
@@ -629,12 +633,12 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
         key, keylen);
     if (scError != SYMCRYPT_NO_ERROR) 
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR, "SymCrypt extract failed");
-        scError = SCOSSL_FAILURE;
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfExtractPrk failed", scError);
+        status = SCOSSL_FAILURE;
         goto cleanup;
     }
 
-    scError = SCOSSL_SUCCESS;
+    status = SCOSSL_SUCCESS;
 
 cleanup:
     //restore original key
@@ -644,10 +648,9 @@ cleanup:
     }
     OPENSSL_free(dupCtx);
     OPENSSL_free(default_zeros);
-    if (mdctx != NULL)
-        EVP_MD_CTX_free(mdctx);
+    EVP_MD_CTX_free(mdctx);
     
-    return scError;
+    return status;
 }
 
 static
@@ -657,38 +660,31 @@ SCOSSL_STATUS p_scossl_tls13kdf_derive(_In_ SCOSSL_PROV_HKDF_CTX *ctx,
 {
     if (ctx == NULL || ctx->hkdfCtx == NULL)
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Ctx/hkdfCtx is NULL");
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
     
     if (!p_scossl_tls13kdf_set_ctx_params(ctx, params))
     {
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Failed to set TLS13KDF parameters");
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
     if (keylen == 0)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
-        return 0;
+        return SCOSSL_FAILURE;
     }
 
     switch (ctx->hkdfCtx->mode)
     {
-    case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
-        return p_scossl_tls13kdf_generate_secret(ctx->hkdfCtx, key, keylen);
-        break;
-    case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
-        return p_scossl_tls13_hkdf_expand(ctx->hkdfCtx, key, keylen);
-        break;
-    default:
-        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_HKDF_DERIVE, ERR_R_INTERNAL_ERROR,
-            "Invalid Mode: %d", ctx->hkdfCtx->mode);
-        return SCOSSL_FAILURE;
+        case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
+            return p_scossl_tls13kdf_generate_secret(ctx->hkdfCtx, key, keylen);
+        case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
+            return p_scossl_tls13_hkdf_expand(ctx->hkdfCtx, key, keylen);
+        default:
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
     }
-    return SCOSSL_SUCCESS;
-   
 }
 
 const OSSL_DISPATCH p_scossl_hkdf_kdf_functions[] = {
