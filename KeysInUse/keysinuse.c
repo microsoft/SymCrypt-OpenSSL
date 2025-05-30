@@ -3,6 +3,7 @@
 //
 
 #include "keysinuse.h"
+#include "scossl_helpers.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -72,7 +73,7 @@ static CRYPTO_ONCE keysinuse_init_once = CRYPTO_ONCE_STATIC_INIT;
 static BOOL keysinuse_enabled = TRUE;
 static BOOL keysinuse_running = FALSE;
 
-static off_t max_file_size = 5 << 10; // Default to 5KB
+static long max_file_size = 5 << 10; // Default to 5KB
 static long logging_delay = 60 * 60; // Default to 1 hour
 
 //
@@ -238,13 +239,15 @@ static void keysinuse_init_internal()
     status = SCOSSL_SUCCESS;
 
 cleanup:
-    if (!status)
+    if (status == SCOSSL_FAILURE)
     {
+        keysinuse_enabled = FALSE;
         lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
         lh_keysinuse_ctx_imp = NULL;
         keysinuse_teardown();
     }
 
+    pthread_condattr_destroy(&attr);
     OPENSSL_free(symlinkPath);
     OPENSSL_free(procPath);
 }
@@ -270,6 +273,8 @@ __attribute__((destructor)) static void keysinuse_cleanup_internal()
         lh_keysinuse_ctx_imp = NULL;
     }
 
+    pthread_cond_destroy(&logging_thread_cond_wake_early);
+
     CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
     lh_keysinuse_ctx_imp_lock = NULL;
 }
@@ -287,7 +292,7 @@ void keysinuse_teardown()
 
     // Finish logging thread. The logging thread will call keysinuse_cleanup
     // and free all references to any keysinuse contexts it still has a reference to.
-    if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex) == 0))
+    if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) == 0)
     {
         if (is_logging)
         {
@@ -326,7 +331,7 @@ void keysinuse_disable()
     keysinuse_teardown();
 }
 
-BOOL keysinuse_is_running()
+int keysinuse_is_running()
 {
     // Try to initialize keysinuse if it hasn't been already
     keysinuse_init();
@@ -336,15 +341,15 @@ BOOL keysinuse_is_running()
 //
 // Configuration
 //
-void keysinuse_set_max_file_size(off_t size)
+void keysinuse_set_max_file_size(long size)
 {
     if (size > 0)
     {
-        max_file_size = size;
+        max_file_size = (off_t) size;
     }
 }
 
-void keysinuse_set_logging_delay(INT64 delay)
+void keysinuse_set_logging_delay(long delay)
 {
     if (delay >= 0)
     {
@@ -423,8 +428,7 @@ SCOSSL_STATUS keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_
     return SCOSSL_SUCCESS;
 }
 
-_Use_decl_annotations_
-SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey)
+SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) const void *pbEncodedKey, unsigned long cbEncodedKey)
 {
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
     UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
@@ -533,8 +537,7 @@ cleanup:
     return ctx;
 }
 
-_Use_decl_annotations_
-SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
+SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(_In_opt_ SCOSSL_KEYSINUSE_CTX *ctx)
 {
     if (keysinuse_is_running() && ctx != NULL &&
         keysinuse_ctx_upref(ctx, NULL) == SCOSSL_SUCCESS)
@@ -545,14 +548,13 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key_by_ctx(SCOSSL_KEYSINUSE_CTX *ctx)
     return NULL;
 }
 
-_Use_decl_annotations_
-void keysinuse_unload_key(SCOSSL_KEYSINUSE_CTX *ctx)
+void keysinuse_unload_key(_In_opt_ SCOSSL_KEYSINUSE_CTX *ctx)
 {
     if (keysinuse_is_running() && ctx != NULL)
     {
         // Don't free the key context here. The logging thread will free the context
         // and remove it from the hash table after logging any pending usage events.
-        keysinuse_ctx_downref(ctx, NULL);;
+        keysinuse_ctx_downref(ctx, NULL);
     }
 }
 
@@ -569,8 +571,7 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 //
 // Usage tracking
 //
-_Use_decl_annotations_
-void keysinuse_on_use(SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
+void keysinuse_on_use(_In_ SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
 {
     SCOSSL_KEYSINUSE_CTX_IMP *ctxImp = (SCOSSL_KEYSINUSE_CTX_IMP*)ctx;
     int pthreadErr;
