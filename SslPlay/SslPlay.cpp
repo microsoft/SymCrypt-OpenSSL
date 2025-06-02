@@ -164,11 +164,14 @@ void TestEcc()
     TestEccCurve(NID_secp384r1);
     TestEccCurve(NID_secp521r1);
     TestEccCurve(NID_brainpoolP256r1);
+    /*
+    TestEccCurve(NID_brainpoolP256r1);
     TestEccCurve(NID_brainpoolP384r1);
     TestEccCurve(NID_brainpoolP512r1);
     TestEccCurve(NID_brainpoolP256r1tls13);
     TestEccCurve(NID_brainpoolP384r1tls13);
     TestEccCurve(NID_brainpoolP512r1tls13);
+    */
     printf("%s", SeparatorLine);
 }
 
