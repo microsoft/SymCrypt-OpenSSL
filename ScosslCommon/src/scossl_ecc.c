@@ -30,6 +30,10 @@ static PSYMCRYPT_ECURVE _hidden_curve_P256 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P384 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P521 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_X25519 = NULL;
+static PSYMCRYPT_ECURVE _hidden_curve_brainpoolP256 = NULL;
+static PSYMCRYPT_ECURVE _hidden_curve_brainpoolP384 = NULL;
+static PSYMCRYPT_ECURVE _hidden_curve_brainpoolP512 = NULL;
+
 
 SCOSSL_STATUS scossl_ecc_init_static()
 {
@@ -41,7 +45,10 @@ SCOSSL_STATUS scossl_ecc_init_static()
         ((_hidden_curve_P256 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP256, 0)) == NULL) ||
         ((_hidden_curve_P384 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP384, 0)) == NULL) ||
         ((_hidden_curve_P521 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP521, 0)) == NULL) ||
-        ((_hidden_curve_X25519 = SymCryptEcurveAllocate(SymCryptEcurveParamsCurve25519, 0)) == NULL))
+        ((_hidden_curve_X25519 = SymCryptEcurveAllocate(SymCryptEcurveParamsCurve25519, 0)) == NULL) || 
+        ((_hidden_curve_brainpoolP256 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP256r1, 0)) == NULL) ||
+        ((_hidden_curve_brainpoolP384 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP384r1, 0)) == NULL) ||
+        ((_hidden_curve_brainpoolP512 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP512r1, 0)) == NULL))
     {
         return SCOSSL_FAILURE;
     }
@@ -81,6 +88,22 @@ void scossl_ecc_destroy_ecc_curves()
         SymCryptEcurveFree(_hidden_curve_X25519);
         _hidden_curve_X25519 = NULL;
     }
+    if (_hidden_curve_brainpoolP256 != NULL)
+    {
+        SymCryptEcurveFree(_hidden_curve_brainpoolP256);
+        _hidden_curve_brainpoolP256 = NULL;
+    }
+    if (_hidden_curve_brainpoolP384 != NULL)
+    {
+        SymCryptEcurveFree(_hidden_curve_brainpoolP384);
+        _hidden_curve_brainpoolP384 = NULL;
+    }
+    if (_hidden_curve_brainpoolP512 != NULL)
+    {
+        SymCryptEcurveFree(_hidden_curve_brainpoolP512);
+        _hidden_curve_brainpoolP512 = NULL;
+    }
+
     scossl_ecc_initialized = FALSE;
 }
 
@@ -99,6 +122,15 @@ PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)
         return _hidden_curve_P384;
     case NID_secp521r1:
         return _hidden_curve_P521;
+    case NID_brainpoolP256r1:
+    case NID_brainpoolP256r1tls13:
+        return _hidden_curve_brainpoolP256;
+    case NID_brainpoolP384r1:
+    case NID_brainpoolP384r1tls13:
+        return _hidden_curve_brainpoolP384;
+    case NID_brainpoolP512r1:
+    case NID_brainpoolP512r1tls13:
+        return _hidden_curve_brainpoolP512;
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_ECC_GROUP_TO_SYMCRYPT_CURVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SCOSSL does not yet support this group (nid %d).", groupNid);
@@ -147,7 +179,18 @@ EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(PCSYMCRYPT_ECURVE pCurve)
     {
         return EC_GROUP_new_by_curve_name(NID_secp521r1);
     }
-
+    else if (pCurve == _hidden_curve_brainpoolP256)
+    {
+        return EC_GROUP_new_by_curve_name(NID_brainpoolP256r1);
+    }
+    else if (pCurve == _hidden_curve_brainpoolP384)
+    {
+        return EC_GROUP_new_by_curve_name(NID_brainpoolP384r1);
+    }
+    else if (pCurve == _hidden_curve_brainpoolP512)
+    {
+        return EC_GROUP_new_by_curve_name(NID_brainpoolP512r1);
+    }
     return NULL;
 }
 
@@ -201,7 +244,18 @@ const char *scossl_ecc_get_curve_name(PCSYMCRYPT_ECURVE curve)
     {
         ret = SN_X25519;
     }
-
+    else if (curve == _hidden_curve_brainpoolP256)
+    {
+        ret = SN_brainpoolP256r1;
+    }
+    else if (curve == _hidden_curve_brainpoolP384)
+    {
+        ret = SN_brainpoolP384r1;
+    }
+    else if (curve == _hidden_curve_brainpoolP512)
+    {
+        ret = SN_brainpoolP512r1;
+    }
     return ret;
 }
 

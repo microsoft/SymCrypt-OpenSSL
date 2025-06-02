@@ -40,6 +40,12 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_ffdhe2048           0x0100
 #define SCOSSL_TLS_GROUP_ID_ffdhe3072           0x0101
 #define SCOSSL_TLS_GROUP_ID_ffdhe4096           0x0102
+#define SCOSSL_TLS_GROUP_ID_brainpoolP256r1     0x001A
+#define SCOSSL_TLS_GROUP_ID_brainpoolP384r1     0x001B
+#define SCOSSL_TLS_GROUP_ID_brainpoolP512r1     0x001C
+#define SCOSSL_TLS_GROUP_ID_brainpoolP256r1_tls13 0x001F
+#define SCOSSL_TLS_GROUP_ID_brainpoolP384r1_tls13 0x0020
+#define SCOSSL_TLS_GROUP_ID_brainpoolP512r1_tls13 0x0021
 #define SCOSSL_TLS_GROUP_ID_mlkem512            0x0200
 #define SCOSSL_TLS_GROUP_ID_mlkem768            0x0201
 #define SCOSSL_TLS_GROUP_ID_mlkem1024           0x0202
