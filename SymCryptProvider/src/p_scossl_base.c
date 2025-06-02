@@ -138,6 +138,16 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe6144 = {
+    SCOSSL_TLS_GROUP_ID_ffdhe6144, 128, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe8192 = {
+    SCOSSL_TLS_GROUP_ID_ffdhe8192, 128, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem512 = {
     SCOSSL_TLS_GROUP_ID_mlkem512, 128, 1,
     TLS1_3_VERSION, 0,
@@ -201,6 +211,8 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
     TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),
+    TLS_GROUP_ENTRY("ffdhe6144", SN_ffdhe6144, "DH", scossl_tls_group_info_ffdhe6144),
+    TLS_GROUP_ENTRY("ffdhe8192", SN_ffdhe8192, "DH", scossl_tls_group_info_ffdhe8192),
     TLS_GROUP_ENTRY("MLKEM512", SCOSSL_SN_MLKEM512, "MLKEM", scossl_tls_group_info_mlkem512),
     TLS_GROUP_ENTRY("MLKEM768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
     TLS_GROUP_ENTRY("MLKEM1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),

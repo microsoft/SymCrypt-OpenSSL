@@ -166,7 +166,7 @@ void TestEcc()
     printf("%s", SeparatorLine);
 }
 
-// Largest supported dlgroup is ffdhe8192/MODP8192 => 1024 byte shared secret is largest secret that can be generated
+// Largest supported dlgroup is ffdhe8192 => 1024 byte shared secret is largest secret that can be generated
 #define SCOSSL_DH_SHARED_SECRET_MAX_LEN (1024)
 
 void TestDhDlgroup(const BIGNUM* p)
