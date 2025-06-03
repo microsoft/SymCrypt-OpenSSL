@@ -32,7 +32,7 @@
 
 #define KEYSINUSE_TEST_SIGN_PLAINTEXT_SIZE 256
 #define KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE 64
-#define SCOSSL_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
+#define KEYSINUSE_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
 
 #ifndef KEYSINUSE_LOG_SYSLOG
     #define KEYSINUSE_TEST_ROOT "keysinuse_test_root"
@@ -47,7 +47,7 @@ using namespace std;
 
 typedef struct
 {
-    char keyIdentifier[SCOSSL_KEYID_SIZE];
+    char keyIdentifier[KEYSINUSE_KEYID_SIZE];
     PCBYTE pbKey;
     SIZE_T cbKey;
 } KEYSINUSE_TEST_CASE;
@@ -95,7 +95,7 @@ typedef struct
     EVP_PKEY *pkey;
     PBYTE pbEncodedKey;
     SIZE_T cbEncodedKey;
-    char pbKeyId[SCOSSL_KEYID_SIZE];
+    char abKeyId[KEYSINUSE_KEYID_SIZE];
 } KEYSINUSE_TEST_KEY;
 
 static KEYSINUSE_TEST_KEY testKeys[] = {
@@ -183,7 +183,7 @@ static bool isNumeric(const char *str)
     return true;
 }
 
-static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], KEYSINUSE_EXPECTED_EVENT expectedEvents[], int numExpectedEvents)
+static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE], KEYSINUSE_EXPECTED_EVENT expectedEvents[], int numExpectedEvents)
 {
     FILE *logOutput = nullptr;
     struct stat sb;
@@ -350,9 +350,9 @@ static SCOSSL_STATUS keysinuse_test_check_log(char pbKeyId[SCOSSL_KEYID_SIZE], K
             goto cleanup;
         }
 
-        if (strcmp(pbKeyId, pbCurToken) != 0)
+        if (strcmp(abKeyId, pbCurToken) != 0)
         {
-            TEST_LOG_ERROR("Logged key ID does not match. Expected %s, Logged: %s", pbKeyId, pbCurToken)
+            TEST_LOG_ERROR("Logged key ID does not match. Expected %s, Logged: %s", abKeyId, pbCurToken)
             goto cleanup;
         }
 
@@ -478,8 +478,10 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicKey, char pbKeyId[SCOSSL_KEYID_SIZE], keysinuse_operation operation)
+SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicKey, char abKeyId[KEYSINUSE_KEYID_SIZE], KEYSINUSE_OPERATION operation)
 {
+    char abKeyIdDerived[KEYSINUSE_KEYID_SIZE] = {0};
+
     SCOSSL_KEYSINUSE_CTX *keysinuseCtx = NULL;
     // Second keysinuse context loaded with the same key bytes
     SCOSSL_KEYSINUSE_CTX *keysinuseCtxCopy = NULL;
@@ -492,11 +494,35 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
         {0, 0, KEYSINUSE_TEST_LOG_DELAY},
         {0, 0, 0}};
 
+    if (keysinuse_derive_key_identifier(pcbPublicKey, cbPublicKey, abKeyIdDerived, sizeof(abKeyIdDerived)) == 0)
+    {
+        TEST_LOG_ERROR("Failed to derive key identifier from public key bytes")
+        return SCOSSL_FAILURE;
+    }
+
+    if (strcmp(abKeyId, abKeyIdDerived) != 0)
+    {
+        TEST_LOG_ERROR("Derived key ID does not match. Expected %s, Got: %s", abKeyId, abKeyIdDerived)
+        goto cleanup;
+    }
+
     // Load the keysinuse context
     if ((keysinuseCtx = keysinuse_load_key(pcbPublicKey, cbPublicKey)) == NULL)
     {
         TEST_LOG_ERROR("Failed to load keysinuse context")
         return SCOSSL_FAILURE;
+    }
+
+    if (keysinuse_ctx_get_key_identifier(keysinuseCtx, abKeyIdDerived, sizeof(abKeyIdDerived)) == 0)
+    {
+        TEST_LOG_ERROR("Failed to get key identifier from context")
+        return SCOSSL_FAILURE;
+    }
+
+    if (strcmp(abKeyId, abKeyIdDerived) != 0)
+    {
+        TEST_LOG_ERROR("Key ID from context does does not match. Expected %s, Got: %s", abKeyId, abKeyIdDerived)
+        goto cleanup;
     }
 
     // Load the same keysinuse context by bytes again
@@ -572,7 +598,7 @@ SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicK
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    ret = keysinuse_test_check_log(abKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
 #ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
 #endif
@@ -586,7 +612,7 @@ cleanup:
 }
 
 #if OPENSSL_VERSION_MAJOR == 3
-SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], string providerName)
+SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char abKeyId[KEYSINUSE_KEYID_SIZE], string providerName)
 {
     string propq;
     const char *keyType = EVP_PKEY_get0_type_name(pkeyBase);
@@ -768,7 +794,7 @@ SCOSSL_STATUS keysinuse_test_provider_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOS
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    ret = keysinuse_test_check_log(abKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
 #ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
 #endif
@@ -787,7 +813,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], string providerName)
+SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEYSINUSE_KEYID_SIZE], string providerName)
 {
     string propq;
     const char *keyType = EVP_PKEY_get0_type_name(pkeyBase);
@@ -978,7 +1004,7 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[S
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    ret = keysinuse_test_check_log(abKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
 #ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
 #endif
@@ -998,7 +1024,7 @@ cleanup:
 }
 #endif
 
-SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], ENGINE *engine)
+SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char abKeyId[KEYSINUSE_KEYID_SIZE], ENGINE *engine)
 {
     EVP_PKEY_CTX *ctx = NULL;
     EVP_PKEY_CTX *ctxCopy = NULL;
@@ -1146,7 +1172,7 @@ SCOSSL_STATUS keysinuse_test_engine_sign(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    ret = keysinuse_test_check_log(abKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
 #ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
 #endif
@@ -1163,7 +1189,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCOSSL_KEYID_SIZE], ENGINE *engine)
+SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEYSINUSE_KEYID_SIZE], ENGINE *engine)
 {
     EVP_PKEY_CTX *ctx = NULL;
     EVP_PKEY_CTX *ctxCopy = NULL;
@@ -1335,7 +1361,7 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char pbKeyId[SCO
 
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
-    ret = keysinuse_test_check_log(pbKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
+    ret = keysinuse_test_check_log(abKeyId, expectedEvents, sizeof(expectedEvents) / sizeof(expectedEvents[0]));
 #ifndef KEYSINUSE_LOG_SYSLOG
     remove(KEYSINUSE_LOG_FILE);
 #endif
@@ -1353,7 +1379,7 @@ cleanup:
 }
 
 // Generates a key with the specified parameters. *ppbKey is set to the encoded
-// public key bytes, and pbKeyId is set to the expected keyId. The size of the
+// public key bytes, and abKeyId is set to the expected keyId. The size of the
 // encoded public key bytes is returned, and 0 is returned on error. The default
 // provider will be explicitly used for this step to ensure any regressions in
 // the tested provider(s) key encoding logic are caught by the tests.
@@ -1426,9 +1452,9 @@ SCOSSL_STATUS keysinuse_test_generate_keys()
 
         for (int j = 0; j < SYMCRYPT_SHA256_RESULT_SIZE / 2; j++)
         {
-            sprintf(&testKeys[i].pbKeyId[j*2], "%02x", pbKeyHash[j]);
+            sprintf(&testKeys[i].abKeyId[j*2], "%02x", pbKeyHash[j]);
         }
-        testKeys[i].pbKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
+        testKeys[i].abKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
 
         EVP_PKEY_CTX_free(ctx);
         ctx = NULL;
@@ -1441,7 +1467,7 @@ cleanup:
     return ret;
 }
 
-SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, keysinuse_operation operation,
+SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, KEYSINUSE_OPERATION operation,
                                        vector<ENGINE *> engines, vector<PVOID> providers)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -1463,10 +1489,10 @@ SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, keysinuse_ope
             }
         }
     }
-    TEST_LOG_VERBOSE("\n\tKeyId: %s\n\n", testKey.pbKeyId)
+    TEST_LOG_VERBOSE("\n\tKeyId: %s\n\n", testKey.abKeyId)
 
     printf("\tTesting KeysInUse API functions\n");
-    if (keysinuse_test_api_functions(testKey.pbEncodedKey, testKey.cbEncodedKey, testKey.pbKeyId, operation) == SCOSSL_FAILURE)
+    if (keysinuse_test_api_functions(testKey.pbEncodedKey, testKey.cbEncodedKey, testKey.abKeyId, operation) == SCOSSL_FAILURE)
     {
         return SCOSSL_FAILURE;
     }
@@ -1480,14 +1506,14 @@ SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, keysinuse_ope
         printf("\tTesting engine (%s) functions\n", ENGINE_get_id(engine));
         if (operation == KEYSINUSE_SIGN)
         {
-            if (keysinuse_test_engine_sign(testKey.pkey, testKey.pbKeyId, engine) == SCOSSL_FAILURE)
+            if (keysinuse_test_engine_sign(testKey.pkey, testKey.abKeyId, engine) == SCOSSL_FAILURE)
             {
                 return SCOSSL_FAILURE;
             }
         }
         else
         {
-            if (keysinuse_test_engine_decrypt(testKey.pkey, testKey.pbKeyId, engine) == SCOSSL_FAILURE)
+            if (keysinuse_test_engine_decrypt(testKey.pkey, testKey.abKeyId, engine) == SCOSSL_FAILURE)
             {
                 return SCOSSL_FAILURE;
             }
@@ -1503,14 +1529,14 @@ SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, keysinuse_ope
         printf("\tTesting provider (%s) functions\n", providerName);
         if (operation == KEYSINUSE_SIGN)
         {
-            if (keysinuse_test_provider_sign(testKey.pkey, testKey.pbKeyId, string(providerName)) == SCOSSL_FAILURE)
+            if (keysinuse_test_provider_sign(testKey.pkey, testKey.abKeyId, string(providerName)) == SCOSSL_FAILURE)
             {
                 return SCOSSL_FAILURE;
             }
         }
         else
         {
-            if (keysinuse_test_provider_decrypt(testKey.pkey, testKey.pbKeyId, string(providerName)) == SCOSSL_FAILURE)
+            if (keysinuse_test_provider_decrypt(testKey.pkey, testKey.abKeyId, string(providerName)) == SCOSSL_FAILURE)
             {
                 return SCOSSL_FAILURE;
             }
@@ -1601,7 +1627,7 @@ int main(int argc, char** argv)
     vector<ENGINE *> engines;
     vector<PVOID> providers;
 
-    char pbKeyId[SCOSSL_KEYID_SIZE];
+    char abKeyId[KEYSINUSE_KEYID_SIZE];
     int ret = 0;
 
     keysinuse_test_cleanup();
