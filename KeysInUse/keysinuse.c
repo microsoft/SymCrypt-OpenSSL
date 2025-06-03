@@ -22,6 +22,8 @@
 extern "C" {
 #endif
 
+#define KEYSINUSE_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
+
 typedef struct
 {
     time_t firstLogTime;
@@ -31,7 +33,7 @@ typedef struct
     // The first 32 bytes of the SHA256 hash of the encoded public key.
     // Use the same encoding rules as the subjectPublicKey field of a certificate
     // (PKCS#1 format for RSA, octet string for ECDSA)
-    char keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE + 1];
+    char keyIdentifier[KEYSINUSE_KEYID_SIZE];
     INT32 refCount;
     CRYPTO_RWLOCK *lock;
 } SCOSSL_KEYSINUSE_CTX_IMP;
@@ -52,15 +54,15 @@ static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx
 #endif
 
 // All keysinuse contexts are created and destroyed by the keysinuse module.
-// The keysinuse contexts are refcounted and indexed in lh_keysinuse_info by
+// The keysinuse contexts are refcounted and indexed in lh_keysinuse_ctx_imp by
 // their keyIdentifier.
 //
 // The first call to keysinuse_load_key with a given keyIdentifier
 // will create a new keysinuse context, increment its ref count, and add it
-// to lh_keysinuse_info. Subsequent calls will fetch the existing context
+// to lh_keysinuse_ctx_imp. Subsequent calls will fetch the existing context
 // and increment the refcount. When the ref count reaches zero, the context
-// is freed and removed from lh_keysinuse_info. When keysinuse_teardown
-// is called, all keysinuse contexts are freed and removed from lh_keysinuse_info.
+// is freed and removed from lh_keysinuse_ctx_imp. When keysinuse_teardown
+// is called, all keysinuse contexts are freed and removed from lh_keysinuse_ctx_imp.
 static LHASH_OF(SCOSSL_KEYSINUSE_CTX_IMP) *lh_keysinuse_ctx_imp = NULL;
 // This lock must be acquired before accessing lh_keysinuse_ctx_imp
 static CRYPTO_RWLOCK *lh_keysinuse_ctx_imp_lock = NULL;
@@ -428,33 +430,55 @@ SCOSSL_STATUS keysinuse_ctx_downref(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _Out_
     return SCOSSL_SUCCESS;
 }
 
-SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) const void *pbEncodedKey, unsigned long cbEncodedKey)
+unsigned int keysinuse_derive_key_identifier(_In_reads_bytes_(cbEncodedKey) const void *pbEncodedKey, unsigned long cbEncodedKey,
+                                             _Out_writes_bytes_opt_(cbEncodedKey)char *pbKeyIdentifier, unsigned long cbKeyIdentifier)
 {
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
     UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
+
+    if (pbKeyIdentifier == NULL)
+    {
+        return KEYSINUSE_KEYID_SIZE;
+    }
+
+    if (cbKeyIdentifier < KEYSINUSE_KEYID_SIZE)
+    {
+        keysinuse_log_error("Insufficient buffer size for key identifier");
+        return 0;
+    }
+
+    if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, EVP_sha256(), NULL) <= 0)
+    {
+        keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
+        return 0;
+    }
+
+    for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
+    {
+        sprintf(&pbKeyIdentifier[i*2], "%02x", abHash[i]);
+    }
+    pbKeyIdentifier[KEYSINUSE_KEYID_SIZE - 1] = '\0';
+
+    return KEYSINUSE_KEYID_SIZE;
+}
+
+SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) const void *pbEncodedKey, unsigned long cbEncodedKey)
+{
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
     SCOSSL_KEYSINUSE_CTX_IMP *ctx = NULL;
     int lhErr = 0;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (!keysinuse_is_running() ||
-        pbEncodedKey == NULL ||
-        cbEncodedKey == 0)
+        pbEncodedKey == NULL || cbEncodedKey == 0)
     {
-        return NULL;
-    }
-
-    if (EVP_Digest(pbEncodedKey, cbEncodedKey, abHash, &cbHash, EVP_sha256(), NULL) <= 0)
-    {
-        keysinuse_log_error("EVP_Digest failed,OPENSSL_%d", ERR_get_error());
         goto cleanup;
     }
 
-    for (int i = 0; i < SYMCRYPT_SHA256_RESULT_SIZE / 2; i++)
+    if (keysinuse_derive_key_identifier(pbEncodedKey, cbEncodedKey, ctxTmpl.keyIdentifier, sizeof(ctxTmpl.keyIdentifier)) == 0)
     {
-        sprintf(&ctxTmpl.keyIdentifier[i*2], "%02x", abHash[i]);
+        goto cleanup;
     }
-    ctxTmpl.keyIdentifier[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
 
     if (CRYPTO_THREAD_read_lock(lh_keysinuse_ctx_imp_lock))
     {
@@ -558,6 +582,40 @@ void keysinuse_unload_key(_In_opt_ SCOSSL_KEYSINUSE_CTX *ctx)
     }
 }
 
+unsigned int keysinuse_ctx_get_key_identifier(_In_ SCOSSL_KEYSINUSE_CTX *ctx,
+                                              _Out_writes_bytes_opt_(cbEncodedKey)char *pbKeyIdentifier, unsigned long cbKeyIdentifier)
+{
+    SCOSSL_KEYSINUSE_CTX_IMP *ctxImp = (SCOSSL_KEYSINUSE_CTX_IMP*)ctx;
+
+    if (!keysinuse_is_running() ||
+        ctxImp == NULL)
+        return 0;
+
+    if (pbKeyIdentifier == NULL)
+    {
+        return KEYSINUSE_KEYID_SIZE;
+    }
+
+    if (cbKeyIdentifier < KEYSINUSE_KEYID_SIZE)
+    {
+        keysinuse_log_error("Insufficient buffer size for key identifier, expected %d, got %lu", KEYSINUSE_KEYID_SIZE, cbKeyIdentifier);
+        return 0;
+    }
+
+    if (CRYPTO_THREAD_write_lock(ctxImp->lock))
+    {
+        memcpy(pbKeyIdentifier, ctxImp->keyIdentifier, KEYSINUSE_KEYID_SIZE);
+
+        CRYPTO_THREAD_unlock(ctxImp->lock);
+    }
+    else
+    {
+        keysinuse_log_error("Failed to lock keysinuse context in keysinuse_ctx_get_key_identifier,OPENSSL_%d", ERR_get_error());
+    }
+
+    return KEYSINUSE_KEYID_SIZE;
+}
+
 _Use_decl_annotations_
 static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 {
@@ -571,7 +629,7 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 //
 // Usage tracking
 //
-void keysinuse_on_use(_In_ SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operation)
+void keysinuse_on_use(_In_ SCOSSL_KEYSINUSE_CTX *ctx, KEYSINUSE_OPERATION operation)
 {
     SCOSSL_KEYSINUSE_CTX_IMP *ctxImp = (SCOSSL_KEYSINUSE_CTX_IMP*)ctx;
     int pthreadErr;
@@ -608,7 +666,7 @@ void keysinuse_on_use(_In_ SCOSSL_KEYSINUSE_CTX *ctx, keysinuse_operation operat
     }
     else
     {
-        keysinuse_log_error("Failed to lock keysinuse info in keysinuse_on_use,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse context in keysinuse_on_use,OPENSSL_%d", ERR_get_error());
     }
 
     if (wakeLoggingThread)
@@ -679,7 +737,7 @@ static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
     }
     else
     {
-        keysinuse_log_error("Failed to lock keysinuse info in keysinuse_ctx_log,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse context in keysinuse_ctx_log,OPENSSL_%d", ERR_get_error());
         return;
     }
 
@@ -914,9 +972,12 @@ static void keysinuse_log_notice(const char *message, ...)
     va_end(args);
 }
 
-// The logging thread runs in a loop. It pops all pending usage from sk_keysinuse_info,
-// and writes them to the log file. It sleeps for logging_delay seconds between each iteration.
-// On the first use of a key, the thread is woken immediatley log the event. All pending
+// The logging thread runs in a loop. It checks every context in lh_keysinuse_ctx_imp, to
+// determine if they have unlogged usage. If the sign or decrypt counters are non-zero,
+// the context is logged as a usage event and the counters are reset. It sleeps for
+// logging_delay seconds between each iteration. On the first use of a key, the thread
+// is woken immediately and logs all contexts with a first usage. Any contexts that have
+// been logged will be skipped until the logging thread wakes up normally. All pending
 // events are logged on program exit.
 _Use_decl_annotations_
 static void *keysinuse_logging_thread_start(ossl_unused void *arg)
