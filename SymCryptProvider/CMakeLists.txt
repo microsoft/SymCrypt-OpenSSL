@@ -73,6 +73,7 @@ target_include_directories(scossl_provider PUBLIC ../ScosslCommon/inc)
 if (KEYSINUSE_ENABLED)
     if (KEYSINUSE_LOG_SYSLOG)
         target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_LOG_SYSLOG)
+        target_link_libraries(scossl_provider PUBLIC ${SYSTEMD_LIBRARY})
     endif()
 
     target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_ENABLED)

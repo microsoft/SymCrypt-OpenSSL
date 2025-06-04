@@ -10,20 +10,35 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    #include <syslog.h>
-#else
-    #include <ftw.h>
-#endif
-
 #include "scossl_helpers.h"
 #include "keysinuse.h"
 
 #include <openssl/evp.h>
-
 #if OPENSSL_VERSION_MAJOR == 3
     #include <openssl/core_names.h>
     #include <openssl/provider.h>
+#endif
+
+#ifdef KEYSINUSE_LOG_SYSLOG
+    #include <systemd/sd-journal.h>
+
+    #define KEYSINUSE_MESSAGE_ID "3bfb12b646534bf0ac67e29b050a78e9"
+    #define JOURNAL_FIELD_SOURCE_REALTIME_TIMESTAMP     "_SOURCE_REALTIME_TIMESTAMP"
+    #define JOURNAL_FIELD_MESSAGE                       "MESSAGE"
+    #define JOURNAL_FIELD_MESSAGE_ID                    "MESSAGE_ID"
+    #define JOURNAL_FIELD_PRIORITY                      "PRIORITY"
+    #define JOURNAL_FIELD_SYSLOG_IDENTIFIER             "SYSLOG_IDENTIFIER"
+    #define JOURNAL_FIELD_KEYSINUSE_KEYID               "KEYSINUSE_KEYID"
+    #define JOURNAL_FIELD_KEYSINUSE_SIGN_COUNT          "KEYSINUSE_SIGN_COUNT"
+    #define JOURNAL_FIELD_KEYSINUSE_DECRYPT_COUNT       "KEYSINUSE_DECRYPT_COUNT"
+    #define JOURNAL_FIELD_KEYSINUSE_FIRST_LOG_TIME      "KEYSINUSE_FIRST_LOG_TIME"
+    #define JOURNAL_FIELD_KEYSINUSE_LAST_LOG_TIME       "KEYSINUSE_LAST_LOG_TIME"
+#else
+    #include <ftw.h>
+
+    #define KEYSINUSE_TEST_ROOT "keysinuse_test_root"
+    #define KEYSINUSE_LOG_DIR "/var/log/keysinuse"
+    #define KEYSINUSE_LOG_FILE KEYSINUSE_LOG_DIR "/keysinuse_not_00000000.log"
 #endif
 
 #define KEYSINUSE_TEST_LOG_DELAY 2 // seconds
@@ -34,16 +49,19 @@
 #define KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE 64
 #define KEYSINUSE_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
 
-#ifndef KEYSINUSE_LOG_SYSLOG
-    #define KEYSINUSE_TEST_ROOT "keysinuse_test_root"
-    #define KEYSINUSE_LOG_DIR "/var/log/keysinuse"
-    #define KEYSINUSE_LOG_FILE KEYSINUSE_LOG_DIR "/keysinuse_not_00000000.log"
+#ifdef KEYSINUSE_LOG_SYSLOG
+    typedef struct
+    {
+        char *pbMessage;
+        char *pbSyslogIdentifier;
+        char *pbKeyIdentifier;
+        int priority;
+        int signCount;
+        int decryptCount;
+        time_t firstLogTime;
+        time_t lastLogTime;
+    } KEYSINUSE_SYSLOG_EVENT;
 #endif
-
-static bool logVerbose = false;
-static bool checkSyslog = false;
-
-using namespace std;
 
 typedef struct
 {
@@ -59,6 +77,34 @@ typedef struct
     int decryptCount;
     time_t loggingDelay;
 } KEYSINUSE_EXPECTED_EVENT;
+
+typedef struct
+{
+    const int keyType;
+    const int keygenParams; // Type specific keygen params. Key size for RSA, group nid for ECDSA
+    EVP_PKEY *pkey;
+    PBYTE pbEncodedKey;
+    SIZE_T cbEncodedKey;
+    char abKeyId[KEYSINUSE_KEYID_SIZE];
+} KEYSINUSE_TEST_KEY;
+
+static KEYSINUSE_TEST_KEY testKeys[] = {
+    {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
+    {EVP_PKEY_EC,       NID_secp521r1,          nullptr, nullptr, 0, {}}};
+
+static char *processName;
+static time_t processStartTime;
+
+static bool logVerbose = false;
+static bool checkSyslog = false;
+
+using namespace std;
 
 // Represents a provider to test and whether *provider is a
 // filepath or provider name.
@@ -87,29 +133,6 @@ static void _test_log_openssl_err(const char *file, int line, const char *messag
 #define TEST_LOG_ERROR(...) _test_log_err(__FILE__, __LINE__, __VA_ARGS__);
 #define TEST_LOG_OPENSSL_ERROR(...) _test_log_openssl_err(__FILE__, __LINE__, __VA_ARGS__);
 #define TEST_LOG_VERBOSE(...) if (logVerbose) printf(__VA_ARGS__);
-
-typedef struct
-{
-    const int keyType;
-    const int keygenParams; // Type specific keygen params. Key size for RSA, group nid for ECDSA
-    EVP_PKEY *pkey;
-    PBYTE pbEncodedKey;
-    SIZE_T cbEncodedKey;
-    char abKeyId[KEYSINUSE_KEYID_SIZE];
-} KEYSINUSE_TEST_KEY;
-
-static KEYSINUSE_TEST_KEY testKeys[] = {
-    {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
-    {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
-    {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_secp521r1,          nullptr, nullptr, 0, {}}};
-
-static char *processName;
-static time_t processStartTime;
 
 #if OPENSSL_VERSION_MAJOR < 3
 // OpenSSL 1.1.1 doesn't natively support EVP_PKEY duplication.
@@ -183,6 +206,216 @@ static bool isNumeric(const char *str)
     return true;
 }
 
+#ifdef KEYSINUSE_LOG_SYSLOG
+char *keysinuse_get_syslog_field_string(const char *fieldName, sd_journal *journal)
+{
+    int sd_ret;
+    const char *data;
+    size_t length;
+    char *ret = nullptr;
+
+    sd_ret = sd_journal_get_data(journal, fieldName, (const void **)&data, &length);
+    if (sd_ret < 0)
+    {
+        TEST_LOG_ERROR("Failed to get journal field %s: %s", JOURNAL_FIELD_MESSAGE, strerror(-sd_ret))
+        return nullptr;
+    }
+
+    length -= strlen(fieldName) + 1; // Skip field name and '='
+    data += strlen(fieldName) + 1; // Skip field name and =
+
+    ret = OPENSSL_strndup(data, length);
+    if (ret == nullptr)
+    {
+        TEST_LOG_ERROR("Failed to copy data")
+        return nullptr;
+    }
+
+    return ret;
+}
+
+long keysinuse_get_syslog_field_long(const char *fieldName, sd_journal *journal)
+{
+    int sd_ret;
+    const char *data;
+    size_t length;
+    unsigned long value = 0;
+
+    sd_ret = sd_journal_get_data(journal, fieldName, (const void **)&data, &length);
+    if (sd_ret < 0)
+    {
+        TEST_LOG_ERROR("Failed to get journal field %s: %s", fieldName, strerror(-sd_ret))
+        return -1;
+    }
+
+    data += strlen(fieldName) + 1; // Skip field name and =
+
+    if (!isNumeric(data))
+    {
+        TEST_LOG_ERROR("Invalid data for field %s: %.*s", fieldName, (int)length, data)
+        return -1;
+    }
+
+    return atol(data);
+}
+
+static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE], KEYSINUSE_EXPECTED_EVENT expectedEvents[], int numExpectedEvents)
+{
+    int sd_ret;
+    sd_journal *journal = nullptr;
+    char *messageId = nullptr;
+    unsigned long eventTimestamp;
+    KEYSINUSE_SYSLOG_EVENT *event = nullptr;
+    vector<KEYSINUSE_SYSLOG_EVENT *> events;
+
+    sd_ret = sd_journal_open(&journal, SD_JOURNAL_LOCAL_ONLY);
+    if (sd_ret < 0)
+    {
+        TEST_LOG_ERROR("Failed to open systemd journal: %s", strerror(-sd_ret))
+        goto cleanup;
+    }
+
+    SD_JOURNAL_FOREACH_BACKWARDS(journal)
+    {
+        if ((eventTimestamp = keysinuse_get_syslog_field_long(JOURNAL_FIELD_SOURCE_REALTIME_TIMESTAMP, journal)) == -1)
+        {
+            continue; // Skip events without a timestamp
+        }
+
+        // Only look at events since this test started
+        if (eventTimestamp / 1000000 < processStartTime)
+        {
+            break;
+        }
+
+        if ((messageId = keysinuse_get_syslog_field_string(JOURNAL_FIELD_MESSAGE_ID, journal)) == nullptr ||
+             strcmp(messageId, KEYSINUSE_MESSAGE_ID) != 0)
+        {
+            OPENSSL_free(messageId);
+            continue; // Not a keysinuse event
+        }
+
+        OPENSSL_free(messageId);
+
+        event = (KEYSINUSE_SYSLOG_EVENT *)OPENSSL_zalloc(sizeof(KEYSINUSE_SYSLOG_EVENT));
+        if (event == nullptr)
+        {
+            TEST_LOG_ERROR("Failed to allocate memory for KEYSINUSE_SYSLOG_EVENT")
+            goto cleanup;
+        }
+
+        events.push_back(event);
+
+        if ((event->pbMessage = keysinuse_get_syslog_field_string(JOURNAL_FIELD_MESSAGE, journal)) == nullptr ||
+            (event->pbSyslogIdentifier = keysinuse_get_syslog_field_string(JOURNAL_FIELD_SYSLOG_IDENTIFIER, journal)) == nullptr ||
+            (event->pbKeyIdentifier = keysinuse_get_syslog_field_string(JOURNAL_FIELD_KEYSINUSE_KEYID, journal)) == nullptr ||
+            (event->priority = keysinuse_get_syslog_field_long(JOURNAL_FIELD_PRIORITY, journal)) == -1 ||
+            (event->signCount = keysinuse_get_syslog_field_long(JOURNAL_FIELD_KEYSINUSE_SIGN_COUNT, journal)) == -1 ||
+            (event->decryptCount = keysinuse_get_syslog_field_long(JOURNAL_FIELD_KEYSINUSE_DECRYPT_COUNT, journal)) == -1 ||
+            (event->firstLogTime = keysinuse_get_syslog_field_long(JOURNAL_FIELD_KEYSINUSE_FIRST_LOG_TIME, journal)) == -1 ||
+            (event->lastLogTime = keysinuse_get_syslog_field_long(JOURNAL_FIELD_KEYSINUSE_LAST_LOG_TIME, journal)) == -1)
+        {
+            goto cleanup;
+        }
+
+        if (events.size() == numExpectedEvents)
+        {
+            break;
+        }
+    }
+
+    if (events.size() < numExpectedEvents)
+    {
+        TEST_LOG_ERROR("Expected %d events, but found only %zu", numExpectedEvents, events.size())
+        goto cleanup;
+    }
+
+    // Check the events
+    for (int i = numExpectedEvents - 1; i >= 0; i--)
+    {
+        TEST_LOG_VERBOSE("\t\t%d: %s\n", numExpectedEvents - i, events[i]->pbMessage)
+        TEST_LOG_VERBOSE("\t\t\t%s=%d\n", JOURNAL_FIELD_PRIORITY, events[i]->priority)
+        TEST_LOG_VERBOSE("\t\t\t%s=%s\n", JOURNAL_FIELD_SYSLOG_IDENTIFIER, events[i]->pbSyslogIdentifier)
+        TEST_LOG_VERBOSE("\t\t\t%s=%s\n", JOURNAL_FIELD_KEYSINUSE_KEYID, events[i]->pbKeyIdentifier)
+        TEST_LOG_VERBOSE("\t\t\t%s=%d\n", JOURNAL_FIELD_KEYSINUSE_SIGN_COUNT, events[i]->signCount)
+        TEST_LOG_VERBOSE("\t\t\t%s=%d\n", JOURNAL_FIELD_KEYSINUSE_DECRYPT_COUNT, events[i]->decryptCount)
+        TEST_LOG_VERBOSE("\t\t\t%s=%ld\n", JOURNAL_FIELD_KEYSINUSE_FIRST_LOG_TIME, events[i]->firstLogTime)
+        TEST_LOG_VERBOSE("\t\t\t%s=%ld\n", JOURNAL_FIELD_KEYSINUSE_LAST_LOG_TIME, events[i]->lastLogTime)
+
+        if (strncmp(events[i]->pbKeyIdentifier, abKeyId, KEYSINUSE_KEYID_SIZE) != 0)
+        {
+            TEST_LOG_ERROR("Logged key ID does not match. Expected %s, Logged: %s", abKeyId, events[i]->pbKeyIdentifier)
+            goto cleanup;
+        }
+
+        if (events[i]->priority != LOG_NOTICE)
+        {
+            TEST_LOG_ERROR("Logged priority does not match. Expected %d, Logged: %d", LOG_NOTICE, events[i]->priority)
+            goto cleanup;
+        }
+
+        if (events[i]->signCount != expectedEvents[i].signCount)
+        {
+            TEST_LOG_ERROR("Logged sign count does not match. Expected %d, Logged: %d",
+                expectedEvents[i].signCount, events[i]->signCount)
+            goto cleanup;
+        }
+
+        if (events[i]->decryptCount != expectedEvents[i].decryptCount)
+        {
+            TEST_LOG_ERROR("Logged decrypt count does not match. Expected %d, Logged: %d",
+                expectedEvents[i].decryptCount, events[i]->decryptCount)
+            goto cleanup;
+        }
+
+        if (events[i]->firstLogTime < processStartTime)
+        {
+            TEST_LOG_ERROR("Logged first log time is before the test started. Expected >= %ld, Logged: %ld",
+                processStartTime, events[i]->firstLogTime)
+            goto cleanup;
+        }
+
+        if (i < numExpectedEvents - 1 &&
+            events[i]->firstLogTime < events[i + 1]->lastLogTime)
+        {
+            TEST_LOG_ERROR("Logged first log time is before the last log time from the previous logging event. First: %ld, Last: %ld",
+                 events[i]->firstLogTime,  events[i + 1]->lastLogTime)
+            goto cleanup;
+        }
+
+        if (expectedEvents[i].loggingDelay != 0)
+        {
+            if (events[i]->lastLogTime - events[i]->firstLogTime < expectedEvents[i].loggingDelay)
+            {
+                TEST_LOG_ERROR("Event logged before expected logging delay expired. Expected >= %lds, Logged: %lds",
+                    expectedEvents[i].loggingDelay, events[i]->lastLogTime - events[i]->firstLogTime)
+                goto cleanup;
+            }
+        }
+        else if (events[i]->firstLogTime != events[i]->lastLogTime)
+        {
+            TEST_LOG_ERROR("First and last log time do not match. First: %ld, Last: %ld",
+                events[i]->firstLogTime, events[i]->lastLogTime)
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    for(KEYSINUSE_SYSLOG_EVENT *event : events)
+    {
+        if (event != nullptr)
+        {
+            OPENSSL_free(event->pbMessage);
+            OPENSSL_free(event->pbSyslogIdentifier);
+            OPENSSL_free(event->pbKeyIdentifier);
+            OPENSSL_free(event);
+        }
+    }
+
+    sd_journal_close(journal);
+    return SCOSSL_SUCCESS;
+}
+#else
 static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE], KEYSINUSE_EXPECTED_EVENT expectedEvents[], int numExpectedEvents)
 {
     FILE *logOutput = nullptr;
@@ -201,21 +434,6 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    char journalCtlCommand[64];
-
-    if (sprintf(journalCtlCommand, "/usr/bin/journalctl -t keysinuse -n %d -q", numExpectedEvents) < 0)
-    {
-        TEST_LOG_ERROR("Failed to create journalctl command")
-        goto cleanup;
-    }
-
-    if ((logOutput = popen(journalCtlCommand, "r")) == NULL)
-    {
-        TEST_LOG_ERROR("Failed to run journalctl: %d", errno)
-        goto cleanup;
-    }
-#else
     if ((logOutput = fopen(KEYSINUSE_LOG_FILE, "r")) == NULL ||
         stat(KEYSINUSE_LOG_FILE, &sb) == -1)
     {
@@ -228,7 +446,6 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         TEST_LOG_ERROR("Log file permissions are not 0200: %o", (sb.st_mode & 0777))
         goto cleanup;
     }
-#endif
 
     // Read and validate the first line's header. The rest of the lines
     // should match exactly.
@@ -239,25 +456,10 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
     }
     curLine = pbLine;
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    // First line of journalctl may be informational and should be skipped
-    if (pbLine[0] == '-')
-    {
-        getline(&pbLine, &cbLine, logOutput);
-    }
-#endif
-
     pbLine[cbRead - 1] = '\0'; // Remove the newline character
     TEST_LOG_VERBOSE("\t\t1: %s\n", curLine);
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    // Skip past the syslog header first
-    pbHeader = strrchr(curLine, ']');
-    pbHeader++;;
-    pbHeader = strtok(pbHeader, "!");
-#else
     pbHeader = strtok(curLine, "!");
-#endif
     pbBody = strtok(nullptr, "");
 
 
@@ -278,7 +480,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
     if ((loggedStartTime = atol(pbCurToken)) < processStartTime)
     {
-        TEST_LOG_ERROR("Logged process start time is before the test started. Expected >= %ld, Logged: %ld", processStartTime, loggedStartTime)
+        TEST_LOG_ERROR("Logged process start time is before the test started. Expected >= %ld, Logged: %ld",
+            processStartTime, loggedStartTime)
         goto cleanup;
     }
 
@@ -291,7 +494,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
     if (strcmp(pbCurToken, processName) != 0)
     {
-        TEST_LOG_ERROR("Logged process name does not match.\n\tExpected %s\n\tLogged: %s", processName, pbCurToken)
+        TEST_LOG_ERROR("Logged process name does not match.\n\tExpected %s\n\tLogged: %s",
+            processName, pbCurToken)
         goto cleanup;
     }
 
@@ -320,15 +524,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
             pbLine[cbRead - 1] = '\0'; // Remove the newline character
             TEST_LOG_VERBOSE("\t\t%d: %s\n", i + 1, curLine);
-
-#ifdef KEYSINUSE_LOG_SYSLOG
-            // Skip past the syslog header first
-            pbHeader = strrchr(curLine, ']');
-            pbHeader++;
-            pbHeader = strtok(pbHeader, "!");
-#else
             pbHeader = strtok(curLine, "!");
-#endif
 
             if (pbHeader == NULL || pbBody == NULL)
             {
@@ -338,7 +534,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
             if (strcmp(pbExpectedHeader, pbHeader) != 0)
             {
-                TEST_LOG_ERROR("Logged header does not match.\n\tExpected %s\n\tLogged: %s", pbExpectedHeader, pbHeader)
+                TEST_LOG_ERROR("Logged header does not match.\n\tExpected %s\n\tLogged: %s",
+                    pbExpectedHeader, pbHeader)
                 goto cleanup;
             }
         }
@@ -352,7 +549,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
         if (strcmp(abKeyId, pbCurToken) != 0)
         {
-            TEST_LOG_ERROR("Logged key ID does not match. Expected %s, Logged: %s", abKeyId, pbCurToken)
+            TEST_LOG_ERROR("Logged key ID does not match. Expected %s, Logged: %s",
+                abKeyId, pbCurToken)
             goto cleanup;
         }
 
@@ -371,7 +569,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
         if (atoi(pbCurToken) != expectedEvents[i].signCount)
         {
-            TEST_LOG_ERROR("Logged sign count does not match. Expected %d, Logged: %s", expectedEvents[i].signCount, pbCurToken)
+            TEST_LOG_ERROR("Logged sign count does not match. Expected %d, Logged: %s",
+                expectedEvents[i].signCount, pbCurToken)
             goto cleanup;
         }
 
@@ -390,7 +589,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
         if (atoi(pbCurToken) != expectedEvents[i].decryptCount)
         {
-            TEST_LOG_ERROR("Logged decrypt count does not match. Expected %d, Logged: %s", expectedEvents[i].decryptCount, pbCurToken)
+            TEST_LOG_ERROR("Logged decrypt count does not match. Expected %d, Logged: %s",
+                expectedEvents[i].decryptCount, pbCurToken)
             goto cleanup;
         }
 
@@ -412,7 +612,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         if (i > 0 &&
             firstLogTime < lastLogTime)
         {
-            TEST_LOG_ERROR("Logged first log time is before the last log time from the previous logging event. First: %ld, Last: %ld", firstLogTime, lastLogTime)
+            TEST_LOG_ERROR("Logged first log time is before the last log time from the previous logging event. First: %ld, Last: %ld",
+                firstLogTime, lastLogTime)
             goto cleanup;
         }
 
@@ -434,7 +635,8 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         // Check the first log time >= processStartTime
         if (firstLogTime < processStartTime)
         {
-            TEST_LOG_ERROR("First log time is before the test started. Expected >= %ld, Logged: %ld", processStartTime, firstLogTime)
+            TEST_LOG_ERROR("First log time is before the test started. Expected >= %ld, Logged: %ld",
+                processStartTime, firstLogTime)
             goto cleanup;
         }
 
@@ -442,13 +644,15 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         {
             if (lastLogTime - firstLogTime < expectedEvents[i].loggingDelay)
             {
-                TEST_LOG_ERROR("Event logged before expected logging delay expired. Expected >= %lds, Logged: %lds", expectedEvents[i].loggingDelay, firstLogTime - loggedStartTime)
+                TEST_LOG_ERROR("Event logged before expected logging delay expired. Expected >= %lds, Logged: %lds",
+                    expectedEvents[i].loggingDelay, lastLogTime - firstLogTime)
                 goto cleanup;
             }
         }
         else if (firstLogTime != lastLogTime)
         {
-            TEST_LOG_ERROR("First and last log time do not match. First: %ld, Last: %ld", firstLogTime, lastLogTime)
+            TEST_LOG_ERROR("First and last log time do not match. First: %ld, Last: %ld",
+                firstLogTime, lastLogTime)
             goto cleanup;
         }
     }
@@ -465,11 +669,7 @@ cleanup:
 
     if (logOutput != NULL)
     {
-#ifdef KEYSINUSE_LOG_SYSLOG
-        pclose(logOutput);
-#else
         fclose(logOutput);
-#endif
     }
 
     free(pbExpectedHeader);
@@ -477,6 +677,7 @@ cleanup:
 
     return ret;
 }
+#endif
 
 SCOSSL_STATUS keysinuse_test_api_functions(PCBYTE pcbPublicKey, SIZE_T cbPublicKey, char abKeyId[KEYSINUSE_KEYID_SIZE], KEYSINUSE_OPERATION operation)
 {
@@ -1741,10 +1942,6 @@ int main(int argc, char** argv)
 
     ERR_pop_to_mark();
 
-#ifdef KEYSINUSE_LOG_SYSLOG
-    openlog("keysinuse", LOG_PID | LOG_NDELAY, LOG_USER);
-#endif
-
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
     keysinuse_init();
 
@@ -1815,10 +2012,6 @@ cleanup:
     OPENSSL_free(processName);
     keysinuse_test_cleanup();
     OPENSSL_cleanup();
-
-#ifdef KEYSINUSE_LOG_SYSLOG
-    closelog();
-#endif
 
     return ret;
 }

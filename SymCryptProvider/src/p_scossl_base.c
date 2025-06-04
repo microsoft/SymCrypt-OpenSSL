@@ -13,7 +13,10 @@
 #include "p_scossl_bio.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
+
+#ifdef KEYSINUSE_ENABLED
 #include "keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {

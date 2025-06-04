@@ -12,6 +12,7 @@ add_executable (KeysInUseTest
 
 if (KEYSINUSE_LOG_SYSLOG)
     target_compile_definitions(KeysInUseTest PRIVATE KEYSINUSE_LOG_SYSLOG)
+    target_link_libraries(KeysInUseTest PUBLIC ${SYSTEMD_LIBRARY})
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
