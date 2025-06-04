@@ -10,7 +10,7 @@
 #include <linux/limits.h>
 
 #ifdef KEYSINUSE_LOG_SYSLOG
- #include <syslog.h>
+ #include <systemd/sd-journal.h>
 #else
  #include <fcntl.h>
  #include <sys/stat.h>
@@ -83,7 +83,9 @@ static long logging_delay = 60 * 60; // Default to 1 hour
 //
 
 #ifdef KEYSINUSE_LOG_SYSLOG
- #define KEYSINUSE_SYSLOG_IDENT "keysinuse"
+ #define KEYSINUSE_MESSAGE "key used"
+ #define KEYSINUSE_SYSLOG_IDENTIFIER "keysinuse"
+ #define KEYSINUSE_MESSAGE_ID "3bfb12b646534bf0ac67e29b050a78e9"
 #else
  // Log files separated by UID.
  // /var/log/keysinuse/keysinuse_<level>_<euid>.log
@@ -132,7 +134,9 @@ static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID 
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
 static void keysinuse_log_error(_In_ const char *message, ...);
+#ifndef KEYSINUSE_LOG_SYSLOG
 static void keysinuse_log_notice(_In_ const char *message, ...);
+#endif
 
 static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 
@@ -589,7 +593,9 @@ unsigned int keysinuse_ctx_get_key_identifier(_In_ SCOSSL_KEYSINUSE_CTX *ctx,
 
     if (!keysinuse_is_running() ||
         ctxImp == NULL)
+    {
         return 0;
+    }
 
     if (pbKeyIdentifier == NULL)
     {
@@ -637,7 +643,9 @@ void keysinuse_on_use(_In_ SCOSSL_KEYSINUSE_CTX *ctx, KEYSINUSE_OPERATION operat
 
     if (!keysinuse_is_running() ||
         ctxImp == NULL)
+    {
         return;
+    }
 
     if (CRYPTO_THREAD_write_lock(ctxImp->lock))
     {
@@ -701,7 +709,9 @@ static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
     SCOSSL_KEYSINUSE_CTX_IMP ctxImpTmp;
 
     if (doallArg == NULL)
+    {
         return;
+    }
 
     isScheduledLogEvent = *(BOOL*)doallArg;
 
@@ -743,12 +753,25 @@ static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
 
     if (logEvent)
     {
+#ifdef KEYSINUSE_LOG_SYSLOG
+        sd_journal_send("MESSAGE=%s: %s", KEYSINUSE_MESSAGE, ctxImpTmp.keyIdentifier,
+                        "MESSAGE_ID=%s", KEYSINUSE_MESSAGE_ID,
+                        "PRIORITY=%d", LOG_NOTICE,
+                        "SYSLOG_IDENTIFIER=%s", KEYSINUSE_SYSLOG_IDENTIFIER,
+                        "KEYSINUSE_KEYID=%s", ctxImpTmp.keyIdentifier,
+                        "KEYSINUSE_SIGN_COUNT=%d", ctxImpTmp.signCounter,
+                        "KEYSINUSE_DECRYPT_COUNT=%d", ctxImpTmp.decryptCounter,
+                        "KEYSINUSE_FIRST_LOG_TIME=%ld", ctxImpTmp.firstLogTime,
+                        "KEYSINUSE_LAST_LOG_TIME=%ld", ctxImpTmp.lastLogTime,
+                        NULL);
+#else
         keysinuse_log_notice("%s,%d,%d,%ld,%ld",
             ctxImpTmp.keyIdentifier,
             ctxImpTmp.signCounter,
             ctxImpTmp.decryptCounter,
             ctxImpTmp.firstLogTime,
             ctxImpTmp.lastLogTime);
+#endif
     }
 
     if (freeCtx)
@@ -766,20 +789,21 @@ _Use_decl_annotations_
 static void keysinuse_log_common(int level, const char *message, va_list args)
 #ifdef KEYSINUSE_LOG_SYSLOG
 {
-    int syslog_priority = LOG_NOTICE;
-    char *level_str = "not";
+    int priority = LOG_NOTICE;
     char msg_buf[LOG_MSG_MAX];
     int msg_len;
 
     if (level == KEYSINUSE_ERR)
     {
-        syslog_priority = LOG_WARNING;
-        level_str = "err";
+        priority = LOG_WARNING;
     }
 
     if ((msg_len = vsnprintf(msg_buf, LOG_MSG_MAX, message, args)) > 0)
     {
-        syslog(syslog_priority, "[keysinuse] %s,%s!%s", prefix, level_str, msg_buf);
+        sd_journal_send("MESSAGE=%s", msg_buf,
+                        "MESSAGE_ID=%s", KEYSINUSE_MESSAGE_ID,
+                        "PRIORITY=%d", priority,
+                        NULL);
     }
 }
 #else
@@ -963,6 +987,7 @@ static void keysinuse_log_error(const char *message, ...)
     va_end(args);
 }
 
+#ifndef KEYSINUSE_LOG_SYSLOG
 _Use_decl_annotations_
 static void keysinuse_log_notice(const char *message, ...)
 {
@@ -971,6 +996,7 @@ static void keysinuse_log_notice(const char *message, ...)
     keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
     va_end(args);
 }
+#endif
 
 // The logging thread runs in a loop. It checks every context in lh_keysinuse_ctx_imp, to
 // determine if they have unlogged usage. If the sign or decrypt counters are non-zero,

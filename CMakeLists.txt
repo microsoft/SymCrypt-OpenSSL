@@ -45,6 +45,17 @@ else()
     endif()
 endif()
 
+if (KEYSINUSE_LOG_SYSLOG)
+    find_package(PkgConfig)
+    if (PKG_CONFIG_FOUND)
+        pkg_check_modules(SYSTEMD libsystemd)
+
+        if (SYSTEMD_FOUND)
+            find_library(SYSTEMD_LIBRARY systemd PATHS ${CMAKE_SOURCE_DIR})
+        endif()
+    endif()
+endif()
+
 # In Sanitize version, enable sanitizers
 if (CMAKE_BUILD_TYPE MATCHES Sanitize)
     add_compile_options(-fsanitize=address)

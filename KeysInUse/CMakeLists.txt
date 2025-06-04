@@ -20,13 +20,15 @@ set_target_properties(keysinuse PROPERTIES PUBLIC_HEADER ./keysinuse.h)
 set_target_properties(keysinuse PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(keysinuse PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
+target_compile_definitions(keysinuse PRIVATE KEYSINUSE_STANDALONE)
+target_include_directories(keysinuse PUBLIC ../ScosslCommon/inc)
+
 if (KEYSINUSE_LOG_SYSLOG)
     target_compile_definitions(keysinuse PRIVATE KEYSINUSE_STANDALONE)
     target_compile_definitions(keysinuse PRIVATE KEYSINUSE_LOG_SYSLOG)
+    target_link_libraries(keysinuse PUBLIC ${SYSTEMD_LIBRARY})
 endif()
 
-target_compile_definitions(keysinuse PRIVATE KEYSINUSE_STANDALONE)
-target_include_directories(keysinuse PUBLIC ../ScosslCommon/inc)
 target_link_libraries(keysinuse PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 install(
