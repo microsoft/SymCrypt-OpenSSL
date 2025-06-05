@@ -15,6 +15,8 @@
 extern "C" {
 #endif
 
+#define SCOSSL_MAX_RSA_MODULUS_SIZE (512)
+
 typedef struct
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
@@ -221,6 +223,12 @@ static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, 
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
 
+static SCOSSL_STATUS p_scossl_rsa_verify_recover_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
+                                              _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFYRECOVER);
+}
+
 static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
@@ -276,6 +284,7 @@ err:
     return ret;
 }
 
+
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
@@ -312,6 +321,141 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 
     return SCOSSL_FAILURE;
 }
+
+
+static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                                _Out_writes_bytes_(*routlen) unsigned char *rout, size_t *routlen,
+                                                size_t routsize,
+                                                _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SIZE_T cbModulus = 0, cbResult = 0;
+    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+
+    if (ctx == NULL || ctx->keyCtx == NULL || sig == NULL || routlen == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_VERIFYRECOVER)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+
+    if (rout == NULL)
+    {
+        *routlen = cbModulus;
+        return SCOSSL_SUCCESS;
+    }
+
+    if (routsize < cbModulus)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->mdInfo != NULL)
+    {
+        switch (ctx->padding)
+        {
+        case RSA_X931_PADDING:
+        {
+            unsigned char tbuf[SCOSSL_MAX_RSA_MODULUS_SIZE];
+            if (cbModulus > sizeof(tbuf)) {
+                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+                return SCOSSL_FAILURE;
+            }
+
+            scError = SymCryptRsaRawDecrypt(
+                ctx->keyCtx->key,
+                sig,
+                siglen,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0,
+                tbuf,
+                cbModulus);
+            cbResult = cbModulus;
+
+            if (scError != SYMCRYPT_NO_ERROR) {
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
+                    "SymCryptRsaRawDecrypt failed", scError);
+                return SCOSSL_FAILURE;
+            }
+
+            if (cbResult < 1 || tbuf[cbResult - 1] != RSA_X931_hash_id(mdnid)) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
+                return SCOSSL_FAILURE;
+            }
+
+            cbResult--; // exclude hash ID byte
+
+            if (cbResult != (SIZE_T)EVP_MD_get_size(ctx->md)) {
+                ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH,
+                               "Should be %d, but got %zu",
+                               EVP_MD_get_size(ctx->md), cbResult);
+                return SCOSSL_FAILURE;
+            }
+
+            if (cbResult > routsize) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+                return SCOSSL_FAILURE;
+            }
+
+            memcpy(rout, tbuf, cbResult);
+            *routlen = cbResult;
+            break;
+        }
+
+        case RSA_PKCS1_PADDING:
+        {
+            size_t tmp_len = routsize;
+            if (!scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, rout, tmp_len, sig, siglen)) {
+                ERR_raise(ERR_LIB_PROV, ERR_R_RSA_LIB);
+                return SCOSSL_FAILURE;
+            }
+            *routlen = tmp_len;
+            break;
+        }
+
+        default:
+            ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE,
+                           "Only X.931 or PKCS#1 v1.5 padding allowed");
+            return SCOSSL_FAILURE;
+        }
+    }
+    else
+    {
+        if (routsize < cbModulus) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
+
+        scError = SymCryptRsaRawDecrypt(
+            ctx->keyCtx->key,
+            sig,
+            siglen,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0,
+            rout,
+            cbModulus);
+        cbResult = cbModulus;
+
+        if (scError != SYMCRYPT_NO_ERROR) {
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
+                "SymCryptRsaRawDecrypt failed", scError);
+            return SCOSSL_FAILURE;
+        }
+
+        *routlen = cbResult;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
                                                          _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
@@ -1072,6 +1216,8 @@ const OSSL_DISPATCH p_scossl_rsa_signature_functions[] = {
     {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_rsa_sign},
     {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_rsa_verify_init},
     {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_rsa_verify},
+    {OSSL_FUNC_SIGNATURE_VERIFY_RECOVER_INIT, (void (*)(void))p_scossl_rsa_verify_recover_init},
+    {OSSL_FUNC_SIGNATURE_VERIFY_RECOVER, (void (*)(void))p_scossl_rsa_verify_recover},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_rsa_digest_sign_init},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, (void (*)(void))p_scossl_rsa_digest_sign_final},
