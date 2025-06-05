@@ -4,7 +4,7 @@
 
 #include "scossl_helpers.h"
 #ifdef KEYSINUSE_ENABLED
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 #endif
 
 #ifdef __cplusplus
@@ -28,8 +28,7 @@ typedef struct
 
 #ifdef KEYSINUSE_ENABLED
     BOOL isImported;
-    CRYPTO_RWLOCK *keysinuseLock;
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+    SCOSSL_KEYSINUSE_CTX *keysinuseCtx;
 #endif
 } SCOSSL_PROV_RSA_KEY_CTX;
 
@@ -43,7 +42,7 @@ SCOSSL_STATUS p_scossl_rsa_pss_restrictions_from_params(_In_ OSSL_LIB_CTX *libct
 SCOSSL_STATUS p_scossl_rsa_pss_restrictions_to_params(_In_ const SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions,
                                                       _Inout_ OSSL_PARAM_BLD *bld);
 
-void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);  
+void p_scossl_rsa_pss_restrictions_get_defaults(_Inout_ SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions);
 
 #ifdef KEYSINUSE_ENABLED
 SCOSSL_STATUS p_scossl_rsa_get_encoded_public_key(_In_ PCSYMCRYPT_RSAKEY key,

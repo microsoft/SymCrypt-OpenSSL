@@ -3,7 +3,7 @@
 //
 #include "p_scossl_base.h"
 #ifdef KEYSINUSE_ENABLED
-#include "p_scossl_keysinuse.h"
+#include "keysinuse.h"
 #endif
 
 #ifdef __cplusplus
@@ -34,8 +34,7 @@ typedef struct {
 
 #ifdef KEYSINUSE_ENABLED
     BOOL isImported;
-    CRYPTO_RWLOCK *keysinuseLock;
-    SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo;
+    SCOSSL_KEYSINUSE_CTX *keysinuseCtx;
 #endif
 } SCOSSL_ECC_KEY_CTX;
 

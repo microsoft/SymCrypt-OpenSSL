@@ -29,12 +29,20 @@ released publicly in the future.
 2. Follow Linux build instructions from SymCrypt repository [SymCrypt](https://github.com/Microsoft/SymCrypt) to build the Linux SymCrypt module
     * You can either install the Linux SymCrypt module (i.e libsymcrypt.so* to /usr/lib/, and inc/* to /usr/include/), or
     * Copy the built module to the root of the SymCrypt-OpenSSL repo `cp <SymCryptRepo>/bin/module/<arch>/LinuxUserMode/<module_name>/libsymcrypt.so ./`
-3. `mkdir bin; cd bin`
-4. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
+3. If you are building with the KeysInUse syslog option (`-DKEYSINUSE_LOG_SYSLOG=1`), install the libsystemd development package
+    __Azure Linux__
+    ```tdnf install -y systemd-devel```
+    __Debian/Ubuntu__
+    ```apt-get install -y libsystemd-dev```
+4. `mkdir bin; cd bin`
+5. `cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake-toolchain/LinuxUserMode-<arch>.cmake`
     * If you have not installed SymCrypt header files, you can also specify the root directory `-DSYMCRYPT_ROOT_DIR=<SymCryptRepo>`
     * If you want to link to a specific OpenSSL installation, you can also specify `-DOPENSSL_ROOT_DIR=<OpensslInstallDirectory>`
+    * If you want to enable keysinuse in the symcrypt provider, specify `-DKEYSINUSE_ENABLED=1`
+    * If you want to only build the standalone keysinsue library, specify `-DKEYSINUSE_STANDALONE=1`
+    * If you want keysinuse to log to syslog instead of a file, specify `-DKEYSINUSE_LOG_SYSLOG=1`
     * Optionally, for a release build, specify `-DCMAKE_BUILD_TYPE=Release`
-5. `cmake --build .`
+6. `cmake --build .`
     * Optionally specify `-jN` where N is the number of processes you wish to spawn for the build
 
 ## Run Samples

@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.13.0)
+include(CheckIncludeFile)
 
 project(SymCrypt-OpenSSL
     VERSION 1.10.0
@@ -11,17 +12,61 @@ set(SYMCRYPT_MINIMUM_MINOR "6")
 find_package(OpenSSL REQUIRED)
 
 if (SYMCRYPT_ROOT_DIR)
+    set(SYMCRYPT_FOUND TRUE)
     include_directories(${SYMCRYPT_ROOT_DIR}/inc)
 else()
+    # Try to load SymCrypt from pkg-config
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
-        pkg_check_modules(SYMCRYPT REQUIRED symcrypt>=${SYMCRYPT_MINIMUM_MAJOR}.${SYMCRYPT_MINIMUM_MINOR})
-        message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
-        include_directories(${SYMCRYPT_INCLUDE_DIRS})
-    else()
-        message(FATAL_ERROR "Provide symcrypt pkg-config or set SYMCRYPT_ROOT_DIR variable")
+        pkg_check_modules(SYMCRYPT symcrypt>=${SYMCRYPT_MINIMUM_MAJOR}.${SYMCRYPT_MINIMUM_MINOR})
+
+        if (SYMCRYPT_FOUND)
+            message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
+            include_directories(${SYMCRYPT_INCLUDE_DIRS})
+        endif()            
     endif()
-endif (SYMCRYPT_ROOT_DIR)
+
+    # Try to find installed SymCrypt
+    if (NOT SYMCRYPT_FOUND)
+        find_file(SYMCRYPT_HEADER "symcrypt.h" PATHS ${CMAKE_SOURCE_DIR})
+
+        # SymCrypt headers required for all projects, including KeysInUse
+        if (NOT SYMCRYPT_HEADER)
+            message(FATAL_ERROR "SymCrypt header file not found. Please set SYMCRYPT_ROOT_DIR or install SymCrypt headers.")
+        endif()
+        
+        find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
+        if (SYMCRYPT_LIBRARY)
+            set(SYMCRYPT_FOUND TRUE)
+            message(STATUS "Found installed SymCrypt library: ${SYMCRYPT_LIBRARY}")
+        else()
+            message(WARNING "SymCrypt library not found. Only KeysInUse will be built. Please set SYMCRYPT_ROOT_DIR or install SymCrypt library.")
+        endif()
+    endif()
+endif()
+
+if (KEYSINUSE_LOG_SYSLOG)
+    find_package(PkgConfig)
+    if (PKG_CONFIG_FOUND)
+        pkg_check_modules(SYSTEMD libsystemd)
+    endif()
+
+    # Try to find installed libsystemd
+    if (NOT SYSTEMD_FOUND)
+        find_file(SYSTEMD_HEADER "systemd/sd-journal.h" PATHS ${CMAKE_SOURCE_DIR})
+
+        if (NOT SYSTEMD_HEADER)
+            message(FATAL_ERROR "systemd/sd-journal.h not found. Please install libsystemd headers.")
+        endif()
+    endif()
+
+    find_library(SYSTEMD_LIBRARY systemd PATHS ${CMAKE_SOURCE_DIR})
+    if (SYSTEMD_LIBRARY)
+        message(STATUS "Found installed Systemd library: ${SYSTEMD_LIBRARY}")
+    else()
+        message(WARNING "Systemd library not found. Please install libsystemd.")
+    endif()
+endif()
 
 # In Sanitize version, enable sanitizers
 if (CMAKE_BUILD_TYPE MATCHES Sanitize)
@@ -42,11 +87,16 @@ else()
     add_compile_options(-DDBG=1)
 endif()
 
-add_subdirectory (ScosslCommon)
-add_subdirectory (SymCryptEngine/static)
-add_subdirectory (SymCryptEngine/dynamic)
-add_subdirectory (SslPlay)
-
-if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-    add_subdirectory (SymCryptProvider)
+if (SYMCRYPT_FOUND AND NOT KEYSINUSE_STANDALONE)
+    add_subdirectory (ScosslCommon)
+    add_subdirectory (SymCryptEngine/static)
+    add_subdirectory (SymCryptEngine/dynamic)
+    add_subdirectory (test/SslPlay)
+    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
+        add_subdirectory (SymCryptProvider)
+    endif()
 endif()
+
+# SymCrypt not needed for just building the KeysInUse standalone library and test
+add_subdirectory (KeysInUse)
+add_subdirectory (test/KeysInUseTest)

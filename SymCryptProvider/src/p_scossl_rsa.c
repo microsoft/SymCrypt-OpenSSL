@@ -247,35 +247,38 @@ cleanup:
 _Use_decl_annotations_
 void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
-    if (keyCtx->isImported &&
-        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
+    PBYTE pbPublicKey = NULL;
+    SIZE_T cbPublicKey;
+
+    // Initialize keysinuse for private keys. Generated keys are
+    // ignored to avoid noise from ephemeral keys.
+    if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
     {
-        if (keyCtx->keysinuseInfo == NULL)
+        // KeysInUse related errors shouldn't surface to caller, including errors
+        // from p_scossl_rsa_get_encoded_public_key
+        ERR_set_mark();
+
+        if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
         {
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
-
-            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
-            {
-                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
-            }
-
-            OPENSSL_free(pbPublicKey);
+            keyCtx->keysinuseCtx = keysinuse_load_key(pbPublicKey, cbPublicKey);
         }
-        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
+        else
+        {
+            SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+                "p_scossl_rsa_get_encoded_public_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
+        }
+
+        ERR_pop_to_mark();
+
+        OPENSSL_free(pbPublicKey);
     }
 }
 
 _Use_decl_annotations_
 void p_scossl_rsa_reset_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
-    if (keyCtx->keysinuseLock != NULL &&
-        CRYPTO_THREAD_write_lock(keyCtx->keysinuseLock))
-    {
-        p_scossl_keysinuse_info_free(keyCtx->keysinuseInfo);
-        keyCtx->keysinuseInfo = NULL;
-        CRYPTO_THREAD_unlock(keyCtx->keysinuseLock);
-    }
+    keysinuse_unload_key(keyCtx->keysinuseCtx);
+    keyCtx->keysinuseCtx = NULL;
 }
 
 #endif
