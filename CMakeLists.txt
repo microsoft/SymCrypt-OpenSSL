@@ -37,7 +37,7 @@ else()
         
         find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
         if (SYMCRYPT_LIBRARY)
-        set(SYMCRYPT_FOUND TRUE)
+            set(SYMCRYPT_FOUND TRUE)
             message(STATUS "Found installed SymCrypt library: ${SYMCRYPT_LIBRARY}")
         else()
             message(WARNING "SymCrypt library not found. Only KeysInUse will be built. Please set SYMCRYPT_ROOT_DIR or install SymCrypt library.")
@@ -49,10 +49,22 @@ if (KEYSINUSE_LOG_SYSLOG)
     find_package(PkgConfig)
     if (PKG_CONFIG_FOUND)
         pkg_check_modules(SYSTEMD libsystemd)
+    endif()
 
-        if (SYSTEMD_FOUND)
-            find_library(SYSTEMD_LIBRARY systemd PATHS ${CMAKE_SOURCE_DIR})
+    # Try to find installed libsystemd
+    if (NOT SYSTEMD_FOUND)
+        find_file(SYSTEMD_HEADER "systemd/sd-journal.h" PATHS ${CMAKE_SOURCE_DIR})
+
+        if (NOT SYSTEMD_HEADER)
+            message(FATAL_ERROR "systemd/sd-journal.h not found. Please install libsystemd headers.")
         endif()
+    endif()
+
+    find_library(SYSTEMD_LIBRARY systemd PATHS ${CMAKE_SOURCE_DIR})
+    if (SYSTEMD_LIBRARY)
+        message(STATUS "Found installed Systemd library: ${SYSTEMD_LIBRARY}")
+    else()
+        message(WARNING "Systemd library not found. Please install libsystemd.")
     endif()
 endif()
 

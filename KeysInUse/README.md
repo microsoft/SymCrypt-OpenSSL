@@ -9,7 +9,7 @@ KeysInUse was originally implemented as the [KeysInUse engine for OpenSSL 1.1.1]
 has been moved here to support scenarios for OpenSSL 3.
 
 If you want KeysInUse to log to syslog instead of `/var/log/keysinuse`, you can specify `-DKEYSINUSE_LOG_SYSLOG=1` in the CMake
-configuration step.
+configuration step. Syslog logging depends on libsystemd.
 
 ## Testing
 The KeysInUse tests test both the KeysInUse API, and optionally any providers or engines that use KeysInUse. The test assumes any
