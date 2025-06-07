@@ -319,9 +319,8 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }
 
-    return SCOSSL_FAILURE;
+    return SCOSSL_FAILURE; 
 }
-
 
 static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                 _Out_writes_bytes_(*routlen) unsigned char *rout, size_t *routlen,
@@ -329,110 +328,71 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                 _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SIZE_T cbModulus = 0, cbResult = 0;
-    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+    SIZE_T cbModulus = 0;
 
-    if (ctx == NULL || ctx->keyCtx == NULL || sig == NULL || routlen == NULL)
-    {
+    if (ctx == NULL || ctx->keyCtx == NULL || sig == NULL || routlen == NULL) {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->operation != EVP_PKEY_OP_VERIFYRECOVER)
-    {
+    if (ctx->operation != EVP_PKEY_OP_VERIFYRECOVER) {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
     cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+    printf("\n###### Megan: cbModulus = %lu, routsize = %lu, *routlen = %lu, siglen = %lu\n",
+           cbModulus, routsize, *routlen, siglen);
 
-    if (rout == NULL)
-    {
+    printf("sig = ");
+    for (size_t i = 0; i < siglen; i++) {
+        printf("%02x", sig[i]);
+    }
+    printf("\n");
+
+    if (rout == NULL) {
         *routlen = cbModulus;
         return SCOSSL_SUCCESS;
     }
 
-    if (routsize < cbModulus)
-    {
+    if (routsize < cbModulus) {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->mdInfo != NULL)
-    {
-        switch (ctx->padding)
-        {
-        case RSA_X931_PADDING:
-        {
-            unsigned char tbuf[SCOSSL_MAX_RSA_MODULUS_SIZE];
-            if (cbModulus > sizeof(tbuf)) {
-                ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
-                return SCOSSL_FAILURE;
-            }
+    if (ctx->md != NULL) {
+        switch (ctx->padding) {
+        case RSA_PKCS1_PADDING:
+            printf("\n###### Megan: PKCS1 verify-recover path, routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
 
-            scError = SymCryptRsaRawDecrypt(
+            // Perform public key operation to recover encoded DigestInfo
+            scError = SymCryptRsaRawEncrypt(
                 ctx->keyCtx->key,
                 sig,
                 siglen,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 0,
-                tbuf,
-                cbModulus);
-            cbResult = cbModulus;
+                rout,
+                cbModulus
+                );
 
             if (scError != SYMCRYPT_NO_ERROR) {
-                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
-                    "SymCryptRsaRawDecrypt failed", scError);
+                printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover) failed 0x%x\n", scError);
+                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                                          "SymCryptRsaRawEncrypt failed", scError);
                 return SCOSSL_FAILURE;
             }
 
-            if (cbResult < 1 || tbuf[cbResult - 1] != RSA_X931_hash_id(mdnid)) {
-                ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
-                return SCOSSL_FAILURE;
-            }
-
-            cbResult--; // exclude hash ID byte
-
-            if (cbResult != (SIZE_T)EVP_MD_get_size(ctx->md)) {
-                ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH,
-                               "Should be %d, but got %zu",
-                               EVP_MD_get_size(ctx->md), cbResult);
-                return SCOSSL_FAILURE;
-            }
-
-            if (cbResult > routsize) {
-                ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-                return SCOSSL_FAILURE;
-            }
-
-            memcpy(rout, tbuf, cbResult);
-            *routlen = cbResult;
+            *routlen = cbModulus;
             break;
-        }
-
-        case RSA_PKCS1_PADDING:
-        {
-            size_t tmp_len = routsize;
-            if (!scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, rout, tmp_len, sig, siglen)) {
-                ERR_raise(ERR_LIB_PROV, ERR_R_RSA_LIB);
-                return SCOSSL_FAILURE;
-            }
-            *routlen = tmp_len;
-            break;
-        }
 
         default:
             ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE,
-                           "Only X.931 or PKCS#1 v1.5 padding allowed");
+                           "Only PKCS#1 v1.5 padding allowed");
             return SCOSSL_FAILURE;
         }
-    }
-    else
-    {
-        if (routsize < cbModulus) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-            return SCOSSL_FAILURE;
-        }
+    } else {
+        printf("\n###### Megan: raw decrypt path (no digest specified)\n");
 
         scError = SymCryptRsaRawDecrypt(
             ctx->keyCtx->key,
@@ -441,20 +401,22 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0,
             rout,
-            cbModulus);
-        cbResult = cbModulus;
+            cbModulus
+        );
 
         if (scError != SYMCRYPT_NO_ERROR) {
+            printf("\n###### Megan: SymCryptRsaRawDecrypt failed 0x%x\n", scError);
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
-                "SymCryptRsaRawDecrypt failed", scError);
+                                      "SymCryptRsaRawDecrypt failed", scError);
             return SCOSSL_FAILURE;
         }
 
-        *routlen = cbResult;
+        *routlen = cbModulus;
     }
 
     return SCOSSL_SUCCESS;
 }
+
 
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
