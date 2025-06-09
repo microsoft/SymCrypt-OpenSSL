@@ -22,8 +22,6 @@
 extern "C" {
 #endif
 
-#define KEYSINUSE_KEYID_SIZE (SYMCRYPT_SHA256_RESULT_SIZE + 1)
-
 typedef struct
 {
     time_t firstLogTime;
@@ -97,9 +95,12 @@ static long logging_delay = 60 * 60; // Default to 1 hour
 #define KEYSINUSE_NOTICE 1
 
 #define LOG_MSG_MAX 256
+
+#ifndef KEYSINUSE_LOG_SYSLOG
 static const char *default_prefix = "";
 static char *prefix = NULL;
 static int prefix_size = 0;
+#endif
 
 //
 // Logging thread
@@ -134,9 +135,7 @@ static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID 
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
 static void keysinuse_log_error(_In_ const char *message, ...);
-#ifndef KEYSINUSE_LOG_SYSLOG
 static void keysinuse_log_notice(_In_ const char *message, ...);
-#endif
 
 static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 
@@ -144,28 +143,19 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 // Setup/teardown
 //
 
-static void keysinuse_init_internal()
-{
 #ifndef KEYSINUSE_LOG_SYSLOG
+static SCOSSL_STATUS keysinuse_init_logging()
+{
     int mkdirResult;
     mode_t umaskOriginal;
-#endif
-    pid_t pid = getpid();
-    time_t initTime = time(NULL);
     char *symlinkPath = NULL;
     int cbSymlink;
     char *procPath = NULL;
     int cbProcPath = PATH_MAX;
     int cbProcPathUsed = 0;
-    pthread_condattr_t attr;
-    int pthreadErr;
+    pid_t pid = getpid();
+    time_t initTime = time(NULL);
     SCOSSL_STATUS status = SCOSSL_FAILURE;
-
-    if (!keysinuse_enabled)
-        return;
-
-    lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
-    lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
 
     // Generate prefix for all log messages
     // <keysinuse init time>,<process path>
@@ -183,7 +173,7 @@ static void keysinuse_init_internal()
 #ifndef KEYSINUSE_STANDALONE
             SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
                 "Failed to get process path from /proc/%d/exe with error %d", pid, errno);
-#endif
+#endif // KEYSINUSE_STANDALONE
             OPENSSL_free(procPath);
             procPath = NULL;
             cbProcPathUsed = 0;
@@ -199,12 +189,11 @@ static void keysinuse_init_internal()
 #ifndef KEYSINUSE_STANDALONE
         SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
             "Failed to generate logging prefix with error %d", errno);
-#endif
+#endif // KEYSINUSE_STANDALONE
         OPENSSL_free(prefix);
         prefix = (char*)default_prefix;
     }
 
-#ifndef KEYSINUSE_LOG_SYSLOG
     // Try to create /var/log/keysinuse if it isn't present.
     // This is a best attempt and only succeeds if the callers
     // has sufficient permissions
@@ -226,6 +215,36 @@ static void keysinuse_init_internal()
         keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
         goto cleanup;
     }
+
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_free(symlinkPath);
+    OPENSSL_free(procPath);
+
+    return status;
+}
+#endif
+
+static void keysinuse_init_internal()
+{
+    pthread_condattr_t attr;
+    int pthreadErr;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if (!keysinuse_enabled)
+    {
+        return;
+    }
+
+    lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
+    lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
+
+#ifndef KEYSINUSE_LOG_SYSLOG
+    if (!keysinuse_init_logging())
+    {
+        goto cleanup;
+    }
 #endif
 
     // Start the logging thread. Monotonic clock needs to be set to
@@ -244,6 +263,10 @@ static void keysinuse_init_internal()
     keysinuse_running = TRUE;
     status = SCOSSL_SUCCESS;
 
+#ifdef KEYSINUSE_LOG_SYSLOG
+    keysinuse_log_notice("KeysInUse initialized");
+#endif
+
 cleanup:
     if (status == SCOSSL_FAILURE)
     {
@@ -254,23 +277,22 @@ cleanup:
     }
 
     pthread_condattr_destroy(&attr);
-    OPENSSL_free(symlinkPath);
-    OPENSSL_free(procPath);
 }
 
-// DO NOT call this function directly. It is registered
-// to be called by OPENSSL_at_exit and cleans up the
-// global keysinuse objects
+// DO NOT call this function directly. It should only be called when
+// the shared library is destroyed since it cleans up global state.
 __attribute__((destructor)) static void keysinuse_cleanup_internal()
 {
     keysinuse_teardown();
 
+#ifndef KEYSINUSE_LOG_SYSLOG
     if (prefix != default_prefix)
     {
         OPENSSL_free(prefix);
         prefix = (char*)default_prefix;
         prefix_size = 0;
     }
+#endif
 
     if (lh_keysinuse_ctx_imp != NULL)
     {
@@ -324,6 +346,10 @@ void keysinuse_teardown()
     {
         keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
     }
+
+#ifdef KEYSINUSE_LOG_SYSLOG
+    keysinuse_log_notice("KeysInUse stopped");
+#endif
 }
 
 void keysinuse_disable()
@@ -529,15 +555,12 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) cons
                     keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
                 }
             }
-            else
-            {
-                keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
-            }
 
             CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
 
             if (lh_keysinuse_ctx_imp == NULL || lhErr)
             {
+                keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
                 goto cleanup;
             }
         }
@@ -708,7 +731,8 @@ static void keysinuse_ctx_log(SCOSSL_KEYSINUSE_CTX_IMP *ctxImp, PVOID doallArg)
     time_t now;
     SCOSSL_KEYSINUSE_CTX_IMP ctxImpTmp;
 
-    if (doallArg == NULL)
+    if (ctxImp == NULL ||
+        doallArg == NULL)
     {
         return;
     }
@@ -803,6 +827,7 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
         sd_journal_send("MESSAGE=%s", msg_buf,
                         "MESSAGE_ID=%s", KEYSINUSE_MESSAGE_ID,
                         "PRIORITY=%d", priority,
+                        "SYSLOG_IDENTIFIER=%s", KEYSINUSE_SYSLOG_IDENTIFIER,
                         NULL);
     }
 }
@@ -975,7 +1000,6 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
 }
 #endif // KEYSINUSE_LOG_SYSLOG
 
-
 // Used for logging keysinuse related errors to a separate log file.
 // This avoids poluting the error stack with keysinuse related errors.
 _Use_decl_annotations_
@@ -987,7 +1011,6 @@ static void keysinuse_log_error(const char *message, ...)
     va_end(args);
 }
 
-#ifndef KEYSINUSE_LOG_SYSLOG
 _Use_decl_annotations_
 static void keysinuse_log_notice(const char *message, ...)
 {
@@ -996,7 +1019,6 @@ static void keysinuse_log_notice(const char *message, ...)
     keysinuse_log_common(KEYSINUSE_NOTICE, message, args);
     va_end(args);
 }
-#endif
 
 // The logging thread runs in a loop. It checks every context in lh_keysinuse_ctx_imp, to
 // determine if they have unlogged usage. If the sign or decrypt counters are non-zero,
@@ -1082,18 +1104,27 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg)
 
         if (CRYPTO_THREAD_read_lock(lh_keysinuse_ctx_imp_lock))
         {
-            // Set load factor to 0 during this operation to prevent hash table contraction.
-            // This allows us to safely call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete from
-            // keysinuse_ctx_log to safely remove contexts with no more references.
-            lhDownLoad = lh_SCOSSL_KEYSINUSE_CTX_IMP_get_down_load(lh_keysinuse_ctx_imp);
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, 0);
+            if (lh_keysinuse_ctx_imp != NULL)
+            {
+                // Set load factor to 0 during this operation to prevent hash table contraction.
+                // This allows us to safely call lh_SCOSSL_KEYSINUSE_CTX_IMP_delete from
+                // keysinuse_ctx_log to safely remove contexts with no more references.
+                lhDownLoad = lh_SCOSSL_KEYSINUSE_CTX_IMP_get_down_load(lh_keysinuse_ctx_imp);
+                lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, 0);
 
-            isScheduledLogEvent = waitStatus == ETIMEDOUT;
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg(lh_keysinuse_ctx_imp, keysinuse_ctx_log, &isScheduledLogEvent);
+                isScheduledLogEvent = waitStatus == ETIMEDOUT;
+                lh_SCOSSL_KEYSINUSE_CTX_IMP_doall_arg(lh_keysinuse_ctx_imp, keysinuse_ctx_log, &isScheduledLogEvent);
 
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, lhDownLoad);
+                lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, lhDownLoad);
+            }
 
             CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
+
+            if (lh_keysinuse_ctx_imp == NULL)
+            {
+                keysinuse_log_error("Keysinuse context hash table is missing in logging thread");
+                goto cleanup;
+            }
         }
         else
         {

@@ -16,6 +16,8 @@ typedef enum
 
 typedef void SCOSSL_KEYSINUSE_CTX;  // Exported opaque type
 
+#define KEYSINUSE_KEYID_SIZE 33 // 32 bytes for hex encoded first half of SHA256 hash + 1 for null terminator
+
 //
 // Initialization and teardown
 //
