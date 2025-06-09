@@ -528,9 +528,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     BYTE *default_zeros = NULL;
     BYTE empty_hash[EVP_MAX_MD_SIZE]; 
     BYTE expanded_secret[EVP_MAX_MD_SIZE];
-    EVP_MD_CTX *mdctx = NULL;
     SCOSSL_HKDF_CTX *dupCtx;
-    BOOL key_need_reset =  FALSE;
     SIZE_T mdlen = 0;
     PBYTE pbSavedKey;
     SIZE_T cbSavedKey = 0;
@@ -572,7 +570,6 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     {
         dupCtx->pbKey = default_zeros;
         dupCtx->cbKey = mdlen;
-        key_need_reset = TRUE;
     }
 
     if (dupCtx->pbSalt == NULL) 
@@ -604,23 +601,11 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
             goto cleanup;
         }
         //restore pbKey/cbKey
-        dupCtx->pbKey = ctx->pbKey;
-        dupCtx->cbKey = ctx->cbKey;
         dupCtx->pbKey = pbSavedKey;
         dupCtx->cbKey = cbSavedKey;
 
-        scError = SymCryptHkdfExtractPrk(
-            symcryptHmacAlg,
-            dupCtx->pbKey, dupCtx->cbKey,
-            expanded_secret, keylen,
-            key, keylen);
-        if (scError != SYMCRYPT_NO_ERROR) 
-        {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfExtractPrk failed", scError);
-            goto cleanup;
-        }
-        status = SCOSSL_SUCCESS;
-        goto cleanup;
+        dupCtx->pbSalt = expanded_secret;
+        dupCtx->cbSalt = keylen;
     }
 
     scError = SymCryptHkdfExtractPrk(
@@ -636,15 +621,8 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     status = SCOSSL_SUCCESS;
 
 cleanup:
-    //restore original key
-    if (key_need_reset == TRUE) {
-        ctx->pbKey = NULL;
-        ctx->cbKey = 0;
-    }
     OPENSSL_free(dupCtx);
     OPENSSL_free(default_zeros);
-    EVP_MD_CTX_free(mdctx);
-    
     return status;
 }
 
