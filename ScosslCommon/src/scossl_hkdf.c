@@ -90,6 +90,8 @@ SCOSSL_STATUS scossl_hkdf_reset(SCOSSL_HKDF_CTX *ctx)
 {
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
+    OPENSSL_free(ctx->pbPrefix);
+    OPENSSL_free(ctx->pbLabel);
     OPENSSL_clear_free(ctx->pbData, ctx->cbData);
     OPENSSL_cleanse(ctx, sizeof(*ctx));
     return SCOSSL_SUCCESS;

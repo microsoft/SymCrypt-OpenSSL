@@ -523,7 +523,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
                                                 _Out_writes_bytes_(keylen) unsigned char *key, size_t keylen)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    SCOSSL_STATUS status = SCOSSL_SUCCESS;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
     PCSYMCRYPT_MAC symcryptHmacAlg = NULL;
     BYTE *default_zeros = NULL;
     BYTE empty_hash[EVP_MAX_MD_SIZE]; 
@@ -532,7 +532,9 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     SCOSSL_HKDF_CTX *dupCtx;
     BOOL key_need_reset =  FALSE;
     SIZE_T mdlen = 0;
-
+    PBYTE pbSavedKey;
+    SIZE_T cbSavedKey = 0;
+    
     if (ctx == NULL || ctx->md == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
@@ -553,19 +555,16 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     }
 
     // duplicate a ctx to use as pass-in parameter for Symcrypt
-    dupCtx = OPENSSL_zalloc(sizeof(*ctx));
-    if (!dupCtx) 
+    if ((dupCtx = OPENSSL_memdup(ctx, sizeof(*ctx))) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return SCOSSL_FAILURE;
     }
-    memcpy(dupCtx, ctx, sizeof(*ctx));
     
     default_zeros = OPENSSL_zalloc(EVP_MAX_MD_SIZE);
     if (default_zeros == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        status = SCOSSL_FAILURE;
         goto cleanup;
     }
    
@@ -573,8 +572,6 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     {
         dupCtx->pbKey = default_zeros;
         dupCtx->cbKey = mdlen;
-        ctx->pbKey = default_zeros; //SymCryptHkdfExtractPrk uses original ctx, have to set pbKey as well
-        ctx->cbKey = mdlen;
         key_need_reset = TRUE;
     }
 
@@ -585,31 +582,32 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     }
     else
     {
-        mdctx = EVP_MD_CTX_new();
-        if (mdctx == NULL ||
-            EVP_DigestInit_ex(mdctx, dupCtx->md, NULL) <= 0 ||
-            EVP_DigestFinal_ex(mdctx, empty_hash, NULL) <= 0) 
+        // get empty hash value
+        unsigned int tmplen = 0;
+        if (!EVP_Digest(NULL, 0, empty_hash, &tmplen, dupCtx->md, NULL))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            status = SCOSSL_FAILURE;
             goto cleanup;
         }
 
         dupCtx->pbData = empty_hash;
-        dupCtx->cbData = mdlen;
+        dupCtx->cbData = tmplen;
 
         //scossl_tls13_hkdf_expand uses pbKey, so set it as pbSalt
+        pbSavedKey = dupCtx->pbKey;
+        cbSavedKey = dupCtx->cbKey;
         dupCtx->pbKey = dupCtx->pbSalt;
         dupCtx->cbKey = dupCtx->cbSalt;
 
         if (SCOSSL_SUCCESS != p_scossl_tls13_hkdf_expand(dupCtx, expanded_secret, keylen)) 
         {
-            status = SCOSSL_FAILURE;
             goto cleanup;
         }
         //restore pbKey/cbKey
         dupCtx->pbKey = ctx->pbKey;
         dupCtx->cbKey = ctx->cbKey;
+        dupCtx->pbKey = pbSavedKey;
+        dupCtx->cbKey = cbSavedKey;
 
         scError = SymCryptHkdfExtractPrk(
             symcryptHmacAlg,
@@ -619,10 +617,9 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
         if (scError != SYMCRYPT_NO_ERROR) 
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfExtractPrk failed", scError);
-            status = SCOSSL_FAILURE;
             goto cleanup;
         }
-        scError = SCOSSL_SUCCESS;
+        status = SCOSSL_SUCCESS;
         goto cleanup;
     }
 
@@ -634,10 +631,8 @@ SCOSSL_STATUS p_scossl_tls13kdf_generate_secret(_In_ SCOSSL_HKDF_CTX *ctx,
     if (scError != SYMCRYPT_NO_ERROR) 
     {
         SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptHkdfExtractPrk failed", scError);
-        status = SCOSSL_FAILURE;
         goto cleanup;
     }
-
     status = SCOSSL_SUCCESS;
 
 cleanup:
