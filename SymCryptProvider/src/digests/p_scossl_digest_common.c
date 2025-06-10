@@ -124,3 +124,7 @@ SCOSSL_STATUS p_scossl_digest_digest(PCSYMCRYPT_HASH pHash,
 
     return SCOSSL_SUCCESS;
 }
+
+#ifdef __cplusplus
+}
+#endif

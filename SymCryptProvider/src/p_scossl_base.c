@@ -9,9 +9,14 @@
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
 #include "scossl_provider.h"
+#include "p_scossl_base.h"
 #include "p_scossl_bio.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
+
+#ifdef KEYSINUSE_ENABLED
+#include "keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -444,9 +449,7 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-    #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_teardown();
-    #endif
+
     if (provctx != NULL)
     {
         BIO_meth_free(provctx->coreBioMeth);
@@ -634,15 +637,15 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                 }
             }
 
-            p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
+            keysinuse_set_max_file_size(maxFileSizeBytes);
         }
 
         if (confLoggingDelay != NULL)
         {
-            p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
+            keysinuse_set_logging_delay(atol(confLoggingDelay));
         }
 
-        p_scossl_keysinuse_init();
+        keysinuse_init();
     }
 
     ERR_pop_to_mark();
