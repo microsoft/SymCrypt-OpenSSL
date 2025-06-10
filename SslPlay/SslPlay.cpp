@@ -160,6 +160,8 @@ void TestEccCurve(int nid)
 
 void TestEcc()
 {
+    TestEccCurve(NID_secp192k1);
+    TestEccCurve(NID_secp224r1);
     TestEccCurve(NID_X9_62_prime256v1);
     TestEccCurve(NID_secp384r1);
     TestEccCurve(NID_secp521r1);
