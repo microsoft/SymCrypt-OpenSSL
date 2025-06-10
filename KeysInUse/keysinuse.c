@@ -63,6 +63,8 @@ static int scossl_keysinuse_ctx_cmp(_In_opt_ const SCOSSL_KEYSINUSE_CTX_IMP *ctx
 // is called, all keysinuse contexts are freed and removed from lh_keysinuse_ctx_imp.
 static LHASH_OF(SCOSSL_KEYSINUSE_CTX_IMP) *lh_keysinuse_ctx_imp = NULL;
 // This lock must be acquired before accessing lh_keysinuse_ctx_imp
+// This lock is initialized in keysinuse_init_internal and should only be
+// freed in keysinuse_cleanup_internal
 static CRYPTO_RWLOCK *lh_keysinuse_ctx_imp_lock = NULL;
 
 //
@@ -270,6 +272,7 @@ static void keysinuse_init_internal()
 cleanup:
     if (status == SCOSSL_FAILURE)
     {
+        // lh_keysinuse_ctx_imp_lock should be freed in keysinuse_cleanup_internal
         keysinuse_enabled = FALSE;
         lh_SCOSSL_KEYSINUSE_CTX_IMP_free(lh_keysinuse_ctx_imp);
         lh_keysinuse_ctx_imp = NULL;
@@ -496,8 +499,8 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) cons
 {
     SCOSSL_KEYSINUSE_CTX_IMP ctxTmpl;
     SCOSSL_KEYSINUSE_CTX_IMP *ctx = NULL;
+    SCOSSL_KEYSINUSE_CTX_IMP *localCtx = NULL;
     int lhErr = 0;
-    SCOSSL_STATUS status = SCOSSL_FAILURE;
 
     if (!keysinuse_is_running() ||
         pbEncodedKey == NULL || cbEncodedKey == 0)
@@ -527,40 +530,60 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) cons
     }
     else
     {
-        keysinuse_log_error("Failed to keysinuse context hash table for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
+        keysinuse_log_error("Failed to lock keysinuse context hash table for reading in keysinuse_load_key,OPENSSL_%d", ERR_get_error());
         goto cleanup;
     }
 
     if (ctx == NULL)
     {
         // New key used for keysinuse. Create a new context and add it to the hash table
-        if ((ctx = OPENSSL_zalloc(sizeof(SCOSSL_KEYSINUSE_CTX_IMP))) == NULL ||
-            (ctx->lock = CRYPTO_THREAD_lock_new()) == NULL)
+        if ((localCtx = OPENSSL_zalloc(sizeof(SCOSSL_KEYSINUSE_CTX_IMP))) == NULL ||
+            (localCtx->lock = CRYPTO_THREAD_lock_new()) == NULL)
         {
             keysinuse_log_error("malloc failure in keysinuse_load_key,OPENSSL_%d", ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        memcpy(ctx->keyIdentifier, ctxTmpl.keyIdentifier, sizeof(ctxTmpl.keyIdentifier));
-        ctx->refCount = 1;
+        memcpy(localCtx->keyIdentifier, ctxTmpl.keyIdentifier, sizeof(ctxTmpl.keyIdentifier));
+        localCtx->refCount = 1;
 
         if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
         {
             if (lh_keysinuse_ctx_imp != NULL)
             {
-                lh_SCOSSL_KEYSINUSE_CTX_IMP_insert(lh_keysinuse_ctx_imp, ctx);
-
-                if ((lhErr = lh_SCOSSL_KEYSINUSE_CTX_IMP_error(lh_keysinuse_ctx_imp)))
+                // Make sure another thread didn't add the context while we were waiting for the lock
+                ctx = lh_SCOSSL_KEYSINUSE_CTX_IMP_retrieve(lh_keysinuse_ctx_imp, localCtx);
+                if (ctx == NULL)
                 {
-                    keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
+                    // Add the new context to the hash table
+                    lh_SCOSSL_KEYSINUSE_CTX_IMP_insert(lh_keysinuse_ctx_imp, localCtx);
+
+                    if ((lhErr = lh_SCOSSL_KEYSINUSE_CTX_IMP_error(lh_keysinuse_ctx_imp)))
+                    {
+                        keysinuse_log_error("Failed to add new keysinuse context to the hash table,OPENSSL_%d", ERR_get_error());
+                    }
+                    else
+                    {
+                        // Don't free localCtx now since it's owned by the hash table
+                        ctx = localCtx;
+                        localCtx = NULL;
+                    }
                 }
+                // Another thread added the context, try to upref and use it instead
+                else if (keysinuse_ctx_upref(ctx, NULL) != SCOSSL_SUCCESS)
+                {
+                    ctx = NULL;
+                }
+            }
+            else
+            {
+                keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
             }
 
             CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
 
-            if (lh_keysinuse_ctx_imp == NULL || lhErr)
+            if (ctx == NULL)
             {
-                keysinuse_log_error("Keysinuse context hash table is missing in keysinuse_load_key");
                 goto cleanup;
             }
         }
@@ -576,14 +599,8 @@ SCOSSL_KEYSINUSE_CTX *keysinuse_load_key(_In_reads_bytes_opt_(cbEncodedKey) cons
         goto cleanup;
     }
 
-    status = SCOSSL_SUCCESS;
-
 cleanup:
-    if (status != SCOSSL_SUCCESS)
-    {
-        keysinuse_free_key_ctx(ctx);
-        ctx = NULL;
-    }
+    keysinuse_free_key_ctx(localCtx);
 
     return ctx;
 }
@@ -631,7 +648,7 @@ unsigned int keysinuse_ctx_get_key_identifier(_In_ SCOSSL_KEYSINUSE_CTX *ctx,
         return 0;
     }
 
-    if (CRYPTO_THREAD_write_lock(ctxImp->lock))
+    if (CRYPTO_THREAD_read_lock(ctxImp->lock))
     {
         memcpy(pbKeyIdentifier, ctxImp->keyIdentifier, KEYSINUSE_KEYID_SIZE);
 
@@ -1102,7 +1119,7 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg)
             goto cleanup;
         }
 
-        if (CRYPTO_THREAD_read_lock(lh_keysinuse_ctx_imp_lock))
+        if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
         {
             if (lh_keysinuse_ctx_imp != NULL)
             {
@@ -1128,16 +1145,17 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg)
         }
         else
         {
-            keysinuse_log_error("Logging thread failed to lock keysinuse context hash table for reading,OPENSSL_%d", ERR_get_error());
+            keysinuse_log_error("Logging thread failed to lock keysinuse context hash table for writing,OPENSSL_%d", ERR_get_error());
             goto cleanup;
         }
     }
     while (isLoggingThreadRunning);
 
+    logging_thread_exit_status = SCOSSL_SUCCESS;
+
 cleanup:
     is_logging = FALSE;
     keysinuse_running = FALSE;
-    logging_thread_exit_status = SCOSSL_SUCCESS;
 
     return NULL;
 }
