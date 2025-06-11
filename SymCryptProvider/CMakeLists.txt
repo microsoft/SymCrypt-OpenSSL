@@ -58,9 +58,7 @@ set(SCOSSL_SOURCES
 )
 
 if (KEYSINUSE_ENABLED)
-    list(APPEND SCOSSL_SOURCES ./src/p_scossl_keysinuse.c)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DKEYSINUSE_ENABLED")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKEYSINUSE_ENABLED")
+    list(APPEND SCOSSL_SOURCES ../KeysInUse/keysinuse.c)
 endif()
 
 add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
@@ -72,6 +70,16 @@ target_include_directories(scossl_provider PRIVATE ./src)
 # target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(scossl_provider PUBLIC ../ScosslCommon/inc)
 
+if (KEYSINUSE_ENABLED)
+    if (KEYSINUSE_LOG_SYSLOG)
+        target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_LOG_SYSLOG)
+        target_link_libraries(scossl_provider PUBLIC ${SYSTEMD_LIBRARY})
+    endif()
+
+    target_compile_definitions(scossl_provider PRIVATE KEYSINUSE_ENABLED)
+    target_include_directories(scossl_provider PUBLIC ../KeysInUse)
+endif()
+
 # Remove default "lib" prefix from symcryptprovider.so as OpenSSL provider is not a generic Linux .so
 set_target_properties(scossl_provider PROPERTIES PREFIX "")
 set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
@@ -81,7 +89,7 @@ target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 if (NOT DEFINED OPENSSL_PROVIDERS)
-   set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
+set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
 endif()
 
 # Install the engine to the OpenSSL modules directory

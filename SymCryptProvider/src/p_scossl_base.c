@@ -9,9 +9,14 @@
 #include "scossl_dh.h"
 #include "scossl_ecc.h"
 #include "scossl_provider.h"
+#include "p_scossl_base.h"
 #include "p_scossl_bio.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
+
+#ifdef KEYSINUSE_ENABLED
+#include "keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +51,8 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_ffdhe2048               0x0100
 #define SCOSSL_TLS_GROUP_ID_ffdhe3072               0x0101
 #define SCOSSL_TLS_GROUP_ID_ffdhe4096               0x0102
+#define SCOSSL_TLS_GROUP_ID_ffdhe6144               0x0103
+#define SCOSSL_TLS_GROUP_ID_ffdhe8192               0x0104
 #define SCOSSL_TLS_GROUP_ID_mlkem512                0x0200
 #define SCOSSL_TLS_GROUP_ID_mlkem768                0x0201
 #define SCOSSL_TLS_GROUP_ID_mlkem1024               0x0202
@@ -172,6 +179,16 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe4096 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe6144 = {
+    SCOSSL_TLS_GROUP_ID_ffdhe6144, 128, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe8192 = {
+    SCOSSL_TLS_GROUP_ID_ffdhe8192, 128, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_mlkem512 = {
     SCOSSL_TLS_GROUP_ID_mlkem512, 128, 1,
     TLS1_3_VERSION, 0,
@@ -241,6 +258,8 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
     TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),
+    TLS_GROUP_ENTRY("ffdhe6144", SN_ffdhe6144, "DH", scossl_tls_group_info_ffdhe6144),
+    TLS_GROUP_ENTRY("ffdhe8192", SN_ffdhe8192, "DH", scossl_tls_group_info_ffdhe8192),
     TLS_GROUP_ENTRY("MLKEM512", SCOSSL_SN_MLKEM512, "MLKEM", scossl_tls_group_info_mlkem512),
     TLS_GROUP_ENTRY("MLKEM768", SCOSSL_SN_MLKEM768, "MLKEM", scossl_tls_group_info_mlkem768),
     TLS_GROUP_ENTRY("MLKEM1024", SCOSSL_SN_MLKEM1024, "MLKEM", scossl_tls_group_info_mlkem1024),
@@ -472,9 +491,7 @@ static void p_scossl_teardown(_Inout_ SCOSSL_PROVCTX *provctx)
     scossl_destroy_logging();
     scossl_destroy_safeprime_dlgroups();
     scossl_ecc_destroy_ecc_curves();
-    #ifdef KEYSINUSE_ENABLED
-    p_scossl_keysinuse_teardown();
-    #endif
+
     if (provctx != NULL)
     {
         BIO_meth_free(provctx->coreBioMeth);
@@ -662,15 +679,15 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
                 }
             }
 
-            p_scossl_keysinuse_set_max_file_size(maxFileSizeBytes);
+            keysinuse_set_max_file_size(maxFileSizeBytes);
         }
 
         if (confLoggingDelay != NULL)
         {
-            p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
+            keysinuse_set_logging_delay(atol(confLoggingDelay));
         }
 
-        p_scossl_keysinuse_init();
+        keysinuse_init();
     }
 
     ERR_pop_to_mark();
