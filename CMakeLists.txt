@@ -99,4 +99,6 @@ endif()
 
 # SymCrypt not needed for just building the KeysInUse standalone library and test
 add_subdirectory (KeysInUse)
-add_subdirectory (test/KeysInUseTest)
+if (KEYSINUSE_ENABLED OR KEYSINUSE_STANDALONE)
+    add_subdirectory (test/KeysInUseTest)
+endif()

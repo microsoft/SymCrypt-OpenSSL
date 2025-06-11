@@ -36,23 +36,29 @@ extern "C" {
 #define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
 #endif
 
-#define SCOSSL_TLS_GROUP_ID_secp192r1           0x0013
-#define SCOSSL_TLS_GROUP_ID_secp224r1           0x0015
-#define SCOSSL_TLS_GROUP_ID_secp256r1           0x0017
-#define SCOSSL_TLS_GROUP_ID_secp384r1           0x0018
-#define SCOSSL_TLS_GROUP_ID_secp521r1           0x0019
-#define SCOSSL_TLS_GROUP_ID_x25519              0x001d
-#define SCOSSL_TLS_GROUP_ID_ffdhe2048           0x0100
-#define SCOSSL_TLS_GROUP_ID_ffdhe3072           0x0101
-#define SCOSSL_TLS_GROUP_ID_ffdhe4096           0x0102
-#define SCOSSL_TLS_GROUP_ID_ffdhe6144           0x0103
-#define SCOSSL_TLS_GROUP_ID_ffdhe8192           0x0104
-#define SCOSSL_TLS_GROUP_ID_mlkem512            0x0200
-#define SCOSSL_TLS_GROUP_ID_mlkem768            0x0201
-#define SCOSSL_TLS_GROUP_ID_mlkem1024           0x0202
-#define SCOSSL_TLS_GROUP_ID_secp256r1mlkem768   0x11eb
-#define SCOSSL_TLS_GROUP_ID_x25519mlkem768      0x11ec
-#define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024  0x11ed
+#define SCOSSL_TLS_GROUP_ID_secp192r1               0x0013
+#define SCOSSL_TLS_GROUP_ID_secp224r1               0x0015
+#define SCOSSL_TLS_GROUP_ID_secp256r1               0x0017
+#define SCOSSL_TLS_GROUP_ID_secp384r1               0x0018
+#define SCOSSL_TLS_GROUP_ID_secp521r1               0x0019
+#define SCOSSL_TLS_GROUP_ID_x25519                  0x001d
+#define SCOSSL_TLS_GROUP_ID_brainpoolP256r1         0x001A
+#define SCOSSL_TLS_GROUP_ID_brainpoolP384r1         0x001B
+#define SCOSSL_TLS_GROUP_ID_brainpoolP512r1         0x001C
+#define SCOSSL_TLS_GROUP_ID_brainpoolP256r1_tls13   0x001F
+#define SCOSSL_TLS_GROUP_ID_brainpoolP384r1_tls13   0x0020
+#define SCOSSL_TLS_GROUP_ID_brainpoolP512r1_tls13   0x0021
+#define SCOSSL_TLS_GROUP_ID_ffdhe2048               0x0100
+#define SCOSSL_TLS_GROUP_ID_ffdhe3072               0x0101
+#define SCOSSL_TLS_GROUP_ID_ffdhe4096               0x0102
+#define SCOSSL_TLS_GROUP_ID_ffdhe6144               0x0103
+#define SCOSSL_TLS_GROUP_ID_ffdhe8192               0x0104
+#define SCOSSL_TLS_GROUP_ID_mlkem512                0x0200
+#define SCOSSL_TLS_GROUP_ID_mlkem768                0x0201
+#define SCOSSL_TLS_GROUP_ID_mlkem1024               0x0202
+#define SCOSSL_TLS_GROUP_ID_secp256r1mlkem768       0x11eb
+#define SCOSSL_TLS_GROUP_ID_x25519mlkem768          0x11ec
+#define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024      0x11ed
 
 #define ALG(names, funcs) {     \
     names,                      \
@@ -127,6 +133,36 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
     SCOSSL_TLS_GROUP_ID_x25519, 128, 0,
     TLS1_VERSION, 0,
     DTLS1_VERSION, 0};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP256r1 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP256r1, 128, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP384r1 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP384r1, 192, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP512r1 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP512r1, 256, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP256r1_tls13 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP256r1_tls13, 128, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP384r1_tls13 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP384r1_tls13, 192, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
+
+const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP512r1_tls13 = {
+    SCOSSL_TLS_GROUP_ID_brainpoolP512r1_tls13, 256, 0,
+    TLS1_3_VERSION, 0,
+    -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_ffdhe2048 = {
     SCOSSL_TLS_GROUP_ID_ffdhe2048, 112, 0,
@@ -213,6 +249,12 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("secp521r1", SN_secp521r1, "EC", scossl_tls_group_info_p521),
     TLS_GROUP_ENTRY("P-521", SN_secp521r1, "EC", scossl_tls_group_info_p521),
     TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519),
+    TLS_GROUP_ENTRY("brainpoolP256r1", SN_brainpoolP256r1, "EC", scossl_tls_group_info_brainpoolP256r1),
+    TLS_GROUP_ENTRY("brainpoolP384r1", SN_brainpoolP384r1, "EC", scossl_tls_group_info_brainpoolP384r1),
+    TLS_GROUP_ENTRY("brainpoolP512r1", SN_brainpoolP512r1, "EC", scossl_tls_group_info_brainpoolP512r1),
+    TLS_GROUP_ENTRY("brainpoolP256r1tls13", SN_brainpoolP256r1, "EC", scossl_tls_group_info_brainpoolP256r1),
+    TLS_GROUP_ENTRY("brainpoolP384r1tls13", SN_brainpoolP384r1, "EC", scossl_tls_group_info_brainpoolP384r1),
+    TLS_GROUP_ENTRY("brainpoolP512r1tls13", SN_brainpoolP512r1, "EC", scossl_tls_group_info_brainpoolP512r1),
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
     TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),

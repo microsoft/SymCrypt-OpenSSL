@@ -160,9 +160,17 @@ void TestEccCurve(int nid)
 
 void TestEcc()
 {
+    TestEccCurve(NID_secp192k1);
+    TestEccCurve(NID_secp224r1);
     TestEccCurve(NID_X9_62_prime256v1);
     TestEccCurve(NID_secp384r1);
     TestEccCurve(NID_secp521r1);
+    TestEccCurve(NID_brainpoolP256r1);
+    TestEccCurve(NID_brainpoolP384r1);
+    TestEccCurve(NID_brainpoolP512r1);
+    TestEccCurve(NID_brainpoolP256t1);
+    TestEccCurve(NID_brainpoolP384t1);
+    TestEccCurve(NID_brainpoolP512t1);
     printf("%s", SeparatorLine);
 }
 
