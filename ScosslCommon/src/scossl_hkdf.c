@@ -16,35 +16,61 @@ SCOSSL_HKDF_CTX *scossl_hkdf_newctx()
 _Use_decl_annotations_
 SCOSSL_HKDF_CTX *scossl_hkdf_dupctx(SCOSSL_HKDF_CTX *ctx)
 {
-    SCOSSL_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_HKDF_CTX));
+    SCOSSL_HKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_HKDF_CTX));
     if (copyCtx != NULL)
     {
-        if (ctx->pbSalt == NULL)
+        if (ctx->pbSalt != NULL)
         {
-            copyCtx->pbSalt = NULL;
+            if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
+            {
+                scossl_hkdf_freectx(copyCtx);
+                return NULL;
+            }
         }
-        else if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
+        if (ctx->pbKey != NULL)
         {
-            scossl_hkdf_freectx(copyCtx);
-            return NULL;
+            if ((copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
+            {
+                scossl_hkdf_freectx(copyCtx);
+                return NULL;
+            }
         }
-        copyCtx->cbSalt = ctx->cbSalt;
+        if (ctx->pbPrefix != NULL)
+        {
+            if ((copyCtx->pbPrefix = OPENSSL_memdup(ctx->pbPrefix, ctx->cbPrefix)) == NULL)
+            {
+                scossl_hkdf_freectx(copyCtx);
+                return NULL;
+            }
+        }
+        if (ctx->pbLabel != NULL)
+        {
+            if ((copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel)) == NULL)
+            {
+                scossl_hkdf_freectx(copyCtx);
+                return NULL;
+            }
+        }
 
-        if (ctx->pbKey == NULL)
+        if (ctx->pbData != NULL)
         {
-            copyCtx->pbKey = NULL;
+            if ((copyCtx->pbData = OPENSSL_memdup(ctx->pbData, ctx->cbData)) == NULL)
+            {
+                scossl_hkdf_freectx(copyCtx);
+                return NULL;
+            }
         }
-        else if ((copyCtx->pbKey = OPENSSL_memdup(ctx->pbKey, ctx->cbKey)) == NULL)
-        {
-            scossl_hkdf_freectx(copyCtx);
-            return NULL;
-        }
-        copyCtx->cbKey = ctx->cbKey;
 
         copyCtx->md = ctx->md;
         copyCtx->mode = ctx->mode;
         copyCtx->cbInfo = ctx->cbInfo;
         memcpy(copyCtx->info, ctx->info, ctx->cbInfo);
+        copyCtx->cbSalt = ctx->cbSalt;
+        copyCtx->cbKey = ctx->cbKey;
+        copyCtx->cbPrefix = ctx->cbPrefix;
+        copyCtx->cbLabel = ctx->cbLabel;
+        copyCtx->cbData = ctx->cbData;
+
     }
 
     return copyCtx;
@@ -55,10 +81,7 @@ void scossl_hkdf_freectx(SCOSSL_HKDF_CTX *ctx)
 {
     if (ctx == NULL)
         return;
-
-    OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
-    OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
-    OPENSSL_cleanse(ctx->info, ctx->cbInfo);
+    scossl_hkdf_reset(ctx);
     OPENSSL_free(ctx);
 }
 
@@ -67,6 +90,9 @@ SCOSSL_STATUS scossl_hkdf_reset(SCOSSL_HKDF_CTX *ctx)
 {
     OPENSSL_clear_free(ctx->pbSalt, ctx->cbSalt);
     OPENSSL_clear_free(ctx->pbKey, ctx->cbKey);
+    OPENSSL_free(ctx->pbPrefix);
+    OPENSSL_free(ctx->pbLabel);
+    OPENSSL_clear_free(ctx->pbData, ctx->cbData);
     OPENSSL_cleanse(ctx, sizeof(*ctx));
     return SCOSSL_SUCCESS;
 }

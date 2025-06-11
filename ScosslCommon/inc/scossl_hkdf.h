@@ -37,6 +37,13 @@ typedef struct
     SIZE_T cbKey;
     BYTE info[HKDF_MAXBUF];
     SIZE_T cbInfo;
+    // Below fields (label, prefix, data) are only used in TLS1.3KDF
+    PBYTE pbLabel;
+    SIZE_T cbLabel;
+    PBYTE pbPrefix;
+    SIZE_T cbPrefix;
+    PBYTE pbData;
+    SIZE_T cbData;
 } SCOSSL_HKDF_CTX;
 
 SCOSSL_HKDF_CTX *scossl_hkdf_newctx();
