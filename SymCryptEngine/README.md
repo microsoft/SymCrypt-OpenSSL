@@ -24,7 +24,7 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
    + SSH-KDF (SHA1, SHA2-256, SHA2-384, SHA2-512)
  + Key Agreement
    + ECDH (P256, P384, P521)
-   + Finite Field DH (ffdhe2048, ffdhe3072, ffdhe4096, modp2048, modp3072, modp4096)
+   + Finite Field DH (ffdhe2048, ffdhe3072, ffdhe4096, ffdhe6144, ffdhe8192, modp2048, modp3072, modp4096)
  + Hashing
    + SHA1
    + SHA2-256

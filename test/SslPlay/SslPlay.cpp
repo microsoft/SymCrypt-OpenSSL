@@ -160,14 +160,22 @@ void TestEccCurve(int nid)
 
 void TestEcc()
 {
+    TestEccCurve(NID_secp192k1);
+    TestEccCurve(NID_secp224r1);
     TestEccCurve(NID_X9_62_prime256v1);
     TestEccCurve(NID_secp384r1);
     TestEccCurve(NID_secp521r1);
+    TestEccCurve(NID_brainpoolP256r1);
+    TestEccCurve(NID_brainpoolP384r1);
+    TestEccCurve(NID_brainpoolP512r1);
+    TestEccCurve(NID_brainpoolP256t1);
+    TestEccCurve(NID_brainpoolP384t1);
+    TestEccCurve(NID_brainpoolP512t1);
     printf("%s", SeparatorLine);
 }
 
-// Largest supported dlgroup is ffdhe4096/MODP4096 => 512 byte shared secret is largest secret that can be generated
-#define SCOSSL_DH_SHARED_SECRET_MAX_LEN (512)
+// Largest supported dlgroup is ffdhe8192 => 1024 byte shared secret is largest secret that can be generated
+#define SCOSSL_DH_SHARED_SECRET_MAX_LEN (1024)
 
 void TestDhDlgroup(const BIGNUM* p)
 {
@@ -307,7 +315,14 @@ void TestDh()
     DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
     TestDhDlgroup(p_ffdhe);
     DH_free(dh_ffdhe);
-
+    dh_ffdhe = DH_new_by_nid(NID_ffdhe6144);
+    DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
+    TestDhDlgroup(p_ffdhe);
+    DH_free(dh_ffdhe);
+    dh_ffdhe = DH_new_by_nid(NID_ffdhe8192);
+    DH_get0_pqg(dh_ffdhe, &p_ffdhe, NULL, NULL);
+    TestDhDlgroup(p_ffdhe);
+    DH_free(dh_ffdhe);
     // Test an unsupported DH group
     TestDhDlgroup(NULL);
 

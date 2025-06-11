@@ -105,21 +105,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (keyCtx != NULL)
     {
         ctx->keyCtx = keyCtx;
+
 #ifdef KEYSINUSE_ENABLED
-        if (p_scossl_keysinuse_running() &&
-            operation == EVP_PKEY_OP_DECRYPT &&
-            keyCtx->isImported &&
-            keyCtx->keysinuseInfo == NULL)
+        if (keysinuse_is_running() &&
+            operation == EVP_PKEY_OP_DECRYPT)
         {
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
-
-            if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
-            {
-                keyCtx->keysinuseInfo = p_scossl_keysinuse_info_new(pbPublicKey, cbPublicKey);
-            }
-
-            OPENSSL_free(pbPublicKey);
+            p_scossl_rsa_init_keysinuse(keyCtx);
         }
 #endif
     }
@@ -232,7 +223,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 #ifdef KEYSINUSE_ENABLED
     if (out != NULL)
     {
-        p_scossl_keysinuse_on_decrypt(ctx->keyCtx->keysinuseInfo);
+        keysinuse_on_use(ctx->keyCtx->keysinuseCtx, KEYSINUSE_DECRYPT);
     }
 #endif
 
