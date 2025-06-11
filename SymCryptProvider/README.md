@@ -62,7 +62,7 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
 
 ### Key Exchange
 - DH (Named groups only)
-    - ffdhe2048, ffdhe3072, ffdhe4096
+    - ffdhe2048, ffdhe3072, ffdhe4096, ffdhe6144, ffdhe8192
     - modp2048, modp3072, modp4096
 - ECDH (Named curves only)
     - P-192, P-224, P-256, P-384, P-521
@@ -134,7 +134,7 @@ The SymCrypt provider can be configured in the SymCrypt provider section of the 
 | error_level   | Maximum level to push logging events to OpenSSL error stack. In order, can be <ul><li>off</li><li>error</li><li>info</li><li>debug</li></ul>  | error     |
 
 ### KeysInUse Logging
-The SymCrypt provider optionally supports [KeysInUse logging](https://github.com/microsoft/KeysInUse-OpenSSL) for monitoring private key usage.
+The SymCrypt provider optionally supports [KeysInUse logging](../KeysInUse/README.md) for monitoring private key usage.
 The primary motivation is for application owners to keep inventory of which certificates and keys are actively being used on their machine.
 The feature is off by default and must be enabled by config. If you are building the SymCrypt provider from scratch, the feature also needs
 to be enabled at compile time by adding the `-DKEYSINUSE_ENABLED=1` to the cmake configuration step. KeysInUse configuration is placed in a

@@ -12,6 +12,8 @@ static BOOL scossl_dh_initialized = FALSE;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe4096 = NULL;
+static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe6144 = NULL;
+static PSYMCRYPT_DLGROUP _hidden_dlgroup_ffdhe8192 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp2048 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp3072 = NULL;
 static PSYMCRYPT_DLGROUP _hidden_dlgroup_modp4096 = NULL;
@@ -363,6 +365,8 @@ SCOSSL_STATUS scossl_dh_init_static(void)
     if (((_hidden_dlgroup_ffdhe2048 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 2048)) == NULL) ||
         ((_hidden_dlgroup_ffdhe3072 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 3072)) == NULL) ||
         ((_hidden_dlgroup_ffdhe4096 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 4096)) == NULL) ||
+        ((_hidden_dlgroup_ffdhe6144 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 6144)) == NULL) ||
+        ((_hidden_dlgroup_ffdhe8192 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_TLS_7919, 8192)) == NULL) ||    
         ((_hidden_dlgroup_modp2048 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 2048)) == NULL) ||
         ((_hidden_dlgroup_modp3072 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 3072)) == NULL) ||
         ((_hidden_dlgroup_modp4096 = scossl_initialize_safeprime_dlgroup(SYMCRYPT_DLGROUP_DH_SAFEPRIMETYPE_IKE_3526, 4096)) == NULL) ||
@@ -393,6 +397,16 @@ void scossl_destroy_safeprime_dlgroups(void)
     {
         SymCryptDlgroupFree(_hidden_dlgroup_ffdhe4096);
         _hidden_dlgroup_ffdhe4096 = NULL;
+    }
+    if (_hidden_dlgroup_ffdhe6144)
+    {
+        SymCryptDlgroupFree(_hidden_dlgroup_ffdhe6144);
+        _hidden_dlgroup_ffdhe6144 = NULL;
+    }
+    if (_hidden_dlgroup_ffdhe8192)
+    {
+        SymCryptDlgroupFree(_hidden_dlgroup_ffdhe8192);
+        _hidden_dlgroup_ffdhe8192 = NULL;
     }
     if (_hidden_dlgroup_modp2048)
     {
@@ -439,6 +453,14 @@ PCSYMCRYPT_DLGROUP scossl_dh_get_known_group(PCSYMCRYPT_DLGROUP pDlGroup)
     {
         pKnownDlGroup = _hidden_dlgroup_ffdhe4096;
     }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_ffdhe6144, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_ffdhe6144;
+    }
+    else if (SymCryptDlgroupIsSame(_hidden_dlgroup_ffdhe8192, pDlGroup))
+    {
+        pKnownDlGroup = _hidden_dlgroup_ffdhe8192;
+    }
     else if (SymCryptDlgroupIsSame(_hidden_dlgroup_modp2048, pDlGroup))
     {
         pKnownDlGroup = _hidden_dlgroup_modp2048;
@@ -470,6 +492,12 @@ SCOSSL_STATUS scossl_dh_get_group_by_nid(int dlGroupNid, const BIGNUM* p,
         break;
     case NID_ffdhe4096:
         *ppDlGroup = _hidden_dlgroup_ffdhe4096;
+        break;
+    case NID_ffdhe6144:
+        *ppDlGroup = _hidden_dlgroup_ffdhe6144;
+        break;
+    case NID_ffdhe8192:
+        *ppDlGroup = _hidden_dlgroup_ffdhe8192;
         break;
 #if OPENSSL_VERSION_MAJOR >= 3
     case NID_modp_2048:
@@ -533,6 +561,14 @@ int scossl_dh_get_group_nid(PCSYMCRYPT_DLGROUP pDlGroup)
     else if (pDlGroup == _hidden_dlgroup_ffdhe4096)
     {
         dlGroupNid = NID_ffdhe4096;
+    }
+    else if (pDlGroup == _hidden_dlgroup_ffdhe6144)
+    {
+        dlGroupNid = NID_ffdhe6144;
+    }
+    else if (pDlGroup == _hidden_dlgroup_ffdhe8192)
+    {
+        dlGroupNid = NID_ffdhe8192;
     }
 #if OPENSSL_VERSION_MAJOR >= 3
     else if (pDlGroup == _hidden_dlgroup_modp2048)
