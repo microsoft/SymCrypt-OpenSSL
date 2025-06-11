@@ -128,32 +128,32 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_x25519 = {
     DTLS1_VERSION, 0};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP256r1 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP256r1, 128, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
+    SCOSSL_TLS_GROUP_ID_brainpoolP256r1, 128, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP384r1 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP384r1, 192, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
+    SCOSSL_TLS_GROUP_ID_brainpoolP384r1, 192, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP512r1 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP512r1, 256, 1,
-    TLS1_3_VERSION, 0,
-    -1, -1};
+    SCOSSL_TLS_GROUP_ID_brainpoolP512r1, 256, 0,
+    TLS1_VERSION, TLS1_2_VERSION,
+    DTLS1_VERSION, DTLS1_2_VERSION};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP256r1_tls13 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP256r1_tls13, 128, 1,
+    SCOSSL_TLS_GROUP_ID_brainpoolP256r1_tls13, 128, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP384r1_tls13 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP384r1_tls13, 192, 1,
+    SCOSSL_TLS_GROUP_ID_brainpoolP384r1_tls13, 192, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_brainpoolP512r1_tls13 = {
-    SCOSSL_TLS_GROUP_ID_brainpoolP512r1_tls13, 256, 1,
+    SCOSSL_TLS_GROUP_ID_brainpoolP512r1_tls13, 256, 0,
     TLS1_3_VERSION, 0,
     -1, -1};
 
@@ -202,8 +202,6 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     TLS1_3_VERSION, 0,
     -1, -1};
 
-
-
 #define NUM_PARAMS_TLS_GROUP_ENTRY 11
 #define TLS_GROUP_ENTRY(tlsname, realname, algorithm, group_info) {                                     \
     OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_GROUP_NAME, tlsname, sizeof(tlsname)),                   \
@@ -234,12 +232,12 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("secp521r1", SN_secp521r1, "EC", scossl_tls_group_info_p521),
     TLS_GROUP_ENTRY("P-521", SN_secp521r1, "EC", scossl_tls_group_info_p521),
     TLS_GROUP_ENTRY("x25519", SN_X25519, "X25519", scossl_tls_group_info_x25519),
-    TLS_GROUP_ENTRY("brainpoolP256r1", SN_brainpoolP256r1, "brainpoolP256r1", scossl_tls_group_info_brainpoolP256r1),
-    TLS_GROUP_ENTRY("brainpoolP384r1", SN_brainpoolP384r1, "brainpoolP384r1", scossl_tls_group_info_brainpoolP384r1),
-    TLS_GROUP_ENTRY("brainpoolP512r1", SN_brainpoolP512r1, "brainpoolP512r1", scossl_tls_group_info_brainpoolP512r1),
-    TLS_GROUP_ENTRY("brainpoolP256r1tls13", SN_brainpoolP256r1, "brainpoolP256r1", scossl_tls_group_info_brainpoolP256r1),
-    TLS_GROUP_ENTRY("brainpoolP384r1tls13", SN_brainpoolP384r1, "brainpoolP384r1", scossl_tls_group_info_brainpoolP384r1),
-    TLS_GROUP_ENTRY("brainpoolP512r1tls13", SN_brainpoolP512r1, "brainpoolP512r1", scossl_tls_group_info_brainpoolP512r1),
+    TLS_GROUP_ENTRY("brainpoolP256r1", SN_brainpoolP256r1, "EC", scossl_tls_group_info_brainpoolP256r1),
+    TLS_GROUP_ENTRY("brainpoolP384r1", SN_brainpoolP384r1, "EC", scossl_tls_group_info_brainpoolP384r1),
+    TLS_GROUP_ENTRY("brainpoolP512r1", SN_brainpoolP512r1, "EC", scossl_tls_group_info_brainpoolP512r1),
+    TLS_GROUP_ENTRY("brainpoolP256r1tls13", SN_brainpoolP256r1, "EC", scossl_tls_group_info_brainpoolP256r1),
+    TLS_GROUP_ENTRY("brainpoolP384r1tls13", SN_brainpoolP384r1, "EC", scossl_tls_group_info_brainpoolP384r1),
+    TLS_GROUP_ENTRY("brainpoolP512r1tls13", SN_brainpoolP512r1, "EC", scossl_tls_group_info_brainpoolP512r1),
     TLS_GROUP_ENTRY("ffdhe2048", SN_ffdhe2048, "DH", scossl_tls_group_info_ffdhe2048),
     TLS_GROUP_ENTRY("ffdhe3072", SN_ffdhe3072, "DH", scossl_tls_group_info_ffdhe3072),
     TLS_GROUP_ENTRY("ffdhe4096", SN_ffdhe4096, "DH", scossl_tls_group_info_ffdhe4096),
