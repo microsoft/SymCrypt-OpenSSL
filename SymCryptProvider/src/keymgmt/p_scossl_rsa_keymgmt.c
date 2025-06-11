@@ -407,6 +407,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
     SYMCRYPT_ERROR scError;
     PUINT64 pPubExp64;
+    UINT32 genFlags = SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT;
 
     keyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx == NULL)
@@ -425,9 +426,16 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
+     
+    if (genCtx->nBitsOfModulus < SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS)
+    {
+        genFlags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+        SCOSSL_PROV_LOG_SYMCRYPT_INFO("Generating RSA key with size < %u bits. This operation is not FIPS compliant.", 
+                                       SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS);
+    }
 
     pPubExp64 = genCtx->nPubExp > 0 ? &genCtx->pubExp64 : NULL;
-    scError = SymCryptRsakeyGenerate(keyCtx->key, pPubExp64, genCtx->nPubExp, SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT);
+    scError = SymCryptRsakeyGenerate(keyCtx->key, pPubExp64, genCtx->nPubExp, genFlags);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGenerate failed", scError);
