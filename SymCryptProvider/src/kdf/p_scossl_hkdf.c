@@ -20,7 +20,8 @@ extern "C" {
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_PROPERTIES, NULL, 0),     \
     OSSL_PARAM_utf8_string(OSSL_KDF_PARAM_DIGEST, NULL, 0),         \
     OSSL_PARAM_octet_string(OSSL_KDF_PARAM_KEY, NULL, 0),           \
-    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0)
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_SALT, NULL, 0),          \
+    OSSL_PARAM_octet_string(OSSL_KDF_PARAM_INFO, NULL, 0)
 
 static const OSSL_PARAM p_scossl_hkdf_gettable_ctx_param_types[] = {
     HKDF_COMMON_SETTABLES,
