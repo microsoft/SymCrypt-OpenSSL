@@ -91,7 +91,9 @@ static KEYSINUSE_TEST_KEY testKeys[] = {
     {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
+#ifdef NID_X9_62_prime192v1 // This curve is not available on Azure Linux 3
     {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
+#endif
     {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
