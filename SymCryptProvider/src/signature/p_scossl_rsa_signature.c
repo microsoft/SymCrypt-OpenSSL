@@ -321,6 +321,144 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 
     return SCOSSL_FAILURE; 
 }
+#define SSL_SIG_LENGTH  36
+
+static SCOSSL_STATUS scossl_rsa_verify_recover(
+    _In_ SCOSSL_RSA_SIGN_CTX *ctx,
+    _Out_writes_bytes_(*routlen) unsigned char *rout,
+    size_t *routlen,
+    _In_reads_bytes_(siglen) const unsigned char *sig,
+    size_t siglen)
+{
+    PBYTE decrypted = NULL;
+    PBYTE encoded = NULL;
+    SIZE_T encodedLen = 0;
+    int digestLen = 0;
+    const unsigned char *digest = NULL;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    SIZE_T cbModulus = 0;
+
+    if (ctx == NULL || ctx->keyCtx->key == NULL || routlen == NULL || sig == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+
+    if (siglen != cbModulus) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+        return SCOSSL_FAILURE;
+    }
+
+    decrypted = OPENSSL_zalloc(cbModulus);
+    if (decrypted == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    // Perform public key operation to recover encoded DigestInfo
+    scError = SymCryptRsaRawEncrypt(
+                ctx->keyCtx->key,
+                sig,
+                siglen,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0,
+                decrypted,
+                cbModulus
+                );
+
+    if (scError != SYMCRYPT_NO_ERROR) {
+        printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover) failed 0x%x\n", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                                 "SymCryptRsaRawEncrypt failed", scError);
+        return SCOSSL_FAILURE;
+    }
+#if 0  
+    // Special case: TLS MD5+SHA1
+    if (ctx->mdInfo->id == NID_md5_sha1) {
+        if (modSize != SSL_SIG_LENGTH) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+            goto cleanup;
+        }
+
+        if (rout != NULL) {
+            memcpy(rout, decrypted, SSL_SIG_LENGTH);
+            *routlen = SSL_SIG_LENGTH;
+        } else {
+            if (*routlen != SSL_SIG_LENGTH) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+                goto cleanup;
+            }
+            if (memcmp(rout, decrypted, SSL_SIG_LENGTH) != 0) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
+                goto cleanup;
+            }
+        }
+        SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
+        OPENSSL_clear_free(decrypted, modSize);
+        return SCOSSL_SUCCESS;
+    }
+
+    // Special case: MDC2
+    if (ctx->mdInfo->id == NID_mdc2 &&
+        modSize == 18 &&
+        decrypted[0] == 0x04 && decrypted[1] == 0x10) {
+        if (rout != NULL) {
+            memcpy(rout, decrypted + 2, 16);
+            *routlen = 16;
+        } else {
+            if (*routlen != 16) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+                goto cleanup;
+            }
+            if (memcmp(rout, decrypted + 2, 16) != 0) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
+                goto cleanup;
+            }
+        }
+        SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MDC2 which is not FIPS compliant");
+        OPENSSL_clear_free(decrypted, modSize);
+        return SCOSSL_SUCCESS;
+    }
+#endif
+    // General case: PKCS#1 v1.5
+    printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in General case: PKCS#1 v1.5\n", cbModulus);
+    digestLen = scossl_get_expected_hash_length(ctx->mdInfo->id);
+    printf("\n##### digestLen is %d", digestLen);
+    if (digestLen <= 0) {
+        ERR_raise(ERR_LIB_RSA, RSA_R_UNKNOWN_ALGORITHM_TYPE);
+        goto cleanup;
+    }
+
+    if (rout != NULL) {
+        if (*routlen < (size_t)digestLen) {
+            *routlen = digestLen;
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);   
+            goto cleanup;
+        }
+        digest = decrypted + cbModulus - digestLen;
+    } else {
+        digest = rout;
+    }
+printf("\n##### Digest bytes: ");
+for (int i = 0; i < digestLen; i++) {
+    printf("%02x", digest[i]);
+}
+printf("\n");
+
+    if (rout != NULL) {
+        memcpy(rout, digest, digestLen);
+        *routlen = digestLen;
+    }
+    
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_clear_free(encoded, encodedLen);
+    OPENSSL_clear_free(decrypted, cbModulus);
+    return ret;
+} 
 
 static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                 _Out_writes_bytes_(*routlen) unsigned char *rout, size_t *routlen,
@@ -364,7 +502,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         switch (ctx->padding) {
         case RSA_PKCS1_PADDING:
             printf("\n###### Megan: PKCS1 verify-recover path, routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
-
+/*
             // Perform public key operation to recover encoded DigestInfo
             scError = SymCryptRsaRawEncrypt(
                 ctx->keyCtx->key,
@@ -379,13 +517,13 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
             if (scError != SYMCRYPT_NO_ERROR) {
                 printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover) failed 0x%x\n", scError);
                 SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
-                                          "SymCryptRsaRawEncrypt failed", scError);
+                                          "SymCryptRsaRawEncrypt failed 0x%x", scError);
                 return SCOSSL_FAILURE;
             }
-
-            *routlen = cbModulus;
-            break;
-
+            printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld\n", cbModulus);
+            *routlen = cbModulus; 
+            return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, rout, cbModulus, sig, siglen); */
+            return scossl_rsa_verify_recover(ctx, rout, routlen, sig, siglen);
         default:
             ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE,
                            "Only PKCS#1 v1.5 padding allowed");
@@ -407,7 +545,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         if (scError != SYMCRYPT_NO_ERROR) {
             printf("\n###### Megan: SymCryptRsaRawDecrypt failed 0x%x\n", scError);
             SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
-                                      "SymCryptRsaRawDecrypt failed", scError);
+                                      "SymCryptRsaRawDecrypt failed 0x%x", scError);
             return SCOSSL_FAILURE;
         }
 
