@@ -345,7 +345,7 @@ static SCOSSL_STATUS scossl_rsa_verify_recover(
     }
 
     cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
-
+printf("\n###### Megan: Entering scossl_rsa_verify_recover()\n");
     if (siglen != cbModulus) {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
         return SCOSSL_FAILURE;
@@ -374,14 +374,14 @@ static SCOSSL_STATUS scossl_rsa_verify_recover(
                                  "SymCryptRsaRawEncrypt failed", scError);
         return SCOSSL_FAILURE;
     }
-#if 0  
-    // Special case: TLS MD5+SHA1
+printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good\n");
+    // Special case: TLS MD5+SHA1 !!!!!! this one doesn't have test case !!!!!!!!!!!
     if (ctx->mdInfo->id == NID_md5_sha1) {
-        if (modSize != SSL_SIG_LENGTH) {
+        if (cbModulus != SSL_SIG_LENGTH) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
             goto cleanup;
         }
-
+printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in TLS MD5+SHA1 case\n", cbModulus);
         if (rout != NULL) {
             memcpy(rout, decrypted, SSL_SIG_LENGTH);
             *routlen = SSL_SIG_LENGTH;
@@ -396,14 +396,15 @@ static SCOSSL_STATUS scossl_rsa_verify_recover(
             }
         }
         SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
-        OPENSSL_clear_free(decrypted, modSize);
+        OPENSSL_clear_free(decrypted, cbModulus);
         return SCOSSL_SUCCESS;
     }
 
-    // Special case: MDC2
+    // Special case: MDC2 !!!!!! this one doesn't have test case !!!!!!!!!!!
     if (ctx->mdInfo->id == NID_mdc2 &&
-        modSize == 18 &&
+        cbModulus == 18 &&
         decrypted[0] == 0x04 && decrypted[1] == 0x10) {
+    printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in MDC2 case\n", cbModulus);
         if (rout != NULL) {
             memcpy(rout, decrypted + 2, 16);
             *routlen = 16;
@@ -418,10 +419,10 @@ static SCOSSL_STATUS scossl_rsa_verify_recover(
             }
         }
         SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MDC2 which is not FIPS compliant");
-        OPENSSL_clear_free(decrypted, modSize);
+        OPENSSL_clear_free(decrypted, cbModulus);
         return SCOSSL_SUCCESS;
     }
-#endif
+
     // General case: PKCS#1 v1.5
     printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in General case: PKCS#1 v1.5\n", cbModulus);
     digestLen = scossl_get_expected_hash_length(ctx->mdInfo->id);
@@ -492,8 +493,9 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         *routlen = cbModulus;
         return SCOSSL_SUCCESS;
     }
-
+//!!!!!!!!!!!!!!!!!!!! issue here, why there is a test case with cbModulus is 257, and routsize is 256? !!!!!!!!!!!!!!!
     if (routsize < cbModulus) {
+        printf("\n###### Megan: cbModulus %ld > routsize %lu\n", cbModulus, routsize);
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
     }
@@ -501,30 +503,10 @@ static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (ctx->md != NULL) {
         switch (ctx->padding) {
         case RSA_PKCS1_PADDING:
-            printf("\n###### Megan: PKCS1 verify-recover path, routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
-/*
-            // Perform public key operation to recover encoded DigestInfo
-            scError = SymCryptRsaRawEncrypt(
-                ctx->keyCtx->key,
-                sig,
-                siglen,
-                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-                0,
-                rout,
-                cbModulus
-                );
-
-            if (scError != SYMCRYPT_NO_ERROR) {
-                printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover) failed 0x%x\n", scError);
-                SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
-                                          "SymCryptRsaRawEncrypt failed 0x%x", scError);
-                return SCOSSL_FAILURE;
-            }
-            printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld\n", cbModulus);
-            *routlen = cbModulus; 
-            return scossl_rsa_pkcs1_verify(ctx->keyCtx->key, mdnid, rout, cbModulus, sig, siglen); */
+            printf("\n###### Megan: call scossl_rsa_verify_recover(), routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
             return scossl_rsa_verify_recover(ctx, rout, routlen, sig, siglen);
         default:
+            printf("\n###### Megan: Only PKCS#1 v1.5 padding allowed, routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
             ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE,
                            "Only PKCS#1 v1.5 padding allowed");
             return SCOSSL_FAILURE;
