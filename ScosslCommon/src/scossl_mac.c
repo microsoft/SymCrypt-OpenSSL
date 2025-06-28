@@ -306,6 +306,8 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 {
     SYMCRYPT_ERROR scError;
 
+    ctx->cbTlsDataSize = 0;
+
     if (pbKey != NULL)
     {
         if (ctx->expandedKey == NULL)
@@ -340,7 +342,13 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_update(SCOSSL_MAC_CTX *ctx,
                                 PCBYTE pbData, SIZE_T cbData)
 {
-    ctx->pMac->appendFunc(ctx->macState, pbData, cbData);
+    SIZE_T effectiveLen = cbData;
+    if (ctx->cbTlsDataSize > 0 && ctx->cbTlsDataSize < cbData)
+    {
+        effectiveLen = ctx->cbTlsDataSize;
+    }
+
+    ctx->pMac->appendFunc(ctx->macState, pbData, effectiveLen);
 
     return SCOSSL_SUCCESS;
 }

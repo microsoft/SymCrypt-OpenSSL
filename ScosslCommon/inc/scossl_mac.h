@@ -37,6 +37,8 @@ typedef struct
     PVOID libctx;
     // Purely informational
     char* mdName;
+    // TLS-specific fields
+    SIZE_T cbTlsDataSize;
 } SCOSSL_MAC_CTX;
 
 SCOSSL_MAC_CTX *scossl_mac_dupctx(_In_ SCOSSL_MAC_CTX *ctx);

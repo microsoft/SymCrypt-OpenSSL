@@ -21,6 +21,7 @@ static const OSSL_PARAM p_scossl_hmac_ctx_settable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_MAC_PARAM_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_MAC_PARAM_PROPERTIES, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_MAC_PARAM_KEY, NULL, 0),
+    OSSL_PARAM_size_t(OSSL_MAC_PARAM_TLS_DATA_SIZE, NULL),
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[]);
@@ -195,6 +196,16 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
 
         if (!scossl_mac_init(ctx, pbMacKey, cbMacKey))
         {
+            goto cleanup;
+        }
+    }
+
+    // Handle TLS data size for CBC-mode MAC calculation
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_TLS_DATA_SIZE)) != NULL)
+    {
+        if (!OSSL_PARAM_get_size_t(p, &ctx->cbTlsDataSize))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
         }
     }
