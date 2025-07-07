@@ -167,7 +167,7 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
     // Random mac set in case padding removal failed
     BYTE randMac[EVP_MAX_MD_SIZE];
 
-    UINT32 macEnd = *record;
+    UINT32 macEnd = *recordLen;
     UINT32 macStart = macEnd - ctx->tlsMacSize;
     UINT32 inMac = 0;
 
@@ -236,12 +236,51 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
         rotateOffset++;
         rotateOffset = (rotateOffset & SYMCRYPT_MASK32_LT(rotateOffset, ctx->tlsMacSize));
     }
-
+//need to revisit
+    for (i = 0; i < ctx->tlsMacSize; i++)
+    {
+        ctx->tlsMac[i] = record[i+macStart];
+    }
     // If we failed, we still succeed, but the MAC is set to some
     // random value. It's up to the caller to check the MAC.
     return SCOSSL_SUCCESS;
 }
+static
+SCOSSL_STATUS scossl_tls_remove_padding(unsigned char *buf, size_t *len)
+{
+    size_t padlen = buf[*len - 1];  // zero-based
+    size_t totalPad = padlen + 1;
 
+    if (totalPad > *len)
+    {
+        printf("\n[MEGLIU] remove padding, totalPad %ld > *len %ld\n", totalPad, *len);
+        return SCOSSL_FAILURE;
+    }
+    // Check all padding bytes equal padlen
+    for (size_t i = *len - totalPad; i < *len; i++) {
+        if (buf[i] != padlen)
+            return SCOSSL_FAILURE;
+    }
+
+    *len -= totalPad;
+    return SCOSSL_SUCCESS;
+}
+
+static int scossl_tls_add_padding(unsigned char *out, size_t outsize, const unsigned char *in, size_t inl, size_t *outlen)
+{
+    size_t blocksize = 16;
+    size_t padlen = blocksize - (inl % blocksize);
+    if (padlen == 0)
+        padlen = blocksize;
+
+    if (inl + padlen > outsize)
+        return 0; // Buffer too small
+
+    memcpy(out, in, inl);
+    memset(out + inl, (unsigned char)(padlen - 1), padlen);
+    *outlen = inl + padlen;
+    return 1;
+}
 static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *ctx,
                                                        _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                                        _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
@@ -268,11 +307,22 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
 
         if (ctx->encrypt)
         {
-            // in == out
-            SymCryptPaddingPkcs7Add(
-                SYMCRYPT_AES_BLOCK_SIZE,
-                in, inl,
-                out, outsize, &inl);
+            // TLS 1.1+ uses explicit IV and TLS-style (zero-based) padding
+            if (ctx->tlsVersion >= TLS1_1_VERSION)
+            {
+                if (!scossl_tls_add_padding(out, outsize, in, inl, &inl)) 
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+                    return SCOSSL_FAILURE;
+                }
+            }
+            else
+            {   
+                SymCryptPaddingPkcs7Add(
+                    SYMCRYPT_AES_BLOCK_SIZE,
+                    in, inl,
+                    out, outsize, &inl);
+            }
         }
 
         if (inl % SYMCRYPT_AES_BLOCK_SIZE != 0 ||
@@ -301,7 +351,18 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
             case DTLS1_BAD_VER:
                 out += SYMCRYPT_AES_BLOCK_SIZE;
                 *outl -= SYMCRYPT_AES_BLOCK_SIZE;
-                __attribute__ ((fallthrough));
+                outlPadded = *outl;
+
+                if (ctx->tlsMacSize > *outl)
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+                    return SCOSSL_FAILURE;
+                }
+                scossl_tls_remove_padding(out, outl);
+                return p_scossl_aes_copy_mac(ctx,
+                                             out, outl,
+                                             outlPadded,
+                                             SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1));
             case TLS1_VERSION:
                 outlPadded = *outl;
 
