@@ -160,6 +160,7 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
                                            SIZE_T recordLenPadded,
                                            SCOSSL_STATUS paddingStatus)
 {
+    // MAC rotation is performed in place
     BYTE rotatedMacBuf[64 + EVP_MAX_MD_SIZE];
     PBYTE rotatedMac;
     BYTE randMac[EVP_MAX_MD_SIZE];
@@ -175,13 +176,15 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
     OPENSSL_free(ctx->tlsMac);
     ctx->tlsMac = NULL;
 
+    // Public info, safe to branch
+    // No mac to copy
     if (ctx->tlsMacSize == 0)
     {
         return paddingStatus;
     }
 
     *recordLen -= ctx->tlsMacSize;
-
+    
     if (RAND_bytes_ex(ctx->libctx, randMac, ctx->tlsMacSize, 0) <= 0)
     {
         return SCOSSL_FAILURE;
@@ -194,13 +197,14 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
     }
 
     rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
-
+    
+    // Public info, safe to branch
     if (recordLenPadded > ctx->tlsMacSize + 255 + 1)
     {
         scanStart = recordLenPadded - (ctx->tlsMacSize + 255 + 1);
     }
 
-    // Extract MAC bytes in constant time
+    // Find and extract MAC
     memset(rotatedMac, 0, ctx->tlsMacSize);
     for (i = scanStart, j = 0; i < recordLenPadded; i++)
     {
@@ -216,8 +220,7 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
 
     // Convert paddingStatus to full 0xFF mask or 0x00
     BYTE mask = paddingStatus ? 0xFF : 0x00;
-
-    // Rotate back MAC by rotateOffset, in constant time
+    // MAC rotation
     for (i = 0; i < ctx->tlsMacSize; i++)
     {
         BYTE macByte = 0;
@@ -227,7 +230,6 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
         }
         ctx->tlsMac[i] = SYMCRYPT_OPENSSL_MASK8_SELECT(mask, macByte, randMac[i]);
     }
-
     return SCOSSL_SUCCESS;
 }
 
