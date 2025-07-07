@@ -155,19 +155,16 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
 // This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c
 // and runs in constant time. In case of bad padding, a random MAC is assigned instead
 static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
-                                           _In_reads_bytes_(buflen) unsigned char *record, _Inout_ SIZE_T *recordLen,
+                                           _In_reads_bytes_(buflen) unsigned char *record,
+                                           _Inout_ SIZE_T *recordLen,
                                            SIZE_T recordLenPadded,
                                            SCOSSL_STATUS paddingStatus)
 {
-    // MAC rotation is performed in place
     BYTE rotatedMacBuf[64 + EVP_MAX_MD_SIZE];
     PBYTE rotatedMac;
-    BYTE aux1, aux2, aux3, mask;
-    BYTE paddingStatusByte = (BYTE) (paddingStatus & 0xff);
-    // Random mac set in case padding removal failed
     BYTE randMac[EVP_MAX_MD_SIZE];
 
-    UINT32 macEnd = *recordLen;
+    UINT32 macEnd = (UINT32)(*recordLen);  // mac end index
     UINT32 macStart = macEnd - ctx->tlsMacSize;
     UINT32 inMac = 0;
 
@@ -178,8 +175,6 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
     OPENSSL_free(ctx->tlsMac);
     ctx->tlsMac = NULL;
 
-    // Public info, safe to branch
-    // No mac to copy
     if (ctx->tlsMacSize == 0)
     {
         return paddingStatus;
@@ -187,7 +182,6 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
 
     *recordLen -= ctx->tlsMacSize;
 
-    // Generate random bytes in case of bad padding
     if (RAND_bytes_ex(ctx->libctx, randMac, ctx->tlsMacSize, 0) <= 0)
     {
         return SCOSSL_FAILURE;
@@ -201,13 +195,12 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
 
     rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
 
-    // Public info, safe to branch
     if (recordLenPadded > ctx->tlsMacSize + 255 + 1)
     {
         scanStart = recordLenPadded - (ctx->tlsMacSize + 255 + 1);
     }
 
-    // Find and extract MAC
+    // Extract MAC bytes in constant time
     memset(rotatedMac, 0, ctx->tlsMacSize);
     for (i = scanStart, j = 0; i < recordLenPadded; i++)
     {
@@ -221,30 +214,23 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
         j &= SYMCRYPT_MASK32_LT(j, ctx->tlsMacSize);
     }
 
-    // MAC rotation
-    for (i = 0, j = 0; i < ctx->tlsMacSize; i++)
-    {
-        // in case cache-line is 32 bytes, load from both lines and select appropriately
-        aux1 = rotatedMac[rotateOffset & ~0x20];
-        aux2 = rotatedMac[rotateOffset | 0x20];
-        mask = (BYTE) SYMCRYPT_MASK32_EQ(rotateOffset & !0x20, rotateOffset);
-        aux3 = SYMCRYPT_OPENSSL_MASK8_SELECT(mask, aux1, aux2);
+    // Convert paddingStatus to full 0xFF mask or 0x00
+    BYTE mask = paddingStatus ? 0xFF : 0x00;
 
-
-        ctx->tlsMac[j++] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatusByte, aux3, randMac[i]);
-
-        rotateOffset++;
-        rotateOffset = (rotateOffset & SYMCRYPT_MASK32_LT(rotateOffset, ctx->tlsMacSize));
-    }
-//need to revisit
+    // Rotate back MAC by rotateOffset, in constant time
     for (i = 0; i < ctx->tlsMacSize; i++)
     {
-        ctx->tlsMac[i] = record[i+macStart];
+        BYTE macByte = 0;
+        for (j = 0; j < ctx->tlsMacSize; j++) {
+            UINT32 match = SYMCRYPT_MASK32_EQ(j, (rotateOffset + i) % ctx->tlsMacSize);
+            macByte |= rotatedMac[j] & match;
+        }
+        ctx->tlsMac[i] = SYMCRYPT_OPENSSL_MASK8_SELECT(mask, macByte, randMac[i]);
     }
-    // If we failed, we still succeed, but the MAC is set to some
-    // random value. It's up to the caller to check the MAC.
+
     return SCOSSL_SUCCESS;
 }
+
 static
 SCOSSL_STATUS scossl_tls_remove_padding(unsigned char *buf, size_t *len)
 {
@@ -253,7 +239,6 @@ SCOSSL_STATUS scossl_tls_remove_padding(unsigned char *buf, size_t *len)
 
     if (totalPad > *len)
     {
-        printf("\n[MEGLIU] remove padding, totalPad %ld > *len %ld\n", totalPad, *len);
         return SCOSSL_FAILURE;
     }
     // Check all padding bytes equal padlen
