@@ -263,7 +263,7 @@ static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_tls_add_padding(const unsigned char *in, size_t inl, unsigned char *out, size_t outsize, size_t *outlen)
+static SCOSSL_STATUS p_scossl_aes_tls_add_padding(const unsigned char *in, size_t inl, unsigned char *out, size_t outsize, size_t *outlen)
 {
     // TLS padding with 1-16 bytes, each with value (cbPad-1)
     SIZE_T cbPad = SYMCRYPT_AES_BLOCK_SIZE - (inl & (SYMCRYPT_AES_BLOCK_SIZE-1));
@@ -273,9 +273,14 @@ static SCOSSL_STATUS p_scossl_tls_add_padding(const unsigned char *in, size_t in
         return SCOSSL_FAILURE; // Buffer too small
     }
 
-    memcpy(out, in, inl);
+    if (in != out)
+    {
+        memmove(out, in, inl);
+    }
+
     memset(out + inl, (unsigned char)(cbPad - 1), cbPad);
     *outlen = inl + cbPad;
+
     return SCOSSL_SUCCESS;
 }
 
@@ -306,7 +311,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
         if (ctx->encrypt)
         {
             // in == out
-            p_scossl_tls_add_padding(
+            p_scossl_aes_tls_add_padding(
                 in, inl,
                 out, outsize, &inl);
         }
