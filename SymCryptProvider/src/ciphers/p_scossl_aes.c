@@ -970,7 +970,7 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     return p_scossl_aes_cfb_cipher_internal(ctx, 1, ctx->pbChainingValue, out, outl, outsize, in, inl);
 }
 
-#define IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(kbits, ivlen, lcmode, UCMODE, type)                           \
+#define IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(kbits, ivlen, lcmode, UCMODE, type, blocksize)                \
     SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx(_In_ SCOSSL_PROVCTX *provctx)                \
     {                                                                                                     \
         SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_CTX);                                 \
@@ -990,7 +990,7 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
     SCOSSL_STATUS p_scossl_aes_##kbits##_##lcmode##_get_params(_Inout_ OSSL_PARAM params[])               \
     {                                                                                                     \
         return p_scossl_aes_generic_get_params(params, EVP_CIPH_##UCMODE##_MODE, kbits >> 3,              \
-                                               ivlen, SYMCRYPT_AES_BLOCK_SIZE, 0);                        \
+                                               ivlen, blocksize, 0);                                      \
     }                                                                                                     \
                                                                                                           \
     const OSSL_DISPATCH p_scossl_aes##kbits##lcmode##_functions[] = {                                     \
@@ -999,7 +999,7 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {OSSL_FUNC_CIPHER_FREECTX, (void (*)(void))p_scossl_aes_generic_freectx},                         \
         {OSSL_FUNC_CIPHER_ENCRYPT_INIT, (void (*)(void))p_scossl_aes_generic_encrypt_init},               \
         {OSSL_FUNC_CIPHER_DECRYPT_INIT, (void (*)(void))p_scossl_aes_generic_decrypt_init},               \
-        {OSSL_FUNC_CIPHER_UPDATE, (void (*)(void))p_scossl_aes_generic_##type##_update},                \
+        {OSSL_FUNC_CIPHER_UPDATE, (void (*)(void))p_scossl_aes_generic_##type##_update},                  \
         {OSSL_FUNC_CIPHER_FINAL, (void (*)(void))p_scossl_aes_generic_##type##_final},                    \
         {OSSL_FUNC_CIPHER_CIPHER, (void (*)(void))p_scossl_aes_generic_cipher},                           \
         {OSSL_FUNC_CIPHER_GET_PARAMS, (void (*)(void))p_scossl_aes_##kbits##_##lcmode##_get_params},      \
@@ -1010,21 +1010,21 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_settable_ctx_params}, \
         {0, NULL}};
 
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block, SYMCRYPT_AES_BLOCK_SIZE)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block, SYMCRYPT_AES_BLOCK_SIZE)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block, SYMCRYPT_AES_BLOCK_SIZE)
 
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, 0, ecb, ECB, block)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, 0, ecb, ECB, block)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, 0, ecb, ECB, block)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, 0, ecb, ECB, block, SYMCRYPT_AES_BLOCK_SIZE)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, 0, ecb, ECB, block, SYMCRYPT_AES_BLOCK_SIZE)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, 0, ecb, ECB, block, SYMCRYPT_AES_BLOCK_SIZE)
 
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream, 1)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream, 1)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb, CFB, stream, 1)
 
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream)
-IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream, 1)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(192, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream, 1)
+IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(256, SYMCRYPT_AES_BLOCK_SIZE, cfb8, CFB, stream, 1)
 
 #ifdef __cplusplus
 }
