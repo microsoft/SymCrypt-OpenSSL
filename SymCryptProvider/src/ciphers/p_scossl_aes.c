@@ -150,42 +150,48 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
 
 #define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
 
-// Extracts the MAC from the end of out and saves the result to ctx->tlsMac
+// Verifies the TLS padding from the end of record, extracts the MAC from the end of
+// the unpadded record, and saves the result to ctx->tlsMac.
+//
 // The mac will later be fetched through p_scossl_aes_generic_get_ctx_params
-// This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c
-// and runs in constant time. In case of bad padding, a random MAC is assigned instead
-static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
-                                           _In_reads_bytes_(buflen) unsigned char *record, _Inout_ SIZE_T *recordLen,
-                                           SIZE_T recordLenPadded,
-                                           SCOSSL_STATUS paddingStatus)
+// This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c, and 
+// SymCryptTlsCbcHmacVerifyCore from SymCrypt, and runs in constant time w.r.t
+// the values in pbData. In case of bad padding, a random MAC is assigned instead
+static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
+    _Inout_ SCOSSL_AES_CTX *ctx,
+    _In_reads_bytes_(*pcbData) unsigned char *pbData,
+    _Inout_ SIZE_T *pcbData)
 {
+    SIZE_T cbDataOrig = *pcbData;
+    unsigned const char * pbTail = pbData;
+    UINT32 cbTail = (UINT32)cbDataOrig;
+    UINT32 u32;
+    UINT32 cbPad;
+    UINT32 maxPadLength;
+
     // MAC rotation is performed in place
     BYTE rotatedMacBuf[64 + EVP_MAX_MD_SIZE];
     PBYTE rotatedMac;
-    BYTE aux1, aux2, aux3, mask;
-    BYTE paddingStatusByte = (BYTE) (paddingStatus & 0xff);
-    // Random mac set in case padding removal failed
     BYTE randMac[EVP_MAX_MD_SIZE];
+    BYTE paddingStatus = 0; // 0x00 for valid padding, 0xff for bad padding
 
-    UINT32 macEnd = *record;
-    UINT32 macStart = macEnd - ctx->tlsMacSize;
+    UINT32 macEnd; // index in pbTail
+    UINT32 macStart; // index in pbTail
     UINT32 inMac = 0;
 
-    UINT32 scanStart = 0;
     UINT32 rotateOffset = 0;
     UINT32 i, j;
 
     OPENSSL_free(ctx->tlsMac);
     ctx->tlsMac = NULL;
 
-    // Public info, safe to branch
-    // No mac to copy
-    if (ctx->tlsMacSize == 0)
+    // Check that we have enough data for a valid record.
+    // We need one MAC value plus one padding_length byte
+    if (cbDataOrig < ctx->tlsMacSize + 1)
     {
-        return paddingStatus;
+        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+        return SCOSSL_FAILURE;
     }
-
-    *recordLen -= ctx->tlsMacSize;
 
     // Generate random bytes in case of bad padding
     if (RAND_bytes_ex(ctx->libctx, randMac, ctx->tlsMacSize, 0) <= 0)
@@ -199,46 +205,77 @@ static SCOSSL_STATUS p_scossl_aes_copy_mac(_Inout_ SCOSSL_AES_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
-
-    // Public info, safe to branch
-    if (recordLenPadded > ctx->tlsMacSize + 255 + 1)
+    // We only care about the tail of the input buffer, which we can index with UINT32 indices
+    // The if() is safe as both cbData and u32 are public values.
+    u32 = ctx->tlsMacSize + 255 + 1;
+    if( cbDataOrig > u32 )
     {
-        scanStart = recordLenPadded - (ctx->tlsMacSize + 255 + 1);
+        pbTail += cbDataOrig - u32;
+        cbTail = u32;
     }
 
-    // Find and extract MAC
+    // Pick up the padding_length. Note that this is the value we have to keep secret from
+    // side-channel attacks.
+    cbPad = pbTail[cbTail - 1]; // cbPad in range [0,255]
+
+    // Bound the padding length to cbTail - tlsMacSize
+    // This doesn't reveal data as we treat all cbPad values the same, but it makes our
+    // further computations easier
+    maxPadLength = (UINT32)cbTail - ctx->tlsMacSize;    // We checked this is >= 0
+    u32 = SYMCRYPT_MASK32_LT( maxPadLength, cbPad );    // mask: maxPadLength < cbPad
+    cbPad = cbPad + ((maxPadLength - cbPad) & u32);
+    paddingStatus |= (BYTE)u32; // validation fails if the padding would overlap with the mac
+
+    macEnd = (cbTail - 1) - cbPad;
+    macStart = macEnd - ctx->tlsMacSize;
+
+    rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
+    
+    // Find and extract MAC, and verify padding
     memset(rotatedMac, 0, ctx->tlsMacSize);
-    for (i = scanStart, j = 0; i < recordLenPadded; i++)
+    for (i = 0, j = 0; i < cbTail-1; i++)
     {
         UINT32 macStarted = SYMCRYPT_MASK32_EQ(i, macStart);
-        UINT32 macEnded = SYMCRYPT_MASK32_LT(i, macEnd);
-        BYTE recordByte = record[i];
+        UINT32 macNotEnded = SYMCRYPT_MASK32_LT(i, macEnd);
+        BYTE recordByte = pbTail[i];
 
-        inMac = (inMac | macStarted) & macEnded;
+        inMac = (inMac | macStarted) & macNotEnded;
         rotateOffset |= j & macStarted;
         rotatedMac[j++] |= recordByte & inMac;
         j &= SYMCRYPT_MASK32_LT(j, ctx->tlsMacSize);
+
+        paddingStatus |= (BYTE)((~SYMCRYPT_MASK32_EQ(recordByte, cbPad)) & (~macNotEnded));
     }
 
     // MAC rotation
-    for (i = 0, j = 0; i < ctx->tlsMacSize; i++)
+    for (i = 0; i < ctx->tlsMacSize; i++)
     {
-        // in case cache-line is 32 bytes, load from both lines and select appropriately
-        aux1 = rotatedMac[rotateOffset & ~0x20];
-        aux2 = rotatedMac[rotateOffset | 0x20];
-        mask = (BYTE) SYMCRYPT_MASK32_EQ(rotateOffset & !0x20, rotateOffset);
-        aux3 = SYMCRYPT_OPENSSL_MASK8_SELECT(mask, aux1, aux2);
-
-
-        ctx->tlsMac[j++] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatusByte, aux3, randMac[i]);
-
-        rotateOffset++;
-        rotateOffset = (rotateOffset & SYMCRYPT_MASK32_LT(rotateOffset, ctx->tlsMacSize));
+        BYTE macByte = 0;
+        for (j = 0; j < ctx->tlsMacSize; j++) {
+            UINT32 match = SYMCRYPT_MASK32_EQ(j, (rotateOffset + i) % ctx->tlsMacSize);
+            macByte |= rotatedMac[j] & match;
+        }
+        ctx->tlsMac[i] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatus, randMac[i], macByte);
     }
 
-    // If we failed, we still succeed, but the MAC is set to some
-    // random value. It's up to the caller to check the MAC.
+    *pcbData -= (1 + cbPad + ctx->tlsMacSize);
+
+    return SCOSSL_SUCCESS;
+}
+
+static SCOSSL_STATUS p_scossl_tls_add_padding(const unsigned char *in, size_t inl, unsigned char *out, size_t outsize, size_t *outlen)
+{
+    // TLS padding with 1-16 bytes, each with value (cbPad-1)
+    SIZE_T cbPad = SYMCRYPT_AES_BLOCK_SIZE - (inl & (SYMCRYPT_AES_BLOCK_SIZE-1));
+
+    if (inl + cbPad > outsize)
+    {
+        return SCOSSL_FAILURE; // Buffer too small
+    }
+
+    memcpy(out, in, inl);
+    memset(out + inl, (unsigned char)(cbPad - 1), cbPad);
+    *outlen = inl + cbPad;
     return SCOSSL_SUCCESS;
 }
 
@@ -269,8 +306,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
         if (ctx->encrypt)
         {
             // in == out
-            SymCryptPaddingPkcs7Add(
-                SYMCRYPT_AES_BLOCK_SIZE,
+            p_scossl_tls_add_padding(
                 in, inl,
                 out, outsize, &inl);
         }
@@ -282,18 +318,12 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
             return SCOSSL_FAILURE;
         }
 
-        // Need to remove padding and mac in constant time
+        // Need to remove tls padding and mac in constant time
         if (!ctx->encrypt)
         {
-            SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-            // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
-            SYMCRYPT_UINT32_MAP scErrorMap[1] = {
-                {SYMCRYPT_NO_ERROR, SCOSSL_SUCCESS}};
-            SIZE_T outlPadded;
-
             switch (ctx->tlsVersion)
             {
-            // Need to remove explicit IV in addition to pkcs7 padding and mac
+            // Need to remove explicit IV in addition to tls padding and mac
             case TLS1_2_VERSION:
             case DTLS1_2_VERSION:
             case TLS1_1_VERSION:
@@ -303,23 +333,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
                 *outl -= SYMCRYPT_AES_BLOCK_SIZE;
                 __attribute__ ((fallthrough));
             case TLS1_VERSION:
-                outlPadded = *outl;
-
-                if (ctx->tlsMacSize > *outl)
-                {
-                    ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-                    return SCOSSL_FAILURE;
-                }
-                scError = SymCryptPaddingPkcs7Remove(
-                    SYMCRYPT_AES_BLOCK_SIZE,
-                    out, *outl,
-                    out, *outl,
-                    outl);
-
-                return p_scossl_aes_copy_mac(ctx,
-                                             out, outl,
-                                             outlPadded,
-                                             SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1));
+                return p_scossl_aes_tls_remove_padding_and_copy_mac(ctx, out, outl);
                 break;
             default:
                 ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
