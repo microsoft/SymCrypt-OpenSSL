@@ -153,7 +153,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
 // Verifies the TLS padding from the end of record, extracts the MAC from the end of
 // the unpadded record, and saves the result to ctx->tlsMac.
 //
-// The mac will later be fetched through p_scossl_aes_generic_get_ctx_params
+// The MAC will later be fetched through p_scossl_aes_generic_get_ctx_params
 // This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c, and 
 // SymCryptTlsCbcHmacVerifyCore from SymCrypt, and runs in constant time w.r.t
 // the values in pbData. In case of bad padding, a random MAC is assigned instead
@@ -224,7 +224,7 @@ static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
     maxPadLength = (UINT32)cbTail - ctx->tlsMacSize;    // We checked this is >= 0
     u32 = SYMCRYPT_MASK32_LT( maxPadLength, cbPad );    // mask: maxPadLength < cbPad
     cbPad = cbPad + ((maxPadLength - cbPad) & u32);
-    paddingStatus |= (BYTE)u32; // validation fails if the padding would overlap with the mac
+    paddingStatus |= (BYTE)u32; // validation fails if the padding would overlap with the MAC
 
     macEnd = (cbTail - 1) - cbPad;
     macStart = macEnd - ctx->tlsMacSize;
@@ -323,12 +323,12 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
             return SCOSSL_FAILURE;
         }
 
-        // Need to remove tls padding and mac in constant time
+        // Need to remove TLS padding and MAC in constant time
         if (!ctx->encrypt)
         {
             switch (ctx->tlsVersion)
             {
-            // Need to remove explicit IV in addition to tls padding and mac
+            // Need to remove explicit IV in addition to TLS padding and MAC
             case TLS1_2_VERSION:
             case DTLS1_2_VERSION:
             case TLS1_1_VERSION:
