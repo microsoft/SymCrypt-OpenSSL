@@ -62,12 +62,11 @@ SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_newctx(_In_ SCOSSL_PROVCTX *provctx)
 
 void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
-    if (ctx != NULL)
-    {
-        EVP_MD_free(ctx->hkdfCtx->md);
-        scossl_hkdf_freectx(ctx->hkdfCtx);
-    }
+    if (ctx == NULL)
+        return;
 
+    EVP_MD_free(ctx->hkdfCtx->md);
+    scossl_hkdf_freectx(ctx->hkdfCtx);
     OPENSSL_free(ctx);
 }
 

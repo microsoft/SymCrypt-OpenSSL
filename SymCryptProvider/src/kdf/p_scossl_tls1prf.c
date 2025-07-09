@@ -44,28 +44,44 @@ SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_newctx(_In_ SCOSSL_PROVCTX *provctx)
 
 void p_scossl_tls1prf_freectx(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
 {
-    if (ctx != NULL)
-    {
-        scossl_tls1prf_freectx(ctx->tls1prfCtx);
-        OPENSSL_free(ctx->mdName);
-    }
+    if (ctx == NULL)
+        return;
 
+    OPENSSL_free(ctx->mdName);
+    scossl_tls1prf_freectx(ctx->tls1prfCtx);
     OPENSSL_free(ctx);
 }
 
 SCOSSL_PROV_TLS1_PRF_CTX *p_scossl_tls1prf_dupctx(_In_ SCOSSL_PROV_TLS1_PRF_CTX *ctx)
 {
-    SCOSSL_PROV_TLS1_PRF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_TLS1_PRF_CTX));
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    SCOSSL_PROV_TLS1_PRF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_TLS1_PRF_CTX));
     if (copyCtx != NULL)
     {
         if ((copyCtx->tls1prfCtx = scossl_tls1prf_dupctx(ctx->tls1prfCtx)) == NULL)
         {
-            OPENSSL_free(copyCtx);
-            return NULL;
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
         }
 
-        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
+        if (ctx->mdName != NULL &&
+            (copyCtx->mdName = OPENSSL_strdup(ctx->mdName)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
         copyCtx->libctx = ctx->libctx;
+    }
+
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        p_scossl_tls1prf_freectx(copyCtx);
+        copyCtx = NULL;
     }
 
     return copyCtx;

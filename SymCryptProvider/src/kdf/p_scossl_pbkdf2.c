@@ -78,7 +78,7 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    SCOSSL_PROV_PBKDF2_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_PBKDF2_CTX));
+    SCOSSL_PROV_PBKDF2_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_PBKDF2_CTX));
     if (copyCtx != NULL)
     {
         copyCtx->libctx = ctx->libctx;
@@ -98,14 +98,9 @@ SCOSSL_PROV_PBKDF2_CTX *p_scossl_pbkdf2_dupctx(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx)
             memcpy(copyCtx->pbPassword, ctx->pbPassword, ctx->cbPassword);
             copyCtx->cbPassword = ctx->cbPassword;
         }
-        else
-        {
-            copyCtx->pbPassword = NULL;
-            copyCtx->cbPassword = 0;
-        }
 
-        if ((copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL &&
-            ctx->pbSalt != NULL)
+        if (ctx->pbSalt != NULL &&
+            (copyCtx->pbSalt = OPENSSL_memdup(ctx->pbSalt, ctx->cbSalt)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;            
