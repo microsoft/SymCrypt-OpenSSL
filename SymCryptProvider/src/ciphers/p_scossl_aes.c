@@ -270,6 +270,7 @@ static SCOSSL_STATUS p_scossl_aes_tls_add_padding(const unsigned char *in, size_
 
     if (inl + cbPad > outsize)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE; // Buffer too small
     }
 
@@ -311,9 +312,10 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
         if (ctx->encrypt)
         {
             // in == out
-            p_scossl_aes_tls_add_padding(
-                in, inl,
-                out, outsize, &inl);
+            if (p_scossl_aes_tls_add_padding(in, inl, out, outsize, &inl) != SCOSSL_SUCCESS)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
 
         if (inl % SYMCRYPT_AES_BLOCK_SIZE != 0 ||
