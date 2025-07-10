@@ -219,6 +219,11 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
         OPENSSL_free(ctx->mdName);
         ctx->mdName = mdName;
         mdName = NULL;
+        if (ctx->mdName == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
 
         ctx->tls1prfCtx->pHmac = symcryptHmacAlg;
         ctx->tls1prfCtx->isTlsPrf1_1 = isTlsPrf1_1;

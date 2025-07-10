@@ -223,6 +223,12 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
         symcryptHashAlg = scossl_get_symcrypt_hash_algorithm(EVP_MD_type(md));
         EVP_MD_free(md);
 
+        if (mdName == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+
         if (symcryptHashAlg == NULL)
         {
             OPENSSL_free(mdName);
