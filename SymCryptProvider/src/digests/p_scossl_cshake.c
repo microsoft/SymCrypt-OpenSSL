@@ -132,43 +132,21 @@ static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
 
     SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_CSHAKE_CTX);
 
-    if (ctx != NULL)
+    if (copyCtx != NULL)
     {
-        if (ctx->pbFunctionNameString != NULL)
-        {
-            copyCtx->pbFunctionNameString = OPENSSL_memdup(ctx->pbFunctionNameString, ctx->cbFunctionNameString);
-            if (copyCtx->pbFunctionNameString == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
-        }
-        else
-        {
-            copyCtx->pbFunctionNameString = NULL;
-        }
-        copyCtx->cbFunctionNameString = ctx->cbFunctionNameString;
+        *copyCtx = *ctx;
 
-        if (ctx->pbCustomizationString != NULL)
+        copyCtx->pbFunctionNameString = OPENSSL_memdup(ctx->pbFunctionNameString, ctx->cbFunctionNameString);
+        copyCtx->pbCustomizationString = OPENSSL_memdup(ctx->pbCustomizationString, ctx->cbCustomizationString);
+
+        if ((ctx->pbFunctionNameString != NULL  && copyCtx->pbFunctionNameString == NULL) ||
+            (ctx->pbCustomizationString != NULL && copyCtx->pbCustomizationString == NULL))
         {
-            copyCtx->pbCustomizationString = OPENSSL_memdup(ctx->pbCustomizationString, ctx->cbCustomizationString);
-            if (copyCtx->pbCustomizationString == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
         }
-        else
-        {
-            copyCtx->pbCustomizationString = NULL;
-        }
-        copyCtx->cbCustomizationString = ctx->cbCustomizationString;
 
         ctx->pHash->stateCopyFunc(&ctx->state, &copyCtx->state);
-
-        copyCtx->pHash = ctx->pHash;
-        copyCtx->xofState = ctx->xofState;
-        copyCtx->xofLen = ctx->xofLen;
     }
 
     status = SCOSSL_SUCCESS;

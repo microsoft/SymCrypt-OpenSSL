@@ -21,9 +21,14 @@ SCOSSL_STATUS scossl_aes_gcm_init_ctx(SCOSSL_CIPHER_GCM_CTX *ctx, const unsigned
     ctx->useInvocation = 0;
     ctx->ivlen = SCOSSL_GCM_DEFAULT_IV_LENGTH;
 
-    if (iv != NULL && (ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+    if (iv != NULL)
     {
-        return SCOSSL_FAILURE;
+        OPENSSL_free(ctx->iv);
+
+        if ((ctx->iv = OPENSSL_memdup(iv, ctx->ivlen)) == NULL)
+        {
+            return SCOSSL_FAILURE;
+        }
     }
 
     return SCOSSL_SUCCESS;
@@ -431,7 +436,7 @@ void scossl_aes_ccm_init_ctx(SCOSSL_CIPHER_CCM_CTX *ctx,
                              const unsigned char *iv)
 {
     ctx->ivlen = SCOSSL_CCM_MIN_IV_LENGTH;
-    if (iv)
+    if (iv != NULL)
     {
         memcpy(ctx->iv, iv, ctx->ivlen);
     }
