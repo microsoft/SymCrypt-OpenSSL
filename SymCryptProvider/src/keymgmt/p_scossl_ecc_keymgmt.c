@@ -390,7 +390,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
         SIZE_T cbEncodedKey;
-        if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbEncodedKey, &cbEncodedKey) ||
+        if (!p_scossl_ecc_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbEncodedKey, &cbEncodedKey) ||
             !OSSL_PARAM_set_octet_string(p, pbEncodedKey, cbEncodedKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
