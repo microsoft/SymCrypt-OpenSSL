@@ -88,6 +88,11 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_new_ctx(ossl_unused void *p
         keyCtx->keyType = RSA_FLAG_TYPE_RSA;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+        if (keyCtx->keysinuseLock == NULL)
+        {
+            OPENSSL_free(keyCtx);
+            return NULL;
+        }
 #endif
     }
     return keyCtx;
@@ -102,6 +107,11 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsapss_keymgmt_new_ctx(_In_ SCOSSL_PROV
         keyCtx->keyType = RSA_FLAG_TYPE_RSASSAPSS;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+        if (keyCtx->keysinuseLock == NULL)
+        {
+            OPENSSL_free(keyCtx);
+            return NULL;
+        }
 #endif
     }
     return keyCtx;
@@ -233,7 +243,7 @@ cleanup:
 
 static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
-    SCOSSL_PROV_RSA_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
+    SCOSSL_PROV_RSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (copyCtx == NULL)
     {
         return NULL;
@@ -241,6 +251,11 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
 
 #ifdef KEYSINUSE_ENABLED
     copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+    if (copyCtx->keysinuseLock == NULL)
+    {
+        OPENSSL_free(copyCtx);
+        return NULL;
+    }
 
     if (keyCtx->keysinuseInfo == NULL ||
         p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
@@ -407,7 +422,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     SYMCRYPT_ERROR scError;
     PUINT64 pPubExp64;
 
-    keyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
+    keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx == NULL)
     {
         goto cleanup;
@@ -433,15 +448,20 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
         goto cleanup;
     }
 
-    keyCtx->initialized = TRUE;
     keyCtx->keyType = genCtx->keyType;
     keyCtx->pssRestrictions = genCtx->pssRestrictions;
     genCtx->pssRestrictions = NULL;
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
     keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+    if (keyCtx->keysinuseLock == NULL)
+    {
+        goto cleanup;
+    }
     keyCtx->keysinuseInfo = NULL;
 #endif
+
+    keyCtx->initialized = TRUE;
 
 cleanup:
     if (keyCtx != NULL && !keyCtx->initialized)

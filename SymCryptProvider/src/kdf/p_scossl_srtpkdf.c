@@ -94,6 +94,9 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
 
     if (copyCtx != NULL)
     {
+        *copyCtx = *ctx;
+        copyCtx->pbKey = NULL;
+
         if (ctx->pbKey != NULL)
         {
             if ((copyCtx->pbKey = OPENSSL_secure_malloc(ctx->cbKey)) == NULL)
@@ -103,7 +106,6 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
             }
 
             memcpy(copyCtx->pbKey, ctx->pbKey, ctx->cbKey);
-            copyCtx->cbKey = ctx->cbKey;
 
             scError = SymCryptSrtpKdfExpandKey(&copyCtx->expandedKey, copyCtx->pbKey, copyCtx->cbKey);
             if (scError != SYMCRYPT_NO_ERROR)
@@ -112,23 +114,6 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
                 goto cleanup;
             }
         }
-        else
-        {
-            copyCtx->pbKey = NULL;
-            copyCtx->cbKey = 0;
-        }
-
-        if (ctx->isSaltSet)
-        {
-            memcpy(copyCtx->pbSalt, ctx->pbSalt, SCOSSL_SRTP_KDF_SALT_SIZE);
-        }
-
-        copyCtx->isSrtcp = ctx->isSrtcp;
-        copyCtx->isSaltSet = ctx->isSaltSet;
-        copyCtx->uKeyDerivationRate = ctx->uKeyDerivationRate;
-        copyCtx->uIndex = ctx->uIndex;
-        copyCtx->uIndexWidth = ctx->uIndexWidth;
-        copyCtx->label = ctx->label;
     }
 
     status = SCOSSL_SUCCESS;

@@ -97,10 +97,10 @@ static SCOSSL_DH_CTX *p_scossl_dh_dupctx(_In_ SCOSSL_DH_CTX *ctx)
         copyCtx->kdfCekAlg = OPENSSL_strdup(ctx->kdfCekAlg);
         copyCtx->kdfUkm = OPENSSL_memdup(ctx->kdfUkm, ctx->kdfUkmlen);
 
-        if ((ctx->kdfMdName != NULL && (copyCtx->kdfMdName == NULL)) ||
+        if ((ctx->kdfMdName != NULL  && (copyCtx->kdfMdName == NULL)) ||
             (ctx->kdfMdProps != NULL && (copyCtx->kdfMdProps == NULL)) ||
-            (ctx->kdfCekAlg != NULL && (copyCtx->kdfCekAlg == NULL)) ||
-            (ctx->kdfUkm != NULL && (copyCtx->kdfUkm == NULL)))
+            (ctx->kdfCekAlg != NULL  && (copyCtx->kdfCekAlg == NULL)) ||
+            (ctx->kdfUkm != NULL     && (copyCtx->kdfUkm == NULL)))
         {
             p_scossl_dh_freectx(copyCtx);
             copyCtx = NULL;

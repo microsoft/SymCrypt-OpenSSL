@@ -149,6 +149,11 @@ static void p_scossl_keysinuse_init_once()
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
+    if (sk_keysinuse_info_lock == NULL || sk_keysinuse_info == NULL)
+    {
+        p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
+        goto cleanup;
+    }
 
     // Try to create /var/log/keysinuse if it isn't present.
     // This is a best attempt and only succeeds if the callers

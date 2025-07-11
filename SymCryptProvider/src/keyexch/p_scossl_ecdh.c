@@ -47,9 +47,7 @@ static SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
     SCOSSL_ECDH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (copyCtx != NULL)
     {
-        copyCtx->libctx = ctx->libctx;
-        copyCtx->keyCtx = ctx->keyCtx;
-        copyCtx->peerKeyCtx = ctx->peerKeyCtx;
+        *copyCtx = *ctx;
     }
 
     return copyCtx;
