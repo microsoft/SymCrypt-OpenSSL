@@ -233,7 +233,7 @@ cleanup:
 
 static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
-    SCOSSL_PROV_RSA_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
+    SCOSSL_PROV_RSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (copyCtx == NULL)
     {
         return NULL;
