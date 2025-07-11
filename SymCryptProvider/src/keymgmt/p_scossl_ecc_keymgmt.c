@@ -104,6 +104,12 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *pro
         keyCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
 #ifdef KEYSINUSE_ENABLED
         keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+        if (keyCtx->keysinuseLock == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            OPENSSL_free(keyCtx);
+            return NULL;
+        }
 #endif
     }
 
@@ -150,12 +156,17 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keymgmt_dup_ctx(_In_ const SCOSSL_ECC_KE
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
-    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
+    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
 
     if (copyCtx != NULL)
     {
 #ifdef KEYSINUSE_ENABLED
         copyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+        if (copyCtx->keysinuseLock == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
 
         if (keyCtx->keysinuseInfo == NULL ||
             p_scossl_keysinuse_upref(keyCtx->keysinuseInfo, NULL))
@@ -429,6 +440,11 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
 #ifdef KEYSINUSE_ENABLED
     keyCtx->isImported = FALSE;
     keyCtx->keysinuseLock = CRYPTO_THREAD_lock_new();
+    if (keyCtx->keysinuseLock == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
     keyCtx->keysinuseInfo = NULL;
 #endif
     keyCtx->conversionFormat = genCtx->conversionFormat;
