@@ -68,12 +68,10 @@ static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->operation = ctx->operation;
         copyCtx->provCtx = ctx->provCtx;
+        copyCtx->classicKeyexchCtx = NULL;
 
-        if (ctx->classicKeyexchCtx != NULL)
-        {
-            copyCtx->classicKeyexchCtx = NULL;
-        }
-        else if ((copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
+        if (ctx->classicKeyexchCtx != NULL &&
+            (copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
         {
             OPENSSL_free(copyCtx);
             copyCtx = NULL;

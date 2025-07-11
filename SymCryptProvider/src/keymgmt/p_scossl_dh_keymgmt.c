@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#define SCOSSL_DH_KEYHEN_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
+#define SCOSSL_DH_KEYGEN_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
 #define SCOSSL_DH_PBITS_DEFAULT 2048
 // Private key length determined by group
@@ -105,15 +105,13 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
         if ((ctx->keyCtx = scossl_dh_new_key_ctx()) == NULL)
         {
             OPENSSL_free(ctx);
-            ctx = NULL;
+            return NULL;
         }
-        else
-        {
-            ctx->pDlGroup = NULL;
-            ctx->groupSetByParams = FALSE;
-            ctx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
-            ctx->libCtx = provCtx->libctx;
-        }
+
+        ctx->pDlGroup = NULL;
+        ctx->groupSetByParams = FALSE;
+        ctx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
+        ctx->libCtx = provCtx->libctx;
     }
 
     return ctx;
@@ -500,7 +498,7 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
 {
     SCOSSL_DH_KEYGEN_CTX *genCtx = NULL;
 
-    if ((selection & SCOSSL_DH_KEYHEN_POSSIBLE_SELECTIONS) != 0 &&
+    if ((selection & SCOSSL_DH_KEYGEN_POSSIBLE_SELECTIONS) != 0 &&
         (genCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEYGEN_CTX))) != NULL)
     {
         genCtx->pDlGroup = NULL;
