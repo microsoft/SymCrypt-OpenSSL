@@ -17,23 +17,18 @@ _Use_decl_annotations_
 SCOSSL_TLS1_PRF_CTX *scossl_tls1prf_dupctx(SCOSSL_TLS1_PRF_CTX *ctx)
 {
     SCOSSL_TLS1_PRF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_TLS1_PRF_CTX));
+
     if (copyCtx != NULL)
     {
-        if (ctx->pbSecret == NULL)
-        {
-            copyCtx->pbSecret = NULL;
-        }
-        else if ((copyCtx->pbSecret = OPENSSL_memdup(ctx->pbSecret, ctx->cbSecret)) == NULL)
+        *copyCtx = *ctx;
+        copyCtx->pbSecret = NULL;
+        
+        if (ctx->pbSecret != NULL &&
+            (copyCtx->pbSecret = OPENSSL_memdup(ctx->pbSecret, ctx->cbSecret)) == NULL)
         {
             scossl_tls1prf_freectx(copyCtx);
-            return NULL;
+            copyCtx = NULL;
         }
-
-        copyCtx->isTlsPrf1_1 = ctx->isTlsPrf1_1;
-        copyCtx->pHmac = ctx->pHmac;
-        copyCtx->cbSecret = ctx->cbSecret;
-        copyCtx->cbSeed = ctx->cbSeed;
-        memcpy(copyCtx->seed, ctx->seed, ctx->cbSeed);
     }
 
     return copyCtx;

@@ -55,7 +55,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
-    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
+    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
 
     if (copyCtx != NULL)
     {

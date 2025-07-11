@@ -65,10 +65,11 @@ static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_GCM_CTX);
     if (copy_ctx != NULL)
     {
-        memcpy(copy_ctx, ctx, sizeof(SCOSSL_CIPHER_GCM_CTX));
+        *copy_ctx = *ctx;
 
         if (ctx->iv != NULL && (copy_ctx->iv = OPENSSL_memdup(ctx->iv, ctx->ivlen)) == NULL)
         {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             p_scossl_aes_gcm_freectx(copy_ctx);
             return NULL;
         }
@@ -552,7 +553,6 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
         if (ctx != NULL)                                                                                     \
         {                                                                                                    \
             ctx->keylen = kbits >> 3;                                                                        \
-            ctx->ivlen = defaultIvLen;                                                                       \
             scossl_aes_##lcmode##_init_ctx(ctx, NULL);                                                       \
         }                                                                                                    \
                                                                                                              \

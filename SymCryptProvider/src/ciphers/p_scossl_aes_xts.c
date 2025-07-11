@@ -40,7 +40,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
 
 static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_newctx_internal(size_t keylen)
 {
-    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
+    SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_AES_XTS_CTX);
     if (ctx != NULL)
     {
         ctx->keylen = keylen;

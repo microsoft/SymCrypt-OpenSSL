@@ -129,7 +129,12 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
             }
         }
 
-        copyCtx->mdName = OPENSSL_strdup(ctx->mdName);
+        if (ctx->mdName != NULL &&
+            (copyCtx->mdName = OPENSSL_strdup(ctx->mdName)) == NULL)
+        {
+            goto cleanup;
+        }
+
         copyCtx->libctx = ctx->libctx;
     }
 

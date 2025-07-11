@@ -181,7 +181,11 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
             goto cleanup;
         }
 
-        ctx->mdName = OPENSSL_strdup(mdName);
+        if ((ctx->mdName = OPENSSL_strdup(mdName)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_KEY)) != NULL)
