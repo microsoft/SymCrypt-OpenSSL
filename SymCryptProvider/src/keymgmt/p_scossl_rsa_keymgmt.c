@@ -401,7 +401,7 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     PUINT64 pPubExp64;
     UINT32 genFlags = SYMCRYPT_FLAG_RSAKEY_SIGN | SYMCRYPT_FLAG_RSAKEY_ENCRYPT;
 
-    keyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
+    keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
     if (keyCtx == NULL)
     {
         goto cleanup;
@@ -434,7 +434,6 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
         goto cleanup;
     }
 
-    keyCtx->initialized = TRUE;
     keyCtx->keyType = genCtx->keyType;
     keyCtx->pssRestrictions = genCtx->pssRestrictions;
     genCtx->pssRestrictions = NULL;
@@ -442,6 +441,8 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
     keyCtx->isImported = FALSE;
     keyCtx->keysinuseCtx = NULL;
 #endif
+
+    keyCtx->initialized = TRUE;
 
 cleanup:
     if (keyCtx != NULL && !keyCtx->initialized)
