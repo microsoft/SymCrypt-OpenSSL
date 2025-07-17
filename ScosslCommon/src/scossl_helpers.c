@@ -198,6 +198,11 @@ void SCOSSL_set_trace_level(int trace_level, int ossl_ERR_level)
 
 void SCOSSL_set_trace_log_filename(const char *filename)
 {
+    if( _loggingLock == NULL )
+    {
+        return;
+    }
+
     if( _traceLogFilename )
     {
         OPENSSL_free(_traceLogFilename);
@@ -239,6 +244,11 @@ static void _scossl_log_bytes_valist(
     char errStringBuf[SCOSSL_TRACELOG_PARA_LENGTH];
     char paraBuf[SCOSSL_TRACELOG_PARA_LENGTH];
     char *trace_level_prefix = "";
+    
+    if( _loggingLock == NULL )
+    {
+        return;
+    }
 
     if( SYMCRYPT_MAX(_traceLogLevel, _osslERRLogLevel) < trace_level )
     {
