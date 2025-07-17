@@ -241,6 +241,10 @@ static void keysinuse_init_internal()
 
     lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
     lh_keysinuse_ctx_imp = lh_SCOSSL_KEYSINUSE_CTX_IMP_new(scossl_keysinuse_ctx_hash, scossl_keysinuse_ctx_cmp);
+    if (lh_keysinuse_ctx_imp_lock == NULL || lh_keysinuse_ctx_imp == NULL)
+    {
+        goto cleanup;
+    }
 
 #ifndef KEYSINUSE_LOG_SYSLOG
     if (!keysinuse_init_logging())
