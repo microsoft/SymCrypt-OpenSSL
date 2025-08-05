@@ -1260,7 +1260,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     OSSL_PARAM_BLD *bld = NULL;
     OSSL_PARAM *params = NULL;
     // Always export public key if key is initialized
-    BOOL includePublic = ctx->keyCtx->initialized;
+    BOOL includePublic = (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0;;
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     PBYTE pbPrimeP = NULL;
     PBYTE pbPrimeQ = NULL;
