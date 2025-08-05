@@ -89,7 +89,6 @@ static const OSSL_PARAM p_scossl_dh_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
-    OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_P, NULL, 0),
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_Q, NULL, 0),
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_G, NULL, 0),
@@ -937,7 +936,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
         (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_SUCCESS;
+        return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS)) != NULL)
@@ -947,7 +946,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
             !OSSL_PARAM_set_int(p, BN_security_bits(pubKeyBits, privKeyBits)))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_SUCCESS;
+            return SCOSSL_FAILURE;
         }
     }
 
@@ -955,7 +954,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
         (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits / 8)))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        return SCOSSL_SUCCESS;
+        return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DH_PRIV_LEN)) != NULL &&
@@ -1229,7 +1228,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_import(_Inout_ SCOSSL_PROV_DH_KEY_CTX *
     ctx->pDlGroup = pDlGroup;
     ctx->groupSetByParams = groupSetByParams;
     ctx->nBitsPriv = nBitsPriv;
-    ctx->keyCtx->initialized = TRUE;
+
     ret = SCOSSL_SUCCESS;
 
 cleanup:
