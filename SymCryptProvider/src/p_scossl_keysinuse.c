@@ -239,12 +239,15 @@ void p_scossl_keysinuse_teardown()
                 p_scossl_keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
             }
         }
+        else
+        {
+            pthread_mutex_unlock(&logging_thread_mutex);
+        }
     }
     else
     {
         p_scossl_keysinuse_log_error("Cleanup failed to acquire mutex,SYS_%d", pthreadErr);
     }
-    pthread_mutex_unlock(&logging_thread_mutex);
 
     if (prefix != default_prefix)
     {
