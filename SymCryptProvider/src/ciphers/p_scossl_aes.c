@@ -199,12 +199,6 @@ static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
         return SCOSSL_FAILURE;
     }
 
-    if ((ctx->tlsMac = OPENSSL_malloc(ctx->tlsMacSize)) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return SCOSSL_FAILURE;
-    }
-
     // We only care about the tail of the input buffer, which we can index with UINT32 indices
     // The if() is safe as both cbData and u32 are public values.
     u32 = ctx->tlsMacSize + 255 + 1;
@@ -247,15 +241,25 @@ static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
         paddingStatus |= (BYTE)((~SYMCRYPT_MASK32_EQ(recordByte, cbPad)) & (~macNotEnded));
     }
 
-    // MAC rotation
-    for (i = 0; i < ctx->tlsMacSize; i++)
+    // Public info, safe to branch
+    if (ctx->tlsMacSize > 0)
     {
-        BYTE macByte = 0;
-        for (j = 0; j < ctx->tlsMacSize; j++) {
-            UINT32 match = SYMCRYPT_MASK32_EQ(j, (rotateOffset + i) % ctx->tlsMacSize);
-            macByte |= rotatedMac[j] & match;
+        if ((ctx->tlsMac = OPENSSL_malloc(ctx->tlsMacSize)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
         }
-        ctx->tlsMac[i] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatus, randMac[i], macByte);
+
+        // MAC rotation
+        for (i = 0; i < ctx->tlsMacSize; i++)
+        {
+            BYTE macByte = 0;
+            for (j = 0; j < ctx->tlsMacSize; j++) {
+                UINT32 match = SYMCRYPT_MASK32_EQ(j, (rotateOffset + i) % ctx->tlsMacSize);
+                macByte |= rotatedMac[j] & match;
+            }
+            ctx->tlsMac[i] = SYMCRYPT_OPENSSL_MASK8_SELECT(paddingStatus, randMac[i], macByte);
+        }
     }
 
     *pcbData -= (1 + cbPad + ctx->tlsMacSize);
