@@ -296,11 +296,6 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
     SIZE_T cbInFullBlocks = 0;
     *outl = 0;
 
-    if (inl == 0)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
     if (ctx->tlsVersion > 0)
     {
         // Each update call corresponds to a TLS record and is individually padded
