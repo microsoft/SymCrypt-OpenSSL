@@ -45,6 +45,10 @@ DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 // This is destroyed if the logging thread fails to start, or when the logging thread exits.
 // Always check this is non-NULL outside the logging thread.
 static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info = NULL;
+// Stack of keysinuseInfo that have been popped by the logging thread, but not yet logged.
+// This should only be used in the logging thread. It is defined here to avoid reallocation
+// and leaks if the process forks and a new logging thread is created in the child process.
+static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = NULL;
 // This lock should be aquired before accessing sk_keysinuse_info
 static CRYPTO_RWLOCK *sk_keysinuse_info_lock = NULL;
 
@@ -66,6 +70,7 @@ static BOOL is_logging = FALSE;
 // Internal function declarations
 //
 static void p_scossl_keysinuse_init_once();
+static void p_scossl_keysinuse_atfork_reinit();
 
 static void p_scossl_keysinuse_add_use(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning);
 
@@ -149,7 +154,10 @@ static void p_scossl_keysinuse_init_once()
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    if (sk_keysinuse_info_lock == NULL || sk_keysinuse_info == NULL)
+    sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
+    if (sk_keysinuse_info_lock == NULL || 
+        sk_keysinuse_info == NULL ||
+        sk_keysinuse_info_pending == NULL)
     {
         p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
         goto cleanup;
@@ -190,11 +198,16 @@ static void p_scossl_keysinuse_init_once()
         goto cleanup;
     }
 
+    if ((pthreadErr = pthread_atfork(NULL, NULL, p_scossl_keysinuse_atfork_reinit)) != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to register child process reinit. Child processes will not log events,SYS_%d", pthreadErr);
+    }
+
     keysinuse_enabled = TRUE;
     status = SCOSSL_SUCCESS;
 
 cleanup:
-    if (!status)
+    if (status != SCOSSL_SUCCESS)
     {
         sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
         sk_keysinuse_info = NULL;
@@ -208,6 +221,75 @@ cleanup:
 void p_scossl_keysinuse_init()
 {
     CRYPTO_THREAD_run_once(&keysinuse_init_once, p_scossl_keysinuse_init_once);
+}
+
+// If the calling process forks, the logging thread needs to be restarted in the
+// child process, and any locks should be reinitialized in case the parent
+// process held a lock at the time of the fork. 
+static void p_scossl_keysinuse_atfork_reinit()
+{
+    SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo = NULL;
+    pthread_condattr_t attr;
+    int pthreadErr;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    // Reset global state
+    keysinuse_enabled = FALSE;
+    first_use_pending = FALSE;
+    is_logging = FALSE;
+    logging_thread_exit_status = SCOSSL_FAILURE;
+
+    CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
+    sk_keysinuse_info_lock = NULL;
+
+    logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+
+    // If any keysinuseInfo were pending logging in the stack, they will
+    // be logged by the parent process. Remove them from the child process's
+    // stack and reset them. 
+    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
+    {
+        pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info);
+        if (pKeysinuseInfo != NULL)
+        {
+            pKeysinuseInfo->logPending = FALSE;
+            pKeysinuseInfo->decryptCounter = 0;
+            pKeysinuseInfo->signCounter = 0;
+
+            p_scossl_keysinuse_info_free(pKeysinuseInfo);
+        }
+    }
+
+    sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
+    if (sk_keysinuse_info_lock == NULL)
+    {
+        p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
+        goto cleanup;
+    }
+    
+    // Start the logging thread. Monotonic clock needs to be set to
+    // prevent wall clock changes from affecting the logging delay sleep time
+    is_logging = TRUE;
+    if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+        (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
+        (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+        (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
+        is_logging = FALSE;
+        goto cleanup;
+    }
+
+    keysinuse_enabled = TRUE;
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+        sk_keysinuse_info = NULL;
+        p_scossl_keysinuse_teardown();
+    }
 }
 
 BOOL p_scossl_keysinuse_running()
@@ -255,6 +337,9 @@ void p_scossl_keysinuse_teardown()
         prefix = (char*)default_prefix;
         prefix_size = 0;
     }
+
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
+    sk_keysinuse_info_pending = NULL;
 
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
     sk_keysinuse_info_lock = NULL;
@@ -685,9 +770,8 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     int pthreadErr;
     int waitStatus;
 
-    // Every time the logging loop runs, all pending usage events are popped to this thread-local stack
+    // Every time the logging loop runs, all pending usage events are popped to sk_keysinuse_info_pending
     // to minimize the time sk_keysinuse_info_lock is held.
-    STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo;
     SCOSSL_PROV_KEYSINUSE_INFO keysinuseInfoTmp;
 
@@ -809,7 +893,6 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     while (isLoggingThreadRunning);
 
 cleanup:
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     logging_thread_exit_status = SCOSSL_SUCCESS;
     keysinuse_enabled = FALSE;
     p_scossl_keysinuse_cleanup();
