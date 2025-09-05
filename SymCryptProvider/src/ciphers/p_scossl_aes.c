@@ -151,7 +151,10 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
 #define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
 
 // Verifies the TLS padding from the end of record, extracts the MAC from the end of
-// the unpadded record, and saves the result to ctx->tlsMac.
+// the unpadded record, and saves the result to ctx->tlsMac. 
+// 
+// If ctx->tlsMacSize is 0 (in the case of encrypt-then-mac), no MAC is extracted, 
+// but the padding is still verified and removed.
 //
 // The MAC will later be fetched through p_scossl_aes_generic_get_ctx_params
 // This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c, and 
