@@ -241,6 +241,8 @@ static void p_scossl_keysinuse_atfork_reinit()
     is_logging = FALSE;
     logging_thread_exit_status = SCOSSL_FAILURE;
 
+    logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+
     // Recreate global locks in case they were held by the logging
     // thread in the parent process at the time of the fork.
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
@@ -250,8 +252,6 @@ static void p_scossl_keysinuse_atfork_reinit()
         p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
         goto cleanup;
     }
-
-    logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
 
     // If any keysinuseInfo were in either stack, they will
     // be logged by the parent process. Remove them from the child process's
