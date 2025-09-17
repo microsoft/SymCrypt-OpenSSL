@@ -83,7 +83,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg);
 //
 // Setup/teardown
 //
-static void p_scossl_keysinuse_cleanup()
+static void p_scossl_keysinuse_logging_thread_cleanup()
 {
     if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
     {
@@ -102,6 +102,9 @@ static void p_scossl_keysinuse_cleanup()
     {
         p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
     }
+
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
+    sk_keysinuse_info_pending = NULL;
 }
 
 static void p_scossl_keysinuse_init_once()
@@ -209,8 +212,6 @@ static void p_scossl_keysinuse_init_once()
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
-        sk_keysinuse_info = NULL;
         p_scossl_keysinuse_teardown();
     }
 
@@ -241,10 +242,12 @@ static void p_scossl_keysinuse_atfork_reinit()
 
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
     sk_keysinuse_info_lock = NULL;
-
+    
+    // Recreate logging thread mutex in case it was held by the logging
+    // thread in the parent process at the time of the fork.
     logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
 
-    // If any keysinuseInfo were pending logging in the stack, they will
+    // If any keysinuseInfo were in either the stack, they will
     // be logged by the parent process. Remove them from the child process's
     // stack and reset them. 
     while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
@@ -260,10 +263,23 @@ static void p_scossl_keysinuse_atfork_reinit()
         }
     }
 
+    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
+    {
+        pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
+        if (pKeysinuseInfo != NULL)
+        {
+            pKeysinuseInfo->logPending = FALSE;
+            pKeysinuseInfo->decryptCounter = 0;
+            pKeysinuseInfo->signCounter = 0;
+
+            p_scossl_keysinuse_info_free(pKeysinuseInfo);
+        }
+    }
+
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     if (sk_keysinuse_info_lock == NULL)
     {
-        p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
+        p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
         goto cleanup;
     }
     
@@ -286,8 +302,6 @@ static void p_scossl_keysinuse_atfork_reinit()
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
-        sk_keysinuse_info = NULL;
         p_scossl_keysinuse_teardown();
     }
 }
@@ -338,11 +352,12 @@ void p_scossl_keysinuse_teardown()
         prefix_size = 0;
     }
 
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
-    sk_keysinuse_info_pending = NULL;
-
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     sk_keysinuse_info_lock = NULL;
+    sk_keysinuse_info = NULL;
+    sk_keysinuse_info_pending = NULL;
 }
 
 //
@@ -895,7 +910,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 cleanup:
     logging_thread_exit_status = SCOSSL_SUCCESS;
     keysinuse_enabled = FALSE;
-    p_scossl_keysinuse_cleanup();
+    p_scossl_keysinuse_logging_thread_cleanup();
 
     return NULL;
 }
