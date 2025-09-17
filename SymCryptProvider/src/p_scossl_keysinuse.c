@@ -241,27 +241,50 @@ static void p_scossl_keysinuse_atfork_reinit()
     is_logging = FALSE;
     logging_thread_exit_status = SCOSSL_FAILURE;
 
-    CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
-    sk_keysinuse_info_lock = NULL;
-    
-    // Recreate logging thread mutex in case it was held by the logging
+    // Recreate global locks in case they were held by the logging
     // thread in the parent process at the time of the fork.
+    CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
+    sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
+    if (sk_keysinuse_info_lock == NULL)
+    {
+        p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
+        goto cleanup;
+    }
+
     logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
 
-    // If any keysinuseInfo were in either the stack, they will
+    // If any keysinuseInfo were in either stack, they will
     // be logged by the parent process. Remove them from the child process's
-    // stack and reset them. 
-    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
+    // stacks and reset them. 
+    if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
     {
-        pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info);
-        if (pKeysinuseInfo != NULL)
+        while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
         {
-            pKeysinuseInfo->logPending = FALSE;
-            pKeysinuseInfo->decryptCounter = 0;
-            pKeysinuseInfo->signCounter = 0;
+            pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info);
+            if (pKeysinuseInfo != NULL)
+            {
+                if (CRYPTO_THREAD_write_lock(pKeysinuseInfo->lock))
+                {
+                    pKeysinuseInfo->logPending = FALSE;
+                    pKeysinuseInfo->decryptCounter = 0;
+                    pKeysinuseInfo->signCounter = 0;
+    
+                    CRYPTO_THREAD_unlock(pKeysinuseInfo->lock);
+                }
+                else
+                {
+                    p_scossl_keysinuse_log_error("Failed to lock keysinuse info,OPENSSL_%d", ERR_get_error());
+                }
 
-            p_scossl_keysinuse_info_free(pKeysinuseInfo);
+                p_scossl_keysinuse_info_free(pKeysinuseInfo);
+            }
         }
+
+        CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
+    }
+    else
+    {
+        p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
     }
 
     while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
@@ -269,9 +292,18 @@ static void p_scossl_keysinuse_atfork_reinit()
         pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
         if (pKeysinuseInfo != NULL)
         {
-            pKeysinuseInfo->logPending = FALSE;
-            pKeysinuseInfo->decryptCounter = 0;
-            pKeysinuseInfo->signCounter = 0;
+            if (CRYPTO_THREAD_write_lock(pKeysinuseInfo->lock))
+            {
+                pKeysinuseInfo->logPending = FALSE;
+                pKeysinuseInfo->decryptCounter = 0;
+                pKeysinuseInfo->signCounter = 0;
+
+                CRYPTO_THREAD_unlock(pKeysinuseInfo->lock);
+            }
+            else
+            {
+                p_scossl_keysinuse_log_error("Failed to lock keysinuse info,OPENSSL_%d", ERR_get_error());
+            }
 
             p_scossl_keysinuse_info_free(pKeysinuseInfo);
         }
@@ -279,14 +311,7 @@ static void p_scossl_keysinuse_atfork_reinit()
 
     // Only recreate logging thread if it was running in the parent process
     if (is_parent_logging)
-    {
-        sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
-        if (sk_keysinuse_info_lock == NULL)
-        {
-            p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
-            goto cleanup;
-        }
-        
+    {     
         // Start the logging thread. Monotonic clock needs to be set to
         // prevent wall clock changes from affecting the logging delay sleep time
         is_logging = TRUE;
