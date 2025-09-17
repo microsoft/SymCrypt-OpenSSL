@@ -233,6 +233,7 @@ static void p_scossl_keysinuse_atfork_reinit()
     pthread_condattr_t attr;
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+    int is_parent_logging = is_logging;
 
     // Reset global state
     keysinuse_enabled = FALSE;
@@ -276,28 +277,33 @@ static void p_scossl_keysinuse_atfork_reinit()
         }
     }
 
-    sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
-    if (sk_keysinuse_info_lock == NULL)
+    // Only recreate logging thread if it was running in the parent process
+    if (is_parent_logging)
     {
-        p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
-        goto cleanup;
-    }
+        sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
+        if (sk_keysinuse_info_lock == NULL)
+        {
+            p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
+            goto cleanup;
+        }
+        
+        // Start the logging thread. Monotonic clock needs to be set to
+        // prevent wall clock changes from affecting the logging delay sleep time
+        is_logging = TRUE;
+        if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+            (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
+            (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+            (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+        {
+            p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
+            is_logging = FALSE;
+            goto cleanup;
+        }
     
-    // Start the logging thread. Monotonic clock needs to be set to
-    // prevent wall clock changes from affecting the logging delay sleep time
-    is_logging = TRUE;
-    if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
-        (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-        (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
-        (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
-    {
-        p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
-        is_logging = FALSE;
-        goto cleanup;
+        keysinuse_enabled = TRUE;
+        status = SCOSSL_SUCCESS;
     }
 
-    keysinuse_enabled = TRUE;
-    status = SCOSSL_SUCCESS;
 
 cleanup:
     if (status != SCOSSL_SUCCESS)
