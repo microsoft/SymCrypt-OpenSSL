@@ -134,6 +134,7 @@ static void keysinuse_teardown();
 static void keysinuse_atfork_reinit();
 
 static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static void keysinuse_reset_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
 static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
@@ -338,7 +339,6 @@ static void keysinuse_atfork_reinit()
     unsigned long lhDownLoad = 0;
 
     // Reset global state
-    keysinuse_enabled = TRUE;
     keysinuse_running = FALSE;
     first_use_pending = FALSE;
     is_logging = FALSE;
@@ -364,7 +364,7 @@ static void keysinuse_atfork_reinit()
             lhDownLoad = lh_SCOSSL_KEYSINUSE_CTX_IMP_get_down_load(lh_keysinuse_ctx_imp);
             lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, 0);
 
-            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_free_key_ctx);
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_reset_key_ctx);
 
             // Restore original down_load
             lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, lhDownLoad);
@@ -406,6 +406,7 @@ static void keysinuse_atfork_reinit()
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
+        keysinuse_enabled = FALSE;
         keysinuse_teardown();
     }
 
@@ -767,6 +768,34 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 
     CRYPTO_THREAD_lock_free(ctx->lock);
     OPENSSL_free(ctx);
+}
+
+_Use_decl_annotations_
+static void keysinuse_reset_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+{
+    if (ctx == NULL)
+        return;
+
+    CRYPTO_THREAD_lock_free(ctx->lock);
+    ctx->lock = CRYPTO_THREAD_lock_new();
+    if (ctx->lock == NULL)
+    {
+        keysinuse_log_error("Failed to create keysinuse context lock in fork handler");
+        return;
+    }
+
+    if (CRYPTO_THREAD_write_lock(ctx->lock))
+    {
+        // Reset counters
+        ctx->signCounter = 0;
+        ctx->decryptCounter = 0;
+
+        // Reset timestamps
+        ctx->firstLogTime = 0;
+        ctx->lastLogTime = 0;
+
+        CRYPTO_THREAD_unlock(ctx->lock);
+    }
 }
 
 //
