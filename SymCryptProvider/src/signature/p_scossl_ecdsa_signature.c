@@ -198,7 +198,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
     p_scossl_keysinuse_on_sign(ctx->keyCtx->keysinuseInfo);
 #endif
 
-    return SCOSSL_SUCCESS;
+    return SCOSSL_FAILURE;
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,

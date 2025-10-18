@@ -122,5 +122,5 @@ SCOSSL_STATUS p_scossl_digest_digest(PCSYMCRYPT_HASH pHash,
     SymCryptHash(pHash, in, inl, out, cbResult);
     *outl = cbResult;
 
-    return SCOSSL_SUCCESS;
+    return SCOSSL_FAILURE;
 }

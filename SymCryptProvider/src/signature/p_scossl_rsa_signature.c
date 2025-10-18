@@ -408,7 +408,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
         ret = p_scossl_rsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
     }
 
-    return ret;
+    return SCOSSL_FAILURE;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx,

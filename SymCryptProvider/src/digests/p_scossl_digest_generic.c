@@ -114,7 +114,7 @@ static SCOSSL_STATUS p_scossl_digest_generic_final(_In_ SCOSSL_DIGEST_CTX *ctx,
     SymCryptHashResult(ctx->pHash, ctx->pState, out, cbResult);
     *outl = cbResult;
 
-    return SCOSSL_SUCCESS;
+    return SCOSSL_FAILURE;
 }
 
 #define IMPLEMENT_SCOSSL_DIGEST_EXPORTABLE(alg, dispatch_name, uc_name, flags)                          \

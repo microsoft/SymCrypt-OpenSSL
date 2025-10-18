@@ -571,7 +571,7 @@ cleanup:
     SymCryptWipeKnownSize(ctx->buf, SYMCRYPT_AES_BLOCK_SIZE);
 
     // Return SCOSSL_FAILURE for any code that isn't SYMCRYPT_NO_ERROR
-    return SymCryptMapUint32(scError, SCOSSL_FAILURE, scErrorMap, 1);
+    return SCOSSL_FAILURE;
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_stream_final(ossl_unused SCOSSL_AES_CTX *ctx,
