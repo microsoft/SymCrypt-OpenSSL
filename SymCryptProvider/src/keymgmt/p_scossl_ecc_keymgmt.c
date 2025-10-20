@@ -1262,9 +1262,11 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *keyCtx
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 &&
+        keyCtx->initialized)
     {
-        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+        if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+            SymCryptEckeyHasPrivateKey(keyCtx->key))
         {
             if (!p_scossl_ecc_keymgmt_get_private_key_bn(keyCtx, &bnPrivateKey, &cbPrivateKey) ||
                 !OSSL_PARAM_BLD_push_BN_pad(bld, OSSL_PKEY_PARAM_PRIV_KEY, bnPrivateKey, cbPrivateKey))
