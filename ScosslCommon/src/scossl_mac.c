@@ -122,6 +122,7 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                 {
                     SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_INTERNAL_ERROR,
                         "Missing expandedKey in mac context when attempting to copy macState");
+                    goto cleanup;
                 }
                 SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
                 if (macState == NULL)
