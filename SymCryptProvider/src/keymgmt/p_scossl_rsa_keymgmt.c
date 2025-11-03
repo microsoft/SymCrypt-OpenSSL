@@ -43,6 +43,32 @@ typedef struct
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL, 0), \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL, 0),
 
+#define SCOSSL_RSA_MR_DEFAULT_ITERATIONS 5
+#define SCOSSL_RSA_MR_STATUS_ERROR -1
+#define SCOSSL_RSA_MR_STATUS_PRIME 0
+#define SCOSSL_RSA_MR_STATUS_COMPOSITE_WITH_FACTOR 1
+#define SCOSSL_RSA_MR_STATUS_COMPOSITE_NOT_POWER 2
+
+static const BYTE p_scossl_rsa_small_primes_product[] = {
+    0x17, 0xB1, 0x5F, 0x27, 0x04, 0x60, 0xEC, 0x0C, 
+    0x57, 0x27, 0x36, 0xED, 0x1A, 0x6C, 0x0E, 0x24,
+    0x86, 0xBF, 0xBB, 0xA5, 0x11, 0x12, 0x5E, 0x2B, 
+    0x3A, 0xEA, 0x2E, 0xB0, 0x72, 0xD8, 0x6B, 0x32,
+    0x22, 0x44, 0xD8, 0x5A, 0x1B, 0x28, 0x7F, 0x5E, 
+    0xC7, 0x8E, 0xDB, 0xA5, 0x33, 0x68, 0x36, 0xBC,
+    0x85, 0xC4, 0xEB, 0x77, 0x51, 0xF3, 0x54, 0xAE, 
+    0xC8, 0x93, 0x4A, 0xCA, 0xD6, 0xB9, 0x4D, 0x6C,
+    0x02, 0x6B, 0xDB, 0x5B, 0x93, 0xC2, 0x97, 0xF0, 
+    0x50, 0xB3, 0x77, 0xD1, 0x2F, 0xEE, 0x9B, 0x82,
+    0x21, 0x0A, 0x0A, 0x84, 0xD8, 0x17, 0x5A, 0x14, 
+    0x48, 0x71, 0x6B, 0x55, 0x51, 0x4B, 0xBF, 0x26,
+    0xC4, 0x83, 0x3E, 0xB2, 0x33, 0xD3, 0x24, 0xF7, 
+    0x91, 0x2B, 0x95, 0xE2, 0x23, 0x8C, 0x0B, 0xF9,
+    0x48, 0x62, 0x71, 0x16, 0x1E, 0xB6, 0xCD, 0x2D, 
+    0x65, 0x5F, 0xC4, 0x30, 0x93, 0x33, 0x3E, 0xF4,
+    0xE3, 0xE1
+};
+
 static const OSSL_PARAM p_scossl_rsa_keygen_settable_param_types[] = {
     OSSL_PARAM_uint32(OSSL_PKEY_PARAM_RSA_BITS, NULL),
     OSSL_PARAM_size_t(OSSL_PKEY_PARAM_RSA_PRIMES, NULL),
@@ -975,67 +1001,291 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int s
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
+// Perform enhanced miller-rabin primality test on w. 
+// This is based on OpenSSL's implementation from crypto/bn/bn_prime.c
+static int p_scossl_rsa_keymgmt_miller_rabin_enhanced(_In_ BIGNUM *w, _In_ BN_CTX *bnCtx,
+                                                      int iterations)
 {
-    SCOSSL_STATUS success = SCOSSL_SUCCESS;
+    int status = SCOSSL_RSA_MR_STATUS_ERROR;
+    int a, i, j;
+    BIGNUM *m, *w1, *w3, *b, *g, *z, *x;
+    BOOL composite;
+    BN_MONT_CTX *bnMontCtx = NULL;
+
+    // w must be odd
+    if (!BN_is_odd(w))
+    {
+        return SCOSSL_RSA_MR_STATUS_ERROR;
+    }
+
+    BN_CTX_start(bnCtx);
+    m = BN_CTX_get(bnCtx);
+    w1 = BN_CTX_get(bnCtx);
+    w3 = BN_CTX_get(bnCtx); // Used for generating b
+    b = BN_CTX_get(bnCtx);
+    g = BN_CTX_get(bnCtx);
+    z = BN_CTX_get(bnCtx);
+    x = BN_CTX_get(bnCtx);
+
+    if (x == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    // Pre-compute w-1 and w-3
+    if (!BN_copy(w1, w) || !BN_sub_word(w1, 1) ||
+        !BN_copy(w3, w) || !BN_sub_word(w3, 3))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        goto cleanup;
+    }
+
+    if (BN_is_zero(w3) || BN_is_negative(w3))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        return SCOSSL_RSA_MR_STATUS_PRIME;
+    }
+
+    // 1. a = largest integest such that 2^a divides w-1
+    for (a = 1; !BN_is_bit_set(w1, a); a++);
+
+    // 2. m = (w - 1) / 2^a
+    if (!BN_rshift(m, w1, a))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        goto cleanup;
+    }
+
+    if ((bnMontCtx = BN_MONT_CTX_new()) == NULL ||
+        !BN_MONT_CTX_set(bnMontCtx, w, bnCtx))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    for (i = 0; i < iterations; i++)
+    {
+        // 4.1 generate random b in 1 < b < w-1
+        if (!BN_priv_rand_range_ex(b, w3, 0, bnCtx) || !BN_add_word(b, 2))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+            goto cleanup;
+        }
+
+        // 4.3 g = GCD(b, w)
+        if (!BN_gcd(g, b, w, bnCtx))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+            goto cleanup;
+        }
+
+        // 4.4 If g > 1, return probably composite with factor
+        if (!BN_is_one(g))
+        {
+            status = SCOSSL_RSA_MR_STATUS_COMPOSITE_WITH_FACTOR;
+            goto cleanup;
+        }
+
+        // 4.5 z = b^m mod w
+        if (!BN_mod_exp_mont(z, b, m, w, bnCtx, bnMontCtx))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+            goto cleanup;
+        }
+
+        // 4.6 if z == 1 or z == w-1, continue
+        if (BN_is_one(z) || BN_cmp(z, w1) == 0)
+        {
+            continue;
+        }
+
+        composite = TRUE;
+        for (j = 1; j < a; j++)
+        {
+            // 4.7.1 x = x
+            if (!BN_copy(x, z) || 
+            // 4.7.2 z = x^2 mod w
+                !BN_mod_sqr(z, x, w, bnCtx))
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+                goto cleanup;
+            }
+
+            // 4.7.3 If z = w - 1, continue
+            if (BN_cmp(z, w1) == 0)
+            {
+                composite = FALSE;
+                break;
+            }
+            
+            // 4.7.4 If z = 1, go to 4.12
+            if (BN_is_one(z))
+            {
+                break;
+            }
+        }
+
+        if (composite)
+        {
+            // Reached the end of the inner loop, so z != 1
+            if (j == a)
+            {
+                // 4.8 x = z;   x = b^((w-1)/2) mod w and x != w-1
+                if (!BN_copy(x, z) || 
+                // 4.9 z = x^2 mod w
+                    !BN_mod_sqr(z, x, w, bnCtx) ||
+                // 4.10 if z == 1, go to 4.12                
+                    (!BN_is_one(z) &&
+                // 4.11 x = z;  x = b^(w-1) mod w and x != 1
+                     !BN_copy(x, z)))
+                {
+                    ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+                    goto cleanup;
+                }
+            }
+
+            // 4.12 g = GCD(x - 1, w)
+            if (!BN_sub_word(x, 1) ||
+                !BN_gcd(g, x, w, bnCtx))
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+                goto cleanup;
+            }
+
+            // 4.14 If g == 1, return probably composite and not a power of a prime
+            if (BN_is_one(g))
+            {
+                status = SCOSSL_RSA_MR_STATUS_COMPOSITE_NOT_POWER;
+            }
+            // 4.13 If g > 1, return probably composite with factor
+            else
+            {
+                status = SCOSSL_RSA_MR_STATUS_COMPOSITE_WITH_FACTOR;
+            }
+            
+            goto cleanup;
+        }
+    }
+
+    // 5. Return probably prime
+    status = SCOSSL_RSA_MR_STATUS_PRIME;
+
+cleanup:
+    BN_CTX_end(bnCtx);
+    BN_MONT_CTX_free(bnMontCtx);
+
+    return status;
+}
+
+// Validates the RSA key according to SP800-89
+static BOOL p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
+{
+    int mrStatus = SCOSSL_RSA_MR_STATUS_ERROR;
+    BOOL ret = FALSE;
     UINT64 pubExp = 0;
     PBYTE pbModulus = NULL;
-    PBYTE pbPrivateExponent = NULL;
+    BN_CTX *bnCtx = NULL;
+    BIGNUM *bnModulus, *bnSmallestPrimes, *gcd;
     SYMCRYPT_ERROR scError;
 
     UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
-printf("\n Megan is here #####################");
-    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == OSSL_KEYMGMT_SELECT_KEYPAIR)
     {
+        // 
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+    }
+    
+    // Validate public key according to SP800-89 5.3.3
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        bnCtx = BN_CTX_new();
         pbModulus = OPENSSL_malloc(cbModulus);
-        if (pbModulus == NULL)
+        if (pbModulus == NULL || bnCtx == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
+        BN_CTX_start(bnCtx);
+        bnModulus = BN_CTX_get(bnCtx);
+        bnSmallestPrimes = BN_CTX_get(bnCtx);
+        gcd = BN_CTX_get(bnCtx);
+
+        if (gcd == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+        
         scError = SymCryptRsakeyGetValue(
             keyCtx->key,
             pbModulus, cbModulus,
             &pubExp, 1,
             NULL, NULL, 0,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            SYMCRYPT_NUMBER_FORMAT_LSB_FIRST, 
             0);
-        OPENSSL_free(pbModulus);
-
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
-    }
 
-    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY)
-    {
-        pbPrivateExponent = OPENSSL_secure_malloc(cbModulus);
-        if (pbPrivateExponent == NULL)
+        // Convert to BIGNUM for validation checks
+        if (BN_lebin2bn(pbModulus, cbModulus, bnModulus) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
-        scError = SymCryptRsakeyGetCrtValue(
-            keyCtx->key,
-            NULL, NULL, 0,
-            NULL, 0,
-            pbPrivateExponent, cbModulus,
-            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-            0);
-        OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
-
-        if (scError != SYMCRYPT_NO_ERROR)
+        // 1. Modulus size check (checked by SymCrypt during key generation/import)
+        // 2. 2^16 < pubExp < 2^256, pubExp is odd. pubExp < 2^256 is guaranteed by the size of UINT64
+        if (pubExp <= (1 << 16) || (pubExp & 1) == 0)
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
-            return SCOSSL_FAILURE;
+            ERR_raise(ERR_LIB_RSA, RSA_R_PUB_EXPONENT_OUT_OF_RANGE);
+            goto cleanup;
         }
-    }
 
-    return success;
+        // 3. Modulus is odd
+        if (!BN_is_odd(bnModulus))
+        {
+            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+            goto cleanup;
+        }
+
+        // 4. Modulus is composite, but not a power of a prime. Check using Miller-Rabin test
+        mrStatus = p_scossl_rsa_keymgmt_miller_rabin_enhanced(bnModulus, bnCtx, SCOSSL_RSA_MR_DEFAULT_ITERATIONS);
+        if (mrStatus != SCOSSL_RSA_MR_STATUS_COMPOSITE_NOT_POWER)
+        {
+            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+            goto cleanup;
+        }
+
+        // 5. Modulus has no factors smaller than 752
+        if (BN_bin2bn(p_scossl_rsa_small_primes_product, sizeof(p_scossl_rsa_small_primes_product), bnSmallestPrimes) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (!BN_gcd(gcd, bnModulus, bnSmallestPrimes, bnCtx) ||
+            !BN_is_one(gcd))
+        {
+            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+            goto cleanup;
+        }        
+    } 
+
+    ret = TRUE;
+cleanup:
+    OPENSSL_free(pbModulus);
+    BN_CTX_end(bnCtx);
+    BN_CTX_free(bnCtx);
+
+    return ret;
 }
 
 static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
