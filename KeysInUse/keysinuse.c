@@ -234,6 +234,15 @@ static void keysinuse_init_internal()
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
+    const char *env_enabled = getenv("KEYSINUSE_ENABLED");
+    if (env_enabled != NULL)
+    {
+        if (strcmp(env_enabled, "0") == 0)
+        {
+            keysinuse_enabled = FALSE;
+        }
+    }
+
     if (!keysinuse_enabled)
     {
         return;
