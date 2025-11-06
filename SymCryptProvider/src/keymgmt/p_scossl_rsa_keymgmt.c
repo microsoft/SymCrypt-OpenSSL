@@ -43,6 +43,8 @@ typedef struct
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL, 0), \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL, 0),
 
+#define SCOSSL_RSA_FIPS_MIN_SECURITY_BITS 112
+
 #define SCOSSL_RSA_MR_DEFAULT_ITERATIONS 5
 #define SCOSSL_RSA_MR_STATUS_ERROR -1
 #define SCOSSL_RSA_MR_STATUS_PRIME 0
@@ -1007,8 +1009,16 @@ static int p_scossl_rsa_keymgmt_miller_rabin_enhanced(_In_ BIGNUM *w, _In_ BN_CT
                                                       int iterations)
 {
     int status = SCOSSL_RSA_MR_STATUS_ERROR;
-    int a, i, j;
-    BIGNUM *m, *w1, *w3, *b, *g, *z, *x;
+    int a;
+    int i;
+    int j;
+    BIGNUM *m;
+    BIGNUM *w1;
+    BIGNUM *w3;
+    BIGNUM *b;
+    BIGNUM *g;
+    BIGNUM *z;
+    BIGNUM *x;
     BOOL composite;
     BN_MONT_CTX *bnMontCtx = NULL;
 
@@ -1178,114 +1188,344 @@ cleanup:
     return status;
 }
 
-// Validates the RSA key according to SP800-89
-static BOOL p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
+// Validate keypair according to SP800-56B 6.4.1.3.3 (rsakpv2-crt)
+// Not all checks from the spec are included, as some are already
+// guaranteed by SymCrypt during private key import and generation.
+static BOOL p_scossl_rsa_keymgmt_validate_keypair(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
 {
-    int mrStatus = SCOSSL_RSA_MR_STATUS_ERROR;
     BOOL ret = FALSE;
-    UINT64 pubExp = 0;
     PBYTE pbModulus = NULL;
+    UINT32 cbModulus = 0;
+    PBYTE ppbPrimes[2] = {0};
+    SIZE_T pcbPrimes[2] = {0};
+    UINT64 pubExp = 0;
     BN_CTX *bnCtx = NULL;
-    BIGNUM *bnModulus, *bnSmallestPrimes, *gcd;
+    BIGNUM *bnPrime1 = NULL;
+    BIGNUM *bnPrime2 = NULL;
+    BIGNUM *bnDiff = NULL;
     SYMCRYPT_ERROR scError;
-
-    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
-    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == OSSL_KEYMGMT_SELECT_KEYPAIR)
+    
+    if (!keyCtx->initialized || !SymCryptRsakeyHasPrivateKey(keyCtx->key))
     {
-        // 
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+        goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    pcbPrimes[0] = SymCryptRsakeySizeofPrime(keyCtx->key, 0);
+    pcbPrimes[1] = SymCryptRsakeySizeofPrime(keyCtx->key, 1);
+
+    pbModulus = OPENSSL_malloc(cbModulus);
+    ppbPrimes[0] = OPENSSL_secure_malloc(pcbPrimes[0]);
+    ppbPrimes[1] = OPENSSL_secure_malloc(pcbPrimes[1]);
+    bnCtx = BN_CTX_secure_new();
+    if (pbModulus == NULL || 
+        ppbPrimes[0] == NULL ||
+        ppbPrimes[1] == NULL ||
+        bnCtx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    BN_CTX_start(bnCtx);
+
+    // 1a. 112 <= security bits (log a warning but don't fail for compatability)
+    if (p_scossl_rsa_get_security_bits(keyCtx->key) < SCOSSL_RSA_FIPS_MIN_SECURITY_BITS)
+    {
+        SCOSSL_PROV_LOG_INFO(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
+            "RSA keypair security bits less than 112 which is not FIPS compliant");
+    }
+
+    scError = SymCryptRsakeyGetValue(
+        keyCtx->key,
+        pbModulus, cbModulus,
+        &pubExp, 1,
+        ppbPrimes, pcbPrimes, 2,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST, 
+        0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
+        goto cleanup;
+    }
+
+    // 1c. 2^16 < pubExp < 2^256, pubExp is odd. pubExp < 2^256 is guaranteed by the size of UINT64
+    if (pubExp <= (1 << 16) || (pubExp & 1) == 0)
+    {
+        ERR_raise(ERR_LIB_RSA, RSA_R_PUB_EXPONENT_OUT_OF_RANGE);
+        goto cleanup;
     }
     
-    // Validate public key according to SP800-89 5.3.3
-    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    bnPrime1 = BN_CTX_get(bnCtx);
+    bnPrime2 = BN_CTX_get(bnCtx);
+    bnDiff = BN_CTX_get(bnCtx);
+    if (bnDiff == NULL)
     {
-        bnCtx = BN_CTX_new();
-        pbModulus = OPENSSL_malloc(cbModulus);
-        if (pbModulus == NULL || bnCtx == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
 
-        BN_CTX_start(bnCtx);
-        bnModulus = BN_CTX_get(bnCtx);
-        bnSmallestPrimes = BN_CTX_get(bnCtx);
-        gcd = BN_CTX_get(bnCtx);
+    BN_set_flags(bnPrime1, BN_FLG_CONSTTIME);
+    BN_set_flags(bnPrime2, BN_FLG_CONSTTIME);
+    BN_set_flags(bnDiff, BN_FLG_CONSTTIME);
+    
+    // 5c. Check |p – q| <= 2^(nBits/2−100)
+    if (BN_lebin2bn(ppbPrimes[0], pcbPrimes[0], bnPrime1) == NULL ||
+        BN_lebin2bn(ppbPrimes[1], pcbPrimes[1], bnPrime2) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        goto cleanup;
+    }
 
-        if (gcd == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
+    if (!BN_sub(bnDiff, bnPrime1, bnPrime2))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
+        goto cleanup;
+    }
+
+    if (!BN_is_zero(bnDiff))
+    {
+        BN_set_negative(bnDiff, 0);
         
-        scError = SymCryptRsakeyGetValue(
-            keyCtx->key,
-            pbModulus, cbModulus,
-            &pubExp, 1,
-            NULL, NULL, 0,
-            SYMCRYPT_NUMBER_FORMAT_LSB_FIRST, 
-            0);
-        if (scError != SYMCRYPT_NO_ERROR)
+        if (!BN_sub_word(bnDiff, 1))
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
+            ERR_raise(ERR_LIB_PROV, ERR_R_BN_LIB);
             goto cleanup;
         }
 
-        // Convert to BIGNUM for validation checks
-        if (BN_lebin2bn(pbModulus, cbModulus, bnModulus) == NULL)
+        if ((UINT32) BN_num_bits(bnDiff) > ((SymCryptRsakeyModulusBits(keyCtx->key) >> 1) - 100))
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
-
-        // 1. Modulus size check (checked by SymCrypt during key generation/import)
-        // 2. 2^16 < pubExp < 2^256, pubExp is odd. pubExp < 2^256 is guaranteed by the size of UINT64
-        if (pubExp <= (1 << 16) || (pubExp & 1) == 0)
-        {
-            ERR_raise(ERR_LIB_RSA, RSA_R_PUB_EXPONENT_OUT_OF_RANGE);
-            goto cleanup;
-        }
-
-        // 3. Modulus is odd
-        if (!BN_is_odd(bnModulus))
-        {
-            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
-            goto cleanup;
-        }
-
-        // 4. Modulus is composite, but not a power of a prime. Check using Miller-Rabin test
-        mrStatus = p_scossl_rsa_keymgmt_miller_rabin_enhanced(bnModulus, bnCtx, SCOSSL_RSA_MR_DEFAULT_ITERATIONS);
-        if (mrStatus != SCOSSL_RSA_MR_STATUS_COMPOSITE_NOT_POWER)
-        {
-            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
-            goto cleanup;
-        }
-
-        // 5. Modulus has no factors smaller than 752
-        if (BN_bin2bn(p_scossl_rsa_small_primes_product, sizeof(p_scossl_rsa_small_primes_product), bnSmallestPrimes) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
-        if (!BN_gcd(gcd, bnModulus, bnSmallestPrimes, bnCtx) ||
-            !BN_is_one(gcd))
-        {
-            ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
-            goto cleanup;
-        }        
-    } 
+    }
 
     ret = TRUE;
+
+cleanup:
+    OPENSSL_free(pbModulus);
+    OPENSSL_secure_clear_free(ppbPrimes[0], pcbPrimes[0]);
+    OPENSSL_secure_clear_free(ppbPrimes[1], pcbPrimes[1]);
+    BN_clear(bnPrime1);
+    BN_clear(bnPrime2);
+    BN_clear(bnDiff);
+    BN_CTX_end(bnCtx);
+    BN_CTX_free(bnCtx);
+
+    return ret;
+}
+
+// Validate the 0 < d < n
+static BOOL p_scossl_rsa_keymgmt_validate_private_key(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
+{
+    BOOL ret = FALSE;
+    SYMCRYPT_ERROR scError;
+    PBYTE pbPrivateExponent = NULL;
+    PBYTE pbModulus = NULL;
+    UINT32 cbModulus;
+    BN_CTX *bnCtx = NULL;
+    BIGNUM *bnModulus = NULL;
+    BIGNUM *bnPrivateExponent = NULL;
+
+    if (!keyCtx->initialized || !SymCryptRsakeyHasPrivateKey(keyCtx->key))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+        goto cleanup;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+
+    bnCtx = BN_CTX_new();
+    pbModulus = OPENSSL_malloc(cbModulus);
+    pbPrivateExponent = OPENSSL_secure_malloc(cbModulus);
+    if (bnCtx == NULL || 
+        pbModulus == NULL || 
+        pbPrivateExponent == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    BN_CTX_start(bnCtx);
+
+    scError = SymCryptRsakeyGetValue(
+        keyCtx->key,
+        pbModulus, cbModulus,
+        NULL, 0,
+        NULL, NULL, 0,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST, 
+        0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
+        goto cleanup;
+    }
+
+    scError = SymCryptRsakeyGetCrtValue(
+        keyCtx->key,
+        NULL, NULL, 0,
+        NULL, 0,
+        pbPrivateExponent, cbModulus,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
+        0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
+        goto cleanup;
+    }
+
+    bnModulus = BN_CTX_get(bnCtx);
+    bnPrivateExponent = BN_CTX_get(bnCtx);
+
+    if (bnPrivateExponent == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if (BN_lebin2bn(pbModulus, cbModulus, bnModulus) == NULL ||
+        BN_lebin2bn(pbPrivateExponent, cbModulus,  bnPrivateExponent) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    ret = BN_cmp(bnPrivateExponent, BN_value_one()) >= 0 &&
+          BN_cmp(bnPrivateExponent, bnModulus) < 0;
+
+cleanup:
+    OPENSSL_free(pbModulus);
+    OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
+    BN_clear(bnPrivateExponent);
+    BN_CTX_end(bnCtx);
+    BN_CTX_free(bnCtx);
+
+    return ret;
+}
+
+// Validate public key according to SP800-89 5.3.3
+static BOOL p_scossl_rsa_keymgmt_validate_public_key(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
+{
+    BOOL ret = FALSE;
+    int mrStatus = SCOSSL_RSA_MR_STATUS_ERROR;
+    UINT64 pubExp = 0;
+    PBYTE pbModulus = NULL;
+    UINT32 cbModulus = 0;
+    BN_CTX *bnCtx = NULL;
+    BIGNUM *bnModulus;
+    BIGNUM *bnSmallestPrimes;
+    BIGNUM *gcd;
+    SYMCRYPT_ERROR scError;
+
+    if (!keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        goto cleanup;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+    bnCtx = BN_CTX_new();
+    pbModulus = OPENSSL_malloc(cbModulus);
+    if (pbModulus == NULL || bnCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    BN_CTX_start(bnCtx);
+    bnModulus = BN_CTX_get(bnCtx);
+    bnSmallestPrimes = BN_CTX_get(bnCtx);
+    gcd = BN_CTX_get(bnCtx);
+    if (gcd == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+    
+    scError = SymCryptRsakeyGetValue(
+        keyCtx->key,
+        pbModulus, cbModulus,
+        &pubExp, 1,
+        NULL, NULL, 0,
+        SYMCRYPT_NUMBER_FORMAT_LSB_FIRST, 
+        0);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
+        goto cleanup;
+    }
+
+    // Convert to BIGNUM for validation checks
+    if (BN_lebin2bn(pbModulus, cbModulus, bnModulus) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    // 1. Modulus size check (checked by SymCrypt during key generation/import)
+    // 2. 2^16 < pubExp < 2^256, pubExp is odd. pubExp < 2^256 is guaranteed by the size of UINT64
+    if (pubExp <= (1 << 16) || (pubExp & 1) == 0)
+    {
+        ERR_raise(ERR_LIB_RSA, RSA_R_PUB_EXPONENT_OUT_OF_RANGE);
+        goto cleanup;
+    }
+
+    // 3. Modulus is odd
+    if (!BN_is_odd(bnModulus))
+    {
+        ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+        goto cleanup;
+    }
+
+    // 4. Modulus is composite, but not a power of a prime. Check using Miller-Rabin test
+    mrStatus = p_scossl_rsa_keymgmt_miller_rabin_enhanced(bnModulus, bnCtx, SCOSSL_RSA_MR_DEFAULT_ITERATIONS);
+    if (mrStatus != SCOSSL_RSA_MR_STATUS_COMPOSITE_NOT_POWER)
+    {
+        ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+        goto cleanup;
+    }
+
+    // 5. Modulus has no factors smaller than 752
+    if (BN_bin2bn(p_scossl_rsa_small_primes_product, sizeof(p_scossl_rsa_small_primes_product), bnSmallestPrimes) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if (!BN_gcd(gcd, bnModulus, bnSmallestPrimes, bnCtx) ||
+        !BN_is_one(gcd))
+    {
+        ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_MODULUS);
+        goto cleanup;
+    }    
+
+    ret = TRUE;
+
 cleanup:
     OPENSSL_free(pbModulus);
     BN_CTX_end(bnCtx);
     BN_CTX_free(bnCtx);
 
     return ret;
+}
+
+// Validates the RSA key according to SP800-89
+static BOOL p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
+{
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == OSSL_KEYMGMT_SELECT_KEYPAIR)
+    {
+        return p_scossl_rsa_keymgmt_validate_keypair(keyCtx);
+    }
+    else if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        return p_scossl_rsa_keymgmt_validate_private_key(keyCtx); 
+    }
+    else if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        return p_scossl_rsa_keymgmt_validate_public_key(keyCtx);
+    } 
+
+    return TRUE;
 }
 
 static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
@@ -1445,16 +1685,21 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_N)) != NULL)
         {
-            cbModulus = p->data_size;
-
+            if (!OSSL_PARAM_get_BN(p, &bn))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+            
+            cbModulus = BN_num_bytes(bn);
             pbModulus = OPENSSL_malloc(cbModulus);
             if (pbModulus == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
-            if (!OSSL_PARAM_get_BN(p, &bn) ||
-                !BN_bn2bin(bn, pbModulus))
+            
+            if (!BN_bn2bin(bn, pbModulus))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
@@ -1472,16 +1717,21 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
         {
             if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR1)) != NULL)
             {
-                pcbPrimes[0] = p->data_size;
-
+                if (!OSSL_PARAM_get_BN(p, &bn))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+                
+                pcbPrimes[0] = BN_num_bytes(bn);
                 ppbPrimes[0] = OPENSSL_secure_malloc(pcbPrimes[0]);
                 if (ppbPrimes[0] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
                 }
-                if (!OSSL_PARAM_get_BN(p, &bn) ||
-                    !BN_bn2bin(bn, ppbPrimes[0]))
+                
+                if (!BN_bn2bin(bn, ppbPrimes[0]))
                 {
                     ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                     goto cleanup;
@@ -1491,16 +1741,21 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
 
             if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2)) != NULL)
             {
-                pcbPrimes[1] = p->data_size;
-
+                if (!OSSL_PARAM_get_BN(p, &bn))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+                
+                pcbPrimes[1] = BN_num_bytes(bn);
                 ppbPrimes[1] = OPENSSL_secure_malloc(pcbPrimes[1]);
                 if(ppbPrimes[1] == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
                 }
-                if (!OSSL_PARAM_get_BN(p, &bn) ||
-                    !BN_bn2bin(bn, ppbPrimes[1]))
+                
+                if (!BN_bn2bin(bn, ppbPrimes[1]))
                 {
                     ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                     goto cleanup;
@@ -1509,20 +1764,24 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
             }
 
             // Only try to import private key from private exponent if primes are not provided
-            // This is slower and only provided for compatibility purposes
             if (nPrimes == 0 &&
                 (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_D)) != NULL)
             {
-                cbPrivateExponent = p->data_size;
-
+                if (!OSSL_PARAM_get_BN(p, &bn))
+                {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    goto cleanup;
+                }
+                
+                cbPrivateExponent = BN_num_bytes(bn);
                 pbPrivateExponent = OPENSSL_secure_malloc(cbPrivateExponent);
                 if(pbPrivateExponent == NULL)
                 {
                     ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                     goto cleanup;
                 }
-                if (!OSSL_PARAM_get_BN(p, &bn) ||
-                    !BN_bn2bin(bn, pbPrivateExponent))
+                
+                if (!BN_bn2bin(bn, pbPrivateExponent))
                 {
                     ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                     goto cleanup;
@@ -1604,7 +1863,7 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_import(_Inout_ SCOSSL_PROV_RSA_KEY_CTX
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
+    OPENSSL_secure_clear_free(pbPrivateExponent, cbPrivateExponent);
     OPENSSL_secure_clear_free(ppbPrimes[0], pcbPrimes[0]);
     OPENSSL_secure_clear_free(ppbPrimes[1], pcbPrimes[1]);
     OPENSSL_free(pbModulus);
