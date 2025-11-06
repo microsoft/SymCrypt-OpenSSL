@@ -383,8 +383,8 @@ static void keysinuse_atfork_reinit()
         keysinuse_log_error("Failed to lock keysinuse context hash table in fork handler,OPENSSL_%d", ERR_get_error());
     }
 
-    // Only recreate logging thread if it was running in the parent process
-    if (is_parent_logging && is_parent_running)
+    // Only recreate logging thread if it was running in the parent process and keysinuse is enabled
+    if (is_parent_logging && is_parent_running && keysinuse_enabled)
     {
         // Start the logging thread. Monotonic clock needs to be set to
         // prevent wall clock changes from affecting the logging delay sleep time
@@ -780,6 +780,7 @@ static void keysinuse_reset_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
     ctx->lock = CRYPTO_THREAD_lock_new();
     if (ctx->lock == NULL)
     {
+        keysinuse_enabled = FALSE;
         keysinuse_log_error("Failed to create keysinuse context lock in fork handler");
         return;
     }
