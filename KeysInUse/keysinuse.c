@@ -131,8 +131,10 @@ static SCOSSL_STATUS logging_thread_exit_status = SCOSSL_FAILURE;
 static void keysinuse_init_internal();
 static void keysinuse_cleanup_internal();
 static void keysinuse_teardown();
+static void keysinuse_atfork_reinit();
 
 static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static void keysinuse_reset_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
 static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
@@ -266,6 +268,12 @@ static void keysinuse_init_internal()
         goto cleanup;
     }
 
+    if ((pthreadErr = pthread_atfork(NULL, NULL, keysinuse_atfork_reinit)) != 0)
+    {
+        keysinuse_log_error("Failed to register logging fork handler,SYS_%d", pthreadErr);
+        goto cleanup;
+    }
+
     keysinuse_running = TRUE;
     status = SCOSSL_SUCCESS;
 
@@ -317,6 +325,93 @@ __attribute__((destructor)) static void keysinuse_cleanup_internal()
 void keysinuse_init()
 {
     CRYPTO_THREAD_run_once(&keysinuse_init_once, keysinuse_init_internal);
+}
+
+// If the calling process forks, the logging thread needs to be restarted in the
+// child process, and any locks should be reinitialized in case the parent
+// process held a lock at the time of the fork.
+static void keysinuse_atfork_reinit()
+{
+    pthread_condattr_t attr;
+    int pthreadErr;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+    int is_parent_logging = is_logging;
+    int is_parent_running = keysinuse_running;
+    unsigned long lhDownLoad = 0;
+
+    // Reset global state
+    keysinuse_running = FALSE;
+    first_use_pending = FALSE;
+    is_logging = FALSE;
+    logging_thread_exit_status = SCOSSL_FAILURE;
+
+    logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+
+    // Recreate global locks in case they were held by the logging
+    // thread in the parent process at the time of the fork.
+    CRYPTO_THREAD_lock_free(lh_keysinuse_ctx_imp_lock);
+    lh_keysinuse_ctx_imp_lock = CRYPTO_THREAD_lock_new();
+    if (lh_keysinuse_ctx_imp_lock == NULL)
+    {
+        keysinuse_log_error("Failed to create keysinuse lock in child process");
+        goto cleanup;
+    }
+
+    if (CRYPTO_THREAD_write_lock(lh_keysinuse_ctx_imp_lock))
+    {
+        if (lh_keysinuse_ctx_imp != NULL)
+        {
+            // Set load factor to 0 during this operation to prevent hash table contraction.
+            lhDownLoad = lh_SCOSSL_KEYSINUSE_CTX_IMP_get_down_load(lh_keysinuse_ctx_imp);
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, 0);
+
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_reset_key_ctx);
+
+            // Restore original down_load
+            lh_SCOSSL_KEYSINUSE_CTX_IMP_set_down_load(lh_keysinuse_ctx_imp, lhDownLoad);
+        }
+
+        CRYPTO_THREAD_unlock(lh_keysinuse_ctx_imp_lock);
+
+        if (lh_keysinuse_ctx_imp == NULL)
+        {
+            keysinuse_log_error("Keysinuse context hash table is missing in fork handler");
+            goto cleanup;
+        }
+    }
+    else
+    {
+        keysinuse_log_error("Failed to lock keysinuse context hash table in fork handler,OPENSSL_%d", ERR_get_error());
+    }
+
+    // Only recreate logging thread if it was running in the parent process and keysinuse is enabled
+    if (is_parent_logging && is_parent_running && keysinuse_enabled)
+    {
+        // Start the logging thread. Monotonic clock needs to be set to
+        // prevent wall clock changes from affecting the logging delay sleep time
+        is_logging = TRUE;
+        if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+            (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
+            (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+            (pthreadErr = pthread_create(&logging_thread, NULL, keysinuse_logging_thread_start, NULL)) != 0)
+        {
+            keysinuse_log_error("Failed to start logging thread in child,SYS_%d", pthreadErr);
+            is_logging = FALSE;
+            goto cleanup;
+        }
+
+        keysinuse_running = TRUE;
+        status = SCOSSL_SUCCESS;
+    }
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        keysinuse_enabled = FALSE;
+        keysinuse_teardown();
+    }
+
+    pthread_condattr_destroy(&attr);
 }
 
 void keysinuse_teardown()
@@ -674,6 +769,35 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 
     CRYPTO_THREAD_lock_free(ctx->lock);
     OPENSSL_free(ctx);
+}
+
+_Use_decl_annotations_
+static void keysinuse_reset_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+{
+    if (ctx == NULL)
+        return;
+
+    CRYPTO_THREAD_lock_free(ctx->lock);
+    ctx->lock = CRYPTO_THREAD_lock_new();
+    if (ctx->lock == NULL)
+    {
+        keysinuse_enabled = FALSE;
+        keysinuse_log_error("Failed to create keysinuse context lock in fork handler");
+        return;
+    }
+
+    if (CRYPTO_THREAD_write_lock(ctx->lock))
+    {
+        // Reset counters
+        ctx->signCounter = 0;
+        ctx->decryptCounter = 0;
+
+        // Reset timestamps
+        ctx->firstLogTime = 0;
+        ctx->lastLogTime = 0;
+
+        CRYPTO_THREAD_unlock(ctx->lock);
+    }
 }
 
 //
