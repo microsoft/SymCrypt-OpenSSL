@@ -270,7 +270,8 @@ static void keysinuse_init_internal()
 
     if ((pthreadErr = pthread_atfork(NULL, NULL, keysinuse_atfork_reinit)) != 0)
     {
-        keysinuse_log_error("Failed to register child process reinit. Child processes will not log events,SYS_%d", pthreadErr);
+        keysinuse_log_error("Failed to register logging fork handler,SYS_%d", pthreadErr);
+        goto cleanup;
     }
 
     keysinuse_running = TRUE;
