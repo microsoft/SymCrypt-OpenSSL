@@ -128,6 +128,7 @@ static SCOSSL_STATUS logging_thread_exit_status = SCOSSL_FAILURE;
 // Internal function declarations
 //
 
+static BOOL is_keysinuse_enabled();
 static void keysinuse_init_internal();
 static void keysinuse_cleanup_internal();
 static void keysinuse_teardown();
@@ -146,6 +147,17 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 //
 // Setup/teardown
 //
+
+static BOOL is_keysinuse_enabled()
+{
+    const char *env_enabled = getenv("KEYSINUSE_ENABLED");
+    if (env_enabled != NULL && strcmp(env_enabled, "0") == 0)
+    {
+        keysinuse_enabled = FALSE;
+    }
+
+    return keysinuse_enabled;
+}
 
 #ifndef KEYSINUSE_LOG_SYSLOG
 static SCOSSL_STATUS keysinuse_init_logging()
@@ -236,16 +248,7 @@ static void keysinuse_init_internal()
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    const char *env_enabled = getenv("KEYSINUSE_ENABLED");
-    if (env_enabled != NULL)
-    {
-        if (strcmp(env_enabled, "0") == 0)
-        {
-            keysinuse_enabled = FALSE;
-        }
-    }
-
-    if (!keysinuse_enabled)
+    if (!is_keysinuse_enabled())
     {
         return;
     }
@@ -394,7 +397,7 @@ static void keysinuse_atfork_reinit()
     }
 
     // Only recreate logging thread if it was running in the parent process and keysinuse is enabled
-    if (is_parent_logging && is_parent_running && keysinuse_enabled)
+    if (is_parent_logging && is_parent_running && is_keysinuse_enabled())
     {
         // Start the logging thread. Monotonic clock needs to be set to
         // prevent wall clock changes from affecting the logging delay sleep time
