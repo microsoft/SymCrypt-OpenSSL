@@ -21,11 +21,9 @@ typedef struct {
 typedef struct {
     SCOSSL_PROVCTX *provCtx;
 
-    const SCOSSL_MLKEM_GROUP_INFO *groupInfo;
-    PSYMCRYPT_MLKEMKEY key;
+    SYMCRYPT_MLKEM_PARAMS mlkemParams;
     SYMCRYPT_MLKEMKEY_FORMAT format;
-
-    SCOSSL_ECC_KEY_CTX *classicKeyCtx;
+    PSYMCRYPT_MLKEMKEY key;
 } SCOSSL_MLKEM_KEY_CTX;
 
 BOOL p_scossl_mlkem_is_hybrid(_In_ const SCOSSL_MLKEM_KEY_CTX *ctx);
