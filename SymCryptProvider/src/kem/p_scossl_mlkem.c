@@ -311,6 +311,38 @@ SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
     return SCOSSL_SUCCESS;
 }
 
+int p_scossl_mlkem_get_bits(SYMCRYPT_MLKEM_PARAMS mlkemParams)
+{
+    switch (mlkemParams)
+    {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
+        return 512;
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
+        return 768;
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
+        return 1024;
+    default:
+    }
+
+    return 0;
+}
+
+int p_scossl_mlkem_get_security_bits(SYMCRYPT_MLKEM_PARAMS mlkemParams)
+{
+    switch(mlkemParams)
+    {
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM512:
+        return 128;
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM768:
+        return 192;
+    case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
+        return 256;
+    default:
+    }
+
+    return 0;
+}
+
 #ifdef __cplusplus
 }
 #endif
