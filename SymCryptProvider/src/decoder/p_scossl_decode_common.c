@@ -106,7 +106,7 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
 
         ret = dataCb(cbParams, dataCbArg);
     }
-    
+
     ctx->desc->freeKeyCtx(keyCtx);
     BIO_free(bio);
 

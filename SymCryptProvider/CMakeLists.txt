@@ -28,7 +28,7 @@ set(SCOSSL_SOURCES
     ./src/digests/p_scossl_shake.c
     ./src/digests/p_scossl_cshake.c
     ./src/encoder/p_scossl_encode_common.c
-    ./src/encoder/p_scossl_encode_mlkem.c
+    # ./src/encoder/p_scossl_encode_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
     ./src/kdf/p_scossl_pbkdf2.c
@@ -37,6 +37,7 @@ set(SCOSSL_SOURCES
     ./src/kdf/p_scossl_sskdf.c
     ./src/kdf/p_scossl_tls1prf.c
     ./src/kem/p_scossl_mlkem.c
+    ./src/kem/p_scossl_mlkem_hybrid.c
     ./src/keyexch/p_scossl_dh.c
     ./src/keyexch/p_scossl_ecdh.c
     ./src/keyexch/p_scossl_kdf_keyexch.c
@@ -44,6 +45,7 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_kdf_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_keymgmt.c
+    ./src/keymgmt/p_scossl_mlkem_hybrid_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
     ./src/mac/p_scossl_cmac.c
     ./src/mac/p_scossl_hmac.c

@@ -21,6 +21,12 @@ typedef struct {
     int classicGroupNid;
 } SCOSSL_MLKEM_HYBRID_KEYGEN_CTX;
 
+// Forward declarations for helper functions
+SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(const SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx, int selection,
+                                                            PBYTE *ppbKey, SIZE_T *pcbKey);
+SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx, int selection,
+                                                            PCBYTE pbKey, SIZE_T cbKey);
+
 static const OSSL_PARAM p_scossl_mlkem_hybrid_keygen_settable_param_types[] = {
     OSSL_PARAM_END};
 
@@ -162,10 +168,8 @@ cleanup:
     return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_hybrid_keygen_set_params(_Inout_ SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mlkem_hybrid_keygen_set_params(ossl_unused SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *genCtx, ossl_unused const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p;
-
     return SCOSSL_SUCCESS;
 }
 
@@ -307,7 +311,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_set_params(_Inout_ SCOSSL_MLK
             return SCOSSL_FAILURE;
         }
 
-        if (p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, pbKey, cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, pbKey, cbKey) != SCOSSL_SUCCESS)
         {
             return SCOSSL_FAILURE;
         }
@@ -535,7 +539,6 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
     const OSSL_PARAM *p;
     PCBYTE pbKey;
     SIZE_T cbKey;
-    SYMCRYPT_MLKEMKEY_FORMAT format;
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
     {
@@ -556,8 +559,6 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
-        format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
     }
     else if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL)
     {
@@ -566,8 +567,6 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-
-        format = SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY;
     }
     else
     {
@@ -575,7 +574,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
         return SCOSSL_FAILURE;
     }
 
-    if (p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(keyCtx, format, pbKey, cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(keyCtx, selection, pbKey, cbKey) != SCOSSL_SUCCESS)
     {
         return SCOSSL_FAILURE;
     }
@@ -613,7 +612,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
     {
         ret = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
             &pbKey, &cbKey);
 
         if (ret != SCOSSL_SUCCESS)
@@ -636,7 +635,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
 
         ret = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
             keyCtx,
-            SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
+            OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
             &pbKey, &cbKey);
 
         if (ret != SCOSSL_SUCCESS)
@@ -669,29 +668,29 @@ cleanup:
 
 #define IMPLEMENT_SCOSSL_MLKEM_HYBRID(bits, classicGroup, classicGroupNid)                                      \
     static SCOSSL_MLKEM_HYBRID_KEY_CTX                                                                          \
-    *p_scossl_mlkem_##bits##_##classicGroup##_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provCtx)                     \
+    *p_scossl_##classicGroup##_mlkem##bits##_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *provCtx)                     \
     {                                                                                                           \
         return p_scossl_mlkem_hybrid_keymgmt_new_ctx(provCtx,                                                   \
-            SYMCRYPT_MLKEM_PARAMS_MLKEM##bits, ##classicGroupNid);                                              \
+            SYMCRYPT_MLKEM_PARAMS_MLKEM##bits, classicGroupNid);                                                \
     }                                                                                                           \
                                                                                                                 \
     static SCOSSL_MLKEM_HYBRID_KEYGEN_CTX                                                                       \
-    *p_scossl_mlkem_##bits##_##classicGroup##_keygen_init(_In_ SCOSSL_PROVCTX *provCtx,                         \
+    *p_scossl_##classicGroup##_mlkem##bits##_keygen_init(_In_ SCOSSL_PROVCTX *provCtx,                         \
                                                           ossl_unused int selection,                            \
                                                           _In_ const OSSL_PARAM params[])                       \
     {                                                                                                           \
         return p_scossl_mlkem_hybrid_keygen_init(provCtx, selection, params,                                    \
-            SYMCRYPT_MLKEM_PARAMS_MLKEM##bits, ##classicGroupNid);                                              \
+            SYMCRYPT_MLKEM_PARAMS_MLKEM##bits, classicGroupNid);                                                \
     }                                                                                                           \
                                                                                                                 \
-    const OSSL_DISPATCH p_scossl_mlkem##bits##_##classicGroup##_keymgmt_functions[] = {                         \
-        {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_mlkem_##bits##_##classicGroup##_keymgmt_new_ctx},      \
+    const OSSL_DISPATCH p_scossl_##classicGroup##_mlkem##bits##_keymgmt_functions[] = {                         \
+        {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_##classicGroup##_mlkem##bits##_keymgmt_new_ctx},       \
         {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_mlkem_hybrid_keymgmt_dup_key_ctx},                     \
         {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))p_scossl_mlkem_hybrid_keymgmt_free_key_ctx},                   \
         {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_mlkem_hybrid_keygen_set_params},            \
         {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_hybrid_keygen_settable_params},  \
         {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_mlkem_hybrid_keygen_cleanup},                  \
-        {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_mlkem_##bits##_##classicGroup##_keygen_init},     \
+        {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_##classicGroup##_mlkem##bits##_keygen_init},      \
         {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_mlkem_hybrid_keygen_set_template},        \
         {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_mlkem_hybrid_keygen},                                  \
         {OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))p_scossl_mlkem_hybrid_keymgmt_load},                           \

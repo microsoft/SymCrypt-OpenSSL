@@ -45,7 +45,14 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
+        keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+        goto cleanup;
+    }
+
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -78,7 +85,7 @@ cleanup:
         PKCS8_PRIV_KEY_INFO_free(p8Info);
         p8Info = NULL;
     }
-    
+
     OPENSSL_clear_free(pbDer, cbDer);
     OPENSSL_secure_clear_free(pbKey, cbKey);
     ASN1_OCTET_STRING_free(p8Data);
@@ -106,7 +113,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -133,7 +140,7 @@ cleanup:
         pubKey = NULL;
     }
 
-    OPENSSL_secure_free(pbKey); 
+    OPENSSL_secure_free(pbKey);
 
     return pubKey;
 }
@@ -315,9 +322,14 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        // Try to get the private seed. Otherwise this key was encoded using the whole decapsulation key.
+        if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
+            keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+            goto cleanup;
+        }
 
-        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY, &pbKey, &cbKey))
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey))
         {
             goto cleanup;
         }
@@ -336,7 +348,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
                 goto cleanup;
             }
         }
-        else 
+        else
         {
             if (p_scossl_mlkem_is_hybrid(keyCtx))
             {

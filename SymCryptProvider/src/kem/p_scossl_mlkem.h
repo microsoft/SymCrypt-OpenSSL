@@ -14,7 +14,6 @@ typedef struct {
     const char *oid;
     const char *snGroupName;
     const char *lnGroupName;
-    const char *classicGroupName;
     SYMCRYPT_MLKEM_PARAMS mlkemParams;
 } SCOSSL_MLKEM_GROUP_INFO;
 
