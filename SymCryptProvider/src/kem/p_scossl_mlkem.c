@@ -302,10 +302,14 @@ SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
 {
     for (SIZE_T i = 0; i < sizeof(p_scossl_mlkem_groups) / sizeof(SCOSSL_MLKEM_GROUP_INFO); i++)
     {
-        p_scossl_mlkem_groups[i].nid = OBJ_create(p_scossl_mlkem_groups[i].oid, p_scossl_mlkem_groups[i].snGroupName, p_scossl_mlkem_groups[i].lnGroupName);
+        p_scossl_mlkem_groups[i].nid = OBJ_sn2nid(p_scossl_mlkem_groups[i].snGroupName);
         if (p_scossl_mlkem_groups[i].nid == NID_undef)
         {
-            return SCOSSL_FAILURE;
+            p_scossl_mlkem_groups[i].nid = OBJ_create(p_scossl_mlkem_groups[i].oid, p_scossl_mlkem_groups[i].snGroupName, p_scossl_mlkem_groups[i].lnGroupName);
+            if (p_scossl_mlkem_groups[i].nid == NID_undef)
+            {
+                return SCOSSL_FAILURE;
+            }
         }
     }
 

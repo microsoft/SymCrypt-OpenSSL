@@ -467,34 +467,23 @@ static const OSSL_ALGORITHM p_scossl_kem[] = {
     ALG_TABLE_END};
 
 // Decoders
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem_PrivateKeyInfo_functions[];
-extern const OSSL_DISPATCH p_scossl_der_to_mlkem_SubjectPublicKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_PrivateKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_SubjectPublicKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_PrivateKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_SubjectPublicKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_PrivateKeyInfo_functions[];
-// extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem512_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem768_SubjectPublicKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_PrivateKeyInfo_functions[];
+extern const OSSL_DISPATCH p_scossl_der_to_mlkem1024_SubjectPublicKeyInfo_functions[];
 
 static const OSSL_ALGORITHM p_scossl_decoder[] = {
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, PrivateKeyInfo),
-    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, SubjectPublicKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, PrivateKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, SubjectPublicKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768_ENCODE_DECODE, mlkem768, PrivateKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768_ENCODE_DECODE, mlkem768, SubjectPublicKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024_ENCODE_DECODE, mlkem1024, PrivateKeyInfo),
-    // ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024_ENCODE_DECODE, mlkem1024, SubjectPublicKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, PrivateKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, SubjectPublicKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768_ENCODE_DECODE, mlkem768, PrivateKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM768_ENCODE_DECODE, mlkem768, SubjectPublicKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024_ENCODE_DECODE, mlkem1024, PrivateKeyInfo),
+    ALG_DECODER(SCOSSL_ALG_NAME_MLKEM1024_ENCODE_DECODE, mlkem1024, SubjectPublicKeyInfo),
     ALG_TABLE_END};
 
 // Encoders
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_der_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_pem_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_der_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_pem_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_der_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_pem_functions[];
-// extern const OSSL_DISPATCH p_scossl_mlkem_to_text_functions[];
 // extern const OSSL_DISPATCH p_scossl_mlkem512_to_PrivateKeyInfo_der_functions[];
 // extern const OSSL_DISPATCH p_scossl_mlkem512_to_PrivateKeyInfo_pem_functions[];
 // extern const OSSL_DISPATCH p_scossl_mlkem512_to_EncryptedPrivateKeyInfo_der_functions[];
@@ -518,13 +507,6 @@ static const OSSL_ALGORITHM p_scossl_decoder[] = {
 // extern const OSSL_DISPATCH p_scossl_mlkem1024_to_text_functions[];
 
 static const OSSL_ALGORITHM p_scossl_encoder[] = {
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, der),
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, pem),
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, der),
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, pem),
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, der),
-    // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, SubjectPublicKeyInfo, pem),
-    // ALG_TEXT_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem),
     // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, PrivateKeyInfo, der),
     // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, PrivateKeyInfo, pem),
     // ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM512_ENCODE_DECODE, mlkem512, EncryptedPrivateKeyInfo, der),
@@ -550,8 +532,7 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
-    // return p_scossl_mlkem_register_algorithms();
-    return SCOSSL_SUCCESS;
+    return p_scossl_mlkem_register_algorithms();
 }
 
 static int p_scossl_get_status()
