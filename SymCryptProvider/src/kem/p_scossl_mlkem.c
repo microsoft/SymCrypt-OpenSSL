@@ -298,6 +298,19 @@ SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info(_In_ const char *groupNam
     return p_scossl_mlkem_get_group_info_by_nid(OBJ_sn2nid(groupName));
 }
 
+int p_scossl_mlkem_params_to_nid(SYMCRYPT_MLKEM_PARAMS mlkemParams)
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_mlkem_groups) / sizeof(SCOSSL_MLKEM_GROUP_INFO); i++)
+    {
+        if (p_scossl_mlkem_groups[i].mlkemParams == mlkemParams)
+        {
+            return p_scossl_mlkem_groups[i].nid;
+        }
+    }
+
+    return NID_undef;
+}
+
 SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
 {
     for (SIZE_T i = 0; i < sizeof(p_scossl_mlkem_groups) / sizeof(SCOSSL_MLKEM_GROUP_INFO); i++)
