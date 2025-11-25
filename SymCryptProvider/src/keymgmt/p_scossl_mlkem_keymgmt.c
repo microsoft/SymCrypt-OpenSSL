@@ -668,9 +668,9 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-
-        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED)
+        switch (keyCtx->format)
         {
+        case SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED:
             // Reset pbKey in case it was used for encapsulation key export
             OPENSSL_secure_free(pbKey);
             pbKey = NULL;
@@ -690,11 +690,9 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
-        }
 
-        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED ||
-            keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
-        {
+            __fallthrough;
+        case SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY:
             OPENSSL_secure_clear_free(pbKey, cbKey);
             pbKey = NULL;
 
@@ -713,6 +711,10 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
+
+            break;
+        default:
+            break;
         }
     }
 
@@ -882,7 +884,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
 
     if (allocatedKey)
     {
-       *ppbKey = pbKey;
+        *ppbKey = pbKey;
     }
     *pcbKey = cbKey;
 

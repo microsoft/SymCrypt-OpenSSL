@@ -186,7 +186,6 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
                                                 _Out_writes_bytes_opt_(*outlen) unsigned char *out, _Out_ size_t *outlen,
                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
-
     SIZE_T cbMlkemCiphertext = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -315,6 +314,8 @@ SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
 {
     for (SIZE_T i = 0; i < sizeof(p_scossl_mlkem_groups) / sizeof(SCOSSL_MLKEM_GROUP_INFO); i++)
     {
+        // Don't double register MLKEM algorithms. These should already by registered on
+        // OpenSSL 3.5+
         p_scossl_mlkem_groups[i].nid = OBJ_sn2nid(p_scossl_mlkem_groups[i].snGroupName);
         if (p_scossl_mlkem_groups[i].nid == NID_undef)
         {

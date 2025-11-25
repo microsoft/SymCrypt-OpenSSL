@@ -38,7 +38,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key_bytes(_In_ SCOSSL_DECODE_
         goto cleanup;
     }
 
-    if ((keyCtx = p_scossl_mlkem_keymgmt_new_ctx(ctx->provctx, groupInfo->mlkemParams)) == NULL)
+    if ((keyCtx = p_scossl_mlkem_keymgmt_new_ctx(ctx->provctx, mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -64,7 +64,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ SCOSSL_DECODE
     int cbKey;
     ASN1_OCTET_STRING *p8Data = NULL;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
-    SYMCRYPT_MLKEMKEY_FORMAT format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
+    SYMCRYPT_MLKEMKEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
         !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info) ||
@@ -74,7 +74,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ SCOSSL_DECODE
         goto cleanup;
     }
 
-    format = (cbKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY);
+    format = cbKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
 
     keyCtx = p_scossl_mlkem_decode_key_bytes(ctx, algorithm,
                                              mlkemParams, format,
