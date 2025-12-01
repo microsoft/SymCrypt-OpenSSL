@@ -94,6 +94,33 @@ extern "C" {
 
 #define ALG_TABLE_END {NULL, NULL, NULL, NULL}
 
+// Convenience macro to define references for all encoder/decoder types for a particular algorithm
+#define DECODER_DISPATCH_ALL(algorithm)                                                          \
+    extern const OSSL_DISPATCH p_scossl_der_to_##algorithm##_PrivateKeyInfo_functions[];         \
+    extern const OSSL_DISPATCH p_scossl_der_to_##algorithm##_SubjectPublicKeyInfo_functions[];
+
+#define DECODER_ENTRIES_ALL(algorithm)                          \
+    ALG_DECODER(#algorithm, algorithm, PrivateKeyInfo),         \
+    ALG_DECODER(#algorithm, algorithm, SubjectPublicKeyInfo),
+
+#define ENCODER_DISPATCH_ALL(algorithm)                                                             \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_PrivateKeyInfo_der_functions[];            \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_PrivateKeyInfo_pem_functions[];            \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_EncryptedPrivateKeyInfo_der_functions[];   \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_EncryptedPrivateKeyInfo_pem_functions[];   \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_SubjectPublicKeyInfo_der_functions[];      \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_SubjectPublicKeyInfo_pem_functions[];      \
+    extern const OSSL_DISPATCH p_scossl_##algorithm##_to_text_functions[];
+
+#define ENCODER_ENTRIES_ALL(algorithm)                                  \
+    ALG_ENCODER(#algorithm, algorithm, PrivateKeyInfo, der),            \
+    ALG_ENCODER(#algorithm, algorithm, PrivateKeyInfo, pem),            \
+    ALG_ENCODER(#algorithm, algorithm, EncryptedPrivateKeyInfo, der),   \
+    ALG_ENCODER(#algorithm, algorithm, EncryptedPrivateKeyInfo, pem),   \
+    ALG_ENCODER(#algorithm, algorithm, SubjectPublicKeyInfo, der),      \
+    ALG_ENCODER(#algorithm, algorithm, SubjectPublicKeyInfo, pem),      \
+    ALG_TEXT_ENCODER(#algorithm, algorithm),
+
 typedef struct {
     unsigned int groupId;
     unsigned int securityBits;
@@ -103,6 +130,10 @@ typedef struct {
     int minDtls;
     int maxDtls;
 } SCOSSL_TLS_GROUP_INFO;
+
+typedef struct {
+
+} SCOSSL_TLS_SIGALG_INFO;
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p192 = {
     SCOSSL_TLS_GROUP_ID_secp192r1, 80, 0,
@@ -233,6 +264,19 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     OSSL_PARAM_int(OSSL_CAPABILITY_TLS_GROUP_IS_KEM, (int *)&group_info.is_kem),                        \
     OSSL_PARAM_END}
 
+const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa44 = {
+};
+
+const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa65 = {
+};
+
+const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa87 = {
+};
+
+#define NUM_PARAMS_SIGALG_ENTRY 10
+#define TLS_SIGALG_ENTRY(tlsname, sigalg_info) {                                     \
+    OSSL_PARAM_END}
+
 static int scossl_prov_initialized = 0;
 
 static OSSL_FUNC_core_get_params_fn *core_get_params;
@@ -266,6 +310,11 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("SecP256r1MLKEM768", SCOSSL_SN_P256_MLKEM768, "MLKEM", scossl_tls_group_info_secp256r1mlkem768),
     TLS_GROUP_ENTRY("X25519MLKEM768", SCOSSL_SN_X25519_MLKEM768, "MLKEM", scossl_tls_group_info_x25519mlkem768),
     TLS_GROUP_ENTRY("SecP384r1MLKEM1024", SCOSSL_SN_P384_MLKEM1024, "MLKEM", scossl_tls_group_info_secp384r1mlkem1024)};
+
+static const OSSL_PARAM param_sigalg_list[][10] = {
+    TLS_SIGALG_ENTRY("mldsa44", scossl_tls_sigalg_info_mldsa44),
+    TLS_SIGALG_ENTRY("mldsa65", scossl_tls_sigalg_info_mldsa65),
+    TLS_SIGALG_ENTRY("mldsa87", scossl_tls_sigalg_info_mldsa87)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];
@@ -396,15 +445,21 @@ static const OSSL_ALGORITHM p_scossl_rand[] = {
 extern const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_kdf_keymgmt_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
-extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG(SCOSSL_ALG_NAME_DH, p_scossl_dh_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_EC, p_scossl_ecc_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_kdf_keymgmt_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_keymgmt_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_keymgmt_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM, p_scossl_mlkem_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_RSA_PSS, p_scossl_rsapss_keymgmt_functions),
@@ -429,10 +484,16 @@ static const OSSL_ALGORITHM p_scossl_keyexch[] = {
 
 // Signature
 extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
+// extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG(SCOSSL_ALG_NAME_ECDSA, p_scossl_ecdsa_signature_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_keymgmt_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_keymgmt_functions),
+    // ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
     ALG_TABLE_END};
 
@@ -451,15 +512,24 @@ static const OSSL_ALGORITHM p_scossl_kem[] = {
     ALG_TABLE_END};
 
 // Decoders
+// DECODER_DISPATCH_ALL(mldsa44)
+// DECODER_DISPATCH_ALL(mldsa65)
+// DECODER_DISPATCH_ALL(mldsa87)
 extern const OSSL_DISPATCH p_scossl_der_to_mlkem_PrivateKeyInfo_functions[];
 extern const OSSL_DISPATCH p_scossl_der_to_mlkem_SubjectPublicKeyInfo_functions[];
 
 static const OSSL_ALGORITHM p_scossl_decoder[] = {
+    // DECODER_ENTRIES_ALL(mldsa44)
+    // DECODER_ENTRIES_ALL(mldsa65)
+    // DECODER_ENTRIES_ALL(mldsa87)
     ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, PrivateKeyInfo),
     ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, SubjectPublicKeyInfo),
     ALG_TABLE_END};
 
 // Encoders
+// ENCODER_DISPATCH_ALL(mldsa44)
+// ENCODER_DISPATCH_ALL(mldsa65)
+// ENCODER_DISPATCH_ALL(mldsa87)
 extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_der_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem_to_PrivateKeyInfo_pem_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem_to_EncryptedPrivateKeyInfo_der_functions[];
@@ -469,6 +539,9 @@ extern const OSSL_DISPATCH p_scossl_mlkem_to_SubjectPublicKeyInfo_pem_functions[
 extern const OSSL_DISPATCH p_scossl_mlkem_to_text_functions[];
 
 static const OSSL_ALGORITHM p_scossl_encoder[] = {
+    // ENCODER_ENTRIES_ALL(mldsa44)
+    // ENCODER_ENTRIES_ALL(mldsa65)
+    // ENCODER_ENTRIES_ALL(mldsa87)
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, der),
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, PrivateKeyInfo, pem),
     ALG_ENCODER(SCOSSL_ALG_NAME_MLKEM, mlkem, EncryptedPrivateKeyInfo, der),
@@ -582,6 +655,19 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
         for (size_t i = 0; i < sizeof(p_scossl_supported_group_list) / sizeof(p_scossl_supported_group_list[0]); i++)
         {
             if (!cb(p_scossl_supported_group_list[i], arg))
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+
+        return SCOSSL_SUCCESS;
+    }
+
+    if (OPENSSL_strcasecmp(capability, "TLS-SIGALG") == 0)
+    {
+        for (size_t i = 0; i < sizeof(p_scossl_supported_sigalg_list) / sizeof(p_scossl_supported_sigalg_list[0]); i++)
+        {
+            if (!cb(p_scossl_supported_sigalg_list[i], arg))
             {
                 return SCOSSL_FAILURE;
             }
