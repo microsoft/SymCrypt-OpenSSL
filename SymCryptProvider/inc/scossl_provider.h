@@ -70,6 +70,11 @@ extern "C" {
 #define SCOSSL_LN_P384_MLKEM1024    "P384-ML-KEM-1024"
 #define SCOSSL_OID_P384_MLKEM1024   "2.16.840.1.101.3.4.4.6"
 
+// OpenSSL 3.5 parameters
+#ifndef OSSL_PKEY_PARAM_ML_DSA_SEED
+ #define OSSL_PKEY_PARAM_ML_DSA_SEED "seed"
+#endif
+
 #ifdef __cplusplus
 }
 #endif
