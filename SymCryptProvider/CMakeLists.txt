@@ -23,11 +23,13 @@ set(SCOSSL_SOURCES
     ./src/ciphers/p_scossl_aes_xts.c
     ./src/decoder/p_scossl_decode_common.c
     ./src/decoder/p_scossl_decode_mlkem.c
+    ./src/decoder/p_scossl_decode_mldsa.c
     ./src/digests/p_scossl_digest_common.c
     ./src/digests/p_scossl_digest_generic.c
     ./src/digests/p_scossl_shake.c
     ./src/digests/p_scossl_cshake.c
     ./src/encoder/p_scossl_encode_common.c
+    ./src/encoder/p_scossl_encode_mldsa.c
     ./src/encoder/p_scossl_encode_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
     ./src/kdf/p_scossl_kbkdf.c
@@ -44,6 +46,7 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_dh_keymgmt.c
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_kdf_keymgmt.c
+    ./src/keymgmt/p_scossl_mldsa_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_hybrid_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
@@ -51,6 +54,7 @@ set(SCOSSL_SOURCES
     ./src/mac/p_scossl_hmac.c
     ./src/mac/p_scossl_kmac.c
     ./src/signature/p_scossl_ecdsa_signature.c
+    ./src/signature/p_scossl_mldsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
     ./src/p_scossl_bio.c
     ./src/p_scossl_ecc.c
