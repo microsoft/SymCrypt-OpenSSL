@@ -481,6 +481,9 @@ static const OSSL_ALGORITHM p_scossl_asym_cipher[] = {
     ALG_TABLE_END};
 
 // Key encapsulation
+//
+// These MLKEM hybrids are for TLS only. HPKE uses a different combiner mechanism
+// that will be implemented separately.
 extern const OSSL_DISPATCH p_scossl_mlkem_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem_hybrid_functions[];
 
