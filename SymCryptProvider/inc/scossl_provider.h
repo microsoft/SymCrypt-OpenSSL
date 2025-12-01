@@ -72,6 +72,11 @@ extern "C" {
  #define OSSL_PKEY_PARAM_ML_KEM_SEED "seed"
 #endif
 
+// OpenSSL 3.5 parameters
+#ifndef OSSL_PKEY_PARAM_ML_DSA_SEED
+ #define OSSL_PKEY_PARAM_ML_DSA_SEED "seed"
+#endif
+
 #ifdef __cplusplus
 }
 #endif
