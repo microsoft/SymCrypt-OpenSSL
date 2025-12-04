@@ -311,7 +311,7 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("X25519MLKEM768", SCOSSL_SN_X25519_MLKEM768, "X25519MLKEM768", scossl_tls_group_info_x25519mlkem768),
     TLS_GROUP_ENTRY("SecP384r1MLKEM1024", SCOSSL_SN_P384_MLKEM1024, "SecP384r1MLKEM1024", scossl_tls_group_info_secp384r1mlkem1024)};
 
-static const OSSL_PARAM param_sigalg_list[][10] = {
+static const OSSL_PARAM p_scossl_supported_sigalg_list[][10] = {
     TLS_SIGALG_ENTRY("mldsa44", scossl_tls_sigalg_info_mldsa44),
     TLS_SIGALG_ENTRY("mldsa65", scossl_tls_sigalg_info_mldsa65),
     TLS_SIGALG_ENTRY("mldsa87", scossl_tls_sigalg_info_mldsa87)};

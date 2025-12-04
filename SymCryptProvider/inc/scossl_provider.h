@@ -39,11 +39,11 @@ extern "C" {
 #define SCOSSL_OID_MLDSA44    "2.16.840.1.101.3.4.3.17"
 
 #define SCOSSL_SN_MLDSA65     "id-alg-mldsa-65"
-#define SCOSSL_LN_MLDSA65     "ML-DSA-65
+#define SCOSSL_LN_MLDSA65     "ML-DSA-65"
 #define SCOSSL_OID_MLDSA65    "2.16.840.1.101.3.4.3.18"
 
 #define SCOSSL_SN_MLDSA87     "id-alg-mldsa-87"
-#define SCOSSL_LN_MLDSA87     "ML-DSA-87
+#define SCOSSL_LN_MLDSA87     "ML-DSA-87"
 #define SCOSSL_OID_MLDSA87    "2.16.840.1.101.3.4.3.19"
 
 #define SCOSSL_SN_MLKEM512      "id-alg-ml-kem-512"
