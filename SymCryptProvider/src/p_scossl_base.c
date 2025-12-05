@@ -445,23 +445,27 @@ static const OSSL_ALGORITHM p_scossl_rand[] = {
 extern const OSSL_DISPATCH p_scossl_dh_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_ecc_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_kdf_keymgmt_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
-extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
-extern const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[];
-extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem512_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem768_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem1024_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_x25519_mlkem768_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_p256_mlkem768_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_p384_mlkem1024_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_x25519_keymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG(SCOSSL_ALG_NAME_DH, p_scossl_dh_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_EC, p_scossl_ecc_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_HKDF, p_scossl_kdf_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_kdf_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM512, p_scossl_mlkem512_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM768, p_scossl_mlkem768_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM1024, p_scossl_mlkem1024_keymgmt_functions),
@@ -470,7 +474,6 @@ static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG(SCOSSL_ALG_NAME_SecP384r1_MLKEM1024, p_scossl_p384_mlkem1024_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_RSA_PSS, p_scossl_rsapss_keymgmt_functions),
-    ALG(SCOSSL_ALG_NAME_TLS1_PRF, p_scossl_kdf_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_X25519, p_scossl_x25519_keymgmt_functions),
     ALG_TABLE_END};
 
@@ -491,16 +494,16 @@ static const OSSL_ALGORITHM p_scossl_keyexch[] = {
 
 // Signature
 extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
-// extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa44_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa65_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_mldsa87_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG(SCOSSL_ALG_NAME_ECDSA, p_scossl_ecdsa_signature_functions),
-    // ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_keymgmt_functions),
-    // ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_keymgmt_functions),
-    // ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_signature_functions),
     ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
     ALG_TABLE_END};
 
