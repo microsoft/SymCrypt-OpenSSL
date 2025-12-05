@@ -739,7 +739,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
         }
         break;
     case SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY:
-        if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED ||
+        if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
             keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
