@@ -3,7 +3,7 @@
 //
 
 #include "scossl_provider.h"
-#include "signature/p_scossl_mldsa_signature.h"
+#include "p_scossl_mldsa_keymgmt.h"
 
 #include <openssl/param_build.h>
 #include <openssl/proverr.h>
@@ -45,16 +45,11 @@ static const OSSL_PARAM p_scossl_mldsa_impexp_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, SYMCRYPT_MLDSAKEY_FORMAT format,
-                                                     _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
-
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, SYMCRYPT_MLDSAKEY_FORMAT format,
-                                                     _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
-
 int p_scossl_mldsa_get_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams);
 int p_scossl_mldsa_get_security_bits(SYMCRYPT_MLDSA_PARAMS mlkdsaarams);
 
-static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(_In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
+_Use_decl_annotations_
+SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_KEY_CTX));
     
@@ -66,7 +61,8 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(_In_ SYMCRYPT_MLDSA_
     return keyCtx;
 }
 
-static void p_scossl_mldsa_keymgmt_free_key_ctx(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx)
+_Use_decl_annotations_
+void p_scossl_mldsa_keymgmt_free_key_ctx(SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
     if (keyCtx == NULL)
         return;
@@ -502,7 +498,8 @@ static const OSSL_PARAM *p_scossl_mldsa_keymgmt_impexp_types(ossl_unused int sel
     return p_scossl_mldsa_impexp_types;
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[])
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection, const OSSL_PARAM params[])
 {
     PCBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
@@ -570,8 +567,9 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(_Inout_ SCOSSL_MLDSA_KEY_CTX 
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection,
-                                                   _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection,
+                                            OSSL_CALLBACK *param_cb, void *cbarg)
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
