@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "p_scossl_base.h"
 #include "signature/p_scossl_mldsa.h"
 
 #ifdef __cplusplus
