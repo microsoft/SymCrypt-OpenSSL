@@ -13,6 +13,7 @@
 #include "p_scossl_bio.h"
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
+#include "signature/p_scossl_mldsa.h"
 
 #ifdef KEYSINUSE_ENABLED
 #include "keysinuse.h"
@@ -512,16 +513,16 @@ static const OSSL_ALGORITHM p_scossl_kem[] = {
     ALG_TABLE_END};
 
 // Decoders
-// DECODER_DISPATCH_ALL(mldsa44)
-// DECODER_DISPATCH_ALL(mldsa65)
-// DECODER_DISPATCH_ALL(mldsa87)
+DECODER_DISPATCH_ALL(mldsa44)
+DECODER_DISPATCH_ALL(mldsa65)
+DECODER_DISPATCH_ALL(mldsa87)
 extern const OSSL_DISPATCH p_scossl_der_to_mlkem_PrivateKeyInfo_functions[];
 extern const OSSL_DISPATCH p_scossl_der_to_mlkem_SubjectPublicKeyInfo_functions[];
 
 static const OSSL_ALGORITHM p_scossl_decoder[] = {
-    // DECODER_ENTRIES_ALL(mldsa44)
-    // DECODER_ENTRIES_ALL(mldsa65)
-    // DECODER_ENTRIES_ALL(mldsa87)
+    DECODER_ENTRIES_ALL(mldsa44)
+    DECODER_ENTRIES_ALL(mldsa65)
+    DECODER_ENTRIES_ALL(mldsa87)
     ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, PrivateKeyInfo),
     ALG_DECODER(SCOSSL_ALG_NAME_MLKEM_DECODER, mlkem, SubjectPublicKeyInfo),
     ALG_TABLE_END};
@@ -553,7 +554,8 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
-    return p_scossl_mlkem_register_algorithms();
+    return p_scossl_mlkem_register_algorithms() &&
+           p_scossl_mldsa_register_algorithms();
 }
 
 static int p_scossl_get_status()

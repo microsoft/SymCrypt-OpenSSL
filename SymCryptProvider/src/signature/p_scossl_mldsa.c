@@ -3,7 +3,7 @@
 //
 
 #include "scossl_provider.h"
-#include "p_scossl_mldsa_signature.h"
+#include "p_scossl_mldsa.h"
 
 #include <openssl/proverr.h>
 
@@ -12,6 +12,11 @@ extern "C" {
 #endif
 
 #define SCOSSL_MLDSA_MSG_ENCODING_PURE 1
+
+static SCOSSL_MLDSA_ALG_INFO p_scossl_mldsa_algs[] = {
+    {NID_undef, SCOSSL_OID_MLDSA44, SCOSSL_SN_MLDSA44, SCOSSL_LN_MLDSA44, SYMCRYPT_MLDSA_PARAMS_MLDSA44},
+    {NID_undef, SCOSSL_OID_MLDSA65, SCOSSL_SN_MLDSA65, SCOSSL_LN_MLDSA65, SYMCRYPT_MLDSA_PARAMS_MLDSA65},
+    {NID_undef, SCOSSL_OID_MLDSA87, SCOSSL_SN_MLDSA87, SCOSSL_LN_MLDSA87, SYMCRYPT_MLDSA_PARAMS_MLDSA87}};
 
 typedef struct
 {
@@ -434,6 +439,59 @@ cleanup:
     X509_ALGOR_free(x509Alg);
 
     return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(int nid)
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
+    {
+        if (p_scossl_mldsa_algs[i].nid == nid)
+        {
+            return &p_scossl_mldsa_algs[i];
+        }
+    }
+
+    return NULL;
+}
+
+_Use_decl_annotations_
+SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_group_info(_In_ const char *groupName)
+{
+    return p_scossl_mldsa_get_alg_info_by_nid(OBJ_sn2nid(groupName));
+}
+
+int p_scossl_mldsa_params_to_nid(SYMCRYPT_MLDSA_PARAMS mldsaParams)
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
+    {
+        if (p_scossl_mldsa_algs[i].mldsaParams == mldsaParams)
+        {
+            return p_scossl_mldsa_algs[i].nid;
+        }
+    }
+
+    return NID_undef;
+}
+
+SCOSSL_STATUS p_scossl_mldsa_register_algorithms()
+{
+    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
+    {
+        // Don't double register MLDSA algorithms. These should already by registered on
+        // OpenSSL 3.5+
+        p_scossl_mldsa_algs[i].nid = OBJ_sn2nid(p_scossl_mldsa_algs[i].snGroupName);
+        if (p_scossl_mldsa_algs[i].nid == NID_undef)
+        {
+            p_scossl_mldsa_algs[i].nid = OBJ_create(p_scossl_mldsa_algs[i].oid, p_scossl_mldsa_algs[i].snGroupName, p_scossl_mldsa_algs[i].lnGroupName);
+            if (p_scossl_mldsa_algs[i].nid == NID_undef)
+            {
+                return SCOSSL_FAILURE;
+            }
+        }
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 #ifdef __cplusplus
