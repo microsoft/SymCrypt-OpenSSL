@@ -107,8 +107,8 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
     return p_scossl_mldsa_set_ctx_params(ctx, params);
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_sign_message_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                      _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mldsa_sign_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                              _In_ const OSSL_PARAM params[])
 {
     return p_scossl_mldsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
 }
@@ -169,8 +169,8 @@ static SCOSSL_STATUS p_scossl_mldsa_sign(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_verify_message_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                        _In_ const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mldsa_verify_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                                _In_ const OSSL_PARAM params[])
 {
     return p_scossl_mldsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
@@ -352,7 +352,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
     return SCOSSL_SUCCESS;
 }
 
-#define IMPLEMENT_SCOSSL_MLDSA(bits)                                                                    \
+#define SCOSSL_MLDSA_FNS(bits)                                                                          \
     static SCOSSL_MLDSA_SIGNATURE_CTX                                                                   \
     *p_scossl_mldsa##bits##_newctx(ossl_unused SCOSSL_PROVCTX *provctx, ossl_unused const char *propq)  \
     {                                                                                                   \
@@ -363,9 +363,9 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
         {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))p_scossl_mldsa##bits##_newctx},                    \
         {OSSL_FUNC_SIGNATURE_DUPCTX, (void (*)(void))p_scossl_mldsa_dupctx},                            \
         {OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))p_scossl_mldsa_freectx},                          \
-        {OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_sign_message_init},      \
+        {OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))p_scossl_mldsa_sign_init},                      \
         {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_mldsa_sign},                                \
-        {OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_verify_message_init},  \
+        {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_mldsa_verify_init},                  \
         {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_mldsa_verify},                            \
         {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_mldsa_digest_sign_init},        \
         {OSSL_FUNC_SIGNATURE_DIGEST_SIGN, (void (*)(void))p_scossl_mldsa_sign},                         \
@@ -375,8 +375,22 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
         {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_gettable_ctx_params},  \
         {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_set_ctx_params},            \
         {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_settable_ctx_params},  \
-        {0, NULL}};
 
+#define SCOSSL_MLDSA_SIGN_MESSAGE_FNS                                                       \
+    {OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_sign_init},      \
+    {OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_verify_init},
+
+#ifdef OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT
+    #define IMPLEMENT_SCOSSL_MLDSA(bits)    \
+        SCOSSL_MLDSA_FNS(bits)              \
+        SCOSSL_MLDSA_SIGN_MESSAGE_FNS       \
+        {0, NULL}};
+#else
+    #define IMPLEMENT_SCOSSL_MLDSA(bits)    \
+        SCOSSL_MLDSA_FNS(bits)              \
+        {0, NULL}};
+#endif
+        
 IMPLEMENT_SCOSSL_MLDSA(44)
 IMPLEMENT_SCOSSL_MLDSA(65)
 IMPLEMENT_SCOSSL_MLDSA(87)
