@@ -34,15 +34,15 @@ extern "C" {
 //
 // Extended algorithms that may not be in the OpenSSL default implementation
 //
-#define SCOSSL_SN_MLDSA44     "id-alg-mldsa-44"
+#define SCOSSL_SN_MLDSA44     "id-ml-dsa-44"
 #define SCOSSL_LN_MLDSA44     "ML-DSA-44"
 #define SCOSSL_OID_MLDSA44    "2.16.840.1.101.3.4.3.17"
 
-#define SCOSSL_SN_MLDSA65     "id-alg-mldsa-65"
+#define SCOSSL_SN_MLDSA65     "id-ml-dsa-65"
 #define SCOSSL_LN_MLDSA65     "ML-DSA-65"
 #define SCOSSL_OID_MLDSA65    "2.16.840.1.101.3.4.3.18"
 
-#define SCOSSL_SN_MLDSA87     "id-alg-mldsa-87"
+#define SCOSSL_SN_MLDSA87     "id-ml-dsa-87"
 #define SCOSSL_LN_MLDSA87     "ML-DSA-87"
 #define SCOSSL_OID_MLDSA87    "2.16.840.1.101.3.4.3.19"
 
@@ -75,6 +75,22 @@ extern "C" {
 // OpenSSL 3.5 parameters
 #ifndef OSSL_PKEY_PARAM_ML_DSA_SEED
  #define OSSL_PKEY_PARAM_ML_DSA_SEED "seed"
+#endif
+
+#ifndef OSSL_SIGNATURE_PARAM_TEST_ENTROPY
+ #define OSSL_SIGNATURE_PARAM_TEST_ENTROPY "test-entropy"
+#endif
+
+#ifndef OSSL_SIGNATURE_PARAM_DETERMINISTIC
+ #define OSSL_SIGNATURE_PARAM_DETERMINISTIC "deterministic"
+#endif
+
+#ifndef OSSL_SIGNATURE_PARAM_MU
+ #define OSSL_SIGNATURE_PARAM_MU "mu"
+#endif
+
+#ifndef OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING
+ #define OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING "message-encoding"
 #endif
 
 #ifdef __cplusplus
