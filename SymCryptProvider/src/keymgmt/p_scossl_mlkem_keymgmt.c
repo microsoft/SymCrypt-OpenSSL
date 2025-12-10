@@ -496,12 +496,14 @@ static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In
     BOOL ret = FALSE;
     SCOSSL_STATUS success;
 
-    if (keyCtx1->mlkemParams != keyCtx2->mlkemParams)
+    if (keyCtx1 == NULL ||
+        keyCtx2 == NULL ||
+        keyCtx1->mlkemParams != keyCtx2->mlkemParams)
     {
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR))
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
         if (keyCtx1->key != NULL && keyCtx2->key != NULL)
         {
@@ -691,7 +693,7 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
                 goto cleanup;
             }
 
-            __fallthrough;
+            /* fall through */
         case SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY:
             OPENSSL_secure_clear_free(pbKey, cbKey);
             pbKey = NULL;
@@ -936,8 +938,6 @@ cleanup:
 
     return ret;
 }
-
-
 
 #ifdef __cplusplus
 }

@@ -142,7 +142,7 @@ static SCOSSL_STATUS p_scossl_der_to_mlkem_export_object(_In_ SCOSSL_DECODE_CTX 
     }                                                                                                       \
                                                                                                             \
     static const SCOSSL_DECODE_KEYTYPE_DESC p_scossl_mlkem##bits##_##decoderType##_desc = {                 \
-        "MLKEM"#bits,                                                                                       \
+        "ML-KEM-"#bits,                                                                                     \
         select_##decoderType,                                                                               \
         (PSCOSSL_DECODE_INTERNAL_FN)p_scossl_##decoderType##_to_mlkem##bits,                                \
         (OSSL_FUNC_keymgmt_free_fn *)p_scossl_mlkem_keymgmt_free_key_ctx};                                  \

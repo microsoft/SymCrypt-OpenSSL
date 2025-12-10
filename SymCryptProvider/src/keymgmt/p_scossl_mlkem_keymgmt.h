@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "p_scossl_base.h"
 #include "kem/p_scossl_mlkem.h"
 
 #ifdef __cplusplus

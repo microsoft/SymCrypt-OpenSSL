@@ -332,7 +332,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
             goto cleanup;
         }
 
-        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey))
+        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -363,13 +363,13 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         pbKey = NULL;
         cbKey = 0;
 
-        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey))
+        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
         if ((!printedPrivateKey && BIO_printf(out, "MLKEM Public-Key (%ld bit):\n", cbKey * 8) <= 0) ||
-                 BIO_printf(out, "encapsulation-key") <= 0)
+            BIO_printf(out, "encapsulation-key") <= 0)
         {
             goto cleanup;
         }

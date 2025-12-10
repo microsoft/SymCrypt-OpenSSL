@@ -28,8 +28,14 @@ typedef struct
     SCOSSL_MLKEM_KEY_CTX *keyCtx;
 } SCOSSL_MLKEM_CTX;
 
-static const OSSL_PARAM p_scossl_mlkem_param_types[] = {
+static const OSSL_PARAM p_scossl_mlkem_settable_param_types[] = {
+    OSSL_PARAM_octet_string(OSSL_KEM_PARAM_IKME, NULL, 0),
     OSSL_PARAM_END};
+
+static const OSSL_PARAM p_scossl_mlkem_gettable_param_types[] = {
+    OSSL_PARAM_END};
+
+static SCOSSL_STATUS p_scossl_mlkem_set_ctx_params(_In_ SCOSSL_MLKEM_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 /* Context management */
 static SCOSSL_MLKEM_CTX *p_scossl_mlkem_newctx(ossl_unused SCOSSL_PROVCTX *provctx)
@@ -86,7 +92,12 @@ static SCOSSL_STATUS p_scossl_mlkem_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCO
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                      ossl_unused const OSSL_PARAM params[])
 {
-    return p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE);
+    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return p_scossl_mlkem_set_ctx_params(ctx, params);
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
@@ -248,14 +259,33 @@ cleanup:
 //
 // Parameters
 //
-static const OSSL_PARAM *p_scossl_mlkem_ctx_param_types(ossl_unused void *ctx, ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_mlkem_settable_ctx_param_types(ossl_unused void *ctx, ossl_unused void *provctx)
 {
-    return p_scossl_mlkem_param_types;
+    return p_scossl_mlkem_settable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_set_ctx_params(ossl_unused void *ctx, ossl_unused const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mlkem_set_ctx_params(_In_ SCOSSL_MLKEM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation == EVP_PKEY_OP_ENCAPSULATE &&
+        (p = OSSL_PARAM_locate_const(params, OSSL_KEM_PARAM_IKME)) != NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+        return SCOSSL_FAILURE;
+    }
+
     return SCOSSL_SUCCESS;
+}
+
+static const OSSL_PARAM *p_scossl_mlkem_gettable_ctx_param_types(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_mlkem_gettable_param_types;
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_get_ctx_params(ossl_unused void *ctx, ossl_unused OSSL_PARAM params[])
@@ -271,10 +301,10 @@ const OSSL_DISPATCH p_scossl_mlkem_functions[] = {
     {OSSL_FUNC_KEM_ENCAPSULATE, (void (*)(void))p_scossl_mlkem_encapsulate},
     {OSSL_FUNC_KEM_DECAPSULATE_INIT, (void (*)(void))p_scossl_mlkem_decapsulate_init},
     {OSSL_FUNC_KEM_DECAPSULATE, (void (*)(void))p_scossl_mlkem_decapsulate},
+    {OSSL_FUNC_KEM_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_settable_ctx_param_types},
     {OSSL_FUNC_KEM_SET_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_set_ctx_params},
-    {OSSL_FUNC_KEM_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_ctx_param_types},
+    {OSSL_FUNC_KEM_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_gettable_ctx_param_types},
     {OSSL_FUNC_KEM_GET_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_get_ctx_params},
-    {OSSL_FUNC_KEM_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mlkem_ctx_param_types},
     {0, NULL}};
 
 _Use_decl_annotations_
