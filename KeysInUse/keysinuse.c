@@ -135,10 +135,13 @@ static void keysinuse_teardown();
 
 static void keysinuse_atfork_prepare();
 static void keysinuse_atfork_parent();
-static void keysinuse_atfork_reinit();
+static void keysinuse_atfork_child();
+
+static void keysinuse_lock_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static void keysinuse_unlock_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
 
 static void keysinuse_free_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
-static void keysinuse_reset_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
+static void keysinuse_atfork_reset_key_ctx(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx);
 static void keysinuse_ctx_log(_Inout_ SCOSSL_KEYSINUSE_CTX_IMP *ctx, _In_ PVOID doallArg);
 
 static void keysinuse_log_common(int level, _In_ const char *message, va_list args);
@@ -285,7 +288,7 @@ static void keysinuse_init_internal()
 
     if ((pthreadErr = pthread_atfork(keysinuse_atfork_prepare,
                                      keysinuse_atfork_parent, 
-                                     keysinuse_atfork_reinit)) != 0)
+                                     keysinuse_atfork_child)) != 0)
     {
         keysinuse_log_error("Failed to register logging fork handler,SYS_%d", pthreadErr);
         goto cleanup;
@@ -344,21 +347,6 @@ void keysinuse_init()
     CRYPTO_THREAD_run_once(&keysinuse_init_once, keysinuse_init_internal);
 }
 
-static void keysinuse_lock_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
-{
-    if (ctx && ctx->lock)
-    {
-        CRYPTO_THREAD_write_lock(ctx->lock);
-    }
-}
-
-static void keysinuse_unlock_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
-{
-    if (ctx && ctx->lock)
-    {
-        CRYPTO_THREAD_unlock(ctx->lock);
-    }
-}
 
 // acquire all locks to freeze state before fork
 static void keysinuse_atfork_prepare()
@@ -394,7 +382,7 @@ static void keysinuse_atfork_parent()
 
 // The logging thread needs to be restarted in the child process.
 // Inherited locks are destroyed and recreated to ensure they are in a clean, unlocked state.
-static void keysinuse_atfork_reinit()
+static void keysinuse_atfork_child()
 {
     pthread_condattr_t attr;
     int pthreadErr;
@@ -410,7 +398,7 @@ static void keysinuse_atfork_reinit()
 
     if (lh_keysinuse_ctx_imp != NULL)
     {
-        lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_reset_key_ctx);
+        lh_SCOSSL_KEYSINUSE_CTX_IMP_doall(lh_keysinuse_ctx_imp, keysinuse_atfork_reset_key_ctx);
     }
 
     if (lh_keysinuse_ctx_imp_lock != NULL)
@@ -809,26 +797,41 @@ static void keysinuse_free_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 }
 
 _Use_decl_annotations_
-static void keysinuse_reset_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+static void keysinuse_lock_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+{
+    if (ctx && ctx->lock)
+    {
+        CRYPTO_THREAD_write_lock(ctx->lock);
+    }
+}
+
+_Use_decl_annotations_
+static void keysinuse_unlock_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
+{
+    if (ctx && ctx->lock)
+    {
+        CRYPTO_THREAD_unlock(ctx->lock);
+    }
+}
+
+_Use_decl_annotations_
+static void keysinuse_atfork_reset_key_ctx(SCOSSL_KEYSINUSE_CTX_IMP *ctx)
 {
     if (ctx == NULL)
         return;
 
-    if (ctx)
+    // Reset counters
+    ctx->signCounter = 0;
+    ctx->decryptCounter = 0;
+
+    // Reset timestamps
+    ctx->firstLogTime = 0;
+    ctx->lastLogTime = 0;
+
+    if (ctx->lock)
     {
-        // Reset counters
-        ctx->signCounter = 0;
-        ctx->decryptCounter = 0;
-
-        // Reset timestamps
-        ctx->firstLogTime = 0;
-        ctx->lastLogTime = 0;
-
-        if (ctx->lock)
-        {
-            CRYPTO_THREAD_lock_free(ctx->lock);
-            ctx->lock = CRYPTO_THREAD_lock_new();
-        }
+        CRYPTO_THREAD_lock_free(ctx->lock);
+        ctx->lock = CRYPTO_THREAD_lock_new();
     }
 }
 
