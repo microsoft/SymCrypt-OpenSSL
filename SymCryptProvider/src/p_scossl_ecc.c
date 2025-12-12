@@ -170,10 +170,9 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_ecc_set_group(SCOSSL_ECC_KEY_CTX *keyCtx, const char *groupName)
+SCOSSL_STATUS p_scossl_ecc_set_group(SCOSSL_ECC_KEY_CTX *keyCtx, int nid)
 {
     PCSYMCRYPT_ECURVE curve;
-    int nid = OBJ_sn2nid(groupName);
 
     if (nid == NID_X25519)
     {
@@ -252,9 +251,13 @@ SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL is
 _Use_decl_annotations_
 SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->conversionFormat == POINT_CONVERSION_COMPRESSED ? 
-            SYMCRYPT_ECPOINT_FORMAT_X : 
-            SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+
+    if (!keyCtx->isX25519 &&
+        keyCtx->conversionFormat != POINT_CONVERSION_COMPRESSED)
+    {
+        pointFormat = SYMCRYPT_ECPOINT_FORMAT_XY;
+    }
 
     if (keyCtx->curve == NULL)
     {
@@ -267,7 +270,7 @@ SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     }
 
     // One extra byte for point compression type for non-X25519
-    return SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + keyCtx->isX25519 ? 0 : 1;
+    return SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + (keyCtx->isX25519 ? 0 : 1);
 }
 
 // Gets the public key as an encoded octet string

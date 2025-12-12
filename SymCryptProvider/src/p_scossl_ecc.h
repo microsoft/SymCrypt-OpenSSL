@@ -1,6 +1,8 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
+#pragma once
+
 #include "p_scossl_base.h"
 #ifdef KEYSINUSE_ENABLED
 #include "keysinuse.h"
@@ -42,7 +44,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(_In_ SCOSSL_PROVCTX *provctx);
 void p_scossl_ecc_free_ctx(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 
-SCOSSL_STATUS p_scossl_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, _In_ const char *groupName);
+SCOSSL_STATUS p_scossl_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int nid);
 
 SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 
