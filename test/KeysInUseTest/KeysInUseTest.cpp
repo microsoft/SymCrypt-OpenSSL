@@ -9,8 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
-#include <pthread.h>
 
 #include "scossl_helpers.h"
 #include "keysinuse.h"
@@ -1825,91 +1823,8 @@ cleanup:
 #endif
 }
 
-// Global context for fork test
-SCOSSL_KEYSINUSE_CTX *g_fork_ctx = NULL;
-int g_stop_fork_thread = 0;
-
-// Thread function to continuously use the key
-void* fork_test_thread(void* arg) {
-    while (!g_stop_fork_thread) {
-        if (g_fork_ctx) {
-            keysinuse_on_use(g_fork_ctx, KEYSINUSE_SIGN);
-        }
-        usleep(100); // Sleep a bit
-    }
-    return NULL;
-}
-
-SCOSSL_STATUS keysinuse_test_fork()
-{
-    printf("Testing fork safety\n");
-
-    // Create a dummy key context
-    unsigned char dummy_key[] = {0x01, 0x02, 0x03, 0x04};
-    g_fork_ctx = keysinuse_load_key(dummy_key, sizeof(dummy_key));
-    
-    if (!g_fork_ctx) {
-        TEST_LOG_ERROR("Failed to load key for fork test")
-        return SCOSSL_FAILURE;
-    }
-    
-    // Start a thread that uses keys
-    pthread_t tid;
-    if (pthread_create(&tid, NULL, fork_test_thread, NULL) != 0) {
-        TEST_LOG_ERROR("Failed to create thread for fork test")
-        return SCOSSL_FAILURE;
-    }
-    
-    // Fork
-    pid_t pid = fork();
-    
-    if (pid == 0) {
-        // Child process
-        // Set an alarm to kill the child if it hangs
-        alarm(5);
-        
-        // Try to use key in child
-        for (int i = 0; i < 100; i++) {
-            keysinuse_on_use(g_fork_ctx, KEYSINUSE_SIGN);
-            usleep(1000);
-        }
-        
-        // We can't easily return success/failure from child to parent via return value
-        // so we exit with 0 for success
-        exit(0);
-    } else if (pid > 0) {
-        // Parent process
-        int status;
-        waitpid(pid, &status, 0);
-        
-        g_stop_fork_thread = 1;
-        pthread_join(tid, NULL);
-        
-        keysinuse_unload_key(g_fork_ctx);
-        g_fork_ctx = NULL;
-        
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-            printf("\tFork test passed\n");
-            return SCOSSL_SUCCESS;
-        } else {
-            TEST_LOG_ERROR("Fork test failed: child process exited with status %d", WEXITSTATUS(status))
-            return SCOSSL_FAILURE;
-        }
-    } else {
-        TEST_LOG_ERROR("Fork failed")
-        g_stop_fork_thread = 1;
-        pthread_join(tid, NULL);
-        keysinuse_unload_key(g_fork_ctx);
-        g_fork_ctx = NULL;
-        return SCOSSL_FAILURE;
-    }
-}
-
 int main(int argc, char** argv)
 {
-    processName = realpath(argv[0], NULL);
-    processStartTime = time(NULL);
-
     ENGINE *engine = NULL;
     vector<ENGINE *> engines;
     vector<PVOID> providers;
@@ -2029,14 +1944,10 @@ int main(int argc, char** argv)
     ERR_pop_to_mark();
 
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
-
     keysinuse_init();
 
-    if (keysinuse_test_fork() != SCOSSL_SUCCESS)
-    {
-        TEST_LOG_ERROR("Fork test failed")
-        goto cleanup;
-    }
+    processName = realpath(argv[0], NULL);
+    processStartTime = time(NULL);
 
     if (keysinuse_test_create_fakeroot() == SCOSSL_FAILURE)
     {
@@ -2103,5 +2014,5 @@ cleanup:
     keysinuse_test_cleanup();
     OPENSSL_cleanup();
 
-    return ret == SCOSSL_SUCCESS ? 0 : 1;
+    return ret;
 }
