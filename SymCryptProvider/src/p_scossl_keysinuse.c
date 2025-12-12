@@ -70,7 +70,9 @@ static BOOL is_logging = FALSE;
 // Internal function declarations
 //
 static void p_scossl_keysinuse_init_once();
-static void p_scossl_keysinuse_atfork_reinit();
+static void keysinuse_atfork_prepare();
+static void keysinuse_atfork_parent();
+static void keysinuse_atfork_child();
 
 static void p_scossl_keysinuse_add_use(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning);
 
@@ -158,7 +160,7 @@ static void p_scossl_keysinuse_init_once()
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
     sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    if (sk_keysinuse_info_lock == NULL || 
+    if (sk_keysinuse_info_lock == NULL ||
         sk_keysinuse_info == NULL ||
         sk_keysinuse_info_pending == NULL)
     {
@@ -181,7 +183,7 @@ static void p_scossl_keysinuse_init_once()
             rmdir(LOG_DIR);
             goto cleanup;
         }
-    }    
+    }
     else if (errno != EACCES && errno != EEXIST)
     {
         p_scossl_keysinuse_log_error("Failed to create logging directory at %s,SYS_%d", LOG_DIR, errno);
@@ -201,7 +203,9 @@ static void p_scossl_keysinuse_init_once()
         goto cleanup;
     }
 
-    if ((pthreadErr = pthread_atfork(NULL, NULL, p_scossl_keysinuse_atfork_reinit)) != 0)
+    if ((pthreadErr = pthread_atfork(keysinuse_atfork_prepare,
+                                     keysinuse_atfork_parent,
+                                     keysinuse_atfork_child)) != 0)
     {
         p_scossl_keysinuse_log_error("Failed to register child process reinit. Child processes will not log events,SYS_%d", pthreadErr);
     }
@@ -224,10 +228,59 @@ void p_scossl_keysinuse_init()
     CRYPTO_THREAD_run_once(&keysinuse_init_once, p_scossl_keysinuse_init_once);
 }
 
+// Acquire all locks to freeze state before fork
+static void keysinuse_atfork_prepare()
+{
+    // Ensure logging thread is in a stopped state
+    pthread_mutex_lock(&logging_thread_mutex);
+
+    // Prevent updates to the pending keysinuse info stack
+    if (sk_keysinuse_info_lock != NULL)
+    {
+        CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock);
+    }
+
+    // Lock all keysinuse info structures in the stack to prevent updates
+    if (sk_keysinuse_info != NULL)
+    {
+        for (int i = 0; i < sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info); i++)
+        {
+            SCOSSL_PROV_KEYSINUSE_INFO *pInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_value(sk_keysinuse_info, i);
+            if (pInfo != NULL && pInfo->lock != NULL)
+            {
+                CRYPTO_THREAD_write_lock(pInfo->lock);
+            }
+        }
+    }
+}
+
+// Release all locks in reverse order after fork
+static void keysinuse_atfork_parent()
+{
+    if (sk_keysinuse_info != NULL)
+    {
+        for (int i = 0; i < sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info); i++)
+        {
+            SCOSSL_PROV_KEYSINUSE_INFO *pInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_value(sk_keysinuse_info, i);
+            if (pInfo != NULL && pInfo->lock != NULL)
+            {
+                CRYPTO_THREAD_unlock(pInfo->lock);
+            }
+        }
+    }
+
+    if (sk_keysinuse_info_lock != NULL)
+    {
+        CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
+    }
+
+    pthread_mutex_unlock(&logging_thread_mutex);
+}
+
 // If the calling process forks, the logging thread needs to be restarted in the
 // child process, and any locks should be reinitialized in case the parent
-// process held a lock at the time of the fork. 
-static void p_scossl_keysinuse_atfork_reinit()
+// process held a lock at the time of the fork.
+static void p_scossl_keysinuse_atfork_child()
 {
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo = NULL;
     pthread_condattr_t attr;
@@ -241,21 +294,19 @@ static void p_scossl_keysinuse_atfork_reinit()
     is_logging = FALSE;
     logging_thread_exit_status = SCOSSL_FAILURE;
 
-    logging_thread_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
-
     // Recreate global locks in case they were held by the logging
     // thread in the parent process at the time of the fork.
-    CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
-    sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
-    if (sk_keysinuse_info_lock == NULL)
+    if (sk_keysinuse_info_lock != NULL)
     {
-        p_scossl_keysinuse_log_error("Failed to create keysinuse lock in child process");
-        goto cleanup;
+        CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
+        sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     }
+
+    pthread_mutex_unlock(&logging_thread_mutex);
 
     // If any keysinuseInfo were in either stack, they will
     // be logged by the parent process. Remove them from the child process's
-    // stacks and reset them. 
+    // stacks and reset them.
     if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
     {
         while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
@@ -268,7 +319,7 @@ static void p_scossl_keysinuse_atfork_reinit()
                     pKeysinuseInfo->logPending = FALSE;
                     pKeysinuseInfo->decryptCounter = 0;
                     pKeysinuseInfo->signCounter = 0;
-    
+
                     CRYPTO_THREAD_unlock(pKeysinuseInfo->lock);
                 }
                 else
@@ -311,7 +362,7 @@ static void p_scossl_keysinuse_atfork_reinit()
 
     // Only recreate logging thread if it was running in the parent process
     if (is_parent_logging)
-    {     
+    {
         // Start the logging thread. Monotonic clock needs to be set to
         // prevent wall clock changes from affecting the logging delay sleep time
         is_logging = TRUE;
@@ -324,11 +375,10 @@ static void p_scossl_keysinuse_atfork_reinit()
             is_logging = FALSE;
             goto cleanup;
         }
-    
+
         keysinuse_enabled = TRUE;
         status = SCOSSL_SUCCESS;
     }
-
 
 cleanup:
     if (status != SCOSSL_SUCCESS)
