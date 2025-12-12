@@ -1,0 +1,142 @@
+# GDB commands for debugging SymCrypt OpenSSL provider with nginx
+# Load this with: gdb -x gdb_provider_commands.txt
+
+# ============================================
+# SYMBOL LOADING CONFIGURATION
+# ============================================
+
+# Set source code directories
+directory /home/jasjivsingh/SymCrypt-OpenSSL/SymCryptProvider/src
+directory /home/jasjivsingh/SymCrypt-OpenSSL/ScosslCommon/src
+directory /home/jasjivsingh/SymCrypt-OpenSSL/KeysInUse
+
+# Set debug file directory (for separate debug symbols)
+set debug-file-directory /home/jasjivsingh/SymCrypt-OpenSSL/build
+
+# Auto-load symbols from shared libraries
+set auto-solib-add on
+
+# Display symbol loading information
+set verbose on
+
+# ============================================
+# DISPLAY SETTINGS
+# ============================================
+
+set print pretty on
+set print array on
+set print array-indexes on
+set pagination off
+set print symbol-filename on
+
+# ============================================
+# PROCESS CONTROL
+# ============================================
+
+# Follow child processes (nginx workers)
+set follow-fork-mode child
+set detach-on-fork off
+
+# Enable pending breakpoints (for shared libraries)
+set breakpoint pending on
+
+# ============================================
+# FORCE SYMBOL LOADING
+# ============================================
+
+# Try to load symbols from provider immediately
+# (will succeed if already loaded, otherwise will load when available)
+sharedlibrary symcryptprovider
+sharedlibrary keysinuse
+sharedlibrary libssl
+sharedlibrary libcrypto
+
+# Common breakpoints for SymCrypt provider
+# Uncomment the ones you need:
+
+# Provider initialization
+# break scossl_provider_init
+# break scossl_provider_query
+# break scossl_provider_teardown
+
+# Cipher operations
+# break scossl_cipher_encrypt
+# break scossl_cipher_decrypt
+# break scossl_aes_gcm_encrypt
+# break scossl_aes_gcm_decrypt
+
+# KeysInUse logging
+# break keysinuse_init
+# break keysinuse_log_key_operation
+# break keysinuse_cipher_encrypt
+
+# Digest operations
+# break scossl_digest_init
+# break scossl_digest_update
+# break scossl_digest_final
+
+# Key exchange
+# break scossl_ecdh_derive
+# break scossl_dh_derive
+
+# Signature operations
+# break scossl_ecdsa_sign
+# break scossl_rsa_sign
+
+# Display backtrace on breakpoint hit
+commands
+  bt
+  info locals
+end
+
+# Catch common errors
+catch throw
+catch signal SIGSEGV
+catch signal SIGABRT
+
+# Helper functions
+define print_evp_cipher_ctx
+  if $argc == 1
+    print *(EVP_CIPHER_CTX*)$arg0
+  else
+    print "Usage: print_evp_cipher_ctx <ctx_pointer>"
+  end
+end
+
+define print_provider_ctx
+  if $argc == 1
+    print *(OSSL_PROVIDER*)$arg0
+  else
+    print "Usage: print_provider_ctx <provider_pointer>"
+  end
+end
+
+# Logging
+set logging on
+set logging file gdb_debug.log
+set logging overwrite on
+
+echo \n
+echo ========================================\n
+echo GDB Debug Session for nginx + SymCrypt\n
+echo ========================================\n
+echo \n
+echo Useful commands:\n
+echo   info sharedlibrary     - List loaded shared libraries\n
+echo   info breakpoints       - List all breakpoints\n
+echo   bt                     - Backtrace (call stack)\n
+echo   frame N                - Switch to frame N\n
+echo   info locals            - Show local variables\n
+echo   print <var>            - Print variable value\n
+echo   continue               - Continue execution\n
+echo   step                   - Step into function\n
+echo   next                   - Step over function\n
+echo   finish                 - Run until function returns\n
+echo \n
+echo Custom commands:\n
+echo   print_evp_cipher_ctx <ptr>\n
+echo   print_provider_ctx <ptr>\n
+echo \n
+echo Edit this file to enable specific breakpoints!\n
+echo ========================================\n
+echo \n

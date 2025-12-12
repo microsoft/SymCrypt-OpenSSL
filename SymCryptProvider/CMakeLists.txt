@@ -4,8 +4,23 @@ project(scossl_provider)
 
 set(DEFAULT_BUILD_TYPE "Release")
 
+# Always include debug symbols (even in Release builds for debugging)
+# Use -g3 for maximum debug info, -O0 for no optimization (Debug only)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unknown-pragmas")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra")
+
+# Add debug symbols based on build type
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g3 -O0 -DDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -O0 -DDEBUG")
+
+# RelWithDebInfo: Optimized with debug symbols (good for production debugging)
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -g3 -O2")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g3 -O2")
+
+# Even Release builds can have debug symbols (stripped during install if needed)
+# Uncomment next line to always include debug symbols:
+# set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
+# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in

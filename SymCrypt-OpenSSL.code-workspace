@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../openssl"
+		},
+		{
+			"path": "../../../mnt/d/LSG-linux-yocto"
+		},
+		{
+			"path": "../../../mnt/d/LSG-ICM"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "c",
+			"compare": "c",
+			"functional": "c",
+			"tuple": "c",
+			"type_traits": "c",
+			"utility": "c"
+		}
+	}
+}
