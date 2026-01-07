@@ -153,7 +153,7 @@ SCOSSL_STATUS p_scossl_pbkdf2_derive(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
-    
+
     if (!ctx->initialized)
     {
         scError = SymCryptPbkdf2ExpandKey(&ctx->expandedKey, ctx->pMac, ctx->pbPassword, ctx->cbPassword);
@@ -187,15 +187,18 @@ SCOSSL_STATUS p_scossl_pbkdf2_derive(_In_ SCOSSL_PROV_PBKDF2_CTX *ctx,
         }
     }
 
-    scError = SymCryptPbkdf2Derive(
-        &ctx->expandedKey,
-        ctx->pbSalt, ctx->cbSalt,
-        ctx->iterationCount,
-        key, keylen);
-    if (scError != SYMCRYPT_NO_ERROR)
+    if (keylen > 0)
     {
-        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptPbkdf2Derive failed", scError);
-        return SCOSSL_FAILURE;
+        scError = SymCryptPbkdf2Derive(
+            &ctx->expandedKey,
+            ctx->pbSalt, ctx->cbSalt,
+            ctx->iterationCount,
+            key, keylen);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptPbkdf2Derive failed", scError);
+            return SCOSSL_FAILURE;
+        }
     }
 
     return SCOSSL_SUCCESS;
