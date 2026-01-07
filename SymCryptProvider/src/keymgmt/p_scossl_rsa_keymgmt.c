@@ -226,19 +226,26 @@ cleanup:
 
 static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
-    SCOSSL_PROV_RSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX));
-    if (copyCtx == NULL)
+    SCOSSL_PROV_RSA_KEY_CTX *copyCtx;
+    BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
+
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
     {
+        return NULL;
+    }
+
+    if ((copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_RSA_KEY_CTX))) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
 
     copyCtx->initialized = keyCtx->initialized;
     copyCtx->keyType = keyCtx->keyType;
 
-    if (keyCtx->initialized && (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
+    if (keyCtx->initialized)
     {
-        if (!p_scossl_rsa_keymgmt_dup_keydata((PCSYMCRYPT_RSAKEY) keyCtx->key, &copyCtx->key,
-                                              (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0))
+        if (p_scossl_rsa_keymgmt_dup_keydata((PCSYMCRYPT_RSAKEY) keyCtx->key, &copyCtx->key, includePrivate) != SCOSSL_SUCCESS)
         {
             p_scossl_rsa_keymgmt_free_ctx(copyCtx);
             return NULL;
@@ -250,7 +257,8 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keymgmt_dup_ctx(_In_ const SCOSSL_P
 #endif
     }
 
-    if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS && keyCtx->pssRestrictions != NULL)
+    if (keyCtx->keyType == RSA_FLAG_TYPE_RSASSAPSS &&
+        keyCtx->pssRestrictions != NULL)
     {
         if ((copyCtx->pssRestrictions = OPENSSL_memdup(keyCtx->pssRestrictions, sizeof(SCOSSL_RSA_PSS_RESTRICTIONS))) == NULL)
         {
