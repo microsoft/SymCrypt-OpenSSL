@@ -145,6 +145,13 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
+    if (out != NULL &&
+        outsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
     if (ctx->operation != EVP_PKEY_OP_ENCRYPT)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
