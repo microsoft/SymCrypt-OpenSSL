@@ -234,6 +234,20 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p;
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PKCS5)) != NULL)
+    {
+        int pkcs5;
+
+        if (!OSSL_PARAM_get_int(p, &pkcs5))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            goto cleanup;
+        }
+
+        ctx->checkMinSizes = pkcs5 == 0;
+    }
+
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PASSWORD)) != NULL)
     {
         OPENSSL_secure_clear_free(ctx->pbPassword, ctx->cbPassword);
@@ -265,6 +279,12 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SALT)) != NULL)
     {
+        if (ctx->checkMinSizes && p->data_size < SCOSSL_PBKDF2_MIN_SALT_LEN)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
+            goto cleanup;
+        }
+
         OPENSSL_free(ctx->pbSalt);
         ctx->pbSalt = NULL;
         ctx->cbSalt = 0;
@@ -273,7 +293,7 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
-        }        
+        }
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
@@ -304,24 +324,24 @@ SCOSSL_STATUS p_scossl_pbkdf2_set_ctx_params(_Inout_ SCOSSL_PROV_PBKDF2_CTX *ctx
         ctx->initialized = FALSE;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_ITER)) != NULL &&
-        !OSSL_PARAM_get_uint64(p, &ctx->iterationCount))
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_ITER)) != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        goto cleanup;
-    }
+        uint64_t iterationCount;
+        uint64_t minIterationCount = ctx->checkMinSizes ? SCOSSL_PBKDF2_MIN_ITERATIONS : 1;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_PKCS5)) != NULL)
-    {
-        int pkcs5;
-
-        if (!OSSL_PARAM_get_int(p, &pkcs5))
+        if (!OSSL_PARAM_get_uint64(p, &iterationCount))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
         }
 
-        ctx->checkMinSizes = pkcs5 == 0;
+        if (iterationCount < minIterationCount)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_ITERATION_COUNT);
+            goto cleanup;
+        }
+
+        ctx->iterationCount = iterationCount;
     }
 
     ret = SCOSSL_SUCCESS;
