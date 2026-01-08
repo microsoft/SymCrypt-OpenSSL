@@ -994,16 +994,13 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
 #define IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(kbits, ivlen, lcmode, UCMODE, type, blocksize)                \
     SCOSSL_AES_CTX *p_scossl_aes_##kbits##_##lcmode##_newctx(_In_ SCOSSL_PROVCTX *provctx)                \
     {                                                                                                     \
-        SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_malloc, SCOSSL_AES_CTX);                                 \
+        SCOSSL_COMMON_ALIGNED_ALLOC(ctx, OPENSSL_zalloc, SCOSSL_AES_CTX);                                 \
         if (ctx != NULL)                                                                                  \
         {                                                                                                 \
             ctx->keylen = kbits >> 3;                                                                     \
             ctx->pad = TRUE;                                                                              \
             ctx->cipher = (OSSL_FUNC_cipher_cipher_fn *)&scossl_aes_##lcmode##_cipher;                    \
             ctx->libctx = provctx->libctx;                                                                \
-            ctx->tlsMac = NULL;                                                                           \
-            ctx->tlsMacSize = 0;                                                                          \
-            ctx->tlsVersion = 0;                                                                          \
         }                                                                                                 \
                                                                                                           \
         return ctx;                                                                                       \
