@@ -323,6 +323,10 @@ static SCOSSL_STATUS p_scossl_dh_derive(_In_ SCOSSL_DH_CTX *ctx,
 
 static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    const char *mdName = NULL;
+    const char *mdProps = NULL;
+    EVP_MD *md = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p = NULL;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_PAD)) != NULL)
@@ -331,7 +335,7 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
         if (!OSSL_PARAM_get_uint(p, &pad))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         ctx->pad = pad ? 1 : 0;
@@ -344,7 +348,7 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
             kdfType == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
 
         if (kdfType[0] =='\0')
@@ -358,32 +362,48 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
         else
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_KDF_DIGEST)) != NULL)
     {
-        OPENSSL_free(ctx->kdfMdName);
-        ctx->kdfMdName = NULL;
-
-        if (!OSSL_PARAM_get_utf8_string(p, &ctx->kdfMdName, 0))
+        if (!OSSL_PARAM_get_utf8_string(p, &mdName, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
-    }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_KDF_DIGEST_PROPS)) != NULL)
-    {
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_KDF_DIGEST_PROPS)) != NULL)
+        {
+            if (!OSSL_PARAM_get_utf8_string(p, &mdProps, 0))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+        }
+
+        OPENSSL_free(ctx->kdfMdName);
         OPENSSL_free(ctx->kdfMdProps);
+        ctx->kdfMdName = NULL;
         ctx->kdfMdProps = NULL;
 
-        if (!OSSL_PARAM_get_utf8_string(p, &ctx->kdfMdProps, 0))
+        if ((md = EVP_MD_fetch(ctx->libCtx, mdName, mdProps)) == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
+            goto cleanup;
         }
+
+        if (EVP_MD_xof(md))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_XOF_DIGESTS_NOT_ALLOWED);
+            goto cleanup;
+        }
+
+        ctx->kdfMdName = mdName;
+        ctx->kdfMdProps = mdProps;
+        mdName = NULL;
+        mdProps = NULL;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_CEK_ALG)) != NULL)
@@ -394,7 +414,7 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
         if (!OSSL_PARAM_get_utf8_string(p, &ctx->kdfCekAlg, 0))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
@@ -409,7 +429,7 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
             !OSSL_PARAM_get_octet_string(p, (void **)(&ctx->kdfUkm), 0, &ctx->kdfUkmlen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
+            goto cleanup;
         }
     }
 
@@ -417,10 +437,17 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
         !OSSL_PARAM_get_size_t(p, &ctx->kdfOutlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        return SCOSSL_FAILURE;
+        goto cleanup;
     }
 
-    return SCOSSL_SUCCESS;
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_free(mdName);
+    OPENSSL_free(mdProps);
+    EVP_MD_free(md);
+
+    return ret;
 }
 
 static const OSSL_PARAM *p_scossl_dh_ctx_settable_params(ossl_unused void *ctx, ossl_unused void *provctx)
