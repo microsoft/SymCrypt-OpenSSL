@@ -428,7 +428,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT padding,
+SCOSSL_STATUS scossl_rsa_encrypt(PSYMCRYPT_RSAKEY key, UINT8 padding,
                                  int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)
@@ -545,7 +545,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT padding,
+SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT8 padding,
                                  int mdnid, PCBYTE pbLabel, SIZE_T cbLabel, // OAEP-only parameters
                                  PCBYTE pbSrc, SIZE_T cbSrc,
                                  PBYTE pbDst, INT32 *pcbDst, SIZE_T cbDst)

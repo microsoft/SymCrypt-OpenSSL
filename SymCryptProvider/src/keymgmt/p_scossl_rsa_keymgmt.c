@@ -17,7 +17,7 @@ typedef struct
 {
     OSSL_LIB_CTX *libctx;
     // May be set for PSS
-    UINT keyType;
+    UINT32 keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
     UINT32 nBitsOfModulus;
@@ -373,7 +373,7 @@ static void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 }
 
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(_In_ SCOSSL_PROVCTX *provctx, int selection,
-                                                              _In_ const OSSL_PARAM params[], UINT keyType)
+                                                              _In_ const OSSL_PARAM params[], UINT32 keyType)
 {
     // Sanity check
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
