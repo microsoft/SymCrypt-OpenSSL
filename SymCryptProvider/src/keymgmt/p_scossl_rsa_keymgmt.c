@@ -17,7 +17,7 @@ typedef struct
 {
     OSSL_LIB_CTX *libctx;
     // May be set for PSS
-    UINT keyType;
+    UINT32 keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
     UINT32 nBitsOfModulus;
@@ -359,7 +359,7 @@ static void p_scossl_rsa_keygen_cleanup(_Inout_ SCOSSL_RSA_KEYGEN_CTX *genCtx)
 }
 
 static SCOSSL_RSA_KEYGEN_CTX *p_scossl_rsa_keygen_init_common(_In_ SCOSSL_PROVCTX *provctx, int selection,
-                                                              _In_ const OSSL_PARAM params[], UINT keyType)
+                                                              _In_ const OSSL_PARAM params[], UINT32 keyType)
 {
     // Sanity check
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
@@ -426,11 +426,11 @@ static SCOSSL_PROV_RSA_KEY_CTX *p_scossl_rsa_keygen(_In_ SCOSSL_RSA_KEYGEN_CTX *
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptRsakeyAllocate failed");
         goto cleanup;
     }
-     
+
     if (genCtx->nBitsOfModulus < SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS)
     {
         genFlags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
-        SCOSSL_PROV_LOG_SYMCRYPT_INFO("Generating RSA key with size < %u bits. This operation is not FIPS compliant.", 
+        SCOSSL_PROV_LOG_SYMCRYPT_INFO("Generating RSA key with size < %u bits. This operation is not FIPS compliant.",
                                        SYMCRYPT_RSAKEY_FIPS_MIN_BITSIZE_MODULUS);
     }
 

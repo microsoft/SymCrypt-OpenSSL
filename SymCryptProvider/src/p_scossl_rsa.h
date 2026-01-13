@@ -23,7 +23,7 @@ typedef struct
     OSSL_LIB_CTX *libctx;
     BOOL initialized;
     PSYMCRYPT_RSAKEY key;
-    UINT keyType;
+    UINT32 keyType;
     SCOSSL_RSA_PSS_RESTRICTIONS *pssRestrictions;
 
 #ifdef KEYSINUSE_ENABLED
@@ -32,7 +32,7 @@ typedef struct
 #endif
 } SCOSSL_PROV_RSA_KEY_CTX;
 
-const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx, UINT padding,
+const OSSL_ITEM *p_scossl_rsa_get_supported_md(_In_ OSSL_LIB_CTX *libctx, UINT8 padding,
                                                _In_ const char *mdname, _In_ const char *propq,
                                                _Out_opt_ EVP_MD **md);
 

@@ -287,7 +287,7 @@ static void keysinuse_init_internal()
     }
 
     if ((pthreadErr = pthread_atfork(keysinuse_atfork_prepare,
-                                     keysinuse_atfork_parent, 
+                                     keysinuse_atfork_parent,
                                      keysinuse_atfork_child)) != 0)
     {
         keysinuse_log_error("Failed to register logging fork handler,SYS_%d", pthreadErr);
@@ -591,7 +591,7 @@ unsigned int keysinuse_derive_key_identifier(_In_reads_bytes_(cbEncodedKey) cons
                                              _Out_writes_bytes_opt_(cbEncodedKey)char *pbKeyIdentifier, unsigned long cbKeyIdentifier)
 {
     BYTE abHash[SYMCRYPT_SHA256_RESULT_SIZE];
-    UINT cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
+    unsigned int cbHash = SYMCRYPT_SHA256_RESULT_SIZE;
 
     if (pbKeyIdentifier == NULL)
     {

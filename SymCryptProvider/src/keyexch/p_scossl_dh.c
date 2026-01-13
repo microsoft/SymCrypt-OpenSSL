@@ -28,7 +28,7 @@ typedef struct
     SCOSSL_PROV_DH_KEY_CTX *provKey;
     SCOSSL_PROV_DH_KEY_CTX *peerProvKey;
 
-    UINT pad;
+    BOOL pad;
 
     // X9.42 parameters
     enum scossl_kdf_type kdfType;
@@ -338,7 +338,7 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
             goto cleanup;
         }
 
-        ctx->pad = pad ? 1 : 0;
+        ctx->pad = pad ? TRUE : FALSE;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_KDF_TYPE)) != NULL)

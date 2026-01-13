@@ -20,7 +20,7 @@ typedef struct
     OSSL_LIB_CTX *libctx;
 
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
-    UINT padding;
+    UINT8 padding;
     int operation;
 
     // OAEP Parameters
@@ -312,7 +312,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
         // Padding mode may be passed as legacy NID or string, and is
         // checked against the padding modes the ScOSSL provider supports
         int i = 0;
-        UINT padding;
+        unsigned int padding;
 
         switch (p->data_type)
         {

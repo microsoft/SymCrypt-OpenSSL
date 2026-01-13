@@ -56,7 +56,7 @@ typedef struct
     SIZE_T cbBuf;
 
     OSSL_LIB_CTX *libctx;
-    UINT tlsVersion;
+    UINT32 tlsVersion;
     PBYTE tlsMac;
     SIZE_T tlsMacSize;
 
@@ -154,7 +154,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
 // the unpadded record, and saves the result to ctx->tlsMac.
 //
 // The MAC will later be fetched through p_scossl_aes_generic_get_ctx_params
-// This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c, and 
+// This function is adapted from ssl3_cbc_copy_mac in ssl/record/tls_pad.c, and
 // SymCryptTlsCbcHmacVerifyCore from SymCrypt, and runs in constant time w.r.t
 // the values in pbData. In case of bad padding, a random MAC is assigned instead
 static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
@@ -230,7 +230,7 @@ static SCOSSL_STATUS p_scossl_aes_tls_remove_padding_and_copy_mac(
     macStart = macEnd - ctx->tlsMacSize;
 
     rotatedMac = rotatedMacBuf + ((0 - (SIZE_T)rotatedMacBuf) & 0x3f);
-    
+
     // Find and extract MAC, and verify padding
     memset(rotatedMac, 0, ctx->tlsMacSize);
     for (i = 0, j = 0; i < cbTail-1; i++)
@@ -745,7 +745,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_TLS_VERSION)) != NULL)
     {
-        UINT tlsVersion;
+        unsigned int tlsVersion;
         if (!OSSL_PARAM_get_uint(p, &tlsVersion))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
