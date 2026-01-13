@@ -18,9 +18,9 @@ static SCOSSL_MLKEM_GROUP_INFO p_scossl_mlkem_groups[] = {
     {NID_undef, SCOSSL_OID_MLKEM512, SCOSSL_SN_MLKEM512, SCOSSL_LN_MLKEM512, SYMCRYPT_MLKEM_PARAMS_MLKEM512},
     {NID_undef, SCOSSL_OID_MLKEM768, SCOSSL_SN_MLKEM768, SCOSSL_LN_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
     {NID_undef, SCOSSL_OID_MLKEM1024, SCOSSL_SN_MLKEM1024, SCOSSL_LN_MLKEM1024, SYMCRYPT_MLKEM_PARAMS_MLKEM1024},
-    {NID_undef, SCOSSL_OID_P256_MLKEM768, SCOSSL_SN_P256_MLKEM768, SCOSSL_LN_P256_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
-    {NID_undef, SCOSSL_OID_X25519_MLKEM768, SCOSSL_SN_X25519_MLKEM768, SCOSSL_LN_X25519_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
-    {NID_undef, SCOSSL_OID_P384_MLKEM1024, SCOSSL_SN_P384_MLKEM1024, SCOSSL_LN_P384_MLKEM1024, SYMCRYPT_MLKEM_PARAMS_MLKEM1024}};
+    {NID_undef, NULL, SCOSSL_SN_P256_MLKEM768, SCOSSL_LN_P256_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
+    {NID_undef, NULL, SCOSSL_SN_X25519_MLKEM768, SCOSSL_LN_X25519_MLKEM768, SYMCRYPT_MLKEM_PARAMS_MLKEM768},
+    {NID_undef, NULL, SCOSSL_SN_P384_MLKEM1024, SCOSSL_LN_P384_MLKEM1024, SYMCRYPT_MLKEM_PARAMS_MLKEM1024}};
 
 typedef struct
 {
@@ -90,14 +90,10 @@ static SCOSSL_STATUS p_scossl_mlkem_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCO
 // Encapsulation
 //
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
-                                                     ossl_unused const OSSL_PARAM params[])
+                                                     _In_ const OSSL_PARAM params[])
 {
-    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE) != SCOSSL_SUCCESS)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return p_scossl_mlkem_set_ctx_params(ctx, params);
+    return p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE) &&
+           p_scossl_mlkem_set_ctx_params(ctx, params);
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
@@ -178,15 +174,15 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_decapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                      ossl_unused const OSSL_PARAM params[])
 {
+    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_DECAPSULATE) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
     if (keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED &&
         keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-        return SCOSSL_FAILURE;
-    }
-
-    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_DECAPSULATE) != SCOSSL_SUCCESS)
-    {
         return SCOSSL_FAILURE;
     }
 

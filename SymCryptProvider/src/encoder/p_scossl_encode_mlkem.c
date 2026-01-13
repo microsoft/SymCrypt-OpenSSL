@@ -14,8 +14,6 @@
 extern "C" {
 #endif
 
-extern const OSSL_DISPATCH p_scossl_mlkem_keymgmt_functions[];
-
 static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     int nid = p_scossl_mlkem_params_to_nid(keyCtx->mlkemParams);

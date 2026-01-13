@@ -26,7 +26,7 @@ typedef struct
     SCOSSL_ECDH_CTX *classicKeyexchCtx;
 } SCOSSL_MLKEM_HYBRID_CTX;
 
-static const OSSL_PARAM p_scossl_mlkem_param_types[] = {
+static const OSSL_PARAM p_scossl_mlkem_hybrid_param_types[] = {
     OSSL_PARAM_END};
 
 /* Context management */
@@ -129,11 +129,11 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_encapsulate_init(_Inout_ SCOSSL_MLKEM
     return p_scossl_mlkem_hybrid_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE);
 }
 
-// Performs ML-KEM encapsulation using the previously initialized context. If
-// this is a hybrid group, then hybrid encapsulation is performed.
-// ctx->keyCtx->classicKeyCtx is used as the peer key, and our ephemeral
-// ECDH key is generated as to derive the shared ECDH secret. The concatenated
-// order of classic and ML-KEM data depends on the classic group.
+// Performs hybrid ML-KEM encapsulation using the previously initialized
+// context. ctx->keyCtx->classicKeyCtx is used as the classic peer key
+// and our ephemeral ECDH key is generated as to derive the shared
+// ECDH secret. The concatenated order of classic and ML-KEM data
+// depends on the classic group.
 //
 // - secret
 //      X25519:         MLKEM shared secret || ECDH shared secret
@@ -292,8 +292,8 @@ cleanup:
 //
 
 // Unlike encapsulation, we initialize the classic key context for hybrid here,
-// since ctx->keyCtx->classicKeyCtx contains our private key. The peer key is
-// extracted from the public data passed to decapsulate.
+// since ctx->keyCtx->classicKeyCtx contains our classic private key. The peer
+// key is extracted from the public data passed to decapsulate.
 static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate_init(_Inout_ SCOSSL_MLKEM_HYBRID_CTX *ctx, _In_ SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx,
                                                             ossl_unused const OSSL_PARAM params[])
 {
@@ -317,10 +317,9 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate_init(_Inout_ SCOSSL_MLKEM
     return SCOSSL_SUCCESS;
 }
 
-// Performs ML-KEM decapsulation using the previously initialized context. If
-// this is a hybrid group, then hybrid decapsulation is performed.
-// ctx->keyCtx->classicKeyCtx is used as our key, and the peer key is
-// extracted from the beginning of 'in'. The concatenated
+// Performs hybrid ML-KEM decapsulation using the previously initialized
+// context. ctx->keyCtx->classicKeyCtx is used as our key classic key,
+// and the peer key is extracted from the beginning of 'in'. The concatenated
 // order of classic and ML-KEM data depends on the classic group.
 //
 // - out
@@ -464,7 +463,7 @@ cleanup:
 //
 static const OSSL_PARAM *p_scossl_mlkem_hybrid_ctx_param_types(ossl_unused void *ctx, ossl_unused void *provctx)
 {
-    return p_scossl_mlkem_param_types;
+    return p_scossl_mlkem_hybrid_param_types;
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_hybrid_set_ctx_params(ossl_unused void *ctx, ossl_unused const OSSL_PARAM params[])

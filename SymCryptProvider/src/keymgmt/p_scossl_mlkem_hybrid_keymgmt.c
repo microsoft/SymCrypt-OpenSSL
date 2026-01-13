@@ -35,6 +35,7 @@ static const OSSL_PARAM p_scossl_mlkem_hybrid_keymgmt_settable_param_types[] = {
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_mlkem_hybrid_keymgmt_gettable_param_types[] = {
+    OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
     OSSL_PARAM_size_t(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
@@ -370,12 +371,14 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_key_params(_In_ SCOSSL_ML
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
+
+            OPENSSL_secure_free(pbKey);
+            pbKey = NULL;
+            cbKey = 0;
         }
 
         if (paramPrivKey != NULL)
         {
-            OPENSSL_secure_clear_free(pbKey, cbKey);
-
             status = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
                 keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
                 &pbKey, &cbKey);
@@ -390,6 +393,10 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_key_params(_In_ SCOSSL_ML
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
+
+            OPENSSL_secure_clear_free(pbKey, cbKey);
+            pbKey = NULL;
+            cbKey = 0;
         }
     }
 
@@ -627,14 +634,15 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_free(pbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
         keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY)
     {
-        OPENSSL_secure_free(pbKey);
-        pbKey = NULL;
-
         ret = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
             keyCtx,
             OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
@@ -650,6 +658,10 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     if ((params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
@@ -749,7 +761,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(const SCOSSL_MLKEM_H
             goto cleanup;
         }
 
-        // OpenSSL always exports hybrid priate keys as decapsulation keys
+        // OpenSSL always exports hybrid private keys as decapsulation keys
         format = SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
     }
     else
@@ -813,7 +825,7 @@ cleanup:
         OPENSSL_secure_clear_free(pbKey, cbKey);
     }
 
-    return SCOSSL_SUCCESS;
+    return ret;
 }
 
 // Sets the key in keyCtx to the encoded key bytes in pbKey. The key type is indicated by selection.

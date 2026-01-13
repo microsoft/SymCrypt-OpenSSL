@@ -99,9 +99,9 @@ extern "C" {
     extern const OSSL_DISPATCH p_scossl_der_to_##algorithm##_PrivateKeyInfo_functions[];         \
     extern const OSSL_DISPATCH p_scossl_der_to_##algorithm##_SubjectPublicKeyInfo_functions[];
 
-#define DECODER_ENTRIES_ALL(algorithm)                          \
-    ALG_DECODER(#algorithm, algorithm, PrivateKeyInfo),         \
-    ALG_DECODER(#algorithm, algorithm, SubjectPublicKeyInfo),
+#define DECODER_ENTRIES_ALL(provName, algorithm)                \
+    ALG_DECODER(provName, algorithm, PrivateKeyInfo),         \
+    ALG_DECODER(provName, algorithm, SubjectPublicKeyInfo),
 
 #define ENCODER_DISPATCH_ALL(algorithm)                                                             \
     extern const OSSL_DISPATCH p_scossl_##algorithm##_to_PrivateKeyInfo_der_functions[];            \
@@ -112,14 +112,14 @@ extern "C" {
     extern const OSSL_DISPATCH p_scossl_##algorithm##_to_SubjectPublicKeyInfo_pem_functions[];      \
     extern const OSSL_DISPATCH p_scossl_##algorithm##_to_text_functions[];
 
-#define ENCODER_ENTRIES_ALL(algorithm)                                  \
-    ALG_ENCODER(#algorithm, algorithm, PrivateKeyInfo, der),            \
-    ALG_ENCODER(#algorithm, algorithm, PrivateKeyInfo, pem),            \
-    ALG_ENCODER(#algorithm, algorithm, EncryptedPrivateKeyInfo, der),   \
-    ALG_ENCODER(#algorithm, algorithm, EncryptedPrivateKeyInfo, pem),   \
-    ALG_ENCODER(#algorithm, algorithm, SubjectPublicKeyInfo, der),      \
-    ALG_ENCODER(#algorithm, algorithm, SubjectPublicKeyInfo, pem),      \
-    ALG_TEXT_ENCODER(#algorithm, algorithm),
+#define ENCODER_ENTRIES_ALL(provName, algorithm)                        \
+    ALG_ENCODER(provName, algorithm, PrivateKeyInfo, der),            \
+    ALG_ENCODER(provName, algorithm, PrivateKeyInfo, pem),            \
+    ALG_ENCODER(provName, algorithm, EncryptedPrivateKeyInfo, der),   \
+    ALG_ENCODER(provName, algorithm, EncryptedPrivateKeyInfo, pem),   \
+    ALG_ENCODER(provName, algorithm, SubjectPublicKeyInfo, der),      \
+    ALG_ENCODER(provName, algorithm, SubjectPublicKeyInfo, pem),      \
+    ALG_TEXT_ENCODER(provName, algorithm),
 
 typedef struct {
     unsigned int groupId;
@@ -502,9 +502,9 @@ DECODER_DISPATCH_ALL(mlkem768)
 DECODER_DISPATCH_ALL(mlkem1024)
 
 static const OSSL_ALGORITHM p_scossl_decoder[] = {
-    DECODER_ENTRIES_ALL(mlkem512)
-    DECODER_ENTRIES_ALL(mlkem768)
-    DECODER_ENTRIES_ALL(mlkem1024)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM512, mlkem512)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM768, mlkem768)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM1024, mlkem1024)
     ALG_TABLE_END};
 
 // Encoders
@@ -513,9 +513,9 @@ ENCODER_DISPATCH_ALL(mlkem768)
 ENCODER_DISPATCH_ALL(mlkem1024)
 
 static const OSSL_ALGORITHM p_scossl_encoder[] = {
-    ENCODER_ENTRIES_ALL(mlkem512)
-    ENCODER_ENTRIES_ALL(mlkem768)
-    ENCODER_ENTRIES_ALL(mlkem1024)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM512, mlkem512)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM768, mlkem768)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM1024, mlkem1024)
     ALG_TABLE_END};
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
