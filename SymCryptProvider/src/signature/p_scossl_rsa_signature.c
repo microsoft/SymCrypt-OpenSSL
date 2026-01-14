@@ -222,8 +222,8 @@ static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, 
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ SIZE_T *siglen, SIZE_T sigsize,
-                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, SIZE_T tbslen)
+                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -277,8 +277,8 @@ err:
 }
 
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                         _In_reads_bytes_(siglen) const unsigned char *sig, SIZE_T siglen,
-                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, SIZE_T tbslen)
+                                         _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
 
@@ -379,7 +379,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *c
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_update(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                                           _In_reads_bytes_(datalen) const unsigned char *data, SIZE_T datalen)
+                                                           _In_reads_bytes_(datalen) const unsigned char *data, size_t datalen)
 {
     if (ctx->mdctx == NULL)
     {
@@ -390,7 +390,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_signverify_update(_In_ SCOSSL_RSA_SIGN_
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                                    _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ SIZE_T *siglen, SIZE_T sigsize)
+                                                    _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     BYTE digest[EVP_MAX_MD_SIZE];
@@ -412,7 +412,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
 }
 
 static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                                      _In_reads_bytes_(siglen) unsigned char *sig, SIZE_T siglen)
+                                                      _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
     SIZE_T cbDigest = 0;
