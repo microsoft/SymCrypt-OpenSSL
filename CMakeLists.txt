@@ -7,7 +7,7 @@ project(SymCrypt-OpenSSL
     HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
 set(SYMCRYPT_MINIMUM_MAJOR "103")
-set(SYMCRYPT_MINIMUM_MINOR "6")
+set(SYMCRYPT_MINIMUM_MINOR "8")
 
 find_package(OpenSSL REQUIRED)
 
@@ -23,7 +23,7 @@ else()
         if (SYMCRYPT_FOUND)
             message(STATUS "SymCrypt Includes: ${SYMCRYPT_INCLUDE_DIRS}")
             include_directories(${SYMCRYPT_INCLUDE_DIRS})
-        endif()            
+        endif()
     endif()
 
     # Try to find installed SymCrypt
@@ -34,7 +34,7 @@ else()
         if (NOT SYMCRYPT_HEADER)
             message(FATAL_ERROR "SymCrypt header file not found. Please set SYMCRYPT_ROOT_DIR or install SymCrypt headers.")
         endif()
-        
+
         find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
         if (SYMCRYPT_LIBRARY)
             set(SYMCRYPT_FOUND TRUE)
