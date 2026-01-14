@@ -22,6 +22,7 @@ typedef struct
 } SCOSSL_DIGEST_CTX;
 
 SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(_In_ SCOSSL_DIGEST_CTX *ctx);
+void p_scossl_digest_copy_ctx(_Inout_ SCOSSL_DIGEST_CTX *dstCtx, _In_ SCOSSL_DIGEST_CTX *srcCtx);
 void p_scossl_digest_freectx(_Inout_ SCOSSL_DIGEST_CTX *ctx);
 
 SCOSSL_STATUS p_scossl_digest_update(_Inout_ SCOSSL_DIGEST_CTX *ctx,
@@ -80,6 +81,7 @@ const OSSL_PARAM *p_scossl_digest_gettable_params(ossl_unused void *ctx, ossl_un
     {OSSL_FUNC_DIGEST_NEWCTX, (void (*)(void))p_scossl_##dispatch_name##_newctx},            \
     {OSSL_FUNC_DIGEST_FREECTX, (void (*)(void))p_scossl_digest_freectx},                     \
     {OSSL_FUNC_DIGEST_DUPCTX, (void (*)(void))p_scossl_digest_dupctx},                       \
+    {OSSL_FUNC_DIGEST_COPYCTX, (void (*)(void))p_scossl_digest_copy_ctx},                    \
     {OSSL_FUNC_DIGEST_GET_PARAMS, (void (*)(void))p_scossl_##dispatch_name##_get_params},    \
     {OSSL_FUNC_DIGEST_GETTABLE_PARAMS, (void (*)(void))p_scossl_digest_gettable_params},     \
     {OSSL_FUNC_DIGEST_UPDATE, (void (*)(void))p_scossl_digest_update},                       \
