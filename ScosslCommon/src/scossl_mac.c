@@ -109,6 +109,8 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                 SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
                 if (expandedKey == NULL)
                 {
+                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                        "Failed to aligned allocate expanded key");
                     goto cleanup;
                 }
 
@@ -118,15 +120,27 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
 
             if (ctx->macState != NULL)
             {
+                // A caller can potentially initialize a MAC context with state but no key (e.g. HMAC with digest set, but no key yet).
+                // SymCrypt HMAC and CMAC state copy functions allow us to pass NULL for the expanded key parameter, but the key from
+                // ctx will be set in copyCtx->macState, which is undesirable. Instead, allocate an empty expanded key in copyCtx.
                 if (copyCtx->expandedKey == NULL)
                 {
-                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_INTERNAL_ERROR,
-                        "Missing expandedKey in mac context when attempting to copy macState");
-                    goto cleanup;
+                    SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+                    if (expandedKey == NULL)
+                    {
+                        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                            "Failed to aligned allocate expanded key");
+                        goto cleanup;
+                    }
+
+                    copyCtx->expandedKey = expandedKey;
                 }
+
                 SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
                 if (macState == NULL)
                 {
+                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                        "Failed to aligned allocate mac state");
                     goto cleanup;
                 }
 
@@ -317,21 +331,26 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 {
     SYMCRYPT_ERROR scError;
 
-    if (pbKey != NULL)
+    if (ctx->pMac == NULL || ctx->macState == NULL)
     {
-        if (ctx->expandedKey == NULL)
-        {
-            SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
-            if (expandedKey == NULL)
-            {
-                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_INTERNAL_ERROR,
-                    "Failed to aligned allocated expanded key");
-                return SCOSSL_FAILURE;
-            }
+        return SCOSSL_FAILURE;
+    }
 
-            ctx->expandedKey = expandedKey;
+    if (ctx->expandedKey == NULL)
+    {
+        SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+        if (expandedKey == NULL)
+        {
+            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
+                "Failed to aligned allocate expanded key");
+            return SCOSSL_FAILURE;
         }
 
+        ctx->expandedKey = expandedKey;
+    }
+
+    if (pbKey != NULL)
+    {
         scError = ctx->pMac->expandKeyFunc(ctx->expandedKey, pbKey, cbKey);
 
         if (scError != SYMCRYPT_NO_ERROR)
