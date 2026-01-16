@@ -331,7 +331,7 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 {
     SYMCRYPT_ERROR scError;
 
-    if (ctx->pMac == NULL)
+    if (ctx->pMac == NULL || ctx->macState == NULL)
     {
         return SCOSSL_FAILURE;
     }
