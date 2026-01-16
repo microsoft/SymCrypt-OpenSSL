@@ -109,8 +109,8 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                 SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
                 if (expandedKey == NULL)
                 {
-                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
-                        "Failed to aligned allocated expanded key");
+                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                        "Failed to aligned allocate expanded key");
                     goto cleanup;
                 }
 
@@ -128,8 +128,8 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                     SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
                     if (expandedKey == NULL)
                     {
-                        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
-                            "Failed to aligned allocated expanded key");
+                        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                            "Failed to aligned allocate expanded key");
                         goto cleanup;
                     }
 
@@ -139,8 +139,8 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
                 SCOSSL_COMMON_ALIGNED_ALLOC_EX(macState, OPENSSL_malloc, SCOSSL_MAC_STATE, ctx->pMac->stateSize);
                 if (macState == NULL)
                 {
-                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
-                        "Failed to aligned allocated mac state");
+                    SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_DUPCTX, ERR_R_MALLOC_FAILURE,
+                        "Failed to aligned allocate mac state");
                     goto cleanup;
                 }
 
@@ -342,7 +342,7 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
         if (expandedKey == NULL)
         {
             SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
-                "Failed to aligned allocated expanded key");
+                "Failed to aligned allocate expanded key");
             return SCOSSL_FAILURE;
         }
 
