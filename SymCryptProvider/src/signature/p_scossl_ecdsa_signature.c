@@ -314,13 +314,17 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
 
     if (ctx->mdctx == NULL)
     {
-        return SCOSSL_FAILURE;
+        return 0;
     }
 
     ctx->allowMdUpdates = TRUE;
 
-    return EVP_DigestFinal(ctx->mdctx, digest, &cbDigest) &&
-           p_scossl_ecdsa_verify(ctx, sig, siglen, digest, cbDigest);
+    if (!EVP_DigestFinal(ctx->mdctx, digest, &cbDigest))
+    {
+        return 0;
+    }
+
+    return p_scossl_ecdsa_verify(ctx, sig, siglen, digest, cbDigest);
 }
 
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx,
@@ -362,7 +366,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE)) != NULL &&
-        !OSSL_PARAM_get_SIZE_T(p, &ctx->mdSize))
+        !OSSL_PARAM_get_size_t(p, &ctx->mdSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
@@ -396,7 +400,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE)) != NULL &&
-        !OSSL_PARAM_set_SIZE_T(p, ctx->mdSize))
+        !OSSL_PARAM_set_size_t(p, ctx->mdSize))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
