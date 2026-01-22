@@ -70,9 +70,9 @@ static BOOL is_logging = FALSE;
 // Internal function declarations
 //
 static void p_scossl_keysinuse_init_once();
-static void keysinuse_atfork_prepare();
-static void keysinuse_atfork_parent();
-static void keysinuse_atfork_child();
+static void p_scossl_keysinuse_prepare();
+static void p_scossl_keysinuse_parent();
+static void p_scossl_keysinuse_child();
 
 static void p_scossl_keysinuse_add_use(_In_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo, BOOL isSigning);
 
@@ -203,9 +203,9 @@ static void p_scossl_keysinuse_init_once()
         goto cleanup;
     }
 
-    if ((pthreadErr = pthread_atfork(keysinuse_atfork_prepare,
-                                     keysinuse_atfork_parent,
-                                     keysinuse_atfork_child)) != 0)
+    if ((pthreadErr = pthread_atfork(p_scossl_keysinuse_prepare,
+                                     p_scossl_keysinuse_parent,
+                                     p_scossl_keysinuse_child)) != 0)
     {
         p_scossl_keysinuse_log_error("Failed to register child process reinit. Child processes will not log events,SYS_%d", pthreadErr);
     }
@@ -229,7 +229,7 @@ void p_scossl_keysinuse_init()
 }
 
 // Acquire all locks to freeze state before fork
-static void keysinuse_atfork_prepare()
+static void p_scossl_keysinuse_prepare()
 {
     // Ensure logging thread is in a stopped state
     pthread_mutex_lock(&logging_thread_mutex);
@@ -255,7 +255,7 @@ static void keysinuse_atfork_prepare()
 }
 
 // Release all locks in reverse order after fork
-static void keysinuse_atfork_parent()
+static void p_scossl_keysinuse_parent()
 {
     if (sk_keysinuse_info != NULL)
     {
@@ -280,7 +280,7 @@ static void keysinuse_atfork_parent()
 // If the calling process forks, the logging thread needs to be restarted in the
 // child process, and any locks should be reinitialized in case the parent
 // process held a lock at the time of the fork.
-static void p_scossl_keysinuse_atfork_child()
+static void p_scossl_keysinuse_child()
 {
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo = NULL;
     pthread_condattr_t attr;
