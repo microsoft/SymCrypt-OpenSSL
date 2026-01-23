@@ -231,19 +231,14 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SECRET)) != NULL)
     {
-        PBYTE pbSecret = NULL;
-        SIZE_T cbSecret = 0;
+        OPENSSL_clear_free(ctx->tls1prfCtx->pbSecret, ctx->tls1prfCtx->cbSecret);
+        ctx->tls1prfCtx->pbSecret = NULL;
 
-        if (p->data_size > 0 &&
-            !OSSL_PARAM_get_octet_string(p, (void **)&pbSecret, 0, &cbSecret))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->tls1prfCtx->pbSecret, 0, &ctx->tls1prfCtx->cbSecret))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             goto cleanup;
         }
-
-        OPENSSL_clear_free(ctx->tls1prfCtx->pbSecret, ctx->tls1prfCtx->cbSecret);
-        ctx->tls1prfCtx->pbSecret = pbSecret;
-        ctx->tls1prfCtx->cbSecret = cbSecret;
     }
 
     // Parameters may contain multiple seed params that must all be processed

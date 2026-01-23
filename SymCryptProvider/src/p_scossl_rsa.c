@@ -35,7 +35,7 @@ static const OSSL_ITEM p_scossl_rsa_supported_mds[] = {
     {NID_sha3_512,      OSSL_DIGEST_NAME_SHA3_512}};
 
 _Use_decl_annotations_
-const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx, UINT padding,
+const OSSL_ITEM *p_scossl_rsa_get_supported_md(OSSL_LIB_CTX *libctx, UINT8 padding,
                                                const char *mdname, const char *propq,
                                                EVP_MD **md)
 {

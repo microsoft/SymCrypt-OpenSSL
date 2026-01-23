@@ -20,7 +20,7 @@ typedef struct
     OSSL_LIB_CTX *libctx;
 
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
-    UINT padding;
+    UINT8 padding;
     int operation;
 
     // OAEP Parameters
@@ -142,6 +142,13 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (out != NULL &&
+        outsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
     }
 
@@ -305,7 +312,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
         // Padding mode may be passed as legacy NID or string, and is
         // checked against the padding modes the ScOSSL provider supports
         int i = 0;
-        UINT padding;
+        unsigned int padding;
 
         switch (p->data_type)
         {

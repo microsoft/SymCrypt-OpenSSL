@@ -39,12 +39,12 @@ SCOSSL_STATUS scossl_rsapss_verify(_In_ PSYMCRYPT_RSAKEY key, int mdnid, int cbS
                                    _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                    _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
-SCOSSL_STATUS scossl_rsa_encrypt(_In_ PSYMCRYPT_RSAKEY key, UINT padding,
+SCOSSL_STATUS scossl_rsa_encrypt(_In_ PSYMCRYPT_RSAKEY key, UINT8 padding,
                                  int mdnid, _In_reads_bytes_opt_(cbLabel) PCBYTE pbLabel, SIZE_T cbLabel,
                                  _In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc,
                                  _Out_writes_bytes_(*pcbDst) PBYTE pbDst, _Out_ INT32 *pcbDst, SIZE_T cbDst);
 
-SCOSSL_STATUS scossl_rsa_decrypt(_In_ PSYMCRYPT_RSAKEY key, UINT padding,
+SCOSSL_STATUS scossl_rsa_decrypt(_In_ PSYMCRYPT_RSAKEY key, UINT8 padding,
                                  int mdnid, _In_reads_bytes_opt_(cbLabel) PCBYTE pbLabel, SIZE_T cbLabel,
                                  _In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc,
                                  _Out_writes_bytes_(*pcbDst) PBYTE pbDst, _Out_ INT32 *pcbDst, SIZE_T cbDst);

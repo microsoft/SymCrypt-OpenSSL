@@ -200,20 +200,24 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
-                                           _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
-                                           _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
+static int p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
+                                 _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                 _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
+        return -1;
     }
 
     if (ctx->operation != EVP_PKEY_OP_VERIFY)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
-        return SCOSSL_FAILURE;
+        return -1;
     }
 
     return scossl_ecdsa_verify(ctx->keyCtx->key, ctx->keyCtx->curve, tbs, tbslen, sig, siglen);
@@ -281,7 +285,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
                                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    SIZE_T cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -302,21 +306,25 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
     return p_scossl_ecdsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
 }
 
-static SCOSSL_STATUS p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
-                                                        _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
+static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
+                                              _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    SIZE_T cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
-        return SCOSSL_FAILURE;
+        return 0;
     }
 
     ctx->allowMdUpdates = TRUE;
 
-    return EVP_DigestFinal(ctx->mdctx, digest, &cbDigest) &&
-           p_scossl_ecdsa_verify(ctx, sig, siglen, digest, cbDigest);
+    if (!EVP_DigestFinal(ctx->mdctx, digest, &cbDigest))
+    {
+        return 0;
+    }
+
+    return p_scossl_ecdsa_verify(ctx, sig, siglen, digest, cbDigest);
 }
 
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx,

@@ -18,7 +18,7 @@ extern "C" {
 typedef struct
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
-    UINT padding;
+    UINT8 padding;
     int operation;
 
     // Needed for fetching md
@@ -394,7 +394,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    SIZE_T cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -415,7 +415,7 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *
                                                       _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    SIZE_T cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -491,7 +491,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
         // Padding mode may be passed as legacy NID or string, and is
         // checked against the padding modes the ScOSSL provider supports
         int i = 0;
-        UINT padding;
+        unsigned int padding;
 
         switch (p->data_type)
         {
