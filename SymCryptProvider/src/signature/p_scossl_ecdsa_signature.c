@@ -285,7 +285,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
                                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -310,7 +310,7 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
                                               _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {

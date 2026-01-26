@@ -60,6 +60,12 @@ static const OSSL_PARAM p_scossl_dh_ctx_gettable_param_types[] = {
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_ const OSSL_PARAM params[]);
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR < 4
+int EVP_MD_xof(const EVP_MD *md)
+{
+    return md != NULL && ((EVP_MD_get_flags(md) & EVP_MD_FLAG_XOF) != 0);
+}
+#endif // OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR < 4
 
 static SCOSSL_DH_CTX *p_scossl_dh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -323,8 +329,8 @@ static SCOSSL_STATUS p_scossl_dh_derive(_In_ SCOSSL_DH_CTX *ctx,
 
 static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const char *mdName = NULL;
-    const char *mdProps = NULL;
+    char *mdName = NULL;
+    char *mdProps = NULL;
     EVP_MD *md = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p = NULL;
