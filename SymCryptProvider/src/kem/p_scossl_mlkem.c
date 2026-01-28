@@ -92,8 +92,12 @@ static SCOSSL_STATUS p_scossl_mlkem_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCO
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *ctx, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx,
                                                      _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE) &&
-           p_scossl_mlkem_set_ctx_params(ctx, params);
+    if (p_scossl_mlkem_init(ctx, keyCtx, EVP_PKEY_OP_ENCAPSULATE) != SCOSSL_SUCCESS)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    return p_scossl_mlkem_set_ctx_params(ctx, params);
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_encapsulate(_In_ SCOSSL_MLKEM_CTX *ctx,
