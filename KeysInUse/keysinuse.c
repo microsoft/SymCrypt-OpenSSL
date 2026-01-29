@@ -156,13 +156,13 @@ static void *keysinuse_logging_thread_start(ossl_unused void *arg);
 
 static BOOL is_keysinuse_enabled()
 {
-    const char *env_enabled = getenv("KEYSINUSE_ENABLED");
-    if (env_enabled != NULL && strcmp(env_enabled, "0") == 0)
-    {
-        keysinuse_enabled = FALSE;
-    }
+    // const char *env_enabled = getenv("KEYSINUSE_ENABLED");
+    // if (env_enabled != NULL && strcmp(env_enabled, "0") == 0)
+    // {
+    //     keysinuse_enabled = FALSE;
+    // }
 
-    return keysinuse_enabled;
+    return FALSE;
 }
 
 #ifndef KEYSINUSE_LOG_SYSLOG
