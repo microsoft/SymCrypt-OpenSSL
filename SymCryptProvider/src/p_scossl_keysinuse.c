@@ -62,7 +62,7 @@ static CRYPTO_RWLOCK *sk_keysinuse_info_lock = NULL;
 // sk_keysinuse_info, and writes to the log file. The thread is signalled to
 // wake early by logging_thread_cond_wake_early when a key is first used.
 static pthread_t logging_thread;
-static pthread_cond_t logging_thread_cond_wake_early;
+static pthread_cond_t *logging_thread_cond_wake_early = NULL;
 static pthread_mutex_t logging_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Predicate for logging_thread_cond_wake_early. Ensures any keys that
 // were first used while the logging thread was logging are handled before
@@ -109,9 +109,6 @@ static void p_scossl_keysinuse_logging_thread_cleanup()
     {
         p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
     }
-
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
-    sk_keysinuse_info_pending = NULL;
 }
 
 static void p_scossl_keysinuse_init_once()
@@ -166,10 +163,7 @@ static void p_scossl_keysinuse_init_once()
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    if (sk_keysinuse_info_lock == NULL ||
-        sk_keysinuse_info == NULL ||
-        sk_keysinuse_info_pending == NULL)
+    if (sk_keysinuse_info_lock == NULL || sk_keysinuse_info == NULL)
     {
         p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
         goto cleanup;
@@ -200,9 +194,14 @@ static void p_scossl_keysinuse_init_once()
     // Start the logging thread. Monotonic clock needs to be set to
     // prevent wall clock changes from affecting the logging delay sleep time
     is_logging = TRUE;
-    if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+
+    // Allocate condition variable
+    logging_thread_cond_wake_early = OPENSSL_malloc(sizeof(pthread_cond_t));
+
+    if (logging_thread_cond_wake_early == NULL ||
+        (pthreadErr = pthread_condattr_init(&attr)) != 0 ||
         (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-        (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+        (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0 ||
         (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
     {
         p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
@@ -238,6 +237,11 @@ void p_scossl_keysinuse_init()
 // Acquire all locks to freeze state before fork
 static void p_scossl_keysinuse_prepare()
 {
+    if (!keysinuse_enabled)
+    {
+        return;
+    }
+
     // Check if process is multithreaded (more than just main + logging thread)
     // Default to FALSE for safety if we can't determine thread state
     p_scossl_keysinuse_child_enabled = FALSE;
@@ -286,6 +290,11 @@ static void p_scossl_keysinuse_prepare()
 // Release all locks in reverse order after fork
 static void p_scossl_keysinuse_parent()
 {
+    if (!keysinuse_enabled)
+    {
+        return;
+    }
+
     if (sk_keysinuse_info_lock != NULL)
     {
         CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
@@ -304,6 +313,11 @@ static void p_scossl_keysinuse_child()
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     int is_parent_logging = is_logging;
+
+    if (!keysinuse_enabled)
+    {
+        return;
+    }
 
     // Reset global state
     keysinuse_enabled = FALSE;
@@ -328,11 +342,11 @@ static void p_scossl_keysinuse_child()
         return;
     }
 
-    // If any keysinuseInfo were in either stack, they will
+    // If any keysinuseInfo were in either stacksk_keysinuse_info_lock, they will
     // be logged by the parent process. Remove them from the child process's
-    // stacks and reset them. We know that no other threads were running in the
+    // stack and reset them. We know that no other threads were running in the
     // parent process at the time of the fork, so its safe to continue using these
-    // objects in the child process.
+    // keysinuse infos in the child process.
     if (CRYPTO_THREAD_write_lock(sk_keysinuse_info_lock))
     {
         while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info) > 0)
@@ -354,27 +368,22 @@ static void p_scossl_keysinuse_child()
         p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
     }
 
-    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
-    {
-        pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
-        if (pKeysinuseInfo != NULL)
-        {
-            pKeysinuseInfo->logPending = FALSE;
-            pKeysinuseInfo->decryptCounter = 0;
-            pKeysinuseInfo->signCounter = 0;
-            p_scossl_keysinuse_info_free(pKeysinuseInfo);
-        }
-    }
-
     // Only recreate logging thread if it was running in the parent process
     if (is_parent_logging)
     {
         // Start the logging thread. Monotonic clock needs to be set to
         // prevent wall clock changes from affecting the logging delay sleep time
         is_logging = TRUE;
-        if ((pthreadErr = pthread_condattr_init(&attr)) != 0 ||
+
+        OPENSSL_free(logging_thread_cond_wake_early);
+
+        // In child, free old condition variable and allocate a fresh one
+        logging_thread_cond_wake_early = OPENSSL_malloc(sizeof(pthread_cond_t));
+
+        if (logging_thread_cond_wake_early == NULL ||
+            (pthreadErr = pthread_condattr_init(&attr)) != 0 ||
             (pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-            (pthreadErr = pthread_cond_init(&logging_thread_cond_wake_early, &attr)) != 0 ||
+            (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0 ||
             (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
         {
             p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
@@ -410,7 +419,10 @@ void p_scossl_keysinuse_teardown()
         if (is_logging)
         {
             is_logging = FALSE;
-            pthread_cond_signal(&logging_thread_cond_wake_early);
+            if (logging_thread_cond_wake_early != NULL)
+            {
+                pthread_cond_signal(logging_thread_cond_wake_early);
+            }
             pthread_mutex_unlock(&logging_thread_mutex);
 
             if ((pthreadErr = pthread_join(logging_thread, NULL)) != 0)
@@ -420,6 +432,17 @@ void p_scossl_keysinuse_teardown()
             else if (logging_thread_exit_status != SCOSSL_SUCCESS)
             {
                 p_scossl_keysinuse_log_error("Logging thread exited with status %d", logging_thread_exit_status);
+            }
+
+            // Now it's safe to destroy the condition variable since thread has exited
+            if (logging_thread_cond_wake_early != NULL)
+            {
+                if ((pthreadErr = pthread_cond_destroy(logging_thread_cond_wake_early)) != 0)
+                {
+                    p_scossl_keysinuse_log_error("Failed to destroy condition variable,SYS_%d", pthreadErr);
+                }
+                OPENSSL_free(logging_thread_cond_wake_early);
+                logging_thread_cond_wake_early = NULL;
             }
         }
         else
@@ -441,10 +464,8 @@ void p_scossl_keysinuse_teardown()
 
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
     sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     sk_keysinuse_info_lock = NULL;
     sk_keysinuse_info = NULL;
-    sk_keysinuse_info_pending = NULL;
 }
 
 //
@@ -631,7 +652,8 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
         {
             first_use_pending = TRUE;
 
-            if ((pthreadErr = pthread_cond_signal(&logging_thread_cond_wake_early)) != 0)
+            if (logging_thread_cond_wake_early != NULL &&
+                (pthreadErr = pthread_cond_signal(logging_thread_cond_wake_early)) != 0)
             {
                 p_scossl_keysinuse_log_error("Failed to signal logging thread,SYS_%d", pthreadErr);
             }
@@ -879,6 +901,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     // to minimize the time sk_keysinuse_info_lock is held.
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo;
     SCOSSL_PROV_KEYSINUSE_INFO keysinuseInfoTmp;
+    STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
 
     do
     {
@@ -910,7 +933,15 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
                     // Wait until logging_delay has elapsed or the thread is signaled early. logging_thread_mutex is
                     // unlocked by pthread_cond_timedwait so first use events can be signalled.
-                    waitStatus = pthread_cond_timedwait(&logging_thread_cond_wake_early, &logging_thread_mutex, &abstime);
+                    if (logging_thread_cond_wake_early != NULL)
+                    {
+                        waitStatus = pthread_cond_timedwait(logging_thread_cond_wake_early, &logging_thread_mutex, &abstime);
+                    }
+                    else
+                    {
+                        p_scossl_keysinuse_log_error("logging thread wait condition is NULL");
+                        goto cleanup;
+                    }
 
                     // If we are exiting, then treat this iteration like a timeout and log all pending events, even
                     // if the condition was signalled early.
@@ -958,46 +989,54 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
         }
 
-        while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
+        // Log all pending usage events under lock. We need to lock in this section
+        // in case fork is called
+        if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) == 0)
         {
-            pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
-            if (CRYPTO_THREAD_write_lock(pKeysinuseInfo->lock))
+            while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
             {
-                now = time(NULL);
+                pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
+                if (CRYPTO_THREAD_write_lock(pKeysinuseInfo->lock))
+                {
+                    now = time(NULL);
 
-                pKeysinuseInfo->firstLogTime = pKeysinuseInfo->lastLogTime == 0 ? now : pKeysinuseInfo->firstLogTime;
-                pKeysinuseInfo->lastLogTime = now;
-                pKeysinuseInfo->logPending = FALSE;
+                    pKeysinuseInfo->firstLogTime = pKeysinuseInfo->lastLogTime == 0 ? now : pKeysinuseInfo->firstLogTime;
+                    pKeysinuseInfo->lastLogTime = now;
+                    pKeysinuseInfo->logPending = FALSE;
 
-                keysinuseInfoTmp = *pKeysinuseInfo;
+                    keysinuseInfoTmp = *pKeysinuseInfo;
 
-                pKeysinuseInfo->decryptCounter = 0;
-                pKeysinuseInfo->signCounter = 0;
+                    pKeysinuseInfo->decryptCounter = 0;
+                    pKeysinuseInfo->signCounter = 0;
 
-                CRYPTO_THREAD_unlock(pKeysinuseInfo->lock);
+                    CRYPTO_THREAD_unlock(pKeysinuseInfo->lock);
+                }
+                else
+                {
+                    p_scossl_keysinuse_log_error("Failed to lock keysinuse info,OPENSSL_%d", ERR_get_error());
+                    keysinuseInfoTmp.refCount = -1;
+                }
+
+                p_scossl_keysinuse_info_free(pKeysinuseInfo);
+
+                if (keysinuseInfoTmp.refCount > 0)
+                {
+                    p_scossl_keysinuse_log_notice("%s,%d,%d,%ld,%ld",
+                    keysinuseInfoTmp.keyIdentifier,
+                    keysinuseInfoTmp.signCounter,
+                    keysinuseInfoTmp.decryptCounter,
+                    keysinuseInfoTmp.firstLogTime,
+                    keysinuseInfoTmp.lastLogTime);
+                }
             }
-            else
-            {
-                p_scossl_keysinuse_log_error("Failed to lock keysinuse info,OPENSSL_%d", ERR_get_error());
-                keysinuseInfoTmp.refCount = -1;
-            }
 
-            p_scossl_keysinuse_info_free(pKeysinuseInfo);
-
-            if (keysinuseInfoTmp.refCount > 0)
-            {
-                p_scossl_keysinuse_log_notice("%s,%d,%d,%ld,%ld",
-                   keysinuseInfoTmp.keyIdentifier,
-                   keysinuseInfoTmp.signCounter,
-                   keysinuseInfoTmp.decryptCounter,
-                   keysinuseInfoTmp.firstLogTime,
-                   keysinuseInfoTmp.lastLogTime);
-            }
+            pthread_mutex_unlock(&logging_thread_mutex);
         }
     }
     while (isLoggingThreadRunning);
 
 cleanup:
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     logging_thread_exit_status = SCOSSL_SUCCESS;
     keysinuse_enabled = FALSE;
     p_scossl_keysinuse_logging_thread_cleanup();
