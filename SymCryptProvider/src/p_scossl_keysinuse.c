@@ -220,6 +220,7 @@ static void p_scossl_keysinuse_init_once()
                                      p_scossl_keysinuse_child)) != 0)
     {
         p_scossl_keysinuse_log_error("Failed to register child process reinit. Child processes will not log events,SYS_%d", pthreadErr);
+        goto cleanup;
     }
 
     keysinuse_enabled = TRUE;
@@ -263,6 +264,8 @@ static void p_scossl_keysinuse_prepare()
     {
         struct dirent *entry;
         BOOL has_extra_threads = FALSE;
+        int restore_errno = errno;
+
         errno = 0;
 
         while ((entry = readdir(task_dir)) != NULL &&
@@ -287,6 +290,12 @@ static void p_scossl_keysinuse_prepare()
         {
             p_scossl_keysinuse_child_enabled = TRUE;
         }
+
+        errno = restore_errno;
+    }
+    else
+    {
+        p_scossl_keysinuse_log_error("Failed to open /proc/self/task. Child processes will not log events,SYS_%d", errno);
     }
 
     // Ensure logging thread is not holding this mutex
