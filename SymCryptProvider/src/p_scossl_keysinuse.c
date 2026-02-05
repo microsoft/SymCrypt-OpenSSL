@@ -50,7 +50,7 @@ DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 // This is destroyed if the logging thread fails to start, or when the logging thread exits.
 // Always check this is non-NULL outside the logging thread.
 static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info = NULL;
-// This lock should be aquired before accessing sk_keysinuse_info
+// This lock should be acquired before accessing sk_keysinuse_info
 static CRYPTO_RWLOCK *sk_keysinuse_info_lock = NULL;
 
 // To minimize any overhead to crypto operations, all file writes are handled by
@@ -263,6 +263,7 @@ static void p_scossl_keysinuse_prepare()
     {
         struct dirent *entry;
         BOOL has_extra_threads = FALSE;
+        errno = 0;
 
         while ((entry = readdir(task_dir)) != NULL &&
                 !has_extra_threads)
@@ -282,7 +283,7 @@ static void p_scossl_keysinuse_prepare()
         closedir(task_dir);
 
         // Enable child logging only if no extra threads were found
-        if (!has_extra_threads)
+        if (!has_extra_threads && errno == 0)
         {
             p_scossl_keysinuse_child_enabled = TRUE;
         }
@@ -336,17 +337,8 @@ static void p_scossl_keysinuse_child()
     first_use_pending = FALSE;
     is_logging = FALSE;
     logging_thread_exit_status = SCOSSL_FAILURE;
-
-    if (sk_keysinuse_info_lock != NULL)
-    {
-        CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
-
-        // Recreate the RW lock just in case there was a read lock in the parent
-        CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
-        sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
-    }
-
-    pthread_mutex_unlock(&logging_thread_mutex);
+    pid = getpid();
+    logging_thread_tid = 0;
 
     // If any keysinuseInfo were in sk_keysinuse_info_lock, they will
     // be logged by the parent process. Remove them from the child process's
@@ -373,6 +365,22 @@ static void p_scossl_keysinuse_child()
             }
         }
     }
+
+    if (sk_keysinuse_info_lock != NULL)
+    {
+        CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
+
+        // Recreate the RW lock just in case there was a read lock in the parent
+        CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
+
+        if ((sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new()) == NULL)
+        {
+            p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
+            goto cleanup;
+        }
+    }
+
+    pthread_mutex_unlock(&logging_thread_mutex);
 
     // Only recreate logging thread if it was running in the parent process
     if (is_parent_logging && p_scossl_keysinuse_child_enabled)
