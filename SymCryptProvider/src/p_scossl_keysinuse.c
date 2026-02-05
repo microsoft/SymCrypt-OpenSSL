@@ -349,7 +349,7 @@ static void p_scossl_keysinuse_child()
     pid = getpid();
     logging_thread_tid = 0;
 
-    // If any keysinuseInfo were in sk_keysinuse_info_lock, they will
+    // If any keysinuseInfo were in sk_keysinuse_info, they will
     // be logged by the parent process. Remove them from the child process's
     // stack and reset them. This does not acquire any locks since we cannot
     // guarantee the parent was not multi-threaded and holding a keysinuseInfo lock
