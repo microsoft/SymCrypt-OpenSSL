@@ -20,10 +20,12 @@ extern "C" {
 
 // Older versions of OBJ_create expect a non-NULL OID. This OID is never
 // used for hybrid KEM groups, so just use a dummy OID for compatibility.
+// These OIDs are the same as the ones used by the OQS provider, since
+// OpenSSL at least expects a valid formatted OID.
 #if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR < 2
-    #define SCOSSL_OID_P256_MLKEM768    "3.0.0.1"
-    #define SCOSSL_OID_X25519_MLKEM768  "3.0.0.2"
-    #define SCOSSL_OID_P384_MLKEM1024   "3.0.0.3"
+    #define SCOSSL_OID_P256_MLKEM768    "1.3.6.1.4.1.22554.5.7.1"
+    #define SCOSSL_OID_X25519_MLKEM768  "1.3.6.1.4.1.22554.5.7.2"
+    #define SCOSSL_OID_P384_MLKEM1024   "1.3.6.1.4.1.22554.5.8.1"
 #else
     #define SCOSSL_OID_P256_MLKEM768    NULL
     #define SCOSSL_OID_X25519_MLKEM768  NULL
