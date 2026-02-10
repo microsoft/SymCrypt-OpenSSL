@@ -25,6 +25,7 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_hkdf_gettable_ctx_param_types[] = {
     HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_hkdf_settable_ctx_param_types[] = {
