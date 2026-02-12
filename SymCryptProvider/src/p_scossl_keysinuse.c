@@ -933,6 +933,11 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo;
     SCOSSL_PROV_KEYSINUSE_INFO keysinuseInfoTmp;
     STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
+    if (sk_keysinuse_info_pending == NULL)
+    {
+        p_scossl_keysinuse_log_error("Failed to create pending info stack");
+        goto cleanup;
+    }
 
     do
     {
@@ -1066,9 +1071,10 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     }
     while (isLoggingThreadRunning);
 
+    logging_thread_exit_status = SCOSSL_SUCCESS;
+
 cleanup:
     sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
-    logging_thread_exit_status = SCOSSL_SUCCESS;
     keysinuse_enabled = FALSE;
     p_scossl_keysinuse_logging_thread_cleanup();
 
