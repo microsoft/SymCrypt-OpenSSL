@@ -252,8 +252,8 @@ void p_scossl_rsa_init_keysinuse(SCOSSL_PROV_RSA_KEY_CTX *keyCtx)
     {
         if (keyCtx->keysinuseInfo == NULL)
         {
-            PBYTE pbPublicKey;
-            SIZE_T cbPublicKey;
+            PBYTE pbPublicKey = NULL;
+            SIZE_T cbPublicKey = 0;
 
             if (p_scossl_rsa_get_encoded_public_key(keyCtx->key, &pbPublicKey, &cbPublicKey))
             {
