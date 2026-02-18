@@ -78,6 +78,7 @@ static ERR_STRING_DATA SCOSSL_ERR_function_strings[] = {
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_HASH_ALGORITHM, 0), "scossl_get_symcrypt_hash_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_GET_SYMCRYPT_MAC_ALGORITHM, 0), "scossl_get_symcrypt_hmac_algorithm"},
     {ERR_PACK(0, SCOSSL_ERR_F_HKDF_DERIVE, 0), "scossl_hkdf_derive"},
+    {ERR_PACK(0, SCOSSL_ERR_F_MAC_DUPCTX, 0), "scossl_mac_dupctx"},
     {ERR_PACK(0, SCOSSL_ERR_F_MAC_INIT, 0), "scossl_mac_init"},
     {ERR_PACK(0, SCOSSL_ERR_F_MAC_SET_HMAC_MD, 0), "scossl_mac_set_hmac_md"},
     {ERR_PACK(0, SCOSSL_ERR_F_RSA_DECRYPT, 0), "scossl_rsa_decrypt"},
