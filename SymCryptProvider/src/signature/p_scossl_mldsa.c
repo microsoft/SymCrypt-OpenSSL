@@ -42,7 +42,7 @@ static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
 
 static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams, 
+static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
                                                _Out_writes_bytes_(cbAlgId) PBYTE *ppbAlgId, _Out_ SIZE_T *pcbAlgId);
 
 static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(_In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
@@ -88,7 +88,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
         return SCOSSL_FAILURE;
     }
 
-    if (operation == EVP_PKEY_OP_SIGN && 
+    if (operation == EVP_PKEY_OP_SIGN &&
         keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
@@ -103,7 +103,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
 
     ctx->keyCtx = keyCtx;
     ctx->operation = operation;
-    
+
     return p_scossl_mldsa_set_ctx_params(ctx, params);
 }
 
@@ -208,7 +208,7 @@ static SCOSSL_STATUS p_scossl_mldsa_verify(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
 
         return SCOSSL_FAILURE;
     }
-        
+
     return SCOSSL_SUCCESS;
 }
 
@@ -262,7 +262,7 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
             return SCOSSL_FAILURE;
         }
     }
-    
+
     // Unsupported parameters, check value matches default
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING)) != NULL)
     {
@@ -390,7 +390,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
         SCOSSL_MLDSA_FNS(bits)              \
         {0, NULL}};
 #endif
-        
+
 IMPLEMENT_SCOSSL_MLDSA(44)
 IMPLEMENT_SCOSSL_MLDSA(65)
 IMPLEMENT_SCOSSL_MLDSA(87)
@@ -400,7 +400,7 @@ IMPLEMENT_SCOSSL_MLDSA(87)
 //
 
 _Use_decl_annotations_
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams, 
+static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
                                                PBYTE *ppbAlgId, SIZE_T *pcbAlgId)
 {
     X509_ALGOR *x509Alg = NULL;
@@ -408,7 +408,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ppbAlgId == NULL ||
-        *ppbAlgId == NULL || 
+        *ppbAlgId == NULL ||
         pcbAlgId == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
