@@ -133,7 +133,12 @@ typedef struct {
 } SCOSSL_TLS_GROUP_INFO;
 
 typedef struct {
-
+    unsigned int codePoint;
+    unsigned int securityBits;
+    int minTls;
+    int maxTls;
+    int minDtls;
+    int maxDtls;
 } SCOSSL_TLS_SIGALG_INFO;
 
 const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_p192 = {
@@ -266,16 +271,28 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     OSSL_PARAM_END}
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa44 = {
+    0x0904, 128, TLS1_3_VERSION, 0, -1, -1
 };
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa65 = {
+    0x0905, 192, TLS1_3_VERSION, 0, -1, -1
 };
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa87 = {
+    0x0906, 256, TLS1_3_VERSION, 0, -1, -1
 };
 
 #define NUM_PARAMS_SIGALG_ENTRY 10
-#define TLS_SIGALG_ENTRY(tlsname, sigalg_info) {                                     \
+#define TLS_SIGALG_ENTRY(tlsname, algorithm, oid, sigalg_info) {                                    \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_SIGALG_IANA_NAME, tlsname, sizeof(tlsname)),         \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_SIGALG_NAME, algorithm, sizeof(algorithm)),          \
+    OSSL_PARAM_utf8_string(OSSL_CAPABILITY_TLS_SIGALG_OID, oid, sizeof(oid)),                       \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_SIGALG_CODE_POINT, (unsigned int *)&sigalg_info.codePoint), \
+    OSSL_PARAM_uint(OSSL_CAPABILITY_TLS_SIGALG_SECURITY_BITS, (unsigned int *)&sigalg_info.securityBits), \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_SIGALG_MIN_TLS, (int *)&sigalg_info.minTls),                 \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_SIGALG_MAX_TLS, (int *)&sigalg_info.maxTls),                 \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_SIGALG_MIN_DTLS, (int *)&sigalg_info.minDtls),               \
+    OSSL_PARAM_int(OSSL_CAPABILITY_TLS_SIGALG_MAX_DTLS, (int *)&sigalg_info.maxDtls),               \
     OSSL_PARAM_END}
 
 static int scossl_prov_initialized = 0;
@@ -313,9 +330,9 @@ static const OSSL_PARAM p_scossl_supported_group_list[][NUM_PARAMS_TLS_GROUP_ENT
     TLS_GROUP_ENTRY("SecP384r1MLKEM1024", SCOSSL_SN_P384_MLKEM1024, "SecP384r1MLKEM1024", scossl_tls_group_info_secp384r1mlkem1024)};
 
 static const OSSL_PARAM p_scossl_supported_sigalg_list[][10] = {
-    TLS_SIGALG_ENTRY("mldsa44", scossl_tls_sigalg_info_mldsa44),
-    TLS_SIGALG_ENTRY("mldsa65", scossl_tls_sigalg_info_mldsa65),
-    TLS_SIGALG_ENTRY("mldsa87", scossl_tls_sigalg_info_mldsa87)};
+    TLS_SIGALG_ENTRY("mldsa44", SCOSSL_LN_MLDSA44, SCOSSL_OID_MLDSA44, scossl_tls_sigalg_info_mldsa44),
+    TLS_SIGALG_ENTRY("mldsa65", SCOSSL_LN_MLDSA65, SCOSSL_OID_MLDSA65, scossl_tls_sigalg_info_mldsa65),
+    TLS_SIGALG_ENTRY("mldsa87", SCOSSL_LN_MLDSA87, SCOSSL_OID_MLDSA87, scossl_tls_sigalg_info_mldsa87)};
 
 // Digest
 extern const OSSL_DISPATCH p_scossl_md5_functions[];

@@ -72,7 +72,6 @@ extern "C" {
  #define OSSL_PKEY_PARAM_ML_KEM_SEED "seed"
 #endif
 
-// OpenSSL 3.5 parameters
 #ifndef OSSL_PKEY_PARAM_ML_DSA_SEED
  #define OSSL_PKEY_PARAM_ML_DSA_SEED "seed"
 #endif
@@ -91,6 +90,14 @@ extern "C" {
 
 #ifndef OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING
  #define OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING "message-encoding"
+#endif
+
+#ifndef OSSL_CAPABAILITY_TLS_SIGALG_MIN_DTLS
+ #define OSSL_CAPABILITY_TLS_SIGALG_MIN_DTLS "tls-min-dtls"
+#endif
+
+#ifndef OSSL_CAPABAILITY_TLS_SIGALG_MAX_DTLS
+ #define OSSL_CAPABILITY_TLS_SIGALG_MAX_DTLS "tls-max-dtls"
 #endif
 
 #ifdef __cplusplus
