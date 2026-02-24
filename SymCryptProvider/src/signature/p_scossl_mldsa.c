@@ -408,7 +408,6 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ppbAlgId == NULL ||
-        *ppbAlgId == NULL ||
         pcbAlgId == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
@@ -467,12 +466,6 @@ SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(int nid)
     }
 
     return NULL;
-}
-
-_Use_decl_annotations_
-SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_group_info(_In_ const char *groupName)
-{
-    return p_scossl_mldsa_get_alg_info_by_nid(OBJ_sn2nid(groupName));
 }
 
 int p_scossl_mldsa_params_to_nid(SYMCRYPT_MLDSA_PARAMS mldsaParams)

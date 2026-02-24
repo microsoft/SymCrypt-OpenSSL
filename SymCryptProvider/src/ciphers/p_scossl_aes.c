@@ -338,7 +338,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_block_update(_Inout_ SCOSSL_AES_CTX *c
             case DTLS1_BAD_VER:
                 out += SYMCRYPT_AES_BLOCK_SIZE;
                 *outl -= SYMCRYPT_AES_BLOCK_SIZE;
-                __attribute__ ((fallthrough));
+                /* fallthrough */
             case TLS1_VERSION:
                 return p_scossl_aes_tls_remove_padding_and_copy_mac(ctx, out, outl);
                 break;

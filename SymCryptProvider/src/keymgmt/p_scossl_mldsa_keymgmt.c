@@ -52,12 +52,12 @@ _Use_decl_annotations_
 SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_KEY_CTX));
-    
+
     if (keyCtx != NULL)
     {
         keyCtx->mldsaParams = mldsaParams;
     }
-    
+
     return keyCtx;
 }
 
@@ -98,7 +98,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(_In_ const SCOSS
         {
             format = keyCtx->format;
         }
-        else 
+        else
         {
             format = SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY;
         }
@@ -153,23 +153,23 @@ static void p_scossl_mldsa_keygen_cleanup(_Inout_ SCOSSL_MLDSA_KEYGEN_CTX *genCt
     OPENSSL_secure_clear_free(genCtx, sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
 }
 
-static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[], 
+static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[],
                                                            _In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
     SCOSSL_MLDSA_KEYGEN_CTX *genCtx = OPENSSL_secure_zalloc(sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
-    
+
     if (genCtx != NULL)
     {
         genCtx->mldsaParams = mldsaParams;
-        
+
         if (p_scossl_mldsa_keygen_set_params(genCtx, params) != SCOSSL_SUCCESS)
         {
             p_scossl_mldsa_keygen_cleanup(genCtx);
             return NULL;
         }
     }
-    
-    
+
+
     return genCtx;
 }
 
@@ -180,13 +180,13 @@ static SCOSSL_STATUS p_scossl_mldsa_keygen_set_template(_Inout_ SCOSSL_MLDSA_KEY
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    
+
     if (genCtx->mldsaParams != tmplCtx->mldsaParams)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
         return SCOSSL_FAILURE;
     }
-    
+
     return SCOSSL_SUCCESS;
 }
 
@@ -196,7 +196,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(_In_ SCOSSL_MLDSA_KEYGEN_CTX 
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-    
+
     if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
@@ -209,7 +209,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(_In_ SCOSSL_MLDSA_KEYGEN_CTX 
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
-    
+
     if (genCtx->cbSeed != 0)
     {
         scError = SymCryptMlDsakeySetValue(
@@ -302,7 +302,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
         }
     }
 
-    
+
     if (paramEncodedKey != NULL || paramPubKey != NULL)
     {
         if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
@@ -324,12 +324,14 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_free(pbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     if (paramPrivKey != NULL)
     {
-        OPENSSL_secure_clear_free(pbKey, cbKey);
-
         if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get encoded private key");
@@ -341,12 +343,14 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     if (paramPrivateSeed != NULL)
     {
-        OPENSSL_secure_clear_free(pbKey, cbKey);
-
         if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get private seed");
@@ -358,6 +362,10 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     ret = SCOSSL_SUCCESS;
@@ -440,7 +448,7 @@ static BOOL p_scossl_mldsa_keymgmt_match(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx
     BOOL ret = FALSE;
     SYMCRYPT_MLDSAKEY_FORMAT format;
 
-    if (keyCtx1 == NULL || 
+    if (keyCtx1 == NULL ||
         keyCtx2 == NULL ||
         keyCtx1->mldsaParams != keyCtx2->mldsaParams)
     {
@@ -606,6 +614,10 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
+
+        OPENSSL_secure_free(pbKey);
+        pbKey = NULL;
+        cbKey = 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
@@ -613,10 +625,6 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
         switch (keyCtx->format)
         {
         case SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED:
-            // Reset pbKey in case it was used for public key export
-            OPENSSL_secure_free(pbKey);
-            pbKey = NULL;
-
             if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
@@ -628,11 +636,12 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
                 goto cleanup;
             }
 
-            __attribute__ ((fallthrough));
-        case SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY:
             OPENSSL_secure_clear_free(pbKey, cbKey);
             pbKey = NULL;
+            cbKey = 0;
 
+            /* fallthrough */
+        case SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY:
             if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
@@ -643,6 +652,10 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
+
+            OPENSSL_secure_clear_free(pbKey, cbKey);
+            pbKey = NULL;
+            cbKey = 0;
 
             break;
         default:
@@ -800,7 +813,7 @@ cleanup:
     {
         OPENSSL_secure_clear_free(pbKey, cbKey);
     }
-    
+
     return ret;
 }
 
@@ -854,7 +867,7 @@ int p_scossl_mldsa_get_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams)
         case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
             return 2592;
         default:
-            break;   
+            break;
     }
 
     return 0;
@@ -871,7 +884,7 @@ int p_scossl_mldsa_get_security_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams)
         case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
             return 256;
         default:
-            break;   
+            break;
     }
 
     return 0;
