@@ -342,7 +342,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
                 goto cleanup;
             }
         }
-        else if (BIO_printf(out, "MLDSA Private-Key (%ld bit decapsulation key encoding):\nprivate-key", cbKey * 8) <= 0)
+        else if (BIO_printf(out, "MLDSA Private-Key (%ld bit private key encoding):\nprivate-key", cbKey * 8) <= 0)
         {
             goto cleanup;
         }
@@ -361,7 +361,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         pbKey = NULL;
         cbKey = 0;
 
-        if (!p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey))
+        if (!p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey, &cbKey))
         {
             goto cleanup;
         }
