@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #define SCOSSL_MLDSA_MSG_ENCODING_PURE 1
+#define SCOSSL_MLDSA_MAX_ALGORITHM_ID_SIZE 256
 
 static SCOSSL_MLDSA_ALG_INFO p_scossl_mldsa_algs[] = {
     {NID_undef, SCOSSL_OID_MLDSA44, SCOSSL_SN_MLDSA44, SCOSSL_LN_MLDSA44, SYMCRYPT_MLDSA_PARAMS_MLDSA44},
@@ -331,17 +332,24 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
 {
     OSSL_PARAM *p;
 
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL)
     {
-        if (p->data_type != OSSL_PARAM_OCTET_STRING)
+        BYTE abAid[SCOSSL_MLDSA_MAX_ALGORITHM_ID_SIZE];
+        PBYTE pbAid = abAid;
+        SIZE_T cbAid;
+
+        if (p_scossl_mldsa_get_alg_id(ctx->mldsaParams, &pbAid, &cbAid) != SCOSSL_SUCCESS)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        p->return_size = 0;
-
-        if (p_scossl_mldsa_get_alg_id(ctx->mldsaParams, (PBYTE *)&p->data, &p->return_size) != SCOSSL_SUCCESS)
+        if (!OSSL_PARAM_set_octet_string(p, pbAid, cbAid))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;

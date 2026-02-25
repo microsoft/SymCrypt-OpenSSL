@@ -17,7 +17,7 @@ extern "C" {
 typedef struct
 {
     SYMCRYPT_MLDSA_PARAMS mldsaParams;
-    BYTE pbSeed[SCOSSL_MLDSA_PRIVATE_SEED_LENGTH];
+    BYTE abSeed[SCOSSL_MLDSA_PRIVATE_SEED_LENGTH];
     SIZE_T cbSeed;
 } SCOSSL_MLDSA_KEYGEN_CTX;
 
@@ -132,7 +132,7 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(_Inout_ SCOSSL_MLDSA_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
-    PBYTE pbSeed = genCtx->pbSeed;
+    PBYTE pbSeed = genCtx->abSeed;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ML_DSA_SEED)) != NULL &&
@@ -215,11 +215,15 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(_In_ SCOSSL_MLDSA_KEYGEN_CTX 
     if (genCtx->cbSeed != 0)
     {
         scError = SymCryptMlDsakeySetValue(
-            genCtx->pbSeed,
+            genCtx->abSeed,
             genCtx->cbSeed,
             SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
             0,
             keyCtx->key);
+
+        OPENSSL_cleanse(genCtx->abSeed, genCtx->cbSeed);
+        genCtx->cbSeed = 0;
+
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsakeySetValue failed", scError);
