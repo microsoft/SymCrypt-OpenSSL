@@ -248,7 +248,6 @@ static const OSSL_PARAM *p_scossl_mldsa_settable_ctx_params(ossl_unused SCOSSL_M
     return p_scossl_mldsa_ctx_settable_param_types;
 }
 
-// Reject OSSL_SIGNATURE_PARAM_DETERMINISTIC, OSSL_SIGNATURE_PARAM_TEST_ENTROPY, and OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING
 static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
@@ -403,6 +402,7 @@ _Use_decl_annotations_
 static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
                                                PBYTE *ppbAlgId, SIZE_T *pcbAlgId)
 {
+    ASN1_OBJECT *aobj = NULL;
     X509_ALGOR *x509Alg = NULL;
     int cbAid;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -436,7 +436,15 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams
         goto cleanup;
     }
 
-    X509_ALGOR_set0(x509Alg, OBJ_txt2obj(oid, 1), V_ASN1_UNDEF, NULL);
+    aobj = OBJ_txt2obj(oid, 1);
+    if (aobj == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "OBJ_txt2obj failed");
+        goto cleanup;
+    }
+
+    X509_ALGOR_set0(x509Alg, aobj, V_ASN1_UNDEF, NULL);
+    aobj = NULL; // X509_ALGOR_set0 takes ownership
 
     if ((cbAid = i2d_X509_ALGOR(x509Alg, ppbAlgId)) < 0)
     {
@@ -450,6 +458,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams
 
 cleanup:
     X509_ALGOR_free(x509Alg);
+    ASN1_OBJECT_free(aobj);
 
     return ret;
 }

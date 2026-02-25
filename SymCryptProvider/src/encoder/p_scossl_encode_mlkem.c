@@ -24,9 +24,9 @@ static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CT
 static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
-    SIZE_T cbKey;
+    SIZE_T cbKey = 0;
     unsigned char *pbDer = NULL;
-    int cbDer;
+    int cbDer = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     ASN1_OBJECT *p8Obj;
@@ -96,7 +96,7 @@ cleanup:
 static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
-    SIZE_T cbKey;
+    SIZE_T cbKey = 0;
     X509_PUBKEY *pubKey = NULL;
     ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
