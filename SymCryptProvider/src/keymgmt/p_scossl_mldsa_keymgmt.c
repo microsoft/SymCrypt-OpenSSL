@@ -408,7 +408,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(_In_ SCOSSL_MLDSA_KEY_CTX
             return SCOSSL_FAILURE;
         }
 
-        if (!OSSL_PARAM_set_size_t(p, cbSignature))
+        if (!OSSL_PARAM_set_int(p, cbSignature))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
