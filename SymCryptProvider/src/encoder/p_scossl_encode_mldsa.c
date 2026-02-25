@@ -4,7 +4,7 @@
 
 #include "scossl_provider.h"
 #include "p_scossl_encode_common.h"
-#include "keymgmt/p_scossl_mlkem_keymgmt.h"
+#include "keymgmt/p_scossl_mldsa_keymgmt.h"
 
 #include <openssl/asn1t.h>
 #include <openssl/pkcs12.h>
@@ -14,14 +14,14 @@
 extern "C" {
 #endif
 
-static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
+static ASN1_OBJECT *p_scossl_encode_mldsa_get_oid(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
-    int nid = p_scossl_mlkem_params_to_nid(keyCtx->mlkemParams);
+    int nid = p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams);
 
     return nid == NID_undef ? NULL : OBJ_nid2obj(nid);
 }
 
-static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
+static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
@@ -45,14 +45,14 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if (keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED &&
-        keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+    if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
+        keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -64,9 +64,9 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
-    if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
+    if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mlkem_get_oid returned NULL");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
         goto cleanup;
     }
 
@@ -93,7 +93,7 @@ cleanup:
     return p8Info;
 }
 
-static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
+static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
@@ -113,14 +113,14 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
 
-    if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
+    if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mlkem_get_oid returned NULL");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
         goto cleanup;
     }
 
@@ -146,8 +146,8 @@ cleanup:
 }
 
 
-static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                               _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                               _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                                int selection,
                                                                _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
@@ -171,7 +171,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCOD
         goto cleanup;
     }
 
-    if ((p8Info = p_scossl_mlkem_key_to_p8info(keyCtx)) == NULL)
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
     {
         goto cleanup;
     }
@@ -213,8 +213,8 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                      _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                      _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                       int selection,
                                                       _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
@@ -230,10 +230,10 @@ static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
 
     if (ctx->cipher != NULL)
     {
-        return p_scossl_mlkem_to_EncryptedPrivateKeyInfo(ctx, out, keyCtx, selection, passphraseCb, passphraseCbArgs);
+        return p_scossl_mldsa_to_EncryptedPrivateKeyInfo(ctx, out, keyCtx, selection, passphraseCb, passphraseCbArgs);
     }
 
-    if ((p8Info = p_scossl_mlkem_key_to_p8info(keyCtx)) == NULL)
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
     {
         goto cleanup;
     }
@@ -261,8 +261,8 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                            _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                            _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                             int selection,
                                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
@@ -276,7 +276,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
         goto cleanup;
     }
 
-    if ((pubKey = p_scossl_mlkem_key_to_pubkey(keyCtx)) == NULL)
+    if ((pubKey = p_scossl_mldsa_key_to_pubkey(keyCtx)) == NULL)
     {
         goto cleanup;
     }
@@ -304,8 +304,8 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                            _In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx,
+static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                            _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                             int selection,
                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
@@ -323,26 +323,26 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        if (keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED &&
-            keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
+        if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
+            keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
             goto cleanup;
         }
 
-        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED)
+        if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
         {
-            if (BIO_printf(out, "MLKEM Private-Key (512 bit private seed encoding):\nprivate-seed") <= 0)
+            if (BIO_printf(out, "MLDSA Private-Key (512 bit private seed encoding):\nprivate-seed") <= 0)
             {
                 goto cleanup;
             }
         }
-        else if (BIO_printf(out, "MLKEM Private-Key (%ld bit decapsulation key encoding):\ndecapsulation-key", cbKey * 8) <= 0)
+        else if (BIO_printf(out, "MLDSA Private-Key (%ld bit private key encoding):\nprivate-key", cbKey * 8) <= 0)
         {
             goto cleanup;
         }
@@ -361,13 +361,13 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         pbKey = NULL;
         cbKey = 0;
 
-        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if ((!printedPrivateKey && BIO_printf(out, "MLKEM Public-Key (%ld bit):\n", cbKey * 8) <= 0) ||
-            BIO_printf(out, "encapsulation-key") <= 0)
+        if ((!printedPrivateKey && BIO_printf(out, "MLDSA Public-Key (%ld bit):\n", cbKey * 8) <= 0) ||
+                 BIO_printf(out, "public-key") <= 0)
         {
             goto cleanup;
         }
@@ -378,10 +378,10 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         }
     }
 
-    nid = p_scossl_mlkem_params_to_nid(keyCtx->mlkemParams);
+    nid = p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams);
 
     if (nid != NID_undef &&
-        BIO_printf(out, "PARAMETER SET: %s\n", OBJ_nid2ln(nid)) <= 0)
+        BIO_printf(out, "ALGORITHM: %s\n", OBJ_nid2ln(nid)) <= 0)
     {
         goto cleanup;
     }
@@ -394,107 +394,107 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx, SYMCRYPT_MLKEM_PARAMS mlkemParams,
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused SCOSSL_ENCODE_CTX *ctx, SYMCRYPT_MLDSA_PARAMS mldsaParams,
                                                                   int selection, _In_ const OSSL_PARAM params[])
 {
-    SCOSSL_MLKEM_KEY_CTX *keyCtx = p_scossl_mlkem_keymgmt_new_ctx(ctx->provctx, mlkemParams);
+    SCOSSL_MLDSA_KEY_CTX *keyCtx = p_scossl_mldsa_keymgmt_new_ctx(mldsaParams);
 
     if (keyCtx != NULL &&
-        p_scossl_mlkem_keymgmt_import(keyCtx, selection, params) != SCOSSL_SUCCESS)
+        p_scossl_mldsa_keymgmt_import(keyCtx, selection, params) != SCOSSL_SUCCESS)
     {
-        p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
+        p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
         keyCtx = NULL;
     }
 
     return keyCtx;
 }
 
-static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_text_desc = {
+static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_text_desc = {
     0,
     SCOSSL_ENCODE_TEXT,
-    (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_text};
+    (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_text};
 
-static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_text_newctx(_In_ SCOSSL_PROVCTX *provctx)
+static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_text_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
-    return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_text_desc);
+    return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_text_desc);
 }
 
-#define MAKE_MLKEM_ASN1_ENCODER(encoderType)                                                                        \
-    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_##encoderType##_der_desc = {                                   \
+#define MAKE_MLDSA_ASN1_ENCODER(encoderType)                                                                        \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_der_desc = {                                   \
         select_##encoderType,                                                                                       \
         SCOSSL_ENCODE_DER,                                                                                          \
-        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##encoderType};                                               \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                               \
                                                                                                                     \
-    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mlkem_##encoderType##_pem_desc = {                                   \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_pem_desc = {                                   \
         select_##encoderType,                                                                                       \
         SCOSSL_ENCODE_PEM,                                                                                          \
-        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mlkem_to_##encoderType};                                               \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                               \
                                                                                                                     \
-    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
+    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
     {                                                                                                               \
-        return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_##encoderType##_der_desc);                           \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_der_desc);                           \
     }                                                                                                               \
                                                                                                                     \
-    static SCOSSL_ENCODE_CTX *p_scossl_mlkem_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
+    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
     {                                                                                                               \
-        return p_scossl_encode_newctx(provctx, &p_scossl_mlkem_##encoderType##_pem_desc);                           \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_pem_desc);                           \
     }                                                                                                               \
                                                                                                                     \
-    static BOOL p_scossl_der_to_mlkem_##encoderType##_does_selection(ossl_unused void *provctx, int selection)      \
+    static BOOL p_scossl_der_to_mldsa_##encoderType##_does_selection(ossl_unused void *provctx, int selection)      \
     {                                                                                                               \
-        return p_scossl_encode_does_selection(&p_scossl_mlkem_##encoderType##_der_desc, selection);                 \
+        return p_scossl_encode_does_selection(&p_scossl_mldsa_##encoderType##_der_desc, selection);                 \
     }
 
-#define MLKEM_ENCODER_DISPATCH(encoderType, bits)                                                                   \
-    const OSSL_DISPATCH p_scossl_mlkem##bits##_to_##encoderType##_der_functions[] = {                               \
-        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##encoderType##_der_newctx},                   \
+#define MLDSA_ENCODER_DISPATCH(encoderType, bits)                                                                   \
+    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_##encoderType##_der_functions[] = {                               \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_##encoderType##_der_newctx},                   \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                         \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},               \
-        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##encoderType##_does_selection},   \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mldsa_##encoderType##_does_selection},   \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mlkem##bits##_encoder_import_object},            \
-        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},                       \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};                                                                                                 \
                                                                                                                     \
-    const OSSL_DISPATCH p_scossl_mlkem##bits##_to_##encoderType##_pem_functions[] = {                               \
-        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_##encoderType##_pem_newctx},                   \
+    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_##encoderType##_pem_functions[] = {                               \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_##encoderType##_pem_newctx},                   \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                         \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},               \
-        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mlkem_##encoderType##_does_selection},   \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mldsa_##encoderType##_does_selection},   \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mlkem##bits##_encoder_import_object},            \
-        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},                       \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};
 
-#define MAKE_MLKEM_VARIANT_ENCODER_FUNCTIONS(bits)                                                                  \
-    static SCOSSL_MLKEM_KEY_CTX  *p_scossl_mlkem##bits##_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx,         \
+#define MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(bits)                                                                  \
+    static SCOSSL_MLDSA_KEY_CTX  *p_scossl_mldsa##bits##_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx,         \
                                                                                int selection,                       \
                                                                                _In_ const OSSL_PARAM params[])      \
     {                                                                                                               \
-        return p_scossl_mlkem_encoder_import_object(ctx, SYMCRYPT_MLKEM_PARAMS_MLKEM##bits, selection, params);     \
+        return p_scossl_mldsa_encoder_import_object(ctx, SYMCRYPT_MLDSA_PARAMS_MLDSA##bits, selection, params);     \
     }                                                                                                               \
                                                                                                                     \
-    const OSSL_DISPATCH p_scossl_mlkem##bits##_to_text_functions[] = {                                              \
-        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mlkem_to_text_newctx},                                  \
+    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_text_functions[] = {                                              \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_text_newctx},                                  \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mlkem##bits##_encoder_import_object},            \
-        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mlkem_keymgmt_free_key_ctx},                       \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};                                                                                                 \
                                                                                                                     \
-    MLKEM_ENCODER_DISPATCH(PrivateKeyInfo, bits)                                                                    \
-    MLKEM_ENCODER_DISPATCH(EncryptedPrivateKeyInfo, bits)                                                           \
-    MLKEM_ENCODER_DISPATCH(SubjectPublicKeyInfo, bits)
+    MLDSA_ENCODER_DISPATCH(PrivateKeyInfo, bits)                                                                    \
+    MLDSA_ENCODER_DISPATCH(EncryptedPrivateKeyInfo, bits)                                                           \
+    MLDSA_ENCODER_DISPATCH(SubjectPublicKeyInfo, bits)
 
-MAKE_MLKEM_ASN1_ENCODER(PrivateKeyInfo)
-MAKE_MLKEM_ASN1_ENCODER(EncryptedPrivateKeyInfo)
-MAKE_MLKEM_ASN1_ENCODER(SubjectPublicKeyInfo)
+MAKE_MLDSA_ASN1_ENCODER(PrivateKeyInfo)
+MAKE_MLDSA_ASN1_ENCODER(EncryptedPrivateKeyInfo)
+MAKE_MLDSA_ASN1_ENCODER(SubjectPublicKeyInfo)
 
-MAKE_MLKEM_VARIANT_ENCODER_FUNCTIONS(512)
-MAKE_MLKEM_VARIANT_ENCODER_FUNCTIONS(768)
-MAKE_MLKEM_VARIANT_ENCODER_FUNCTIONS(1024)
+MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(44)
+MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(65)
+MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(87)
 
 #ifdef __cplusplus
 }
