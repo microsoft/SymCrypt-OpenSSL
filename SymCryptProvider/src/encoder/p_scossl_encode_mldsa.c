@@ -46,7 +46,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
     }
 
     if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
-        keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY)
+        keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
         goto cleanup;
@@ -324,7 +324,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
         if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
-            keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY)
+            keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
             goto cleanup;

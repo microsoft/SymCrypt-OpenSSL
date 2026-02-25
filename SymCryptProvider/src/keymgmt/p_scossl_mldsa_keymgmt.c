@@ -46,7 +46,7 @@ static const OSSL_PARAM p_scossl_mldsa_impexp_types[] = {
     OSSL_PARAM_END};
 
 int p_scossl_mldsa_get_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams);
-int p_scossl_mldsa_get_security_bits(SYMCRYPT_MLDSA_PARAMS mlkdsaarams);
+int p_scossl_mldsa_get_security_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams);
 
 _Use_decl_annotations_
 SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS mldsaParams)
