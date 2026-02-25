@@ -344,7 +344,7 @@ SCOSSL_STATUS p_scossl_mlkem_register_algorithms()
 {
     for (SIZE_T i = 0; i < sizeof(p_scossl_mlkem_groups) / sizeof(SCOSSL_MLKEM_GROUP_INFO); i++)
     {
-        // Don't double register MLKEM algorithms. These should already by registered on
+        // Don't double register MLKEM algorithms. These should already be registered on
         // OpenSSL 3.5+
         p_scossl_mlkem_groups[i].nid = OBJ_sn2nid(p_scossl_mlkem_groups[i].snGroupName);
         if (p_scossl_mlkem_groups[i].nid == NID_undef)

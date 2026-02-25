@@ -29,7 +29,6 @@ typedef struct
 
 SCOSSL_STATUS p_scossl_mldsa_register_algorithms();
 SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(int nid);
-SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info(_In_ const char *algName);
 int p_scossl_mldsa_params_to_nid(SYMCRYPT_MLDSA_PARAMS mldsaParams);
 
 #ifdef __cplusplus

@@ -34,6 +34,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(ossl_unused SCOSSL_
 
     if (mldsaParams != algInfo->mldsaParams)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
         goto cleanup;
     }
 
@@ -48,7 +49,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(ossl_unused SCOSSL_
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        OPENSSL_free(keyCtx);
+        p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
         keyCtx = NULL;
     }
 
@@ -72,6 +73,8 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(_In_ SCOSSL_DECODE
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
     }
+
+    cbKey = ASN1_STRING_length(p8Data);
 
     format = cbKey == 64 ? SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
 

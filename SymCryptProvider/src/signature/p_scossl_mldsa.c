@@ -485,7 +485,7 @@ SCOSSL_STATUS p_scossl_mldsa_register_algorithms()
 {
     for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
     {
-        // Don't double register MLDSA algorithms. These should already by registered on
+        // Don't double register MLDSA algorithms. These should already be registered on
         // OpenSSL 3.5+
         p_scossl_mldsa_algs[i].nid = OBJ_sn2nid(p_scossl_mldsa_algs[i].snGroupName);
         if (p_scossl_mldsa_algs[i].nid == NID_undef)

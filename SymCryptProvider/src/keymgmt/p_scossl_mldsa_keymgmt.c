@@ -125,6 +125,8 @@ cleanup:
         copyCtx = NULL;
     }
 
+    OPENSSL_secure_clear_free(pbKey, cbKey);
+
     return copyCtx;
 }
 
