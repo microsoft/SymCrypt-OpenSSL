@@ -412,6 +412,14 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(_In_ SCOSSL_MLDSA_KEY_CTX
             return SCOSSL_FAILURE;
         }
     }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MANDATORY_DIGEST)) != NULL &&
+        !OSSL_PARAM_set_utf8_string(p, ""))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     return p_scossl_mldsa_keymgmt_get_key_params(keyCtx, params);
 }
 
