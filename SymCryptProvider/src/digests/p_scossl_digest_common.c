@@ -57,6 +57,17 @@ SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
     return copyCtx;
 }
 
+#ifdef OSSL_FUNC_DIGEST_COPYCTX
+_Use_decl_annotations_
+void p_scossl_digest_copy_ctx(SCOSSL_DIGEST_CTX *dstCtx, SCOSSL_DIGEST_CTX *srcCtx)
+{
+    dstCtx->pHash = srcCtx->pHash;
+    dstCtx->xofLen = srcCtx->xofLen;
+
+    srcCtx->pHash->stateCopyFunc(srcCtx->pState, dstCtx->pState);
+}
+#endif
+
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_t blocksize, UINT32 flags)
 {
