@@ -285,7 +285,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
                                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -310,7 +310,7 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
                                               _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -372,6 +372,24 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE)) != NULL)
+    {
+        unsigned int nonce_type;
+        if (!OSSL_PARAM_get_uint(p, &nonce_type))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (nonce_type != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+#endif
+
     return SCOSSL_SUCCESS;
 }
 
@@ -405,6 +423,15 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
+
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE)) != NULL &&
+        !OSSL_PARAM_set_uint(p, 0))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+#endif
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL)
     {
