@@ -25,6 +25,7 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_hkdf_gettable_ctx_param_types[] = {
     HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_hkdf_settable_ctx_param_types[] = {
@@ -301,21 +302,24 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
     }
 
     // Parameters may contain multiple info params that must all be processed
-    for (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO);
-         p != NULL;
-         p = OSSL_PARAM_locate_const(p + 1, OSSL_KDF_PARAM_INFO))
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO)) != NULL)
     {
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbInfo, &cbInfo))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
+        ctx->hkdfCtx->cbInfo = 0;
 
-        if (!scossl_hkdf_append_info(ctx->hkdfCtx, pbInfo, cbInfo))
+        do
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
-            return SCOSSL_FAILURE;
-        }
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbInfo, &cbInfo))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+
+            if (!scossl_hkdf_append_info(ctx->hkdfCtx, pbInfo, cbInfo))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
+                return SCOSSL_FAILURE;
+            }
+        } while ((p = OSSL_PARAM_locate_const(p + 1, OSSL_KDF_PARAM_INFO)) != NULL);
     }
 
     return SCOSSL_SUCCESS;
