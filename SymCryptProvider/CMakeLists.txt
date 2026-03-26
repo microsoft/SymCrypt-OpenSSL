@@ -59,6 +59,12 @@ set(SCOSSL_SOURCES
     ./src/p_scossl_base.c
 )
 
+if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3.5)
+    list(APPEND SCOSSL_SOURCES
+        ./src/skeymgmt/p_scossl_generic_skeymgmt.c
+        ./src/skeymgmt/p_scossl_aes_skeymgmt.c)
+endif()
+
 if (KEYSINUSE_ENABLED)
     list(APPEND SCOSSL_SOURCES ../KeysInUse/keysinuse.c)
 endif()
