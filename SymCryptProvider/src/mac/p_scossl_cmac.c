@@ -4,6 +4,7 @@
 
 #include "scossl_mac.h"
 #include "p_scossl_base.h"
+#include "p_scossl_skey.h"
 
 #include <openssl/proverr.h>
 
@@ -42,6 +43,14 @@ static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ SCOSSL_MAC_CTX *ctx,
     return p_scossl_cmac_set_ctx_params(ctx, params) &&
            scossl_mac_init(ctx, key, keylen);
 
+}
+
+static SCOSSL_STATUS p_scossl_cmac_init_skey(_Inout_ void *ctx,
+                                             _In_ SCOSSL_SKEY *skey,
+                                             _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_cmac_set_ctx_params(ctx, params) &&
+           scossl_mac_init(ctx, skey->pbKey, skey->cbKey);
 }
 
 static const OSSL_PARAM *p_scossl_cmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -130,6 +139,7 @@ const OSSL_DISPATCH p_scossl_cmac_functions[] = {
     {OSSL_FUNC_MAC_FREECTX, (void (*)(void))scossl_mac_freectx},
     {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))scossl_mac_dupctx},
     {OSSL_FUNC_MAC_INIT, (void (*)(void))p_scossl_cmac_init},
+    {OSSL_FUNC_MAC_INIT_SKEY, (void (*)(void))p_scossl_cmac_init_skey},
     {OSSL_FUNC_MAC_UPDATE, (void (*)(void))scossl_mac_update},
     {OSSL_FUNC_MAC_FINAL, (void (*)(void))scossl_mac_final},
     {OSSL_FUNC_MAC_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_cmac_gettable_ctx_params},
