@@ -121,7 +121,7 @@ SCOSSL_STATUS p_scossl_generic_skeymgmt_export(SCOSSL_SKEY *skey, int selection,
 }
 
 _Use_decl_annotations_
-SCOSSL_SKEY *p_scossl_generic_skeymgmt_generate(SCOSSL_PROVCTX *provctx, const OSSL_PARAM params[])
+SCOSSL_SKEY *p_scossl_generic_skeygen_generate(SCOSSL_PROVCTX *provctx, const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     SIZE_T cbKey = 0;

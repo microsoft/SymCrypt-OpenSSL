@@ -8,6 +8,7 @@
 
 #include "scossl_helpers.h"
 #include "p_scossl_aes.h"
+#include "p_scossl_skey.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,6 +121,19 @@ static SCOSSL_STATUS p_scossl_aes_xts_decrypt_init(_Inout_ SCOSSL_AES_XTS_CTX *c
     return p_scossl_aes_xts_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
+static SCOSSL_STATUS p_scossl_aes_xts_skey_encrypt_init(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(keylen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_xts_init_internal((SCOSSL_AES_XTS_CTX *)ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_xts_skey_decrypt_init(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(keylen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_xts_init_internal((SCOSSL_AES_XTS_CTX *)ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
 
 static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,
                                              _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
@@ -274,6 +288,8 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
         {OSSL_FUNC_CIPHER_GETTABLE_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_params},     \
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_xts_settable_ctx_params}, \
+        {OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_xts_skey_encrypt_init},     \
+        {OSSL_FUNC_CIPHER_DECRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_xts_skey_decrypt_init},     \
         {0, NULL}};
 
 IMPLEMENT_SCOSSL_AES_XTS_CIPHER(128)
