@@ -282,7 +282,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
                                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -307,7 +307,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *c
                                                         _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    UINT cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -374,7 +374,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
-        
+
         if (nonce_type != 0)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);

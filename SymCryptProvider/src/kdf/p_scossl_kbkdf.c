@@ -30,7 +30,7 @@ typedef struct
     SIZE_T cbLabel;
     PCSYMCRYPT_MAC pMac;
 
-    UINT macType;
+    UINT8 macType;
     SIZE_T cbCmacKey;
     const SCOSSL_KMAC_EXTENSIONS *pMacEx;
 } SCOSSL_PROV_KBKDF_CTX;
