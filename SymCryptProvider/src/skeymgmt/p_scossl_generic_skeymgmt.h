@@ -13,7 +13,7 @@ extern "C" {
 
 void p_scossl_generic_skeymgmt_free(_Inout_ SCOSSL_SKEY *skey);
 
-void *p_scossl_generic_skeymgmt_import(_In_ SCOSSL_PROVCTX *provctx, int selection, _In_ const OSSL_PARAM params[]);
+SCOSSL_SKEY *p_scossl_generic_skeymgmt_import(_In_ SCOSSL_PROVCTX *provctx, int selection, _In_ const OSSL_PARAM params[]);
 SCOSSL_STATUS p_scossl_generic_skeymgmt_export(_In_ SCOSSL_SKEY *skey, int selection,
                                                _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg);
 

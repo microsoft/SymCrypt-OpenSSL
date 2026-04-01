@@ -18,8 +18,7 @@ static const OSSL_PARAM p_scossl_aes_skeygen_settable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_SKEY_PARAM_KEY_LENGTH, NULL),
     OSSL_PARAM_END};
 
-static void *p_scossl_aes_skeymgmt_import(_In_ SCOSSL_PROVCTX *provctx, int selection,
-                                          _In_ const OSSL_PARAM params[])
+static SCOSSL_SKEY *p_scossl_aes_skeymgmt_import(_In_ SCOSSL_PROVCTX *provctx, int selection, _In_ const OSSL_PARAM params[])
 {
     SCOSSL_SKEY *skey = p_scossl_generic_skeymgmt_import(provctx, selection, params);
 

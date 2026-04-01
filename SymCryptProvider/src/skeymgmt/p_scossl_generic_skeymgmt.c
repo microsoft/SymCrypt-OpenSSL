@@ -41,7 +41,7 @@ void p_scossl_generic_skeymgmt_free(SCOSSL_SKEY *skey)
 }
 
 _Use_decl_annotations_
-void *p_scossl_generic_skeymgmt_import(SCOSSL_PROVCTX *provctx, int selection, const OSSL_PARAM params[])
+SCOSSL_SKEY *p_scossl_generic_skeymgmt_import(SCOSSL_PROVCTX *provctx, int selection, const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     PCBYTE pcbKey = NULL;
