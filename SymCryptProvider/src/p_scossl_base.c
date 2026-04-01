@@ -525,7 +525,7 @@ extern const OSSL_DISPATCH p_scossl_generic_skeymgmt_functions[];
 
 static const OSSL_ALGORITHM p_scossl_skeymgmt[] = {
     ALG("AES", p_scossl_aes_skeymgmt_functions),
-    ALG("GENERIC-SECRET", p_scossl_kdf_keymgmt_functions),
+    ALG("GENERIC-SECRET", p_scossl_generic_skeymgmt_functions),
     ALG_TABLE_END};
 #endif // OSSL_OP_SKEYMGMT
 
