@@ -63,13 +63,13 @@ if (KEYSINUSE_ENABLED)
     list(APPEND SCOSSL_SOURCES ../KeysInUse/keysinuse.c)
 endif()
 
-add_library(scossl_provider SHARED ${SCOSSL_SOURCES})
+# Shared library target (OpenSSL provider module)
+add_library(scossl_provider SHARED ${SCOSSL_SOURCES} $<TARGET_OBJECTS:scossl_common>)
 add_dependencies(scossl_provider scossl_common)
 
 set_target_properties(scossl_provider PROPERTIES PUBLIC_HEADER ./inc/p_scossl_base.h)
 target_include_directories(scossl_provider PUBLIC ./inc)
 target_include_directories(scossl_provider PRIVATE ./src)
-# target_include_directories(scossl_provider PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(scossl_provider PUBLIC ../ScosslCommon/inc)
 
 if (KEYSINUSE_ENABLED)
@@ -86,18 +86,48 @@ endif()
 set_target_properties(scossl_provider PROPERTIES PREFIX "")
 set_target_properties(scossl_provider PROPERTIES OUTPUT_NAME "symcryptprovider")
 
-target_link_libraries(scossl_provider PRIVATE scossl_common)
 target_link_libraries(scossl_provider PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_provider PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+
+# Static library target with embedded scossl_common
+add_library(scossl_provider_static STATIC ${SCOSSL_SOURCES} $<TARGET_OBJECTS:scossl_common>)
+add_dependencies(scossl_provider_static scossl_common)
+
+set_target_properties(scossl_provider_static PROPERTIES PUBLIC_HEADER ./inc/p_scossl_base.h)
+target_include_directories(scossl_provider_static PUBLIC ./inc)
+target_include_directories(scossl_provider_static PRIVATE ./src)
+target_include_directories(scossl_provider_static PUBLIC ../ScosslCommon/inc)
+
+if (KEYSINUSE_ENABLED)
+    if (KEYSINUSE_LOG_SYSLOG)
+        target_compile_definitions(scossl_provider_static PRIVATE KEYSINUSE_LOG_SYSLOG)
+        target_link_libraries(scossl_provider_static PUBLIC ${SYSTEMD_LIBRARY})
+    endif()
+
+    target_compile_definitions(scossl_provider_static PRIVATE KEYSINUSE_ENABLED)
+    target_include_directories(scossl_provider_static PUBLIC ../KeysInUse)
+endif()
+
+# Static libraries typically keep the "lib" prefix
+set_target_properties(scossl_provider_static PROPERTIES OUTPUT_NAME "symcryptprovider")
+
+target_link_libraries(scossl_provider_static PUBLIC ${SYMCRYPT_LIBRARY})
+target_link_libraries(scossl_provider_static PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 
 if (NOT DEFINED OPENSSL_PROVIDERS)
 set(OPENSSL_PROVIDERS "${CMAKE_INSTALL_LIBDIR}/ossl-modules" CACHE PATH "Path to OpenSSL providers")
 endif()
 
-# Install the engine to the OpenSSL modules directory
+# Install the provider to the OpenSSL modules directory
 # NB: this won't work if the distro has a custom modules directory that doesn't match
 # the OpenSSL default.
 install(
     TARGETS scossl_provider
     LIBRARY DESTINATION "${OPENSSL_PROVIDERS}"
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Install the static provider library to standard library directory
+install(
+    TARGETS scossl_provider_static
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

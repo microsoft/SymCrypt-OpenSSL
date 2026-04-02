@@ -39,7 +39,7 @@ if (${OPENSSL_VERSION} VERSION_EQUAL 1)
     list(APPEND SCOSSL_SOURCES ../src/e_scossl_pkey_meths.c)
 endif()
 
-add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES})
+add_library(scossl_dynamic SHARED ${SCOSSL_SOURCES} $<TARGET_OBJECTS:scossl_common>)
 add_dependencies(scossl_dynamic scossl_common)
 
 set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/e_scossl.h)
@@ -53,7 +53,7 @@ target_include_directories(scossl_dynamic PUBLIC ../ScosslCommon/inc)
 set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
 set_target_properties(scossl_dynamic PROPERTIES OUTPUT_NAME "symcryptengine")
 
-target_link_libraries(scossl_dynamic PRIVATE scossl_common)
+# No need to link scossl_common since it's built-in
 target_link_libraries(scossl_dynamic PUBLIC ${SYMCRYPT_LIBRARY})
 target_link_libraries(scossl_dynamic PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 

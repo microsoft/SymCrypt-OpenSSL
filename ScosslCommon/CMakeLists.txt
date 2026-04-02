@@ -20,9 +20,6 @@ set(SCOSSL_SOURCES
     ./src/scossl_tls1prf.c
 )
 
-add_library(scossl_common STATIC ${SCOSSL_SOURCES})
-
+add_library(scossl_common OBJECT ${SCOSSL_SOURCES})
 target_include_directories(scossl_common PUBLIC ./inc)
 target_include_directories(scossl_common PRIVATE ./src)
-
-set_target_properties(scossl_common PROPERTIES OUTPUT_NAME "scosslcommon")
