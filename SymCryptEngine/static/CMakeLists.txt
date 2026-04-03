@@ -45,7 +45,7 @@ set_target_properties(scossl_static PROPERTIES PUBLIC_HEADER ../inc/e_scossl.h)
 target_include_directories(scossl_static PUBLIC ../inc)
 target_include_directories(scossl_static PRIVATE ../src)
 target_include_directories(scossl_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_include_directories(scossl_static PUBLIC ../ScosslCommon/inc)
+target_include_directories(scossl_static PUBLIC ../../ScosslCommon/inc)
 
 install(TARGETS scossl_static
     EXCLUDE_FROM_ALL

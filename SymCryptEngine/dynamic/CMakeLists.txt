@@ -47,7 +47,7 @@ set_target_properties(scossl_dynamic PROPERTIES PUBLIC_HEADER ../inc/e_scossl.h)
 target_include_directories(scossl_dynamic PUBLIC ../inc)
 target_include_directories(scossl_dynamic PRIVATE ../src)
 target_include_directories(scossl_dynamic PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(scossl_dynamic PUBLIC ../ScosslCommon/inc)
+target_include_directories(scossl_dynamic PUBLIC ../../ScosslCommon/inc)
 
 # Remove default "lib" prefix from symcryptengine.so as OpenSSL engine is not a generic Linux .so
 set_target_properties(scossl_dynamic PROPERTIES PREFIX "")
