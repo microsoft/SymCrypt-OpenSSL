@@ -125,14 +125,14 @@ static SCOSSL_STATUS p_scossl_aes_xts_skey_encrypt_init(_Inout_ SCOSSL_AES_XTS_C
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_xts_init_internal((SCOSSL_AES_XTS_CTX *)ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    return p_scossl_aes_xts_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_xts_skey_decrypt_init(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_xts_init_internal((SCOSSL_AES_XTS_CTX *)ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    return p_scossl_aes_xts_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,

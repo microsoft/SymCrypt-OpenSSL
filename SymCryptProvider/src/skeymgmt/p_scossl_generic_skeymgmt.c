@@ -18,7 +18,8 @@ static const OSSL_PARAM p_scossl_generic_skeygen_settable_param_types[] = {
     OSSL_PARAM_size_t(OSSL_SKEY_PARAM_KEY_LENGTH, NULL),
     OSSL_PARAM_END};
 
-SCOSSL_SKEY *p_scossl_generic_skeymgmt_new(_In_ OSSL_LIB_CTX *libctx)
+_Use_decl_annotations_
+SCOSSL_SKEY *p_scossl_generic_skeymgmt_new(OSSL_LIB_CTX *libctx)
 {
     SCOSSL_SKEY *skey = OPENSSL_zalloc(sizeof(SCOSSL_SKEY));
     if (skey != NULL)
@@ -40,8 +41,7 @@ void p_scossl_generic_skeymgmt_free(SCOSSL_SKEY *skey)
     OPENSSL_free(skey);
 }
 
-_Use_decl_annotations_
-SCOSSL_SKEY *p_scossl_generic_skeymgmt_import(SCOSSL_PROVCTX *provctx, int selection, const OSSL_PARAM params[])
+SCOSSL_SKEY *p_scossl_generic_skeymgmt_import(_In_ SCOSSL_PROVCTX *provctx, int selection, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     PCBYTE pcbKey = NULL;
@@ -54,36 +54,37 @@ SCOSSL_SKEY *p_scossl_generic_skeymgmt_import(SCOSSL_PROVCTX *provctx, int selec
         goto cleanup;
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_SKEY_PARAM_RAW_BYTES)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SKEY_PARAM_RAW_BYTES)) == NULL)
     {
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pcbKey, &cbKey))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
 
-        if (pcbKey == NULL)
-        {
-            goto cleanup;
-        }
+    if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pcbKey, &cbKey))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
+    }
 
-        skey = p_scossl_generic_skeymgmt_new(provctx->libctx);
-        if (skey == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
+    skey = p_scossl_generic_skeymgmt_new(provctx->libctx);
+    if (skey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
 
+    if (cbKey > 0)
+    {
         skey->pbKey = OPENSSL_secure_malloc(cbKey);
         if (skey->pbKey == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
-
-        skey->cbKey = cbKey;
         memcpy(skey->pbKey, pcbKey, cbKey);
     }
+
+    skey->cbKey = cbKey;
 
     status = SCOSSL_SUCCESS;
 
@@ -114,51 +115,50 @@ SCOSSL_STATUS p_scossl_generic_skeymgmt_export(SCOSSL_SKEY *skey, int selection,
         return SCOSSL_FAILURE;
     }
 
-    params[0] = OSSL_PARAM_construct_octet_string(OSSL_SKEY_PARAM_RAW_BYTES, skey->pbKey, skey->cbKey);
+    params[0] = OSSL_PARAM_construct_octet_string(OSSL_SKEY_PARAM_RAW_BYTES, skey->cbKey > 0 ? skey->pbKey : "", skey->cbKey);
     params[1] = OSSL_PARAM_construct_end();
 
     return param_cb(params, cbarg);
 }
 
-_Use_decl_annotations_
-SCOSSL_SKEY *p_scossl_generic_skeygen_generate(SCOSSL_PROVCTX *provctx, const OSSL_PARAM params[])
+SCOSSL_SKEY *p_scossl_generic_skeygen_generate(_In_ SCOSSL_PROVCTX *provctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
     SIZE_T cbKey = 0;
     SCOSSL_SKEY *skey = NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_SKEY_PARAM_KEY_LENGTH)) != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SKEY_PARAM_KEY_LENGTH)) == NULL)
     {
-        if (!OSSL_PARAM_get_size_t(p, &cbKey))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
-        }
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
 
-        if (cbKey == 0)
-        {
-            goto cleanup;
-        }
+    if (!OSSL_PARAM_get_size_t(p, &cbKey))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+        goto cleanup;
+    }
 
-        skey = p_scossl_generic_skeymgmt_new(provctx->libctx);
-        if (skey == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
+    skey = p_scossl_generic_skeymgmt_new(provctx->libctx);
+    if (skey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
 
+    if (cbKey > 0)
+    {
         skey->pbKey = OPENSSL_secure_malloc(cbKey);
         if (skey->pbKey == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
-
         SymCryptRandom(skey->pbKey, cbKey);
-        skey->cbKey = cbKey;
-
     }
+
+    skey->cbKey = cbKey;
 
     status = SCOSSL_SUCCESS;
 

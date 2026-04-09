@@ -519,7 +519,6 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
     ALG_TABLE_END};
 
 // Symmetric key management
-#ifdef OSSL_OP_SKEYMGMT
 extern const OSSL_DISPATCH p_scossl_aes_skeymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_generic_skeymgmt_functions[];
 
@@ -527,7 +526,6 @@ static const OSSL_ALGORITHM p_scossl_skeymgmt[] = {
     ALG("AES", p_scossl_aes_skeymgmt_functions),
     ALG("GENERIC-SECRET", p_scossl_generic_skeymgmt_functions),
     ALG_TABLE_END};
-#endif // OSSL_OP_SKEYMGMT
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
@@ -620,10 +618,8 @@ static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx,
         return p_scossl_decoder;
     case OSSL_OP_ENCODER:
         return p_scossl_encoder;
-#ifdef OSSL_OP_SKEYMGMT
     case OSSL_OP_SKEYMGMT:
         return p_scossl_skeymgmt;
-#endif
     }
 
     return NULL;
