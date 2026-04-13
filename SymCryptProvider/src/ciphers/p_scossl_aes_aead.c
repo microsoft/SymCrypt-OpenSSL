@@ -8,6 +8,7 @@
 
 #include "scossl_aes_aead.h"
 #include "p_scossl_aes.h"
+#include "p_scossl_skey.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -113,6 +114,20 @@ static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX
                                                    _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_gcm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_encrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_gcm_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_decrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_gcm_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_gcm_final(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
@@ -372,6 +387,20 @@ static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX
     return p_scossl_aes_ccm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_encrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_ccm_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_decrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_ccm_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
 static SCOSSL_STATUS p_scossl_aes_ccm_final(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
                                             _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, ossl_unused size_t outsize)
 {
@@ -579,6 +608,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
         {OSSL_FUNC_CIPHER_GETTABLE_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_params},            \
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_##lcmode##_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_##lcmode##_settable_ctx_params}, \
+        {OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_##lcmode##_skey_encrypt_init},     \
+        {OSSL_FUNC_CIPHER_DECRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_##lcmode##_skey_decrypt_init},     \
         {0, NULL}};
 
 IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(128, SCOSSL_GCM_DEFAULT_IV_LENGTH, gcm, GCM)

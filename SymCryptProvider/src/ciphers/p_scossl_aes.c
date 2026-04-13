@@ -10,6 +10,7 @@
 #include "scossl_helpers.h"
 #include "p_scossl_base.h"
 #include "p_scossl_aes.h"
+#include "p_scossl_skey.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,12 +149,26 @@ static SCOSSL_STATUS p_scossl_aes_generic_decrypt_init(_Inout_ SCOSSL_AES_CTX *c
     return p_scossl_aes_generic_init_internal(ctx, FALSE, key, keylen, iv, ivlen, params);
 }
 
+static SCOSSL_STATUS p_scossl_aes_generic_skey_encrypt_init(_Inout_ SCOSSL_AES_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                            _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                            _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_generic_init_internal(ctx, TRUE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_generic_skey_decrypt_init(_Inout_ SCOSSL_AES_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                            _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                            _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_aes_generic_init_internal(ctx, FALSE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+}
+
 #define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
 
 // Verifies the TLS padding from the end of record, extracts the MAC from the end of
-// the unpadded record, and saves the result to ctx->tlsMac. 
-// 
-// If ctx->tlsMacSize is 0 (in the case of encrypt-then-mac), no MAC is extracted, 
+// the unpadded record, and saves the result to ctx->tlsMac.
+//
+// If ctx->tlsMacSize is 0 (in the case of encrypt-then-mac), no MAC is extracted,
 // but the padding is still verified and removed.
 //
 // The MAC will later be fetched through p_scossl_aes_generic_get_ctx_params
@@ -1028,6 +1043,8 @@ static SCOSSL_STATUS scossl_aes_cfb8_cipher(_Inout_ SCOSSL_AES_CTX *ctx,
         {OSSL_FUNC_CIPHER_GETTABLE_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_params},         \
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_generic_settable_ctx_params}, \
+        {OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_generic_skey_encrypt_init},     \
+        {OSSL_FUNC_CIPHER_DECRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_generic_skey_decrypt_init},     \
         {0, NULL}};
 
 IMPLEMENT_SCOSSL_AES_GENERIC_CIPHER(128, SYMCRYPT_AES_BLOCK_SIZE, cbc, CBC, block, SYMCRYPT_AES_BLOCK_SIZE)

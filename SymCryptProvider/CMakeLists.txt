@@ -11,7 +11,7 @@ configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/inc/p_scossl_base.h)
 
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL 3.5 REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
 find_library(SYMCRYPT_LIBRARY symcrypt PATHS ${CMAKE_SOURCE_DIR})
@@ -52,6 +52,8 @@ set(SCOSSL_SOURCES
     ./src/mac/p_scossl_kmac.c
     ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_rsa_signature.c
+    ./src/skeymgmt/p_scossl_aes_skeymgmt.c
+    ./src/skeymgmt/p_scossl_generic_skeymgmt.c
     ./src/p_scossl_bio.c
     ./src/p_scossl_ecc.c
     ./src/p_scossl_rand.c
