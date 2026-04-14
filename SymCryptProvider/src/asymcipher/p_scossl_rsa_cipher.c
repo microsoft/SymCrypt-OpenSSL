@@ -169,6 +169,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
+    if (out == NULL)
+    {
+        *outlen = cbModulus;
+        return SCOSSL_SUCCESS;
+    }
+
     if (outsize < cbModulus)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
