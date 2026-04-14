@@ -32,6 +32,7 @@ typedef struct
     PCSCOSSL_MAC_EX pMacEx;
     PBYTE pbKey;
     SIZE_T cbKey;
+    BOOL initialized;
 
     // Provider specific fields
     PVOID libctx;
