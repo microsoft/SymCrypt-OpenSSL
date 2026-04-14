@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
+#define SCOSSL_X25519_KEY_SIZE (32)
 #define SCOSSL_ECC_DEFAULT_DIGEST SN_sha256
 #define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
@@ -568,7 +568,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     {
         if (keyCtx->isX25519)
         {
-            if (!OSSL_PARAM_set_uint32(p, SCOSSL_X25519_MAX_SIZE))
+            if (!OSSL_PARAM_set_uint32(p, SCOSSL_X25519_KEY_SIZE))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
@@ -1332,10 +1332,12 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    PSYMCRYPT_ECKEY ecKey = NULL;
     PBYTE  pbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
+    BYTE modifiedPrivateBits = 0;
     const OSSL_PARAM *p;
 
     // Other parameters
@@ -1352,17 +1354,17 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
     // Keypair
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
-        if ((keyCtx->key = SymCryptEckeyAllocate(keyCtx->curve))== NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY)) != NULL)
         {
             if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPublicKey, 0, &cbPublicKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+
+            if (cbPublicKey != SCOSSL_X25519_KEY_SIZE)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
                 goto cleanup;
             }
         }
@@ -1375,13 +1377,33 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 goto cleanup;
             }
 
+            // Match the default OpenSSL provider by rejecting empty or short
+            // raw X25519 private keys before applying RFC 7748 clamping.
+            if (cbPrivateKey != SCOSSL_X25519_KEY_SIZE)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+                goto cleanup;
+            }
+
             // Preserve original bits for export
-            keyCtx->modifiedPrivateBits = pbPrivateKey[0] & 0x07;
-            keyCtx->modifiedPrivateBits |= pbPrivateKey[cbPrivateKey-1] & 0xc0;
+            modifiedPrivateBits = pbPrivateKey[0] & 0x07;
+            modifiedPrivateBits |= pbPrivateKey[cbPrivateKey-1] & 0xc0;
 
             pbPrivateKey[0] &= 0xf8;
             pbPrivateKey[cbPrivateKey-1] &= 0x7f;
             pbPrivateKey[cbPrivateKey-1] |= 0x40;
+        }
+
+        if (pbPrivateKey == NULL && pbPublicKey == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+            goto cleanup;
+        }
+
+        if ((ecKey = SymCryptEckeyAllocate(keyCtx->curve)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
         }
 
         scError = SymCryptEckeySetValue(
@@ -1390,18 +1412,35 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
             SYMCRYPT_ECPOINT_FORMAT_X,
             SYMCRYPT_FLAG_ECKEY_ECDH,
-            keyCtx->key);
+            ecKey);
         if (scError != SYMCRYPT_NO_ERROR)
         {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptEckeySetValue failed", scError);
             goto cleanup;
         }
 
+        if (keyCtx->key != NULL)
+        {
+            SymCryptEckeyFree(keyCtx->key);
+        }
+
+#ifdef KEYSINUSE_ENABLED
+        // Reset keysinuse in case new key material is overwriting existing
+        p_scossl_ecc_reset_keysinuse(keyCtx);
+#endif
+
+        keyCtx->key = ecKey;
+        ecKey = NULL;
+        keyCtx->modifiedPrivateBits = modifiedPrivateBits;
         keyCtx->initialized = TRUE;
     }
 
     ret = SCOSSL_SUCCESS;
 cleanup:
+    if (ret != SCOSSL_SUCCESS && ecKey != NULL)
+    {
+        SymCryptEckeyFree(ecKey);
+    }
 
     OPENSSL_secure_clear_free(pbPrivateKey, cbPrivateKey);
     OPENSSL_free(pbPublicKey);
