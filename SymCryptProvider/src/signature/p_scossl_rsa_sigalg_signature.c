@@ -188,8 +188,12 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
             return p_scossl_rsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
         }
 
-        return p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
-               p_scossl_rsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
+        if (p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) != SCOSSL_SUCCESS)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        return p_scossl_rsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
     }
 
     return p_scossl_rsa_sign_internal(ctx, sig, siglen, sigsize, tbs, tbslen);
@@ -223,8 +227,12 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         }
         ctx->cbSignature = siglen;
 
-        return p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
-               p_scossl_rsa_sigalg_verify_message_final(ctx);
+        if (p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) != SCOSSL_SUCCESS)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        return p_scossl_rsa_sigalg_verify_message_final(ctx);
     }
 
     return p_scossl_rsa_verify_internal(ctx, sig, siglen, tbs, tbslen);

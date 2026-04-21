@@ -102,11 +102,12 @@ SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(SCOSSL_RSA_SIGN_CTX *ctx)
     {
         if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
             (ctx->mdctx != NULL && ((copyCtx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
-            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
+            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)) ||
+            (ctx->pbSignature != NULL && ((copyCtx->pbSignature = OPENSSL_memdup(ctx->pbSignature, ctx->cbSignature)) == NULL)))
         {
             p_scossl_rsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            copyCtx = NULL;
+            return NULL;
         }
 
         copyCtx->keyCtx = ctx->keyCtx;

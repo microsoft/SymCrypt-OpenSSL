@@ -124,6 +124,10 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_sign_message_final(_In_ SCOSSL_ECDSA_
     return p_scossl_ecdsa_sign_internal(ctx, sig, siglen, sigsize, digest, cbDigest);
 }
 
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
 static int p_scossl_ecdsa_sigalg_verify_message_final(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
@@ -178,13 +182,21 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
             return p_scossl_ecdsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
         }
 
-        return p_scossl_ecdsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
-               p_scossl_ecdsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
+        if (p_scossl_ecdsa_sigalg_signverify_message_update(ctx, tbs, tbslen) <= 0)
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        return p_scossl_ecdsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
     }
 
     return p_scossl_ecdsa_sign_internal(ctx, sig, siglen, sigsize, tbs, tbslen);
 }
 
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
 static int p_scossl_ecdsa_sigalg_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
                                         _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
@@ -213,8 +225,12 @@ static int p_scossl_ecdsa_sigalg_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
         }
         ctx->cbSignature = siglen;
 
-        return p_scossl_ecdsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
-               p_scossl_ecdsa_sigalg_verify_message_final(ctx);
+        if (p_scossl_ecdsa_sigalg_signverify_message_update(ctx, tbs, tbslen) <= 0)
+        {
+            return 0;
+        }
+
+        return p_scossl_ecdsa_sigalg_verify_message_final(ctx);
     }
 
     return p_scossl_ecdsa_verify_internal(ctx, sig, siglen, tbs, tbslen);

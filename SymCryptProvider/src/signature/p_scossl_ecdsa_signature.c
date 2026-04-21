@@ -69,7 +69,8 @@ SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(SCOSSL_ECDSA_CTX *ctx)
     {
         if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
             (ctx->mdctx != NULL && ((copyCtx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
-            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
+            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)) ||
+            (ctx->pbSignature != NULL && ((copyCtx->pbSignature = OPENSSL_memdup(ctx->pbSignature, ctx->cbSignature)) == NULL)))
         {
             p_scossl_ecdsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -86,6 +87,7 @@ SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(SCOSSL_ECDSA_CTX *ctx)
         copyCtx->allowUpdate = ctx->allowUpdate;
         copyCtx->allowFinal = ctx->allowFinal;
         copyCtx->allowOneshot = ctx->allowOneshot;
+        copyCtx->cbSignature = ctx->cbSignature;
     }
 
     return copyCtx;
@@ -331,8 +333,10 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
     return p_scossl_ecdsa_sign_internal(ctx, sig, siglen, sigsize, tbs, tbslen);
 }
 
-// Generic dispatch one-shot verify. Enforces oneshot state before delegating
-// to the primitive.
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
 static int p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
                                  _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                  _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
