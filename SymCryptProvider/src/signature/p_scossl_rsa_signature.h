@@ -55,7 +55,7 @@ SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In
                                            _In_ const OSSL_PARAM params[], int operation);
 
 SCOSSL_STATUS p_scossl_rsa_sign_internal(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                         _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                         _Out_writes_bytes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen);
 SCOSSL_STATUS p_scossl_rsa_verify_internal(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                            _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,

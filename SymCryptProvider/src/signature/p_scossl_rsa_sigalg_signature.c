@@ -82,8 +82,8 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_signverify_message_init(_Inout_ SCOSSL_
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sigalg_signverify_message_update(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                                                   _In_reads_bytes_(datalen) const unsigned char *data,
-                                                                   size_t datalen)
+                                                                   _In_reads_bytes_(inlen) const unsigned char *in,
+                                                                   size_t inlen)
 {
     if (ctx == NULL || ctx->mdctx == NULL)
     {
@@ -99,7 +99,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_signverify_message_update(_In_ SCOSSL_R
 
     ctx->allowOneshot = 0;
 
-    return EVP_DigestUpdate(ctx->mdctx, data, datalen);
+    return EVP_DigestUpdate(ctx->mdctx, in, inlen);
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sigalg_sign_message_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
@@ -166,12 +166,12 @@ static int p_scossl_rsa_sigalg_verify_message_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
 }
 
 static SCOSSL_STATUS p_scossl_rsa_sigalg_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                              _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                              _Out_writes_bytes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                               _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     if (ctx == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
@@ -201,7 +201,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 {
     if (ctx == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
