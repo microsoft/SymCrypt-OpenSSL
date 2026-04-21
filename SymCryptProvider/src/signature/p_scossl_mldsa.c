@@ -44,7 +44,7 @@ static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
 static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
 static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
-                                               _Out_writes_bytes_(cbAlgId) PBYTE *ppbAlgId, _Out_ SIZE_T *pcbAlgId);
+                                               _Out_writes_bytes_(cbAlgId) PBYTE ppbAlgId, _Out_ SIZE_T *pcbAlgId);
 
 static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(_In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
@@ -343,7 +343,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_C
         PBYTE pbAid = abAid;
         SIZE_T cbAid;
 
-        if (p_scossl_mldsa_get_alg_id(ctx->mldsaParams, &pbAid, &cbAid) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_get_alg_id(ctx->mldsaParams, pbAid, &cbAid) != SCOSSL_SUCCESS)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -408,15 +408,14 @@ IMPLEMENT_SCOSSL_MLDSA(87)
 
 _Use_decl_annotations_
 static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
-                                               PBYTE *ppbAlgId, SIZE_T *pcbAlgId)
+                                               PBYTE pbAlgId, SIZE_T *pcbAlgId)
 {
     ASN1_OBJECT *aobj = NULL;
     X509_ALGOR *x509Alg = NULL;
     int cbAid;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
-    if (ppbAlgId == NULL ||
-        pcbAlgId == NULL)
+    if (pbAlgId == NULL || pcbAlgId == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
@@ -454,7 +453,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams
     X509_ALGOR_set0(x509Alg, aobj, V_ASN1_UNDEF, NULL);
     aobj = NULL; // X509_ALGOR_set0 takes ownership
 
-    if ((cbAid = i2d_X509_ALGOR(x509Alg, ppbAlgId)) < 0)
+    if ((cbAid = i2d_X509_ALGOR(x509Alg, &pbAlgId)) < 0)
     {
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "i2d_X509_ALGOR failed");
         goto cleanup;

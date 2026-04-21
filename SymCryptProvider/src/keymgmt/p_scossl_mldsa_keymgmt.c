@@ -132,14 +132,27 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(_Inout_ SCOSSL_MLDSA_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
-    PBYTE pbSeed = genCtx->abSeed;
     const OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ML_DSA_SEED)) != NULL &&
-        !OSSL_PARAM_get_octet_string(p, (void **)&pbSeed, SCOSSL_MLDSA_PRIVATE_SEED_LENGTH, &genCtx->cbSeed))
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ML_DSA_SEED)) != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-        return SCOSSL_FAILURE;
+        PBYTE pbSeed = genCtx->abSeed;
+        SIZE_T cbSeed = 0;
+
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&pbSeed, SCOSSL_MLDSA_PRIVATE_SEED_LENGTH, &cbSeed))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (cbSeed != SCOSSL_MLDSA_PRIVATE_SEED_LENGTH)
+        {
+            genCtx->cbSeed = 0;
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SEED_LENGTH);
+            return SCOSSL_FAILURE;
+        }
+
+        genCtx->cbSeed = cbSeed;
     }
 
     return SCOSSL_SUCCESS;
