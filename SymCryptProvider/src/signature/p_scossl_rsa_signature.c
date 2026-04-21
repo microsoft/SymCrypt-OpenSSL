@@ -151,7 +151,15 @@ static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
         copyCtx->md = ctx->md;
         copyCtx->cbSalt = ctx->cbSalt;
         copyCtx->mdInfo = ctx->mdInfo;
+        copyCtx->allowMdUpdates = ctx->allowMdUpdates;
+        copyCtx->pssRestricted = ctx->pssRestricted;
         copyCtx->mgf1MdInfo = ctx->mgf1MdInfo;
+        copyCtx->cbSaltMin = ctx->cbSaltMin;
+        copyCtx->isSigalg = ctx->isSigalg;
+        copyCtx->allowUpdate = ctx->allowUpdate;
+        copyCtx->allowFinal = ctx->allowFinal;
+        copyCtx->allowOneshot = ctx->allowOneshot;
+        copyCtx->cbSignature = ctx->cbSignature;
     }
 
     return copyCtx;
@@ -168,10 +176,18 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
     }
 
     ctx->cbSalt = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
+    ctx->cbSaltMin = -1;
     ctx->operation = operation;
+    ctx->allowMdUpdates = TRUE;
     ctx->allowUpdate = TRUE;
     ctx->allowFinal = TRUE;
     ctx->allowOneshot = TRUE;
+    ctx->isSigalg = FALSE;
+    ctx->pssRestricted = FALSE;
+
+    OPENSSL_free(ctx->pbSignature);
+    ctx->pbSignature = NULL;
+    ctx->cbSignature = 0;
 
     if (keyCtx != NULL)
     {
@@ -214,7 +230,7 @@ static SCOSSL_STATUS p_scossl_rsa_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *c
 
 #ifdef KEYSINUSE_ENABLED
         if (keysinuse_is_running() &&
-            operation == EVP_PKEY_OP_SIGN)
+            (operation == EVP_PKEY_OP_SIGN || operation == EVP_PKEY_OP_SIGNMSG))
         {
             p_scossl_rsa_init_keysinuse(keyCtx);
         }
@@ -236,9 +252,9 @@ static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, 
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
 
-static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
-                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static SCOSSL_STATUS p_scossl_rsa_sign_internal(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                                _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                                _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -246,12 +262,6 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->operation != EVP_PKEY_OP_SIGN)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -291,21 +301,15 @@ err:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
-                                         _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
-                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static SCOSSL_STATUS p_scossl_rsa_verify_internal(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                                  _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                                  _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
     int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->operation != EVP_PKEY_OP_VERIFY)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -327,7 +331,6 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
 
     return SCOSSL_FAILURE;
 }
-
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
                                                          _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
 {
@@ -396,10 +399,25 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *c
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_update(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                            _In_reads_bytes_(datalen) const unsigned char *data, size_t datalen)
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
+
+    if (ctx->isSigalg)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowUpdate)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_UPDATE_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    ctx->allowOneshot = FALSE;
 
     return EVP_DigestUpdate(ctx->mdctx, data, datalen);
 }
@@ -411,17 +429,40 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
-        return ret;
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->isSigalg)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowFinal)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FINAL_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
     }
 
     // If sig is NULL, this is a size fetch, and the digest does not need to be computed
-    if (sig == NULL || EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
+    if (sig != NULL)
     {
-        ctx->allowMdUpdates = sig != NULL;
-        ret = p_scossl_rsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
+        if (!EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
+        {
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->allowUpdate = FALSE;
+        ctx->allowFinal = FALSE;
+        ctx->allowOneshot = FALSE;
     }
+
+    ret = p_scossl_rsa_sign_internal(ctx, sig, siglen, sigsize, digest, cbDigest);
+
+    ctx->allowMdUpdates = TRUE;
 
     return ret;
 }
@@ -429,18 +470,42 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
 static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                       _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->isSigalg)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowFinal)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FINAL_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
     {
         return SCOSSL_FAILURE;
     }
 
+    ctx->allowUpdate = FALSE;
+    ctx->allowFinal = FALSE;
+    ctx->allowOneshot = FALSE;
+
+    ret = p_scossl_rsa_verify_internal(ctx, sig, siglen, digest, cbDigest);
+
     ctx->allowMdUpdates = TRUE;
 
-    return EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest) &&
-           p_scossl_rsa_verify(ctx, sig, siglen, digest, cbDigest);
+    return ret;
 }
 
 static const OSSL_PARAM *p_scossl_rsa_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
@@ -628,7 +693,8 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
             {
             case RSA_PSS_SALTLEN_AUTO:
             case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
-                if (ctx->operation == EVP_PKEY_OP_VERIFY)
+                if (ctx->operation == EVP_PKEY_OP_VERIFY ||
+                    ctx->operation == EVP_PKEY_OP_VERIFYMSG)
                 {
                     ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
                     return SCOSSL_FAILURE;
@@ -713,7 +779,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
 static const OSSL_PARAM *p_scossl_rsa_sigalg_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, ossl_unused void *provctx)
 {
-    if (ctx != NULL && ctx->operation != EVP_PKEY_OP_VERIFYMSG)
+    if (ctx != NULL && ctx->operation == EVP_PKEY_OP_VERIFYMSG)
     {
         return p_scossl_rsa_sigalg_ctx_settable_param_types;
     }
@@ -1106,30 +1172,6 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ct
     return EVP_MD_CTX_set_params(ctx->mdctx, params);
 }
 
-const OSSL_DISPATCH p_scossl_rsa_signature_functions[] = {
-    {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))p_scossl_rsa_newctx},
-    {OSSL_FUNC_SIGNATURE_DUPCTX, (void (*)(void))p_scossl_rsa_dupctx},
-    {OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))p_scossl_rsa_freectx},
-    {OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))p_scossl_rsa_sign_init},
-    {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_rsa_sign},
-    {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_rsa_verify_init},
-    {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_rsa_verify},
-    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_rsa_digest_sign_init},
-    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
-    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, (void (*)(void))p_scossl_rsa_digest_sign_final},
-    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, (void (*)(void))p_scossl_rsa_digest_verify_init},
-    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
-    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, (void (*)(void))p_scossl_rsa_digest_verify_final},
-    {OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_get_ctx_params},
-    {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_gettable_ctx_params},
-    {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_set_ctx_params},
-    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_settable_ctx_params},
-    {OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_get_ctx_md_params},
-    {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_gettable_ctx_md_params},
-    {OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_set_ctx_md_params},
-    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_settable_ctx_md_params},
-    {0, NULL}};
-
 static SCOSSL_STATUS p_scossl_rsa_sigalg_signverify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
                                                          _In_ const OSSL_PARAM params[], int operation,
                                                          _In_ const char *mdname)
@@ -1246,7 +1288,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_sign_message_final(_In_ SCOSSL_RSA_SIGN
         ctx->allowOneshot = FALSE;
     }
 
-    return p_scossl_rsa_sign(ctx, sig, siglen, sigsize, abDigest, cbDigest);
+    return p_scossl_rsa_sign_internal(ctx, sig, siglen, sigsize, abDigest, cbDigest);
 }
 
 static int p_scossl_rsa_sigalg_verify_message_final(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
@@ -1275,8 +1317,99 @@ static int p_scossl_rsa_sigalg_verify_message_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     ctx->allowFinal = FALSE;
     ctx->allowOneshot = FALSE;
 
-    return p_scossl_rsa_verify(ctx, ctx->pbSignature, ctx->cbSignature, abDigest, cbDigest);
+    return p_scossl_rsa_verify_internal(ctx, ctx->pbSignature, ctx->cbSignature, abDigest, cbDigest);
 }
+
+static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                       _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                       _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowOneshot)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation == EVP_PKEY_OP_SIGNMSG)
+    {
+        if (sig == NULL)
+        {
+            return p_scossl_rsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
+        }
+
+        return p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
+               p_scossl_rsa_sigalg_sign_message_final(ctx, sig, siglen, sigsize);
+    }
+
+    return p_scossl_rsa_sign_internal(ctx, sig, siglen, sigsize, tbs, tbslen);
+}
+
+// Dispatch-facing verify function.
+// If verifying a message, digests tbs and verifies the result.
+// Otherwise, verifies tbs directly as a pre-computed digest.
+static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                         _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowOneshot)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation == EVP_PKEY_OP_VERIFYMSG)
+    {
+        OPENSSL_free(ctx->pbSignature);
+        ctx->cbSignature = 0;
+        if ((ctx->pbSignature = OPENSSL_memdup(sig, siglen)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+        ctx->cbSignature = siglen;
+
+        return p_scossl_rsa_sigalg_signverify_message_update(ctx, tbs, tbslen) &&
+               p_scossl_rsa_sigalg_verify_message_final(ctx);
+    }
+
+    return p_scossl_rsa_verify_internal(ctx, sig, siglen, tbs, tbslen);
+}
+
+const OSSL_DISPATCH p_scossl_rsa_signature_functions[] = {
+    {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))p_scossl_rsa_newctx},
+    {OSSL_FUNC_SIGNATURE_DUPCTX, (void (*)(void))p_scossl_rsa_dupctx},
+    {OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))p_scossl_rsa_freectx},
+    {OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))p_scossl_rsa_sign_init},
+    {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_rsa_sign},
+    {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_rsa_verify_init},
+    {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_rsa_verify},
+    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_rsa_digest_sign_init},
+    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
+    {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, (void (*)(void))p_scossl_rsa_digest_sign_final},
+    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, (void (*)(void))p_scossl_rsa_digest_verify_init},
+    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
+    {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, (void (*)(void))p_scossl_rsa_digest_verify_final},
+    {OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_get_ctx_params},
+    {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_gettable_ctx_params},
+    {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))p_scossl_rsa_set_ctx_params},
+    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_rsa_settable_ctx_params},
+    {OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_get_ctx_md_params},
+    {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_gettable_ctx_md_params},
+    {OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_set_ctx_md_params},
+    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, (void (*)(void))p_scossl_rsa_settable_ctx_md_params},
+    {0, NULL}};
 
 static const char **p_scossl_rsa_sigalg_query_key_types(void)
 {
