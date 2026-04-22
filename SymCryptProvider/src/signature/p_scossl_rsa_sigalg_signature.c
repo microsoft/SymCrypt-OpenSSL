@@ -13,6 +13,8 @@
 extern "C" {
 #endif
 
+#define SCOSSL_RSA_MAX_SIGNATURE_LEN (SYMCRYPT_RSAKEY_MAX_BITSIZE_MODULUS / 8)
+
 static const OSSL_PARAM p_scossl_rsa_sigalg_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_SIGNATURE, NULL, 0),
     OSSL_PARAM_END};
@@ -97,7 +99,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_signverify_message_update(_In_ SCOSSL_R
         return SCOSSL_FAILURE;
     }
 
-    ctx->allowOneshot = 0;
+    ctx->allowOneshot = FALSE;
 
     return EVP_DigestUpdate(ctx->mdctx, in, inlen);
 }
@@ -220,6 +222,13 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         OPENSSL_free(ctx->pbSignature);
         ctx->cbSignature = 0;
 
+        if (siglen == 0 ||
+            siglen > SCOSSL_RSA_MAX_SIGNATURE_LEN)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
+            return SCOSSL_FAILURE;
+        }
+
         if ((ctx->pbSignature = OPENSSL_memdup(sig, siglen)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -262,13 +271,32 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_
     {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_SIGNATURE)) != NULL)
         {
+            PCBYTE pcbSignature = NULL;
+            SIZE_T cbSignature = 0;
+
             OPENSSL_free(ctx->pbSignature);
             ctx->pbSignature = NULL;
             ctx->cbSignature = 0;
-            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbSignature, 0, &ctx->cbSignature))
+
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pcbSignature, &cbSignature))
             {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
+
+            if (cbSignature == 0 ||
+                cbSignature > SCOSSL_RSA_MAX_SIGNATURE_LEN)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
+                return SCOSSL_FAILURE;
+            }
+
+            if ((ctx->pbSignature = OPENSSL_memdup(pcbSignature, cbSignature)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                return SCOSSL_FAILURE;
+            }
+            ctx->cbSignature = cbSignature;
         }
     }
 

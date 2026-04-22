@@ -282,14 +282,14 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_set_ctx_params(_Inout_ SCOSSL_ECDSA_C
     {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_SIGNATURE)) != NULL)
         {
-            PCBYTE pbSignature = NULL;
+            PCBYTE pcbSignature = NULL;
             SIZE_T cbSignature = 0;
 
             OPENSSL_free(ctx->pbSignature);
             ctx->pbSignature = NULL;
             ctx->cbSignature = 0;
 
-            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbSignature, &cbSignature))
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pcbSignature, &cbSignature))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
@@ -302,7 +302,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_set_ctx_params(_Inout_ SCOSSL_ECDSA_C
                 return SCOSSL_FAILURE;
             }
 
-            if ((ctx->pbSignature = OPENSSL_memdup(pbSignature, cbSignature)) == NULL)
+            if ((ctx->pbSignature = OPENSSL_memdup(pcbSignature, cbSignature)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 return SCOSSL_FAILURE;

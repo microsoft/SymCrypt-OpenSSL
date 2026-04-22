@@ -419,6 +419,8 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     // If sig is NULL, this is a size fetch, and the digest does not need to be computed
     if (sig != NULL)
     {
+        ctx->allowMdUpdates = TRUE;
+
         if (!EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
         {
             return SCOSSL_FAILURE;
@@ -431,7 +433,6 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
 
     ret = p_scossl_rsa_sign_internal(ctx, sig, siglen, sigsize, digest, cbDigest);
 
-    ctx->allowMdUpdates = TRUE;
 
     return ret;
 }
