@@ -14,15 +14,6 @@ extern "C" {
 #define NID_secp192r1 (NID_X9_62_prime192v1)
 #define NID_secp256r1 (NID_X9_62_prime256v1)
 
-// If r and s are both 0, the DER encoding would be 8 bytes
-// (0x30 0x06 0x02 0x01 0x00 0x02 0x01 0x00)
-// integers must contain at least 1 octet of content in DER
-#define SCOSSL_ECDSA_MIN_DER_SIGNATURE_LEN (8)
-// Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
-#define SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN (139)
-// Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
-#define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
-
 static BOOL scossl_ecc_initialized = FALSE;
 static PSYMCRYPT_ECURVE _hidden_curve_P192 = NULL;
 static PSYMCRYPT_ECURVE _hidden_curve_P224 = NULL;
@@ -422,13 +413,13 @@ SCOSSL_STATUS scossl_ecc_init_static()
         ((_hidden_curve_P256 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP256, 0)) == NULL) ||
         ((_hidden_curve_P384 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP384, 0)) == NULL) ||
         ((_hidden_curve_P521 = SymCryptEcurveAllocate(SymCryptEcurveParamsNistP521, 0)) == NULL) ||
-        ((_hidden_curve_X25519 = SymCryptEcurveAllocate(SymCryptEcurveParamsCurve25519, 0)) == NULL) || 
+        ((_hidden_curve_X25519 = SymCryptEcurveAllocate(SymCryptEcurveParamsCurve25519, 0)) == NULL) ||
         ((_hidden_curve_brainpoolP256r1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP256r1, 0)) == NULL) ||
         ((_hidden_curve_brainpoolP384r1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP384r1, 0)) == NULL) ||
         ((_hidden_curve_brainpoolP512r1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP512r1, 0)) == NULL) ||
         ((_hidden_curve_brainpoolP256t1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP256t1, 0)) == NULL) ||
-        ((_hidden_curve_brainpoolP384t1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP384t1, 0)) == NULL) || 
-        ((_hidden_curve_brainpoolP512t1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP512t1, 0)) == NULL)) 
+        ((_hidden_curve_brainpoolP384t1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP384t1, 0)) == NULL) ||
+        ((_hidden_curve_brainpoolP512t1 = SymCryptEcurveAllocate(SymCryptEcurveParamsBrainpoolP512t1, 0)) == NULL))
     {
         return SCOSSL_FAILURE;
     }
@@ -1068,10 +1059,14 @@ SCOSSL_STATUS scossl_ecdsa_sign(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     return SCOSSL_SUCCESS;
 }
 
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
 _Use_decl_annotations_
-SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
-                                  PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                  PCBYTE pbSignature, SIZE_T pcbSignature)
+int scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
+                        PCBYTE pbHashValue, SIZE_T cbHashValue,
+                        PCBYTE pbSignature, SIZE_T pcbSignature)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     BYTE buf[SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN] = {0};
@@ -1082,14 +1077,14 @@ SCOSSL_STATUS scossl_ecdsa_verify(PSYMCRYPT_ECKEY key, PCSYMCRYPT_ECURVE curve,
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY,
             "SymCryptEckeyExtendKeyUsage failed", scError);
-        return SCOSSL_FAILURE;
+        return -1;
     }
 
-    if (!scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig))
+    if (scossl_ecdsa_remove_der(pbSignature, pcbSignature, &buf[0], cbSymCryptSig) != SCOSSL_SUCCESS)
     {
         SCOSSL_LOG_ERROR(SCOSSL_ERR_F_ECDSA_VERIFY, ERR_R_OPERATION_FAIL,
             "scossl_ecdsa_remove_der failed");
-        return SCOSSL_FAILURE;
+        return -1;
     }
 
     scError = SymCryptEcDsaVerify(

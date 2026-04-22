@@ -64,7 +64,7 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
 // Verifies that the signature in sigbuf of size sig_len is a valid ECDSA signature of the hash value dgst
 // of size dgst_len using the public key eckey. The parameter type is ignored.
 // Returns 1 for a valid signature, 0 for an invalid signature, and -1 on error.
-SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+int e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
                           _In_reads_bytes_(sig_len) const unsigned char* sigbuf, int sig_len, _In_ EC_KEY* eckey);
 
 // Verifies that the signature in sig is a valid ECDSA signature of the hash value dgst of size dgst_len

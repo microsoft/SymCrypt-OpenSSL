@@ -96,10 +96,16 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_sign_message_final(_In_ SCOSSL_ECDSA_
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx == NULL || ctx->mdctx == NULL)
+    if (ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (ctx->mdctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+        return 0;
     }
 
     if (!ctx->allowFinal)
@@ -133,21 +139,27 @@ static int p_scossl_ecdsa_sigalg_verify_message_final(_In_ SCOSSL_ECDSA_CTX *ctx
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx == NULL || ctx->mdctx == NULL)
+    if (ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return SCOSSL_FAILURE;
+        return 0;
+    }
+
+    if (ctx->mdctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+        return 0;
     }
 
     if (!ctx->allowFinal)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FINAL_CALL_OUT_OF_ORDER);
-        return SCOSSL_FAILURE;
+        return 0;
     }
 
     if (!EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
     {
-        return SCOSSL_FAILURE;
+        return 0;
     }
 
     ctx->allowUpdate = FALSE;
@@ -204,24 +216,32 @@ static int p_scossl_ecdsa_sigalg_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
     if (ctx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return -1;
+        return 0;
     }
 
     if (!ctx->allowOneshot)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
-        return -1;
+        return 0;
     }
 
     if (ctx->operation == EVP_PKEY_OP_VERIFYMSG)
     {
         OPENSSL_free(ctx->pbSignature);
+        ctx->pbSignature = NULL;
         ctx->cbSignature = 0;
+
+        if (siglen == 0 ||
+            siglen > SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
+            return 0;
+        }
 
         if ((ctx->pbSignature = OPENSSL_memdup(sig, siglen)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            return -1;
+            return 0;
         }
         ctx->cbSignature = siglen;
 
@@ -262,13 +282,32 @@ static SCOSSL_STATUS p_scossl_ecdsa_sigalg_set_ctx_params(_Inout_ SCOSSL_ECDSA_C
     {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_SIGNATURE)) != NULL)
         {
+            PCBYTE pbSignature = NULL;
+            SIZE_T cbSignature = 0;
+
             OPENSSL_free(ctx->pbSignature);
             ctx->pbSignature = NULL;
             ctx->cbSignature = 0;
-            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbSignature, 0, &ctx->cbSignature))
+
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbSignature, &cbSignature))
             {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
+
+            if (cbSignature == 0 ||
+                cbSignature > SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
+                return SCOSSL_FAILURE;
+            }
+
+            if ((ctx->pbSignature = OPENSSL_memdup(pbSignature, cbSignature)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                return SCOSSL_FAILURE;
+            }
+            ctx->cbSignature = cbSignature;
         }
     }
 

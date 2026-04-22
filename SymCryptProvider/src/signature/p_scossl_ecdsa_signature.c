@@ -201,7 +201,7 @@ int p_scossl_ecdsa_verify_internal(SCOSSL_ECDSA_CTX *ctx,
                                    const unsigned char *sig, size_t siglen,
                                    const unsigned char *tbs, size_t tbslen)
 {
-    if (ctx == NULL || ctx->keyCtx == NULL)
+    if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         return -1;
@@ -299,8 +299,15 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+
     if (ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return 0;
     }
 
@@ -343,14 +350,14 @@ static int p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
 {
     if (ctx == NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return -1;
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
     }
 
     if (!ctx->allowOneshot)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
-        return -1;
+        return 0;
     }
 
     return p_scossl_ecdsa_verify_internal(ctx, sig, siglen, tbs, tbslen);
