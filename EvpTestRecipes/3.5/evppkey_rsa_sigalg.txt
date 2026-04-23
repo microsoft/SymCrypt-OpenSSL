@@ -83,7 +83,7 @@ Result = KEYOP_ERROR
 
 # Digest too short
 Sign = RSA-SHA1:RSA-2048
-Input = "0123456789ABCDEF12345"
+Input = "0123456789ABCDEF123"
 Output = 00
 Result = KEYOP_ERROR
 
