@@ -242,14 +242,14 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     else
     {
         cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+        if (cbModulus == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+            return SCOSSL_FAILURE;
+        }
+
         if (out == NULL)
         {
-            if (cbModulus == 0)
-            {
-                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
-                return SCOSSL_FAILURE;
-            }
-
             *outlen = cbModulus;
             return SCOSSL_SUCCESS;
         }
