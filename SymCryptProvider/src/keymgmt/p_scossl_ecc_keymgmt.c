@@ -1334,6 +1334,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     PSYMCRYPT_ECKEY ecKey = NULL;
     PBYTE  pbPrivateKey = NULL;
+    PCBYTE pcbPrivateKey = NULL;
     SIZE_T cbPrivateKey = 0;
     PBYTE  pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
@@ -1371,7 +1372,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
 
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
         {
-            if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPrivateKey, 0, &cbPrivateKey))
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pcbPrivateKey, &cbPrivateKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
@@ -1382,6 +1383,13 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
                 goto cleanup;
             }
+
+            if ((pbPrivateKey = OPENSSL_secure_malloc(cbPrivateKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+            memcpy(pbPrivateKey, pcbPrivateKey, cbPrivateKey);
 
             // Preserve original bits for export
             modifiedPrivateBits = pbPrivateKey[0] & 0x07;
