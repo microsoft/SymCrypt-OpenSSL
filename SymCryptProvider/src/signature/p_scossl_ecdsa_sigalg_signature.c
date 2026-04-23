@@ -157,6 +157,12 @@ static int p_scossl_ecdsa_sigalg_verify_message_final(_In_ SCOSSL_ECDSA_CTX *ctx
         return 0;
     }
 
+    if (ctx->pbSignature == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
+        return 0;
+    }
+
     if (!EVP_DigestFinal_ex(ctx->mdctx, digest, &cbDigest))
     {
         return 0;

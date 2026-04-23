@@ -39,9 +39,9 @@ SIZE_T scossl_ecdsa_size(_In_ PCSYMCRYPT_ECURVE curve);
 SCOSSL_STATUS scossl_ecdsa_sign(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
                                 _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                 _Out_writes_bytes_opt_(*pcbSignature) PBYTE pbSignature, _Out_ unsigned int* pcbSignature);
-SCOSSL_STATUS scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
-                                  _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                  _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+int scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
+                        _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                        _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
 #ifdef __cplusplus
 }

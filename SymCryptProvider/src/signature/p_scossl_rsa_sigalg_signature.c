@@ -122,7 +122,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_sign_message_final(_In_ SCOSSL_RSA_SIGN
         ERR_raise(ERR_LIB_PROV, PROV_R_FINAL_CALL_OUT_OF_ORDER);
         return SCOSSL_FAILURE;
     }
-\
+
     if (sig != NULL)
     {
         if (!EVP_DigestFinal_ex(ctx->mdctx, abDigest, &cbDigest))
@@ -152,6 +152,12 @@ static int p_scossl_rsa_sigalg_verify_message_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     if (!ctx->allowFinal)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FINAL_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->pbSignature == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SIGNATURE_SIZE);
         return SCOSSL_FAILURE;
     }
 
@@ -220,6 +226,7 @@ static SCOSSL_STATUS p_scossl_rsa_sigalg_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (ctx->operation == EVP_PKEY_OP_VERIFYMSG)
     {
         OPENSSL_free(ctx->pbSignature);
+        ctx->pbSignature = NULL;
         ctx->cbSignature = 0;
 
         if (siglen == 0 ||
