@@ -149,6 +149,8 @@ SCOSSL_MAC_CTX *scossl_mac_dupctx(SCOSSL_MAC_CTX *ctx)
             }
         }
 
+        copyCtx->initialized = ctx->initialized;
+
         if (ctx->mdName != NULL &&
             (copyCtx->mdName = OPENSSL_strdup(ctx->mdName)) == NULL)
         {
@@ -207,6 +209,8 @@ SCOSSL_STATUS scossl_mac_set_hmac_md(SCOSSL_MAC_CTX *ctx, int mdNid)
         SCOSSL_COMMON_ALIGNED_FREE_EX(ctx->expandedKey, OPENSSL_clear_free, ctx->pMac->expandedKeySize);
         ctx->expandedKey = NULL;
     }
+
+    ctx->initialized = FALSE;
 
     switch (mdNid)
     {
@@ -282,6 +286,8 @@ SCOSSL_STATUS scossl_mac_set_cmac_cipher(SCOSSL_MAC_CTX *ctx, const EVP_CIPHER *
         ctx->expandedKey = NULL;
     }
 
+    ctx->initialized = FALSE;
+
     switch (EVP_CIPHER_nid(cipher))
     {
     case NID_aes_128_cbc:
@@ -336,21 +342,21 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->expandedKey == NULL)
-    {
-        SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
-        if (expandedKey == NULL)
-        {
-            SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
-                "Failed to aligned allocate expanded key");
-            return SCOSSL_FAILURE;
-        }
-
-        ctx->expandedKey = expandedKey;
-    }
-
     if (pbKey != NULL)
     {
+        if (ctx->expandedKey == NULL)
+        {
+            SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
+            if (expandedKey == NULL)
+            {
+                SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, ERR_R_MALLOC_FAILURE,
+                    "Failed to aligned allocate expanded key");
+                return SCOSSL_FAILURE;
+            }
+
+            ctx->expandedKey = expandedKey;
+        }
+
         scError = ctx->pMac->expandKeyFunc(ctx->expandedKey, pbKey, cbKey);
 
         if (scError != SYMCRYPT_NO_ERROR)
@@ -359,6 +365,13 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
                 "SymCryptMacExpandKey failed", scError);
             return SCOSSL_FAILURE;
         }
+
+        ctx->initialized = TRUE;
+    }
+
+    if (!ctx->initialized)
+    {
+        return SCOSSL_FAILURE;
     }
 
     ctx->pMac->initFunc(ctx->macState, ctx->expandedKey);
@@ -370,6 +383,13 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_update(SCOSSL_MAC_CTX *ctx,
                                 PCBYTE pbData, SIZE_T cbData)
 {
+    if (!ctx->initialized)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_UPDATE, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "MAC key has not been initialized");
+        return SCOSSL_FAILURE;
+    }
+
     ctx->pMac->appendFunc(ctx->macState, pbData, cbData);
 
     return SCOSSL_SUCCESS;
@@ -379,6 +399,13 @@ _Use_decl_annotations_
 SCOSSL_STATUS scossl_mac_final(SCOSSL_MAC_CTX *ctx,
                                PBYTE pbResult, SIZE_T *cbResult, SIZE_T outsize)
 {
+    if (!ctx->initialized)
+    {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_FINAL, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "MAC key has not been initialized");
+        return SCOSSL_FAILURE;
+    }
+
     if (pbResult != NULL)
     {
         if (outsize < ctx->pMac->resultSize)

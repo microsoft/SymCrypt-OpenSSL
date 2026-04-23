@@ -8,6 +8,7 @@
 
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
+#include <openssl/prov_ssl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -141,11 +142,12 @@ static SCOSSL_STATUS p_scossl_rsa_decrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ct
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+                                                  _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                  _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
+    UINT32 cbModulus;
     SCOSSL_STATUS ret;
 
     if (ctx->keyCtx == NULL)
@@ -157,6 +159,25 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->operation != EVP_PKEY_OP_ENCRYPT)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+    if (cbModulus == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (out == NULL)
+    {
+        *outlen = cbModulus;
+        return SCOSSL_SUCCESS;
+    }
+
+    if (outsize < cbModulus)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
     }
 
@@ -187,11 +208,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+                                                  _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                  _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
+    UINT32 cbModulus;
     SCOSSL_STATUS ret;
 
     if (ctx->keyCtx == NULL)
@@ -204,6 +226,41 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
+    }
+
+    if (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING)
+    {
+        if (out == NULL)
+        {
+            *outlen = SSL_MAX_MASTER_KEY_LENGTH;
+            return SCOSSL_SUCCESS;
+        }
+        if (outsize < SSL_MAX_MASTER_KEY_LENGTH)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
+    }
+    else
+    {
+        cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+        if (cbModulus == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+            return SCOSSL_FAILURE;
+        }
+
+        if (out == NULL)
+        {
+            *outlen = cbModulus;
+            return SCOSSL_SUCCESS;
+        }
+
+        if (outsize < cbModulus)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
     }
 
     // Default to SHA1 for OAEP. Update md in context so this is

@@ -1056,7 +1056,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0);
         if (scError != SYMCRYPT_NO_ERROR)
-            {
+        {
             SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
             goto cleanup;
         }
@@ -1074,7 +1074,7 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
             goto cleanup;
         }
 
-        if (memcmp(pbPrivateExponent1, pbPrivateExponent1, cbModulus) != 0)
+        if (memcmp(pbPrivateExponent1, pbPrivateExponent2, cbModulus) != 0)
         {
             goto cleanup;
         }
