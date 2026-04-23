@@ -1377,8 +1377,6 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 goto cleanup;
             }
 
-            // Match the default OpenSSL provider by rejecting empty or short
-            // raw X25519 private keys before applying RFC 7748 clamping.
             if (cbPrivateKey != SCOSSL_X25519_KEY_SIZE)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
