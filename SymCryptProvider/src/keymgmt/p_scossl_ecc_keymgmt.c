@@ -1104,6 +1104,33 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             }
         }
 
+        // RFC 7748 section 5: mask the high bit and reduce modulo p = 2^255 - 19.
+        // Non-canonical encodings (values in [p, 2^255-1]) must be accepted and
+        // treated as their canonical equivalent.
+        if (cbPublicKey == 32)
+        {
+            pbPublicKey[31] &= 0x7f;
+
+            if (pbPublicKey[0] >= 0xed && pbPublicKey[31] == 0x7f)
+            {
+                BOOL nonCanonical = TRUE;
+                for (SIZE_T i = 1; i < 31; i++)
+                {
+                    if (pbPublicKey[i] != 0xff)
+                    {
+                        nonCanonical = FALSE;
+                        break;
+                    }
+                }
+
+                if (nonCanonical)
+                {
+                    pbPublicKey[0] -= 0xed;
+                    memset(&pbPublicKey[1], 0, 31);
+                }
+            }
+        }
+
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
         {
             if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPrivateKey, 0, &cbPrivateKey))
