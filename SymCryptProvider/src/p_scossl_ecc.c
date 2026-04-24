@@ -11,8 +11,6 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
-
 // Canonicalize an X25519 public key in place per RFC 7748 section 5.
 // Masks the high bit (bit 255) and reduces non-canonical values (>= p = 2^255 - 19)
 // modulo p. The buffer must be exactly 32 bytes and mutable.
@@ -520,6 +518,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
     PBYTE pbPrivateKey = NULL;
+    UINT32 flags = SYMCRYPT_FLAG_ECKEY_ECDH;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -532,6 +531,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         numFormat = SYMCRYPT_NUMBER_FORMAT_LSB_FIRST;
         pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+        flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
     }
     else
     {
@@ -554,20 +554,15 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         if (keyCtx->isX25519)
         {
-            cbPublicKey = cbEncodedPublicKey;
-
             if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
             }
+            cbPublicKey = cbEncodedPublicKey;
 
             memcpy(pbPublicKey, pbEncodedPublicKey, cbPublicKey);
-
-            if (cbPublicKey == 32)
-            {
-                scossl_x25519_canonicalize_public_key(pbPublicKey);
-            }
+            scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
         else
         {
@@ -621,7 +616,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
         pbPublicKey, cbPublicKey,
         numFormat,
         pointFormat,
-        SYMCRYPT_FLAG_ECKEY_ECDH | (keyCtx->isX25519 ? SYMCRYPT_FLAG_KEY_NO_FIPS : 0),
+        flags,
         keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {

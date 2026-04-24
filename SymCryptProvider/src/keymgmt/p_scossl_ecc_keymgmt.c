@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
 #define SCOSSL_ECC_DEFAULT_DIGEST SN_sha256
 #define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
@@ -554,10 +553,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
                 goto cleanup;
             }
 
-            if (cbPublicKey == 32)
-            {
-                scossl_x25519_canonicalize_public_key(pbPublicKey);
-            }
+            scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
         else
         {
@@ -1107,13 +1103,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
             }
-        }
 
-        // RFC 7748 section 5: mask the high bit and reduce modulo p = 2^255 - 19.
-        // Non-canonical encodings (values in [p, 2^255-1]) must be accepted and
-        // treated as their canonical equivalent.
-        if (pbPublicKey != NULL && cbPublicKey == 32)
-        {
             scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
 
