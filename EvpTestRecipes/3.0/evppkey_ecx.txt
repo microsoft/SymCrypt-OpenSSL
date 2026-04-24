@@ -89,3 +89,69 @@ Result = KEYPAIR_MISMATCH
 
 PrivPubKeyPair = Bob-25519:Alice-25519-PUBLIC
 Result = KEYPAIR_MISMATCH
+
+Title = X25519 non-canonical public keys
+
+PrivateKeyRaw=NonCanonical-Priv-1:X25519:288796bc5aff4b81a37501757bc0753a3c21964790d38699308debc17a6eaf8d
+
+# f0ff..ff7f has value >= p, reduces to u = 3 mod p
+PublicKeyRaw=NonCanonical-Pub-1:X25519:f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=NonCanonical-Priv-1
+PeerKey=NonCanonical-Pub-1
+SharedSecret=b4e0dd76da7b071728b61f856771aa356e57eda78a5b1655cc3820fb5f854c5c
+
+PrivateKeyRaw=NonCanonical-Priv-2:X25519:60887b3dc72443026ebedbbbb70665f42b87add1440e7768fbd7e8e2ce5f639d
+
+# f0ff..ffff has high bit set AND value >= p after masking
+PublicKeyRaw=NonCanonical-Pub-2:X25519:f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+Derive=NonCanonical-Priv-2
+PeerKey=NonCanonical-Pub-2
+SharedSecret=38d6304c4a7e6d9f7959334fb5245bd2c754525d4c91db950206926234c1f633
+
+Title = X25519 low-order public keys
+
+# u = 1 (low-order point)
+PublicKeyRaw=LowOrder-Pub-1:X25519:0100000000000000000000000000000000000000000000000000000000000000
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-1
+Result=DERIVE_ERROR
+
+# Wycheproof low-order point on the curve
+PublicKeyRaw=LowOrder-Pub-2:X25519:e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-2
+Result=DERIVE_ERROR
+
+# Wycheproof low-order point on the twist
+PublicKeyRaw=LowOrder-Pub-3:X25519:5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-3
+Result=DERIVE_ERROR
+
+# u = p - 1 (low-order)
+PublicKeyRaw=LowOrder-Pub-4:X25519:ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-4
+Result=DERIVE_ERROR
+
+# Non-canonical encoding of u = 1 (value = 1 + p = eeff..ff7f)
+# Tests both canonicalization AND low-order rejection
+PublicKeyRaw=LowOrder-Pub-5-NonCanonical:X25519:eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-5-NonCanonical
+Result=DERIVE_ERROR
+
+# Non-canonical encoding of identity (value = p = edff...ff7f, reduces to 0)
+# Acceptance criterion #3: identity must be rejected
+PublicKeyRaw=LowOrder-Pub-6-Identity-NonCanonical:X25519:edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-6-Identity-NonCanonical
+Result=DERIVE_ERROR
