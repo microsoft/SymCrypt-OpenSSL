@@ -126,7 +126,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
                 pbPublicKey, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 pointFormat,
-                SYMCRYPT_FLAG_ECKEY_ECDH,
+                SYMCRYPT_FLAG_ECKEY_ECDH | (keyCtx->isX25519 ? SYMCRYPT_FLAG_KEY_NO_FIPS : 0),
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {

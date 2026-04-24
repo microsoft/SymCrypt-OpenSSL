@@ -1121,12 +1121,15 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             pbPrivateKey[cbPrivateKey-1] |= 0x40;
         }
 
+        // RFC 7748 accepts any 32-byte string as a public key, including low-order
+        // and on-twist points that do not satisfy the FIPS subgroup check.
+        // X25519 is not a FIPS algorithm, so skip the FIPS check.
         scError = SymCryptEckeySetValue(
             pbPrivateKey, cbPrivateKey,
             pbPublicKey, cbPublicKey,
             SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
             SYMCRYPT_ECPOINT_FORMAT_X,
-            SYMCRYPT_FLAG_ECKEY_ECDH,
+            SYMCRYPT_FLAG_ECKEY_ECDH | SYMCRYPT_FLAG_KEY_NO_FIPS,
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
