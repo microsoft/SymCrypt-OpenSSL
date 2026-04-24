@@ -526,8 +526,42 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         if (keyCtx->isX25519)
         {
-            pbPublicKey = (PBYTE) pbEncodedPublicKey;
             cbPublicKey = cbEncodedPublicKey;
+
+            if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
+
+            memcpy(pbPublicKey, pbEncodedPublicKey, cbPublicKey);
+
+            // RFC 7748 section 5: mask the high bit and reduce modulo p = 2^255 - 19.
+            // Non-canonical encodings (values in [p, 2^255-1]) must be accepted and
+            // treated as their canonical equivalent.
+            if (cbPublicKey == 32)
+            {
+                pbPublicKey[31] &= 0x7f;
+
+                if (pbPublicKey[0] >= 0xed && pbPublicKey[31] == 0x7f)
+                {
+                    BOOL nonCanonical = TRUE;
+                    for (SIZE_T i = 1; i < 31; i++)
+                    {
+                        if (pbPublicKey[i] != 0xff)
+                        {
+                            nonCanonical = FALSE;
+                            break;
+                        }
+                    }
+
+                    if (nonCanonical)
+                    {
+                        pbPublicKey[0] -= 0xed;
+                        memset(&pbPublicKey[1], 0, 31);
+                    }
+                }
+            }
         }
         else
         {
@@ -581,7 +615,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
         pbPublicKey, cbPublicKey,
         numFormat,
         pointFormat,
-        SYMCRYPT_FLAG_ECKEY_ECDH,
+        SYMCRYPT_FLAG_ECKEY_ECDH | (keyCtx->isX25519 ? SYMCRYPT_FLAG_KEY_NO_FIPS : 0),
         keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -600,15 +634,10 @@ cleanup:
         keyCtx->key = NULL;
     }
 
-    // X25519 needs to copy and decode the private key, other ECC needs
-    // to copy and decode the public key.
+    OPENSSL_free(pbPublicKey);
     if (keyCtx->isX25519)
     {
         OPENSSL_secure_clear_free(pbPrivateKey, cbEncodedPrivateKey);
-    }
-    else
-    {
-        OPENSSL_free(pbPublicKey);
     }
 
     EC_GROUP_free(ecGroup);
