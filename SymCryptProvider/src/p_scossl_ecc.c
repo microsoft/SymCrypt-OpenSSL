@@ -13,6 +13,34 @@ extern "C" {
 
 #define SCOSSL_X25519_MAX_SIZE (32)
 
+// Canonicalize an X25519 public key in place per RFC 7748 section 5.
+// Masks the high bit (bit 255) and reduces non-canonical values (>= p = 2^255 - 19)
+// modulo p. The buffer must be exactly 32 bytes and mutable.
+_Use_decl_annotations_
+void scossl_x25519_canonicalize_public_key(PBYTE pbPublicKey)
+{
+    pbPublicKey[31] &= 0x7f;
+
+    if (pbPublicKey[0] >= 0xed && pbPublicKey[31] == 0x7f)
+    {
+        BOOL nonCanonical = TRUE;
+        for (SIZE_T i = 1; i < 31; i++)
+        {
+            if (pbPublicKey[i] != 0xff)
+            {
+                nonCanonical = FALSE;
+                break;
+            }
+        }
+
+        if (nonCanonical)
+        {
+            pbPublicKey[0] -= 0xed;
+            memset(&pbPublicKey[1], 0, 31);
+        }
+    }
+}
+
 _Use_decl_annotations_
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(SCOSSL_PROVCTX *provctx)
 {
@@ -536,31 +564,9 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
 
             memcpy(pbPublicKey, pbEncodedPublicKey, cbPublicKey);
 
-            // RFC 7748 section 5: mask the high bit and reduce modulo p = 2^255 - 19.
-            // Non-canonical encodings (values in [p, 2^255-1]) must be accepted and
-            // treated as their canonical equivalent.
             if (cbPublicKey == 32)
             {
-                pbPublicKey[31] &= 0x7f;
-
-                if (pbPublicKey[0] >= 0xed && pbPublicKey[31] == 0x7f)
-                {
-                    BOOL nonCanonical = TRUE;
-                    for (SIZE_T i = 1; i < 31; i++)
-                    {
-                        if (pbPublicKey[i] != 0xff)
-                        {
-                            nonCanonical = FALSE;
-                            break;
-                        }
-                    }
-
-                    if (nonCanonical)
-                    {
-                        pbPublicKey[0] -= 0xed;
-                        memset(&pbPublicKey[1], 0, 31);
-                    }
-                }
+                scossl_x25519_canonicalize_public_key(pbPublicKey);
             }
         }
         else
