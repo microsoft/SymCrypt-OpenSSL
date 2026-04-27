@@ -567,7 +567,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         if (keyCtx->isX25519)
         {
-            if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
+            if ((pbPublicKey = OPENSSL_malloc(cbEncodedPublicKey)) == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
                 goto cleanup;
