@@ -110,7 +110,163 @@ Derive=NonCanonical-Priv-2
 PeerKey=NonCanonical-Pub-2
 SharedSecret=38d6304c4a7e6d9f7959334fb5245bd2c754525d4c91db950206926234c1f633
 
+# efff..ff7f has value >= p, reduces to u = 2 mod p
+PublicKeyRaw=NonCanonical-Pub-3:X25519:efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-3
+SharedSecret=E80C0BE9D3A1C5D71EDD6316E8C9115CA35397CD47109BD38E32864F1ADECF4D
+
+# f1ff..ff7f has value >= p, reduces to u = 4 mod p
+PublicKeyRaw=NonCanonical-Pub-4:X25519:f1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-4
+SharedSecret=3DC4B23E14B1E04DA492BAEBA54AE9CF9CD5298713903E6238E5128B31FA5E4E
+
+# f2ff..ff7f has value >= p, reduces to u = 5 mod p
+PublicKeyRaw=NonCanonical-Pub-5:X25519:f2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-5
+SharedSecret=717EFC3F25E74904CCDF9896B6EB5836E85A45B5A7A26F9E3ACF91F0EB7D3F4A
+
+# f3ff..ff7f has value >= p, reduces to u = 6 mod p
+PublicKeyRaw=NonCanonical-Pub-6:X25519:f3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-6
+SharedSecret=0FD3892BF714427086056B360E24A98CF0EE50BA6DC45744EBAA0BB8F9BC1F27
+
+# f4ff..ff7f has value >= p, reduces to u = 7 mod p
+PublicKeyRaw=NonCanonical-Pub-7:X25519:f4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-7
+SharedSecret=AF4F41D8794E87F83BEF3BF7B0929D43133911C25C5105AFB221A79FC9946C59
+
+# f5ff..ff7f has value >= p, reduces to u = 8 mod p
+PublicKeyRaw=NonCanonical-Pub-8:X25519:f5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-8
+SharedSecret=C8F33C10FCF2B405BB6097703DE0D4E706522736FAE188E1EBF7E4C1BCC2211B
+
+# f6ff..ff7f has value >= p, reduces to u = 9 (the base point) mod p
+PublicKeyRaw=NonCanonical-Pub-9:X25519:f6ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-9
+SharedSecret=8520F0098930A754748B7DDCB43EF75A0DBF3A0D26381AF4EBA4A98EAA9B4E6A
+
+# f7ff..ff7f has value >= p, reduces to u = 10 mod p
+PublicKeyRaw=NonCanonical-Pub-10:X25519:f7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-10
+SharedSecret=01EE50445ED8B4AE530677B182359A0E41312B80EA4CC72185D18F352F485065
+
+# f8ff..ff7f has value >= p, reduces to u = 11 mod p
+PublicKeyRaw=NonCanonical-Pub-11:X25519:f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-11
+SharedSecret=E087CBDC36A1C45005481BC63B949590DCDC0F538A04C9BBC1C13E3DB0B82A52
+
+# f9ff..ff7f has value >= p, reduces to u = 12 mod p
+PublicKeyRaw=NonCanonical-Pub-12:X25519:f9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-12
+SharedSecret=98205C5722464A4FEFA3535D51BB4BFD25E7F1584A4DD7AFA74CE035D058892A
+
+# faff..ff7f has value >= p, reduces to u = 13 mod p
+PublicKeyRaw=NonCanonical-Pub-13:X25519:faffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-13
+SharedSecret=B8042BA97FC573CA543F1D05A56F3DC45BE0CB1B13CB9E01F07386E479980314
+
+# fbff..ff7f has value >= p, reduces to u = 14 mod p
+PublicKeyRaw=NonCanonical-Pub-14:X25519:fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-14
+SharedSecret=53446A13586F563B6C32B9F40FA122A5F15AF45C5E750003A27C280CD39BC340
+
+# fcff..ff7f has value >= p, reduces to u = 15 mod p
+PublicKeyRaw=NonCanonical-Pub-15:X25519:fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-15
+SharedSecret=FD5168B75730FD82D6392D05D53E2346CCD2F0895D4588F68977BE2BD719BA3B
+
+# fdff..ff7f has value >= p, reduces to u = 16 mod p
+PublicKeyRaw=NonCanonical-Pub-16:X25519:fdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-16
+SharedSecret=2FEF9732A4204D308743EC3DF457D9F6AF7AB3601097E4201FF04D773EC4C815
+
+# feff..ff7f has value >= p, reduces to u = 17 mod p
+PublicKeyRaw=NonCanonical-Pub-17:X25519:feffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-17
+SharedSecret=81A02A45014594332261085128959869FC0540C6B12380F51DB4B41380DE2C2C
+
+# ffff..ff7f has value >= p, reduces to u = 18 mod p
+PublicKeyRaw=NonCanonical-Pub-18:X25519:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+
+Derive=Alice-25519-Raw
+PeerKey=NonCanonical-Pub-18
+SharedSecret=359668D79A67267A57FFEF8F0F4A9882A7C0E3122CB1999C5626346383F9F811
+
+# Non-canonical p+0 (reduces to u = 0, identity) and p+1 (reduces to u = 1, low-order)
+# are tested in the low-order section below as LowOrder-Pub-6-Identity-NonCanonical
+# and LowOrder-Pub-5-NonCanonical respectively.
+
+Title = X25519 high bit (bit 255) set
+
+# Canonical non-low-order key with high bit set: must produce same shared secret
+# Tests that bit 255 is masked before use
+PublicKeyRaw=HighBit-Pub-1:X25519:de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882bcf
+
+Derive=Alice-25519-Raw
+PeerKey=HighBit-Pub-1
+SharedSecret=4A5D9D5BA4CE2DE1728E3BF480350F25E07E21C947D19E3376F09B3C1E161742
+
+# Canonical low-order key (u = 0) with high bit set
+PublicKeyRaw=HighBit-LowOrder-Pub-1:X25519:0000000000000000000000000000000000000000000000000000000000000080
+
+Derive=Alice-25519-Raw
+PeerKey=HighBit-LowOrder-Pub-1
+Result=DERIVE_ERROR
+
+# Non-canonical (p+2, reduces to u = 2) with high bit set
+# Tests that high bit is masked BEFORE non-canonical reduction
+PublicKeyRaw=HighBit-NonCanonical-Pub-1:X25519:efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+Derive=Alice-25519-Raw
+PeerKey=HighBit-NonCanonical-Pub-1
+SharedSecret=E80C0BE9D3A1C5D71EDD6316E8C9115CA35397CD47109BD38E32864F1ADECF4D
+
+# Non-canonical (p+1, reduces to u = 1, low-order) with high bit set
+# Tests high-bit masking + non-canonical reduction + low-order rejection
+PublicKeyRaw=HighBit-NonCanonical-Pub-2:X25519:eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+Derive=Alice-25519-Raw
+PeerKey=HighBit-NonCanonical-Pub-2
+Result=DERIVE_ERROR
+
 Title = X25519 low-order public keys
+
+# u = 0 (identity)
+PublicKeyRaw=LowOrder-Pub-0:X25519:0000000000000000000000000000000000000000000000000000000000000000
+
+Derive=Alice-25519-Raw
+PeerKey=LowOrder-Pub-0
+Result=DERIVE_ERROR
 
 # u = 1 (low-order point)
 PublicKeyRaw=LowOrder-Pub-1:X25519:0100000000000000000000000000000000000000000000000000000000000000
