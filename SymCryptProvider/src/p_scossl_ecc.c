@@ -260,7 +260,7 @@ SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL is
 {
     if (keyCtx->isX25519)
     {
-        return SCOSSL_X25519_MAX_SIZE;
+        return SCOSSL_X25519_KEY_SIZE;
     }
     else if (isEcdh)
     {
@@ -532,6 +532,13 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
         numFormat = SYMCRYPT_NUMBER_FORMAT_LSB_FIRST;
         pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
         flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+
+        if (pbEncodedPublicKey != NULL && cbEncodedPublicKey != SCOSSL_X25519_KEY_SIZE ||
+            pbEncodedPrivateKey != NULL && cbEncodedPrivateKey != SCOSSL_X25519_KEY_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            goto cleanup;
+        }
     }
     else
     {
