@@ -11,7 +11,33 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
+// Canonicalize an X25519 public key in place per RFC 7748 section 5.
+// Masks the high bit (bit 255) and reduces non-canonical values (>= p = 2^255 - 19)
+// modulo p. The buffer must be exactly 32 bytes and mutable.
+_Use_decl_annotations_
+void p_scossl_x25519_canonicalize_public_key(PBYTE pbPublicKey)
+{
+    pbPublicKey[31] &= 0x7f;
+
+    if (pbPublicKey[0] >= 0xed && pbPublicKey[31] == 0x7f)
+    {
+        BOOL nonCanonical = TRUE;
+        for (SIZE_T i = 1; i < 31; i++)
+        {
+            if (pbPublicKey[i] != 0xff)
+            {
+                nonCanonical = FALSE;
+                break;
+            }
+        }
+
+        if (nonCanonical)
+        {
+            pbPublicKey[0] -= 0xed;
+            memset(&pbPublicKey[1], 0, 31);
+        }
+    }
+}
 
 _Use_decl_annotations_
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(SCOSSL_PROVCTX *provctx)
@@ -53,6 +79,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     SIZE_T cbPrivateKey = 0;
     SCOSSL_STATUS success = SCOSSL_FAILURE;
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    UINT32 flags = SYMCRYPT_FLAG_ECKEY_ECDH;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
@@ -120,13 +147,18 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
                 goto cleanup;
             }
 
+            if (keyCtx->isX25519)
+            {
+                flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+            }
+
             // Default ECDH only. If the key is used for ECDSA then we call SymCryptEckeyExtendKeyUsage
             scError = SymCryptEckeySetValue(
                 pbPrivateKey, cbPrivateKey,
                 pbPublicKey, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 pointFormat,
-                SYMCRYPT_FLAG_ECKEY_ECDH,
+                flags,
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
@@ -234,7 +266,7 @@ SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL is
 {
     if (keyCtx->isX25519)
     {
-        return SCOSSL_X25519_MAX_SIZE;
+        return SCOSSL_X25519_KEY_SIZE;
     }
     else if (isEcdh)
     {
@@ -492,6 +524,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     PBYTE pbPublicKey = NULL;
     SIZE_T cbPublicKey = 0;
     PBYTE pbPrivateKey = NULL;
+    UINT32 flags = SYMCRYPT_FLAG_ECKEY_ECDH;
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -504,6 +537,14 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         numFormat = SYMCRYPT_NUMBER_FORMAT_LSB_FIRST;
         pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+        flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+
+        if ((pbEncodedPublicKey != NULL && cbEncodedPublicKey != SCOSSL_X25519_KEY_SIZE) ||
+            (pbEncodedPrivateKey != NULL && cbEncodedPrivateKey != SCOSSL_X25519_KEY_SIZE))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+            goto cleanup;
+        }
     }
     else
     {
@@ -526,8 +567,15 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     {
         if (keyCtx->isX25519)
         {
-            pbPublicKey = (PBYTE) pbEncodedPublicKey;
+            if ((pbPublicKey = OPENSSL_malloc(cbEncodedPublicKey)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
             cbPublicKey = cbEncodedPublicKey;
+
+            memcpy(pbPublicKey, pbEncodedPublicKey, cbPublicKey);
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
         else
         {
@@ -581,7 +629,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
         pbPublicKey, cbPublicKey,
         numFormat,
         pointFormat,
-        SYMCRYPT_FLAG_ECKEY_ECDH,
+        flags,
         keyCtx->key);
     if (scError != SYMCRYPT_NO_ERROR)
     {
@@ -600,15 +648,10 @@ cleanup:
         keyCtx->key = NULL;
     }
 
-    // X25519 needs to copy and decode the private key, other ECC needs
-    // to copy and decode the public key.
+    OPENSSL_free(pbPublicKey);
     if (keyCtx->isX25519)
     {
         OPENSSL_secure_clear_free(pbPrivateKey, cbEncodedPrivateKey);
-    }
-    else
-    {
-        OPENSSL_free(pbPublicKey);
     }
 
     EC_GROUP_free(ecGroup);

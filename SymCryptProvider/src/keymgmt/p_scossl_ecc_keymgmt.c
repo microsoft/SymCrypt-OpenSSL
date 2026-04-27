@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
 #define SCOSSL_ECC_DEFAULT_DIGEST SN_sha256
 #define SCOSSL_ECC_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
@@ -527,6 +526,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    UINT32 flags = SYMCRYPT_FLAG_ECKEY_ECDH;
     const OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
@@ -553,6 +553,16 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
             }
+
+            if (cbPublicKey != SCOSSL_X25519_KEY_SIZE)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+                goto cleanup;
+            }
+
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
+
+            flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
         }
         else
         {
@@ -585,7 +595,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
             pbPublicKey, cbPublicKey,
             numFormat,
             pointFormat,
-            SYMCRYPT_FLAG_ECKEY_ECDH,
+            flags,
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -1102,6 +1112,14 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 goto cleanup;
             }
+
+            if (cbPublicKey != SCOSSL_X25519_KEY_SIZE)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
+                goto cleanup;
+            }
+
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
 
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
@@ -1109,6 +1127,12 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             if (!OSSL_PARAM_get_octet_string(p, (void **)&pbPrivateKey, 0, &cbPrivateKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
+
+            if (cbPrivateKey != SCOSSL_X25519_KEY_SIZE)
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
                 goto cleanup;
             }
 
@@ -1126,7 +1150,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
             pbPublicKey, cbPublicKey,
             SYMCRYPT_NUMBER_FORMAT_LSB_FIRST,
             SYMCRYPT_ECPOINT_FORMAT_X,
-            SYMCRYPT_FLAG_ECKEY_ECDH,
+            SYMCRYPT_FLAG_ECKEY_ECDH | SYMCRYPT_FLAG_KEY_NO_FIPS,
             keyCtx->key);
         if (scError != SYMCRYPT_NO_ERROR)
         {
