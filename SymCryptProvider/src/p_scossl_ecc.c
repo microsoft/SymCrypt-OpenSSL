@@ -15,7 +15,7 @@ extern "C" {
 // Masks the high bit (bit 255) and reduces non-canonical values (>= p = 2^255 - 19)
 // modulo p. The buffer must be exactly 32 bytes and mutable.
 _Use_decl_annotations_
-void scossl_x25519_canonicalize_public_key(PBYTE pbPublicKey)
+void p_scossl_x25519_canonicalize_public_key(PBYTE pbPublicKey)
 {
     pbPublicKey[31] &= 0x7f;
 
@@ -569,7 +569,7 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
             cbPublicKey = cbEncodedPublicKey;
 
             memcpy(pbPublicKey, pbEncodedPublicKey, cbPublicKey);
-            scossl_x25519_canonicalize_public_key(pbPublicKey);
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
         else
         {

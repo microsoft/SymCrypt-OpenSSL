@@ -560,7 +560,7 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
                 goto cleanup;
             }
 
-            scossl_x25519_canonicalize_public_key(pbPublicKey);
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
 
             flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
         }
@@ -1119,7 +1119,7 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *
                 goto cleanup;
             }
 
-            scossl_x25519_canonicalize_public_key(pbPublicKey);
+            p_scossl_x25519_canonicalize_public_key(pbPublicKey);
         }
 
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
