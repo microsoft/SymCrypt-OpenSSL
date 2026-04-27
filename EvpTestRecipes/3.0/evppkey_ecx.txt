@@ -92,130 +92,126 @@ Result = KEYPAIR_MISMATCH
 
 Title = X25519 non-canonical public keys
 
-# efff..ff7f has value >= p, reduces to u = 2 mod p
+# reduces to u = 2 mod p
 PublicKeyRaw=NonCanonical-Pub-1:X25519:efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-1
 SharedSecret=E80C0BE9D3A1C5D71EDD6316E8C9115CA35397CD47109BD38E32864F1ADECF4D
 
-PrivateKeyRaw=NonCanonical-Priv-2:X25519:288796bc5aff4b81a37501757bc0753a3c21964790d38699308debc17a6eaf8d
-
-# f0ff..ff7f has value >= p, reduces to u = 3 mod p
+# reduces to u = 3 mod p
 PublicKeyRaw=NonCanonical-Pub-2:X25519:f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
-Derive=NonCanonical-Priv-2
+Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-2
-SharedSecret=B4E0DD76DA7B071728B61F856771AA356E57EDA78A5B1655CC3820FB5F854C5C
+SharedSecret=2B6282A3A5AA1380B79D8ED2F73811F182E35E17E25A86D23C4D2F65713A6B7F
 
-PrivateKeyRaw=NonCanonical-Priv-3:X25519:60887b3dc72443026ebedbbbb70665f42b87add1440e7768fbd7e8e2ce5f639d
-
-# f0ff..ffff has high bit set AND value >= p after masking, reduces to u = 3 mod p
+# high bit set AND value >= p after masking, reduces to u = 3 mod p
 PublicKeyRaw=NonCanonical-Pub-3:X25519:f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-Derive=NonCanonical-Priv-3
+Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-3
-SharedSecret=38D6304C4A7E6D9F7959334FB5245BD2C754525D4C91DB950206926234C1F633
+SharedSecret=2B6282A3A5AA1380B79D8ED2F73811F182E35E17E25A86D23C4D2F65713A6B7F
 
-# f1ff..ff7f has value >= p, reduces to u = 4 mod p
+# reduces to u = 4 mod p
 PublicKeyRaw=NonCanonical-Pub-4:X25519:f1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-4
 SharedSecret=3DC4B23E14B1E04DA492BAEBA54AE9CF9CD5298713903E6238E5128B31FA5E4E
 
-# f2ff..ff7f has value >= p, reduces to u = 5 mod p
+# reduces to u = 5 mod p
 PublicKeyRaw=NonCanonical-Pub-5:X25519:f2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-5
 SharedSecret=717EFC3F25E74904CCDF9896B6EB5836E85A45B5A7A26F9E3ACF91F0EB7D3F4A
 
-# f3ff..ff7f has value >= p, reduces to u = 6 mod p
+# reduces to u = 6 mod p
 PublicKeyRaw=NonCanonical-Pub-6:X25519:f3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-6
 SharedSecret=0FD3892BF714427086056B360E24A98CF0EE50BA6DC45744EBAA0BB8F9BC1F27
 
-# f4ff..ff7f has value >= p, reduces to u = 7 mod p
+# reduces to u = 7 mod p
 PublicKeyRaw=NonCanonical-Pub-7:X25519:f4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-7
 SharedSecret=AF4F41D8794E87F83BEF3BF7B0929D43133911C25C5105AFB221A79FC9946C59
 
-# f5ff..ff7f has value >= p, reduces to u = 8 mod p
+# reduces to u = 8 mod p
 PublicKeyRaw=NonCanonical-Pub-8:X25519:f5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-8
 SharedSecret=C8F33C10FCF2B405BB6097703DE0D4E706522736FAE188E1EBF7E4C1BCC2211B
 
-# f6ff..ff7f has value >= p, reduces to u = 9 (the base point) mod p
+# reduces to u = 9 (the base point) mod p
 PublicKeyRaw=NonCanonical-Pub-9:X25519:f6ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-9
 SharedSecret=8520F0098930A754748B7DDCB43EF75A0DBF3A0D26381AF4EBA4A98EAA9B4E6A
 
-# f7ff..ff7f has value >= p, reduces to u = 10 mod p
+# reduces to u = 10 mod p
 PublicKeyRaw=NonCanonical-Pub-10:X25519:f7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-10
 SharedSecret=01EE50445ED8B4AE530677B182359A0E41312B80EA4CC72185D18F352F485065
 
-# f8ff..ff7f has value >= p, reduces to u = 11 mod p
+# reduces to u = 11 mod p
 PublicKeyRaw=NonCanonical-Pub-11:X25519:f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-11
 SharedSecret=E087CBDC36A1C45005481BC63B949590DCDC0F538A04C9BBC1C13E3DB0B82A52
 
-# f9ff..ff7f has value >= p, reduces to u = 12 mod p
+# reduces to u = 12 mod p
 PublicKeyRaw=NonCanonical-Pub-12:X25519:f9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-12
 SharedSecret=98205C5722464A4FEFA3535D51BB4BFD25E7F1584A4DD7AFA74CE035D058892A
 
-# faff..ff7f has value >= p, reduces to u = 13 mod p
+# reduces to u = 13 mod p
 PublicKeyRaw=NonCanonical-Pub-13:X25519:faffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-13
 SharedSecret=B8042BA97FC573CA543F1D05A56F3DC45BE0CB1B13CB9E01F07386E479980314
 
-# fbff..ff7f has value >= p, reduces to u = 14 mod p
+# reduces to u = 14 mod p
 PublicKeyRaw=NonCanonical-Pub-14:X25519:fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-14
 SharedSecret=53446A13586F563B6C32B9F40FA122A5F15AF45C5E750003A27C280CD39BC340
 
-# fcff..ff7f has value >= p, reduces to u = 15 mod p
+# reduces to u = 15 mod p
 PublicKeyRaw=NonCanonical-Pub-15:X25519:fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-15
 SharedSecret=FD5168B75730FD82D6392D05D53E2346CCD2F0895D4588F68977BE2BD719BA3B
 
-# fdff..ff7f has value >= p, reduces to u = 16 mod p
+# reduces to u = 16 mod p
 PublicKeyRaw=NonCanonical-Pub-16:X25519:fdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-16
 SharedSecret=2FEF9732A4204D308743EC3DF457D9F6AF7AB3601097E4201FF04D773EC4C815
 
-# feff..ff7f has value >= p, reduces to u = 17 mod p
+# reduces to u = 17 mod p
 PublicKeyRaw=NonCanonical-Pub-17:X25519:feffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
 PeerKey=NonCanonical-Pub-17
 SharedSecret=81A02A45014594332261085128959869FC0540C6B12380F51DB4B41380DE2C2C
 
-# ffff..ff7f has value >= p, reduces to u = 18 mod p
+# reduces to u = 18 mod p
 PublicKeyRaw=NonCanonical-Pub-18:X25519:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 
 Derive=Alice-25519-Raw
