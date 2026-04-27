@@ -79,6 +79,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     SIZE_T cbPrivateKey = 0;
     SCOSSL_STATUS success = SCOSSL_FAILURE;
     SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    UINT32 flags = SYMCRYPT_FLAG_ECKEY_ECDH;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
@@ -146,13 +147,18 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
                 goto cleanup;
             }
 
+            if (keyCtx->isX25519)
+            {
+                flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
+            }
+
             // Default ECDH only. If the key is used for ECDSA then we call SymCryptEckeyExtendKeyUsage
             scError = SymCryptEckeySetValue(
                 pbPrivateKey, cbPrivateKey,
                 pbPublicKey, cbPublicKey,
                 SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
                 pointFormat,
-                SYMCRYPT_FLAG_ECKEY_ECDH | (keyCtx->isX25519 ? SYMCRYPT_FLAG_KEY_NO_FIPS : 0),
+                flags,
                 copyCtx->key);
             if (scError != SYMCRYPT_NO_ERROR)
             {
