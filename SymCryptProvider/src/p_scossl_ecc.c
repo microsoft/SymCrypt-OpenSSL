@@ -533,8 +533,8 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
         pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
         flags |= SYMCRYPT_FLAG_KEY_NO_FIPS;
 
-        if (pbEncodedPublicKey != NULL && cbEncodedPublicKey != SCOSSL_X25519_KEY_SIZE ||
-            pbEncodedPrivateKey != NULL && cbEncodedPrivateKey != SCOSSL_X25519_KEY_SIZE)
+        if ((pbEncodedPublicKey != NULL && cbEncodedPublicKey != SCOSSL_X25519_KEY_SIZE) ||
+            (pbEncodedPrivateKey != NULL && cbEncodedPrivateKey != SCOSSL_X25519_KEY_SIZE))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             goto cleanup;
