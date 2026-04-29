@@ -36,6 +36,7 @@ static const OSSL_PARAM *p_scossl_shake_settable_ctx_params(ossl_unused void *ct
 
 static const OSSL_PARAM p_scossl_shake_gettable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM *p_scossl_shake_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
@@ -48,6 +49,13 @@ static SCOSSL_STATUS p_scossl_shake_get_ctx_params(_In_ SCOSSL_DIGEST_CTX *ctx, 
     OSSL_PARAM *p;
 
     if ((p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->xofLen))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->xofLen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
