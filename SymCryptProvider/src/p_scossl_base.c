@@ -809,6 +809,8 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
 #ifdef OSSL_FUNC_PROVIDER_RANDOM_BYTES
 #define SCOSSL_RAND_PROVIDER_STRENGTH 256
 
+// SymCrypt does not differentiate between public and private randomness,
+// so the which parameter is unused.
 static SCOSSL_STATUS p_scossl_provider_random_bytes(ossl_unused void *provctx,
                                                     ossl_unused int which,
                                                     _Out_writes_bytes_(n) void *buf, size_t n,
@@ -816,6 +818,7 @@ static SCOSSL_STATUS p_scossl_provider_random_bytes(ossl_unused void *provctx,
 {
     if (strength > SCOSSL_RAND_PROVIDER_STRENGTH)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INSUFFICIENT_DRBG_STRENGTH);
         return SCOSSL_FAILURE;
     }
 
