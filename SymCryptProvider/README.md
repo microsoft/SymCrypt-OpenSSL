@@ -126,6 +126,19 @@ reference or included in the OpenSSL config using the `.include` keyword.
 The SymCrypt provider can be configured in the SymCrypt provider section of the OpenSSL config (`symcrypt_prov_sect` by default). See the 
 [example configuration](symcrypt_prov.cnf) for reference.
 
+### Random Provider (OpenSSL 3.5+)
+OpenSSL 3.5 introduced the `random_provider` option, which routes all `RAND_bytes()` and `RAND_priv_bytes()` calls
+directly through a named provider, bypassing the default DRBG chain. To make the SymCrypt provider the default random
+provider, add the following to the `[random]` section of your `openssl.cnf` (not in the provider config section):
+
+```
+[openssl_init]
+random = random_sect
+
+[random_sect]
+random_provider = symcryptprovider
+```
+
 ### Debug Logging
 | Key           | Description                                                                                                                                   | Default   |
 | -             | -                                                                                                                                             | -         |

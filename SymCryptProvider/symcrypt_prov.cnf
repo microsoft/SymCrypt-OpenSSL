@@ -13,14 +13,3 @@ keysinuse = keysinuse_sect
 enabled = 0
 max_file_size = 5KB
 logging_delay_seconds = 3600
-
-# To make the SymCrypt provider the default random provider in
-# OpenSSL 3.5+, add the following to the [random] section of
-# your openssl.cnf (not in this provider config section):
-#
-# [random]
-# random_provider = symcryptprovider
-#
-# This routes all RAND_bytes() and RAND_priv_bytes() calls
-# directly through the SymCrypt provider, bypassing the
-# default DRBG chain.
