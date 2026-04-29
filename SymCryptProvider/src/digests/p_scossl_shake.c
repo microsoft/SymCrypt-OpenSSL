@@ -34,6 +34,29 @@ static const OSSL_PARAM *p_scossl_shake_settable_ctx_params(ossl_unused void *ct
     return p_scossl_shake_settable_ctx_param_types;
 }
 
+static const OSSL_PARAM p_scossl_shake_gettable_ctx_param_types[] = {
+    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM *p_scossl_shake_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
+{
+    return p_scossl_shake_gettable_ctx_param_types;
+}
+
+static SCOSSL_STATUS p_scossl_shake_get_ctx_params(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[])
+{
+    OSSL_PARAM *p;
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->xofLen))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
 static SCOSSL_STATUS p_scossl_shake_init(_Inout_ SCOSSL_DIGEST_CTX *ctx, ossl_unused const OSSL_PARAM params[])
 {
     SymCryptHashInit(ctx->pHash, ctx->pState);
@@ -89,6 +112,8 @@ static SCOSSL_STATUS p_scossl_shake_extract(_Inout_ SCOSSL_DIGEST_CTX *ctx,
     SCOSSL_DIGEST_FUNCTIONS_COMMON(Shake##bits##Hash, shake_##bits, SCOSSL_DIGEST_FLAG_XOF)         \
         {OSSL_FUNC_DIGEST_SET_CTX_PARAMS, (void (*)(void))p_scossl_shake_set_ctx_params},           \
         {OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_shake_settable_ctx_params}, \
+        {OSSL_FUNC_DIGEST_GET_CTX_PARAMS, (void (*)(void))p_scossl_shake_get_ctx_params},           \
+        {OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_shake_gettable_ctx_params}, \
         {OSSL_FUNC_DIGEST_INIT, (void (*)(void))p_scossl_shake_init},                               \
         {OSSL_FUNC_DIGEST_FINAL, (void (*)(void))p_scossl_shake_##bits##_final},                    \
         SCOSSL_DIGEST_SHAKE_SQUEEZE(bits)                                                           \
