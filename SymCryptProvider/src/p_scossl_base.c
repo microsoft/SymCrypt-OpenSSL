@@ -808,9 +808,6 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
 // configured as the random_provider, routing all RAND_bytes() and
 // RAND_priv_bytes() calls directly through SymCrypt. This bypasses
 // the default OpenSSL DRBG chain.
-
-// SymCrypt does not differentiate between public and private randomness,
-// so the which parameter is unused.
 static SCOSSL_STATUS p_scossl_provider_random_bytes(ossl_unused void *provctx,
                                                     ossl_unused int which,
                                                     _Out_writes_bytes_(n) void *buf, size_t n,

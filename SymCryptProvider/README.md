@@ -5,19 +5,19 @@ of the engine interface. For OpenSSL 1.1.1 and legacy function support in OpenSS
 
 All cryptographic operations using the EVP APIs in OpenSSL 3 are handled by a provider. The deprecated legacy APIs, hardcoded with a specific
 algorithm name (e.g., RSA_*) will not use providers, and should not be used in OpenSSL 3. The OpenSSL implementations are found in the default
-provider, or the FIPS provider when OpenSSL is compiled with FIPS mode. 
+provider, or the FIPS provider when OpenSSL is compiled with FIPS mode.
 
 Multiple providers can be loaded at once, with the same set of
-algorithms and/or new algorithms. When multiple providers support the same algorithm, OpenSSL's 
+algorithms and/or new algorithms. When multiple providers support the same algorithm, OpenSSL's
 [algorithm fetching rules](https://docs.openssl.org/3.3/man7/ossl-guide-libcrypto-introduction/#algorithm-fetching) are used to select
 which provider (if any) will handle a particular operation. Once selected, OpenSSL expects the provider to handle the operation entirely.
 If a provider does not support a requested algorithm, it will be ignored for that particular algorithm. This means, that if the SymCrypt
 provider does not support an algorithm, other providers can be used if loaded.
 
 Providers' implementations may differ, and are not guaranteed to have the same behavior. We attempt to make the SymCrypt provider behave as
-close to the default provider for compatibility, but some differences still exist. The SymCrypt provider does not have a reliable and 
+close to the default provider for compatibility, but some differences still exist. The SymCrypt provider does not have a reliable and
 performant way of falling through to a different provider. If the caller uses a parameter set the SymCrypt provider does not support, for
-an algorithm the SymCrypt provider does support, the operation will fail. For example, the SymCrypt provider only supports a set of named 
+an algorithm the SymCrypt provider does support, the operation will fail. For example, the SymCrypt provider only supports a set of named
 curves for ECDH and ECDSA. Attempting to use a curve other than those listed below will fail with the SymCrypt provider.
 
 _Compatibility between the default provider and SymCrypt provider is not guaranteed. Please test your application with the SymCrypt provider.
@@ -79,11 +79,11 @@ Note that just because an algorithm is FIPS certifiable, does not mean it is rec
     - PKCS1, OAEP
 
 ## Installation
-We maintain the SymCrypt-OpenSSL packages with the SymCrypt provider for a set of Linux distributions. If your platform isn't listed here, 
+We maintain the SymCrypt-OpenSSL packages with the SymCrypt provider for a set of Linux distributions. If your platform isn't listed here,
 please see [Build From Scratch](#build-from-scratch).
 
 ### Azure Linux 3
-The SymCrypt provider is available in Azure Linux 3 and enabled by default. 
+The SymCrypt provider is available in Azure Linux 3 and enabled by default.
 
 ### Debian package
 The SymCrypt provider is available as an optional package on [packages.microsoft.com](https://learn.microsoft.com/en-us/linux/packages)
@@ -92,7 +92,7 @@ for the following distributions:
 - Ubuntu 24.04 (noble)
 - Debian 12 (bookworm)
 
-The packages installs the SymCrypt provider and a baseline configuration to `/etc/symcrypt-openssl/symcrypt_prov.cnf`, but does not enable 
+The packages installs the SymCrypt provider and a baseline configuration to `/etc/symcrypt-openssl/symcrypt_prov.cnf`, but does not enable
 the provider. The OpenSSL config must be updated to include the SymCrypt provider config, or the SymCrypt provider can be loaded
 programmatically with the [OPENSSL_PROVIDER](https://docs.openssl.org/master/man3/OSSL_PROVIDER/) API.
 
@@ -123,13 +123,13 @@ either be enabled by the [OpenSSL config](https://docs.openssl.org/master/man5/c
 reference or included in the OpenSSL config using the `.include` keyword.
 
 ## Configuration
-The SymCrypt provider can be configured in the SymCrypt provider section of the OpenSSL config (`symcrypt_prov_sect` by default). See the 
+The SymCrypt provider can be configured in the SymCrypt provider section of the OpenSSL config (`symcrypt_prov_sect` by default). See the
 [example configuration](symcrypt_prov.cnf) for reference.
 
-### Random Provider (OpenSSL 3.5+)
+### Random Provider
 OpenSSL 3.5 introduced the `random_provider` option, which routes all `RAND_bytes()` and `RAND_priv_bytes()` calls
 directly through a named provider, bypassing the default DRBG chain. To make the SymCrypt provider the default random
-provider, add the following to the `[random]` section of your `openssl.cnf` (not in the provider config section):
+provider, add the following to the `[random]` section of your `openssl.cnf`:
 
 ```
 [openssl_init]
