@@ -22,6 +22,8 @@
 extern "C" {
 #endif
 
+#define SCOSSL_RAND_PROVIDER_STRENGTH (256)
+
 // SCOSSL provider debug logging
 #define CONF_LOGGING_FILE "logging_file"
 #define CONF_LOGGING_LEVEL "logging_level"
@@ -802,12 +804,10 @@ static void p_scossl_setup_logging(_In_ const OSSL_CORE_HANDLE *handle)
     }
 }
 
-// OSSL_FUNC_PROVIDER_RANDOM_BYTES is available in OpenSSL 3.5+.
 // Implementing this dispatch function allows the SymCrypt provider to be
 // configured as the random_provider, routing all RAND_bytes() and
-// RAND_priv_bytes() calls directly through SymCrypt.
-#ifdef OSSL_FUNC_PROVIDER_RANDOM_BYTES
-#define SCOSSL_RAND_PROVIDER_STRENGTH 256
+// RAND_priv_bytes() calls directly through SymCrypt. This bypasses
+// the default OpenSSL DRBG chain.
 
 // SymCrypt does not differentiate between public and private randomness,
 // so the which parameter is unused.
@@ -825,7 +825,6 @@ static SCOSSL_STATUS p_scossl_provider_random_bytes(ossl_unused void *provctx,
     SymCryptRandom(buf, n);
     return SCOSSL_SUCCESS;
 }
-#endif // OSSL_FUNC_PROVIDER_RANDOM_BYTES
 
 static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))p_scossl_teardown},
@@ -833,9 +832,7 @@ static const OSSL_DISPATCH p_scossl_base_dispatch[] = {
     {OSSL_FUNC_PROVIDER_GET_PARAMS, (void (*)(void))p_scossl_get_params},
     {OSSL_FUNC_PROVIDER_QUERY_OPERATION, (void (*)(void))p_scossl_query_operation},
     {OSSL_FUNC_PROVIDER_GET_CAPABILITIES, (void (*)(void))p_scossl_get_capabilities},
-#ifdef OSSL_FUNC_PROVIDER_RANDOM_BYTES
     {OSSL_FUNC_PROVIDER_RANDOM_BYTES, (void (*)(void))p_scossl_provider_random_bytes},
-#endif
     {0, NULL}};
 
 SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
