@@ -907,6 +907,11 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_get_params(_In_ SCOSSL_PROV_RSA_KEY_CT
 {
     OSSL_PARAM *p;
 
+    if (keyCtx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         !OSSL_PARAM_set_uint32(p, SymCryptRsakeyModulusBits(keyCtx->key)))
     {
@@ -953,7 +958,7 @@ static const OSSL_PARAM *p_scossl_rsa_keymgmt_gettable_params(ossl_unused void *
 static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
 {
     BOOL ret = TRUE;
-    if (keyCtx->key == NULL)
+    if (keyCtx == NULL || keyCtx->key == NULL)
     {
         return FALSE;
     }
@@ -975,6 +980,11 @@ static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _I
     PBYTE pbPrivateExponent1 = NULL;
     PBYTE pbPrivateExponent2 = NULL;
     SYMCRYPT_ERROR scError;
+
+    if (keyCtx1 == NULL || keyCtx2 == NULL)
+    {
+        return FALSE;
+    }
 
     UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx1->key);
 
