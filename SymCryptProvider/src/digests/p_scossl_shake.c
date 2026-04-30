@@ -13,14 +13,20 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_shake_settable_ctx_param_types[] = {
     OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_XOFLEN, NULL),
+    OSSL_PARAM_size_t(OSSL_DIGEST_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&
-        !OSSL_PARAM_get_size_t(p, &ctx->xofLen))
+    p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN);
+    if (p == NULL)
+    {
+        p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_SIZE);
+    }
+
+    if (p!= NULL && !OSSL_PARAM_get_size_t(p, &ctx->xofLen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
