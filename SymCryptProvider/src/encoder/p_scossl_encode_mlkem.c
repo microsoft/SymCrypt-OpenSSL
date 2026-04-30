@@ -60,7 +60,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
     if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
         (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, ERR_R_ASN1_LIB);
         goto cleanup;
     }
 
@@ -72,7 +72,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
 
     if (!PKCS8_pkey_set0(p8Info, p8Obj, 0, V_ASN1_UNDEF, NULL, pbDer, cbDer))
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        ERR_raise(ERR_LIB_PROV, ERR_R_ASN1_LIB);
         goto cleanup;
     }
     pbDer = NULL;
@@ -126,7 +126,7 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
 
     if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbKey, cbKey))
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        ERR_raise(ERR_LIB_PROV, ERR_R_ASN1_LIB);
         goto cleanup;
     }
     pbKey = NULL;
@@ -199,7 +199,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCOD
 
     if (!encodeSuccess)
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        ERR_raise(ERR_LIB_PROV, ERR_R_ASN1_LIB);
         goto cleanup;
     }
 
@@ -249,7 +249,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
 
     if (!encodeSuccess)
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        ERR_raise(ERR_LIB_PROV, ERR_R_ASN1_LIB);
         goto cleanup;
     }
 
@@ -292,7 +292,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
 
     if (!encodeSuccess)
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        ERR_raise(ERR_LIB_PROV, ERR_R_ASN1_LIB);
         goto cleanup;
     }
 

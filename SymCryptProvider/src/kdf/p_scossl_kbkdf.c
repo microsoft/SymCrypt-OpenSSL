@@ -378,7 +378,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
 
         if ((cipher = EVP_CIPHER_fetch(ctx->libCtx, cipherName, propq)) == NULL)
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
             goto cleanup;
         }
 
@@ -394,7 +394,7 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
             ctx->cbCmacKey = 32;
             break;
         default:
-            ERR_raise(ERR_LIB_PROV, PROV_R_UNSUPPORTED_CEK_ALG);
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
             goto cleanup;
         }
 
