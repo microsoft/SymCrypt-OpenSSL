@@ -28,7 +28,7 @@ void p_scossl_kdf_keymgmt_free_ctx(ossl_unused void *keyCtx){}
 
 static BOOL p_scossl_kdf_keymgmt_has(ossl_unused const void *keydata, ossl_unused int selection)
 {
-    return keydata != NULL;
+    return TRUE;
 }
 
 const OSSL_DISPATCH p_scossl_kdf_keymgmt_functions[] = {

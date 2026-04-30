@@ -599,11 +599,6 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
 {
     const OSSL_PARAM *p;
 
-    if (ctx == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
-
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
         SYMCRYPT_ERROR scError;
@@ -932,16 +927,8 @@ cleanup:
 static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
-    int pubKeyBits;
-    int privKeyBits;
-
-    if (ctx == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    pubKeyBits = p_scossl_dh_pubkey_bits(ctx);
-    privKeyBits = p_scossl_dh_privkey_bits(ctx);
+    int pubKeyBits = p_scossl_dh_pubkey_bits(ctx);
+    int privKeyBits = p_scossl_dh_privkey_bits(ctx);
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
@@ -1034,11 +1021,6 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
     PBYTE  pbPublicKey2 = NULL;
     SIZE_T cbPublicKey = 0;
     SYMCRYPT_ERROR scError;
-
-    if (ctx1 == NULL || ctx2 == NULL)
-    {
-        return FALSE;
-    }
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
