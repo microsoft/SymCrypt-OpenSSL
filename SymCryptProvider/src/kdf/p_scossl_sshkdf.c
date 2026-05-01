@@ -191,6 +191,16 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
 {
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         PCSYMCRYPT_HASH symcryptHashAlg = NULL;

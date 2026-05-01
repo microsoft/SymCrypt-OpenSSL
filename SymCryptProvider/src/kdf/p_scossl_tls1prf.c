@@ -172,6 +172,16 @@ SCOSSL_STATUS p_scossl_tls1prf_set_ctx_params(_Inout_ SCOSSL_PROV_TLS1_PRF_CTX *
     SIZE_T cbSeed;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         PCSYMCRYPT_MAC symcryptHmacAlg = NULL;

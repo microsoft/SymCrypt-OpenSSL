@@ -288,6 +288,16 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
     EVP_MD *md = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SECRET)) != NULL ||
         // Shared secret may be set by OSSL_KDF_PARAM_KEY instead
         (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL) 

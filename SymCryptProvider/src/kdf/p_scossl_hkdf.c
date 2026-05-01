@@ -209,6 +209,16 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
     SIZE_T cbInfo;
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE)) != NULL)
     {
         int mode = -1;
@@ -329,6 +339,16 @@ static
 SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if (!p_scossl_hkdf_set_ctx_params(ctx, params))
         return SCOSSL_FAILURE;
