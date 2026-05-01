@@ -19,6 +19,16 @@ static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ct
 {
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&
         !OSSL_PARAM_get_size_t(p, &ctx->xofLen))
     {

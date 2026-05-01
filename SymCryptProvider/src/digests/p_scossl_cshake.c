@@ -296,6 +296,16 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 {
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING)) != NULL)
     {
         if (ctx->xofState != SCOSSL_XOF_STATE_INIT)
@@ -344,6 +354,11 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 
 static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(_In_ SCOSSL_CSHAKE_CTX *ctx, ossl_unused void *provctx)
 {
+    if (ctx == NULL)
+    {
+        return p_scossl_cshake_settable_ctx_param_types;
+    }
+
     return ctx->xofState == SCOSSL_XOF_STATE_INIT ? p_scossl_cshake_settable_ctx_param_types : p_scossl_cshake_settable_ctx_param_types_initialized;
 }
 
