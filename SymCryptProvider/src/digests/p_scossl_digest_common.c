@@ -36,6 +36,9 @@ void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
 _Use_decl_annotations_
 SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
 
     if (copyCtx != NULL)
