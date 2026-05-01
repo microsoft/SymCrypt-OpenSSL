@@ -63,6 +63,9 @@ static void p_scossl_aes_gcm_freectx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx)
 
 static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_GCM_CTX);
     if (copy_ctx != NULL)
     {
@@ -81,6 +84,7 @@ static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX
         }
         SymCryptGcmKeyCopy(&ctx->key, &copy_ctx->key);
     }
+
     return copy_ctx;
 }
 
@@ -89,7 +93,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CT
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
-    if (key && keylen != ctx->keylen)
+    if (key != NULL && keylen != ctx->keylen)
     {
         return SCOSSL_FAILURE;
     }
@@ -353,6 +357,9 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
  */
 static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_CCM_CTX);
     if (copy_ctx != NULL)
     {
@@ -364,6 +371,7 @@ static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX
         copy_ctx->state = ctx->state;
         copy_ctx->state.pExpandedKey = &copy_ctx->key;
     }
+
     return copy_ctx;
 }
 
@@ -377,7 +385,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CT
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
-    if (key && keylen != ctx->keylen)
+    if (key != NULL && keylen != ctx->keylen)
     {
         return SCOSSL_FAILURE;
     }
