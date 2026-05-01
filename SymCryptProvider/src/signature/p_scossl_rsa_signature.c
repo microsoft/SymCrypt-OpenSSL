@@ -439,6 +439,16 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
     const OSSL_PARAM *p;
     const char *mdName, *mdProps;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
     {
         EVP_MD *md = NULL;
@@ -807,6 +817,11 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
     if (params == NULL)
     {
         return SCOSSL_SUCCESS;
