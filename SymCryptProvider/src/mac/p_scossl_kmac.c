@@ -216,6 +216,16 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, 
     SYMCRYPT_ERROR scError;
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_XOF)) != NULL &&
         !OSSL_PARAM_get_int(p, &ctx->xofMode))
     {

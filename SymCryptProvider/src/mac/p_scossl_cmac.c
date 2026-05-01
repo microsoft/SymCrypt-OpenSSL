@@ -88,6 +88,16 @@ static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
 {
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_CIPHER)) != NULL)
     {
         SCOSSL_STATUS success;
