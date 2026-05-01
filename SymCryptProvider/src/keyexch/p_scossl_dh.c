@@ -335,6 +335,16 @@ static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p = NULL;
 
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_PAD)) != NULL)
     {
         unsigned int pad;

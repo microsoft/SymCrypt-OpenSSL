@@ -166,6 +166,16 @@ static SCOSSL_STATUS p_scossl_kdf_keyexch_derive(_In_ SCOSSL_KDF_KEYEXCH_CTX *ct
 
 static SCOSSL_STATUS p_scossl_kdf_keyexch_set_ctx_params(_Inout_ SCOSSL_KDF_KEYEXCH_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     return ctx->kdfFns->setCtxParams(ctx->kdfCtx, params);
 }
 
