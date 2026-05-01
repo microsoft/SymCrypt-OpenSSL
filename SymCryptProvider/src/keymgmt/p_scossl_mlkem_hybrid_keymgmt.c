@@ -301,6 +301,16 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_set_params(_Inout_ SCOSSL_MLK
 {
     const OSSL_PARAM *p;
 
+    if (keyCtx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
         PCBYTE pbKey;

@@ -423,6 +423,16 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
     BOOL groupSetByParams;
     const OSSL_PARAM *p;
 
+    if (genCtx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_TYPE)) != NULL)
     {
         const char *ffcTypeName;
@@ -598,6 +608,16 @@ static const OSSL_PARAM *p_scossl_dh_keymgmt_settable_params(ossl_unused void *p
 static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        return SCOSSL_FAILURE;
+    }
+
+    if (params == NULL)
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
