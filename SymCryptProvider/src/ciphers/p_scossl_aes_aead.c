@@ -161,40 +161,50 @@ static const OSSL_PARAM *p_scossl_aes_gcm_settable_ctx_params(ossl_unused void *
 
 static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->ivlen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->ivlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->taglen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? EVP_GCM_TLS_TAG_LEN : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? EVP_GCM_TLS_TAG_LEN : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
@@ -202,14 +212,15 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
@@ -217,8 +228,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_size == 0 ||
             p->data_size > SCOSSL_GCM_MAX_TAG_LENGTH ||
@@ -227,14 +238,15 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->tag, p->data_size))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN)) != NULL &&
         (p->data == NULL ||
          p->data_type != OSSL_PARAM_OCTET_STRING ||
          !scossl_aes_gcm_iv_gen(ctx, p->data, p->data_size)))
@@ -248,20 +260,15 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
 
 static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
+    const OSSL_PARAM *p;
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN)) != NULL)
     {
         size_t ivlen;
 
@@ -278,8 +285,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
         }
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -293,8 +299,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -308,8 +314,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -323,8 +329,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -443,40 +449,50 @@ static const OSSL_PARAM *p_scossl_aes_ccm_settable_ctx_params(ossl_unused void *
 
 static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->ivlen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->ivlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->taglen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? ctx->taglen : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? ctx->taglen : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
@@ -484,14 +500,15 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
@@ -499,14 +516,15 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL)
     {
         if (p->data_size < ctx->taglen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->tag, ctx->taglen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -519,20 +537,15 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
 
 static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
+    const OSSL_PARAM *p;
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN)) != NULL)
     {
         size_t ivlen;
 
@@ -548,8 +561,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -563,8 +576,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -578,8 +591,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
