@@ -87,8 +87,12 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keymgmt_dup_key_ctx(_In_ const SCOSS
     SYMCRYPT_MLKEMKEY_FORMAT format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
-    SCOSSL_MLKEM_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));
+    SCOSSL_MLKEM_KEY_CTX *copyCtx;
 
+    if (keyCtx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_KEY_CTX));
     if (copyCtx != NULL)
     {
         copyCtx->provCtx = keyCtx->provCtx;
@@ -156,6 +160,12 @@ cleanup:
 static SCOSSL_STATUS p_scossl_mlkem_keygen_set_params(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (genCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ML_KEM_SEED)) != NULL)
     {
@@ -316,12 +326,8 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_params(_Inout_ SCOSSL_MLKEM_KEY_
 
     if (keyCtx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
@@ -462,6 +468,12 @@ static SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_params(_In_ SCOSSL_MLKEM_KEY_CTX
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     OSSL_PARAM *p;
+
+    if (keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         !OSSL_PARAM_set_int(p, p_scossl_mlkem_get_bits(keyCtx->mlkemParams)))

@@ -119,8 +119,12 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_new_ctx(_In_ SCOSSL_PROVCTX *
 
 static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL_PROV_DH_KEY_CTX *ctx, ossl_unused int selection)
 {
-    SCOSSL_PROV_DH_KEY_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_DH_KEY_CTX));
+    SCOSSL_PROV_DH_KEY_CTX *copyCtx;
 
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_DH_KEY_CTX));
     if (copyCtx != NULL)
     {
         *copyCtx = *ctx;
@@ -425,12 +429,8 @@ static SCOSSL_STATUS p_scossl_dh_keygen_set_params(_Inout_ SCOSSL_DH_KEYGEN_CTX 
 
     if (genCtx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_FFC_TYPE)) != NULL)
@@ -611,12 +611,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_set_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
@@ -947,8 +943,17 @@ cleanup:
 static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
-    int pubKeyBits = p_scossl_dh_pubkey_bits(ctx);
-    int privKeyBits = p_scossl_dh_privkey_bits(ctx);
+    int pubKeyBits;
+    int privKeyBits;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    pubKeyBits = p_scossl_dh_pubkey_bits(ctx);
+    privKeyBits = p_scossl_dh_privkey_bits(ctx);
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS)) != NULL &&
         (pubKeyBits < 0 || !OSSL_PARAM_set_int(p, pubKeyBits)))
@@ -1041,6 +1046,12 @@ static BOOL p_scossl_dh_keymgmt_match(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx1, _In_ SC
     PBYTE  pbPublicKey2 = NULL;
     SIZE_T cbPublicKey = 0;
     SYMCRYPT_ERROR scError;
+
+    if (ctx1 == NULL || ctx2 == NULL ||
+        ctx1->keyCtx == NULL || ctx2->keyCtx == NULL)
+    {
+        goto cleanup;
+    }
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
