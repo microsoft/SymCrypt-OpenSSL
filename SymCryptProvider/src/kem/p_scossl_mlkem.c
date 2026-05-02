@@ -72,7 +72,12 @@ static void p_scossl_mlkem_freectx(_Inout_ SCOSSL_MLKEM_CTX *ctx)
 
 static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
 {
-    SCOSSL_MLKEM_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_CTX));
+    SCOSSL_MLKEM_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_CTX));
 
     if (copyCtx != NULL)
     {
@@ -288,12 +293,8 @@ static SCOSSL_STATUS p_scossl_mlkem_set_ctx_params(_In_ SCOSSL_MLKEM_CTX *ctx, _
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if (ctx->operation == EVP_PKEY_OP_ENCAPSULATE &&

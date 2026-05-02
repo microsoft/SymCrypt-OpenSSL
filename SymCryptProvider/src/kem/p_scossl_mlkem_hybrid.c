@@ -53,7 +53,12 @@ static void p_scossl_mlkem_hybrid_freectx(_Inout_ SCOSSL_MLKEM_HYBRID_CTX *ctx)
 
 static SCOSSL_MLKEM_HYBRID_CTX *p_scossl_mlkem_hybrid_dupctx(_In_ SCOSSL_MLKEM_HYBRID_CTX *ctx)
 {
-    SCOSSL_MLKEM_HYBRID_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_HYBRID_CTX));
+    SCOSSL_MLKEM_HYBRID_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_HYBRID_CTX));
 
     if (copyCtx != NULL)
     {
