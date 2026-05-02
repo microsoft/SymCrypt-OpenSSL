@@ -95,7 +95,12 @@ static void p_scossl_kdf_keyexch_freectx(_In_ SCOSSL_KDF_KEYEXCH_CTX *ctx)
 
 static SCOSSL_KDF_KEYEXCH_CTX *p_scossl_kdf_keyexch_dupctx(_In_ SCOSSL_KDF_KEYEXCH_CTX *ctx)
 {
-    SCOSSL_KDF_KEYEXCH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_KDF_KEYEXCH_CTX));
+    SCOSSL_KDF_KEYEXCH_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_KDF_KEYEXCH_CTX));
 
     if (copyCtx != NULL)
     {
@@ -168,12 +173,8 @@ static SCOSSL_STATUS p_scossl_kdf_keyexch_set_ctx_params(_Inout_ SCOSSL_KDF_KEYE
 {
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     return ctx->kdfFns->setCtxParams(ctx->kdfCtx, params);
@@ -181,16 +182,34 @@ static SCOSSL_STATUS p_scossl_kdf_keyexch_set_ctx_params(_Inout_ SCOSSL_KDF_KEYE
 
 static const OSSL_PARAM *p_scossl_kdf_keyexch_ctx_settable_params(_In_ SCOSSL_KDF_KEYEXCH_CTX *ctx, _In_ SCOSSL_PROVCTX *provctx)
 {
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return NULL;
+    }
+
     return ctx->kdfFns->settableCtxParams(ctx->kdfCtx, provctx);
 }
 
 static SCOSSL_STATUS p_scossl_kdf_keyexch_get_ctx_params(_In_ SCOSSL_KDF_KEYEXCH_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     return ctx->kdfFns->getCtxParams(ctx->kdfCtx, params);
 }
 
 static const OSSL_PARAM *p_scossl_kdf_keyexch_ctx_gettable_params(_In_ SCOSSL_KDF_KEYEXCH_CTX *ctx, _In_ SCOSSL_PROVCTX *provctx)
 {
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return NULL;
+    }
+
     return ctx->kdfFns->gettableCtxParams(ctx->kdfCtx, provctx);
 }
 
