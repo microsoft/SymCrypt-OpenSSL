@@ -117,7 +117,12 @@ static void p_scossl_rsa_freectx(SCOSSL_RSA_SIGN_CTX *ctx)
 
 static SCOSSL_RSA_SIGN_CTX *p_scossl_rsa_dupctx(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 {
-    SCOSSL_RSA_SIGN_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
+    SCOSSL_RSA_SIGN_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_RSA_SIGN_CTX));
     if (copyCtx != NULL)
     {
         if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
@@ -225,7 +230,7 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+    int mdnid;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
@@ -243,8 +248,10 @@ static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
     if (sig != NULL && sigsize < SymCryptRsakeySizeofModulus(ctx->keyCtx->key))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-        goto err;
+        return SCOSSL_FAILURE;
     }
+
+    mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
 
     switch (ctx->padding)
     {
@@ -280,7 +287,7 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
 {
-    int mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
+    int mdnid;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
@@ -293,6 +300,8 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
+
+    mdnid = ctx->mdInfo == NULL ? NID_undef : ctx->mdInfo->id;
 
     switch (ctx->padding)
     {
@@ -381,8 +390,9 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_init(_In_ SCOSSL_RSA_SIGN_CTX *c
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_update(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                            _In_reads_bytes_(datalen) const unsigned char *data, size_t datalen)
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -396,9 +406,10 @@ static SCOSSL_STATUS p_scossl_rsa_digest_sign_final(_In_ SCOSSL_RSA_SIGN_CTX *ct
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
-        return ret;
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
+        return SCOSSL_FAILURE;
     }
 
     // If sig is NULL, this is a size fetch, and the digest does not need to be computed
@@ -417,8 +428,9 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *
     BYTE digest[EVP_MAX_MD_SIZE];
     unsigned int cbDigest = 0;
 
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -431,7 +443,12 @@ static SCOSSL_STATUS p_scossl_rsa_digest_verify_final(_In_ SCOSSL_RSA_SIGN_CTX *
 static const OSSL_PARAM *p_scossl_rsa_settable_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                                           ossl_unused void *provctx)
 {
-    return ctx->allowMdUpdates ? p_scossl_rsa_sig_ctx_settable_param_types : p_scossl_rsa_sig_ctx_settable_param_types_no_digest;
+    if (ctx == NULL || ctx->allowMdUpdates)
+    {
+        return p_scossl_rsa_sig_ctx_settable_param_types;
+    }
+
+    return p_scossl_rsa_sig_ctx_settable_param_types_no_digest;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const OSSL_PARAM params[])
@@ -441,12 +458,8 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
@@ -712,7 +725,12 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_params(_Inout_ SCOSSL_RSA_SIGN_CTX *ct
 static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX  *ctx,
                                                           ossl_unused void *provctx)
 {
-    return ctx->padding == RSA_PKCS1_PSS_PADDING ? p_scossl_rsa_pss_sig_ctx_gettable_param_types : p_scossl_rsa_sig_ctx_gettable_param_types;
+    if (ctx == NULL || ctx->padding == RSA_PKCS1_PSS_PADDING)
+    {
+        return p_scossl_rsa_pss_sig_ctx_gettable_param_types;
+    }
+
+    return p_scossl_rsa_sig_ctx_gettable_param_types;
 }
 
 static ASN1_STRING *p_scossl_rsa_pss_params_to_asn1_sequence(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
@@ -817,20 +835,16 @@ cleanup:
 
 static SCOSSL_STATUS p_scossl_rsa_get_ctx_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    if (ctx == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
     OSSL_PARAM *p;
     ASN1_STRING *pval = NULL;
     X509_ALGOR *x509Alg = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->mdInfo == NULL ? "" : ctx->mdInfo->ptr))
@@ -1041,9 +1055,9 @@ cleanup:
 
 static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_gettable_ctx_params(ctx->md);
@@ -1051,8 +1065,9 @@ static const OSSL_PARAM *p_scossl_rsa_gettable_ctx_md_params(_In_ SCOSSL_RSA_SIG
 
 static SCOSSL_STATUS p_scossl_rsa_get_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _Inout_ OSSL_PARAM *params)
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -1061,9 +1076,9 @@ static SCOSSL_STATUS p_scossl_rsa_get_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ct
 
 static const OSSL_PARAM *p_scossl_rsa_settable_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_settable_ctx_params(ctx->md);
@@ -1073,6 +1088,7 @@ static SCOSSL_STATUS p_scossl_rsa_set_ctx_md_params(_In_ SCOSSL_RSA_SIGN_CTX *ct
 {
     if (ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 

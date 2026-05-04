@@ -77,7 +77,12 @@ static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
 
 static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
-    SCOSSL_ECDSA_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECDSA_CTX));
+    SCOSSL_ECDSA_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECDSA_CTX));
     if (copyCtx != NULL)
     {
         if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
@@ -330,7 +335,12 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx,
                                                             ossl_unused void *provctx)
 {
-    return ctx->allowMdUpdates ? p_scossl_ecdsa_ctx_settable_param_types : p_scossl_ecdsa_ctx_settable_param_types_no_digest;
+    if (ctx == NULL || ctx->allowMdUpdates)
+    {
+        return p_scossl_ecdsa_ctx_settable_param_types;
+    }
+
+    return p_scossl_ecdsa_ctx_settable_param_types_no_digest;
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ const OSSL_PARAM params[])
@@ -341,12 +351,8 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
@@ -411,19 +417,15 @@ static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_params(ossl_unused void *ct
 
 static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    if (ctx == NULL)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
     OSSL_PARAM *p;
     X509_ALGOR *x509Alg = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->md == NULL ? "" : EVP_MD_get0_name(ctx->md)))
@@ -531,9 +533,9 @@ cleanup:
 
 static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_gettable_ctx_params(ctx->md);
@@ -541,8 +543,9 @@ static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_md_params(_In_ SCOSSL_ECDSA
 
 static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx, _Inout_ OSSL_PARAM *params)
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -551,9 +554,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx
 
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_settable_ctx_params(ctx->md);
@@ -561,8 +564,9 @@ static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_md_params(_In_ SCOSSL_ECDSA
 
 static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
