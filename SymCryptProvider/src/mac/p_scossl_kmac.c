@@ -92,6 +92,9 @@ static void p_scossl_kmac_freectx(_Inout_ SCOSSL_KMAC_CTX *ctx)
 
 static SCOSSL_KMAC_CTX *p_scossl_kmac_dupctx(_In_ SCOSSL_KMAC_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_KMAC_CTX);
 
     if (copyCtx == NULL)
@@ -194,6 +197,12 @@ static SCOSSL_STATUS p_scossl_kmac_get_ctx_params(_In_ SCOSSL_KMAC_CTX *ctx, _In
 {
     OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->cbOutput))
     {
@@ -218,12 +227,8 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, 
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
-    }
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_XOF)) != NULL &&
