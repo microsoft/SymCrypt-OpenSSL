@@ -147,8 +147,8 @@ SCOSSL_STATUS p_scossl_sshkdf_get_ctx_params(_In_ SCOSSL_PROV_SSHKDF_CTX *ctx, _
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, SIZE_MAX))
     {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        return SCOSSL_FAILURE;
     }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_DIGEST)) != NULL &&
@@ -205,6 +205,11 @@ SCOSSL_STATUS p_scossl_sshkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSHKDF_CTX *ctx
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)

@@ -1,11 +1,9 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
-
-#include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+#include "p_scossl_base.h"
 #include "digests/p_scossl_digest_common.h"
 
 #ifdef __cplusplus
@@ -75,6 +73,11 @@ _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_t blocksize, UINT32 flags)
 {
     OSSL_PARAM *p;
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, size))

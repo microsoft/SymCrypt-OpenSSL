@@ -34,12 +34,12 @@ static const OSSL_PARAM p_scossl_param_types[] = {
     OSSL_PARAM_int(OSSL_PROV_PARAM_STATUS, NULL),
     OSSL_PARAM_END};
 
-// EVP_MD_CTX_dup is a helpful function for the provider, but was not added until OpenSSL 3.1
-// This function is copied from 3.1 to allow its use when the provider is built against 3.0
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
-EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in);
-
-#endif // OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
+// Helper function from the default provider that that is used by get/set
+// parameter functions to avoid iterating through an empty parameter array.
+static inline BOOL p_scossl_is_params_empty(_In_ const OSSL_PARAM params[])
+{
+    return params == NULL || params->key == NULL;
+}
 
 #ifdef __cplusplus
 }

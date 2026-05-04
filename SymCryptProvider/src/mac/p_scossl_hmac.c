@@ -159,6 +159,11 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
         return SCOSSL_FAILURE;
     }
 
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_DIGEST)) != NULL)
     {
         OPENSSL_free(ctx->mdName);

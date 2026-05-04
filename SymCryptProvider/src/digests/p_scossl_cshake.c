@@ -7,6 +7,7 @@
 
 #include "scossl_provider.h"
 #include "p_scossl_digest_common.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -279,6 +280,7 @@ static SCOSSL_STATUS p_scossl_cshake_256_digest(ossl_unused void *prov_ctx,
 {
     return p_scossl_cshake_digest(&SymCryptCShake256Algorithm, in, inl, out, outl, outlen);
 }
+
 static SCOSSL_STATUS p_scossl_cshake_128_get_params(_Inout_ OSSL_PARAM params[])
 {
     return p_scossl_digest_get_params(params,
@@ -303,6 +305,11 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING)) != NULL)

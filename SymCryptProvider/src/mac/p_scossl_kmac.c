@@ -3,8 +3,8 @@
 //
 
 #include "p_scossl_kmac.h"
+#include "p_scossl_base.h"
 
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
@@ -229,6 +229,11 @@ static SCOSSL_STATUS p_scossl_kmac_set_ctx_params(_Inout_ SCOSSL_KMAC_CTX *ctx, 
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_XOF)) != NULL &&

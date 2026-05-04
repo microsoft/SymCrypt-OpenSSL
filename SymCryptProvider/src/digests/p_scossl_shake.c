@@ -2,9 +2,9 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+#include "p_scossl_base.h"
 #include "digests/p_scossl_digest_common.h"
 
 #ifdef __cplusplus
@@ -23,6 +23,11 @@ static SCOSSL_STATUS p_scossl_shake_set_ctx_params(_Inout_ SCOSSL_DIGEST_CTX *ct
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN)) != NULL &&

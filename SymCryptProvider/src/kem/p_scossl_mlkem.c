@@ -297,6 +297,11 @@ static SCOSSL_STATUS p_scossl_mlkem_set_ctx_params(_In_ SCOSSL_MLKEM_CTX *ctx, _
         return SCOSSL_FAILURE;
     }
 
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if (ctx->operation == EVP_PKEY_OP_ENCAPSULATE &&
         (p = OSSL_PARAM_locate_const(params, OSSL_KEM_PARAM_IKME)) != NULL)
     {

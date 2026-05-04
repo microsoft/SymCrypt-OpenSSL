@@ -177,6 +177,11 @@ static SCOSSL_STATUS p_scossl_kdf_keyexch_set_ctx_params(_Inout_ SCOSSL_KDF_KEYE
         return SCOSSL_FAILURE;
     }
 
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     return ctx->kdfFns->setCtxParams(ctx->kdfCtx, params);
 }
 

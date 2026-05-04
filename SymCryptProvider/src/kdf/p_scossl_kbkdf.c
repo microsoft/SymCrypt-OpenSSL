@@ -274,6 +274,11 @@ static SCOSSL_STATUS p_scossl_kbkdf_set_ctx_params(_Inout_ SCOSSL_PROV_KBKDF_CTX
         return SCOSSL_FAILURE;
     }
 
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
     {
         if (!p_scossl_kbkdf_get_octet_string(p, &ctx->pbKey, &ctx->cbKey))

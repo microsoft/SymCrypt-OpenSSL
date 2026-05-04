@@ -2,11 +2,10 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #include "scossl_helpers.h"
+#include "p_scossl_base.h"
 #include "p_scossl_aes.h"
 #include "p_scossl_skey.h"
 
@@ -236,7 +235,7 @@ static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ct
         return SCOSSL_FAILURE;
     }
 
-    if (p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN) != NULL &&
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
@@ -277,6 +276,11 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL)
