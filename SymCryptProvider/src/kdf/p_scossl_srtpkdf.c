@@ -2,11 +2,10 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
-#include "scossl_helpers.h"
 #include "scossl_provider.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,7 +89,12 @@ static SCOSSL_PROV_SRTPKDF_CTX *p_scossl_srtpkdf_dupctx(_In_ SCOSSL_PROV_SRTPKDF
 {
     SYMCRYPT_ERROR scError;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
-    SCOSSL_PROV_SRTPKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
+    SCOSSL_PROV_SRTPKDF_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_SRTPKDF_CTX));
 
     if (copyCtx != NULL)
     {
@@ -204,6 +208,12 @@ static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(ossl_unused void *ctx, _Ino
 {
     OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, SIZE_MAX))
     {
@@ -217,6 +227,17 @@ static SCOSSL_STATUS p_scossl_srtpkdf_get_ctx_params(ossl_unused void *ctx, _Ino
 static SCOSSL_STATUS p_scossl_srtpkdf_set_ctx_params(_Inout_ SCOSSL_PROV_SRTPKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
     {

@@ -882,27 +882,6 @@ cleanup:
     return ret;
 }
 
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
-EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
-{
-    EVP_MD_CTX *out = EVP_MD_CTX_new();
-
-    if (out != NULL && !EVP_MD_CTX_copy_ex(out, in)) {
-        EVP_MD_CTX_free(out);
-        out = NULL;
-    }
-    return out;
-}
-
-#if OPENSSL_VERSION_PATCH < 4
-int OPENSSL_strcasecmp(const char *s1, const char *s2)
-{
-    return strcasecmp(s1, s2);
-}
-#endif // OPENSSL_VERSION_PATCH < 4
-
-#endif // OPENSSL_VERSION_MINOR == 0
-
 #ifdef __cplusplus
 }
 #endif

@@ -7,6 +7,7 @@
 
 #include "scossl_provider.h"
 #include "p_scossl_digest_common.h"
+#include "p_scossl_base.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,6 +130,9 @@ static void p_scossl_cshake_freectx(_Inout_ SCOSSL_CSHAKE_CTX *ctx)
 static SCOSSL_CSHAKE_CTX *p_scossl_cshake_dupctx(_In_ SCOSSL_CSHAKE_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if (ctx == NULL)
+        return NULL;
 
     SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_CSHAKE_CTX);
 
@@ -276,6 +280,7 @@ static SCOSSL_STATUS p_scossl_cshake_256_digest(ossl_unused void *prov_ctx,
 {
     return p_scossl_cshake_digest(&SymCryptCShake256Algorithm, in, inl, out, outl, outlen);
 }
+
 static SCOSSL_STATUS p_scossl_cshake_128_get_params(_Inout_ OSSL_PARAM params[])
 {
     return p_scossl_digest_get_params(params,
@@ -295,6 +300,17 @@ static SCOSSL_STATUS p_scossl_cshake_256_get_params(_Inout_ OSSL_PARAM params[])
 static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING)) != NULL)
     {
@@ -344,6 +360,11 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 
 static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(_In_ SCOSSL_CSHAKE_CTX *ctx, ossl_unused void *provctx)
 {
+    if (ctx == NULL)
+    {
+        return p_scossl_cshake_settable_ctx_param_types;
+    }
+
     return ctx->xofState == SCOSSL_XOF_STATE_INIT ? p_scossl_cshake_settable_ctx_param_types : p_scossl_cshake_settable_ctx_param_types_initialized;
 }
 

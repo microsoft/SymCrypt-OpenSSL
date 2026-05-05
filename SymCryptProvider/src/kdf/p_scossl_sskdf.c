@@ -19,7 +19,7 @@ typedef struct {
     SIZE_T cbSalt;
     PBYTE pbInfo;
     SIZE_T cbInfo;
-    
+
     BOOL isSaltExpanded;
     SYMCRYPT_SSKDF_MAC_EXPANDED_SALT expandedSalt;
 
@@ -74,8 +74,12 @@ void p_scossl_sskdf_freectx(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx)
 SCOSSL_PROV_SSKDF_CTX *p_scossl_sskdf_dupctx(_In_ SCOSSL_PROV_SSKDF_CTX *ctx)
 {
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+    SCOSSL_PROV_SSKDF_CTX *copyCtx;
 
-    SCOSSL_PROV_SSKDF_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_PROV_SSKDF_CTX));
     if (copyCtx != NULL)
     {
         if (ctx->pbSecret != NULL)
@@ -162,7 +166,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
     if (ctx->mac != NULL)
     {
         if (!ctx->isSaltExpanded)
-        {   
+        {
             PCSYMCRYPT_MAC pcSymCryptMacAlgorithm = NULL;
             if (EVP_MAC_is_a(ctx->mac, OSSL_MAC_NAME_HMAC))
             {
@@ -171,7 +175,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
                     ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
                     return SCOSSL_FAILURE;
                 }
-                
+
                 pcSymCryptMacAlgorithm = scossl_get_symcrypt_hmac_algorithm(ctx->mdnid);
             }
             if (EVP_MAC_is_a(ctx->mac, OSSL_MAC_NAME_KMAC128))
@@ -182,8 +186,8 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
             {
                 pcSymCryptMacAlgorithm = SymCryptKmac256Algorithm;
             }
-            
-            
+
+
             if (pcSymCryptMacAlgorithm == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_UNSUPPORTED_MAC_TYPE);
@@ -194,7 +198,7 @@ SCOSSL_STATUS p_scossl_sskdf_derive(_In_ SCOSSL_PROV_SSKDF_CTX *ctx,
                 &ctx->expandedSalt,
                 pcSymCryptMacAlgorithm,
                 ctx->pbSalt, ctx->cbSalt);
-                
+
             if (scError != SYMCRYPT_NO_ERROR)
             {
                 SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptSskdfMacExpandSalt failed", scError);
@@ -254,6 +258,12 @@ SCOSSL_STATUS p_scossl_sskdf_get_ctx_params(_In_ SCOSSL_PROV_SSKDF_CTX *ctx, _In
 {
     OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
     {
         SIZE_T cbResult = 0;
@@ -264,7 +274,7 @@ SCOSSL_STATUS p_scossl_sskdf_get_ctx_params(_In_ SCOSSL_PROV_SSKDF_CTX *ctx, _In
         }
         else if (ctx->pHash != NULL)
         {
-            cbResult = SymCryptHashResultSize(ctx->pHash); 
+            cbResult = SymCryptHashResultSize(ctx->pHash);
         }
         else
         {
@@ -288,9 +298,20 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
     EVP_MD *md = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SECRET)) != NULL ||
         // Shared secret may be set by OSSL_KDF_PARAM_KEY instead
-        (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL) 
+        (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_KEY)) != NULL)
     {
         OPENSSL_secure_free(ctx->pbSecret);
         ctx->cbSecret = 0;
@@ -311,7 +332,7 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
             goto cleanup;
         }
     }
-    
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SALT)) != NULL)
     {
         OPENSSL_free(ctx->pbSalt);
@@ -327,7 +348,7 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
     }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO)) != NULL)
-    {   
+    {
         PBYTE pbCur = NULL;
         SIZE_T cbCur = 0;
         SIZE_T cbInfoMax = 0;
@@ -381,7 +402,7 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_DIGEST)) != NULL)
     {
         const char *mdName;
-    
+
         ctx->pHash = NULL;
         ctx->isSaltExpanded = FALSE;
 

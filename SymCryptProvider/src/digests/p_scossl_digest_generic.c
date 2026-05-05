@@ -44,6 +44,12 @@ static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *
     BYTE pbExportBlob[SCOSSL_MAX_STATE_EXPORT_BLOB_SIZE];
     OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, SCOSSL_DIGEST_PARAM_STATE)) != NULL)
     {
         pExportFunc(ctx->pState, pbExportBlob);
@@ -66,6 +72,12 @@ static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *
     int recomputeChecksum = 0;
     SYMCRYPT_ERROR scError;
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, SCOSSL_DIGEST_PARAM_STATE)) != NULL)
     {

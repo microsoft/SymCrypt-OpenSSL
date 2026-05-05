@@ -2,11 +2,10 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #include "scossl_helpers.h"
+#include "p_scossl_base.h"
 #include "p_scossl_aes.h"
 #include "p_scossl_skey.h"
 
@@ -51,6 +50,9 @@ static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_newctx_internal(size_t keylen)
 
 static SCOSSL_AES_XTS_CTX *p_scossl_aes_xts_dupctx(SCOSSL_AES_XTS_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_AES_XTS_CTX);
     if (copy_ctx != NULL)
     {
@@ -125,6 +127,12 @@ static SCOSSL_STATUS p_scossl_aes_xts_skey_encrypt_init(_Inout_ SCOSSL_AES_XTS_C
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
+    if (skey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     return p_scossl_aes_xts_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
 }
 
@@ -132,6 +140,12 @@ static SCOSSL_STATUS p_scossl_aes_xts_skey_decrypt_init(_Inout_ SCOSSL_AES_XTS_C
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
+    if (skey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     return p_scossl_aes_xts_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
 }
 
@@ -139,6 +153,12 @@ static SCOSSL_STATUS p_scossl_aes_xts_cipher(SCOSSL_AES_XTS_CTX *ctx,
                                              _Out_writes_bytes_(*outl) unsigned char *out, _Out_ size_t *outl, size_t outsize,
                                              _In_reads_bytes_(inl) const unsigned char *in, size_t inl)
 {
+    if (out == NULL || in == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if (inl < SYMCRYPT_AES_BLOCK_SIZE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_INPUT_LENGTH);
@@ -207,45 +227,63 @@ static const OSSL_PARAM *p_scossl_aes_xts_settable_ctx_params(ossl_unused void *
 
 static SCOSSL_STATUS p_scossl_aes_xts_get_ctx_params(_In_ SCOSSL_AES_XTS_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_XTS_TWEAK_LENGTH))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, SCOSSL_XTS_TWEAK_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL &&
         !OSSL_PARAM_set_octet_ptr(p, &ctx->tweak, SCOSSL_XTS_TWEAK_LENGTH) &&
         !OSSL_PARAM_set_octet_string(p, &ctx->tweak, SCOSSL_XTS_TWEAK_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL &&
         !OSSL_PARAM_set_octet_ptr(p, &ctx->tweak, SCOSSL_XTS_TWEAK_LENGTH) &&
         !OSSL_PARAM_set_octet_string(p, &ctx->tweak, SCOSSL_XTS_TWEAK_LENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
+
     return SCOSSL_SUCCESS;
 }
 
 static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
+    const OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL)
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL)
     {
         size_t keylen;
 
@@ -254,11 +292,13 @@ static SCOSSL_STATUS p_scossl_aes_xts_set_ctx_params(_Inout_ SCOSSL_AES_XTS_CTX 
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
+
         if (keylen != ctx->keylen)
         {
             return SCOSSL_FAILURE;
         }
     }
+
     return SCOSSL_SUCCESS;
 }
 
