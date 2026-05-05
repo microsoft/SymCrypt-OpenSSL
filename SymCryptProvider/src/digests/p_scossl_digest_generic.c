@@ -39,7 +39,7 @@ const OSSL_PARAM *p_scossl_digest_export_gettable_ctx_params(ossl_unused void *c
 
 static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *ctx, _Inout_ OSSL_PARAM params[],
                                                         _In_ PSYMCRYPT_DIGEST_STATE_EXPORT pExportFunc,
-                                                        SIZE_T cbExportBlob)
+                                                        SIZE_T cbExportSize)
 {
     BYTE pbExportBlob[SCOSSL_MAX_STATE_EXPORT_BLOB_SIZE];
     OSSL_PARAM *p;
@@ -54,7 +54,7 @@ static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *
     {
         pExportFunc(ctx->pState, pbExportBlob);
 
-        if (!OSSL_PARAM_set_octet_string(p, pbExportBlob, cbExportBlob))
+        if (!OSSL_PARAM_set_octet_string(p, pbExportBlob, cbExportSize))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -65,7 +65,8 @@ static SCOSSL_STATUS p_scossl_digest_get_state_internal(_In_ SCOSSL_DIGEST_CTX *
 }
 
 static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *ctx, _In_ const OSSL_PARAM params[],
-                                                        _In_ PSYMCRYPT_DIGEST_STATE_IMPORT pImportFunc)
+                                                        _In_ PSYMCRYPT_DIGEST_STATE_IMPORT pImportFunc,
+                                                        SIZE_T cbExportSize)
 {
     PBYTE pbImportBlob;
     SIZE_T cbImportBlob;
@@ -91,6 +92,12 @@ static SCOSSL_STATUS p_scossl_digest_set_state_internal(_In_ SCOSSL_DIGEST_CTX *
             !OSSL_PARAM_get_int(p, &recomputeChecksum))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (cbImportBlob != cbExportSize)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_LENGTH);
             return SCOSSL_FAILURE;
         }
 
@@ -134,7 +141,8 @@ static SCOSSL_STATUS p_scossl_digest_generic_final(_In_ SCOSSL_DIGEST_CTX *ctx,
                                                                      _In_ const OSSL_PARAM params[])    \
     {                                                                                                   \
         return p_scossl_digest_set_state_internal(ctx, params,                                          \
-            (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCrypt##alg##StateImport);                                \
+            (PSYMCRYPT_DIGEST_STATE_IMPORT) SymCrypt##alg##StateImport,                                 \
+            SYMCRYPT_##uc_name##_STATE_EXPORT_SIZE);                                                    \
     }                                                                                                   \
                                                                                                         \
     static SCOSSL_STATUS p_scossl_digest_get_##dispatch_name##_state(_In_ SCOSSL_DIGEST_CTX *ctx,       \
