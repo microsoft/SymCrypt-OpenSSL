@@ -1312,7 +1312,7 @@ cleanup:
 static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection,
                                                  _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
+    BOOL includePrivate;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     SCOSSL_RSA_EXPORT_PARAMS *rsaParams = NULL;
     OSSL_PARAM_BLD *bld = NULL;
@@ -1324,13 +1324,6 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *k
         return ret;
     }
 
-    rsaParams = scossl_rsa_new_export_params(includePrivate);
-    if (rsaParams == NULL ||
-        !scossl_rsa_export_key((PCSYMCRYPT_RSAKEY)keyCtx->key, rsaParams))
-    {
-        goto cleanup;
-    }
-
     bld = OSSL_PARAM_BLD_new();
     if (bld == NULL)
     {
@@ -1338,15 +1331,34 @@ static SCOSSL_STATUS p_scossl_rsa_keymgmt_export(_In_ SCOSSL_PROV_RSA_KEY_CTX *k
         goto cleanup;
     }
 
-    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, rsaParams->n) ||
-        !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, rsaParams->e) ||
-        (includePrivate &&
-         (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1, rsaParams->privateParams->p) ||
-          !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2, rsaParams->privateParams->q) ||
-          !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT1, rsaParams->privateParams->dmp1) ||
-          !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT2, rsaParams->privateParams->dmq1) ||
-          !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, rsaParams->privateParams->iqmp) ||
-          !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D, rsaParams->privateParams->d))))
+    if (keyCtx->key != NULL)
+    {
+        includePrivate = keyCtx->key != NULL && ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0);
+
+        rsaParams = scossl_rsa_new_export_params(includePrivate);
+        if (rsaParams == NULL ||
+            (keyCtx->key != NULL && scossl_rsa_export_key((PCSYMCRYPT_RSAKEY)keyCtx->key, rsaParams) != SCOSSL_SUCCESS))
+        {
+            goto cleanup;
+        }
+
+        if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, rsaParams->n) ||
+            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, rsaParams->e) ||
+            (includePrivate &&
+             (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1, rsaParams->privateParams->p) ||
+              !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2, rsaParams->privateParams->q) ||
+              !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT1, rsaParams->privateParams->dmp1) ||
+              !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT2, rsaParams->privateParams->dmq1) ||
+              !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, rsaParams->privateParams->iqmp) ||
+              !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D, rsaParams->privateParams->d))))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
+    }
+    // Match default provider behavior and export empty N and e for uninitialized keys
+    else if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, NULL) ||
+             !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, NULL))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
