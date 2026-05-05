@@ -210,6 +210,12 @@ SCOSSL_STATUS p_scossl_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx)
     keyCtx->keysinuseCtx = NULL;
 #endif
 
+    if (keyCtx->curve == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        return SCOSSL_FAILURE;
+    }
+
     if (keyCtx->key != NULL)
     {
         SymCryptEckeyFree(keyCtx->key);
@@ -257,6 +263,7 @@ _Use_decl_annotations_
 SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
     SYMCRYPT_ECPOINT_FORMAT pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+    SIZE_T cbKey;
 
     if (!keyCtx->isX25519 &&
         keyCtx->conversionFormat != POINT_CONVERSION_COMPRESSED)
@@ -264,14 +271,14 @@ SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
         pointFormat = SYMCRYPT_ECPOINT_FORMAT_XY;
     }
 
-    if (keyCtx->curve == NULL)
+    if (keyCtx->key == NULL || keyCtx->curve == NULL)
     {
         return 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        return SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
+        cbKey = SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
     }
 
     // One extra byte for point compression type for non-X25519
@@ -504,6 +511,12 @@ SCOSSL_STATUS p_scossl_ecc_set_encoded_key(SCOSSL_ECC_KEY_CTX *keyCtx,
     // Reset keysinuse in case new key material is overwriting existing
     p_scossl_ecc_reset_keysinuse(keyCtx);
 #endif
+
+    if (keyCtx->curve == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        return SCOSSL_FAILURE;
+    }
 
     if (keyCtx->isX25519)
     {
