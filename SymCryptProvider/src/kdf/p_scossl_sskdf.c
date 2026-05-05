@@ -316,20 +316,23 @@ SCOSSL_STATUS p_scossl_sskdf_set_ctx_params(_Inout_ SCOSSL_PROV_SSKDF_CTX *ctx, 
         OPENSSL_secure_free(ctx->pbSecret);
         ctx->cbSecret = 0;
 
-        if ((ctx->pbSecret = OPENSSL_secure_malloc(p->data_size)) == NULL)
+        if (p->data_size != 0)
         {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
+            if ((ctx->pbSecret = OPENSSL_secure_malloc(p->data_size)) == NULL)
+            {
+                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+                goto cleanup;
+            }
 
-        if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbSecret, p->data_size, &ctx->cbSecret))
-        {
-            OPENSSL_secure_free(ctx->pbSecret);
-            ctx->pbSecret = NULL;
-            ctx->cbSecret = 0;
+            if (!OSSL_PARAM_get_octet_string(p, (void **)&ctx->pbSecret, p->data_size, &ctx->cbSecret))
+            {
+                OPENSSL_secure_free(ctx->pbSecret);
+                ctx->pbSecret = NULL;
+                ctx->cbSecret = 0;
 
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            goto cleanup;
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                goto cleanup;
+            }
         }
     }
 
