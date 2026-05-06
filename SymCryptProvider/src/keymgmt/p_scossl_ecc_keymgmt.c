@@ -1213,18 +1213,20 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *key
         }
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0
-        && keyCtx->initialized)
+    // Default provider always exports a 32-byte public key if
+    // public key is selected. If no key data is present, then
+    // the export is an empty 32-byte key
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
     {
-        cbPublicKey = SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
-        if ((pbPublicKey = OPENSSL_malloc(cbPublicKey)) == NULL)
+        cbPublicKey = SCOSSL_X25519_MAX_SIZE;
+        if ((pbPublicKey = OPENSSL_zalloc(cbPublicKey)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
     }
 
-    if (cbPublicKey > 0 || cbPrivateKey > 0)
+    if (keyCtx->initialized && (cbPublicKey > 0 || cbPrivateKey > 0))
     {
         scError = SymCryptEckeyGetValue(
             keyCtx->key,
@@ -1248,21 +1250,19 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *key
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY))
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
+        pbPrivateKey != NULL)
     {
-        if (pbPrivateKey != NULL)
-        {
-            pbPrivateKey[0] = (keyCtx->modifiedPrivateBits & 0x07) | (pbPrivateKey[0] & 0xf8);
-            pbPrivateKey[cbPrivateKey-1] = (keyCtx->modifiedPrivateBits & 0xc0) | (pbPrivateKey[cbPrivateKey-1] & 0x3f);
-        }
+        pbPrivateKey[0] = (keyCtx->modifiedPrivateBits & 0x07) | (pbPrivateKey[0] & 0xf8);
+        pbPrivateKey[cbPrivateKey-1] = (keyCtx->modifiedPrivateBits & 0xc0) | (pbPrivateKey[cbPrivateKey-1] & 0x3f);
 
         if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbPrivateKey, cbPrivateKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
     }
+
     if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 &&
         !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbPublicKey, cbPublicKey))
     {
