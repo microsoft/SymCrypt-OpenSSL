@@ -263,7 +263,6 @@ _Use_decl_annotations_
 SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
     SYMCRYPT_ECPOINT_FORMAT pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
-    SIZE_T cbKey;
 
     if (!keyCtx->isX25519 &&
         keyCtx->conversionFormat != POINT_CONVERSION_COMPRESSED)
@@ -278,7 +277,7 @@ SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        cbKey = SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
+        return SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
     }
 
     // One extra byte for point compression type for non-X25519
