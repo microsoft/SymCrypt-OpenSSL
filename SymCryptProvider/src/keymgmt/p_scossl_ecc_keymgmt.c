@@ -737,14 +737,14 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0)
+    if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
     {
         if (keyCtx1->curve == NULL ||
             keyCtx2->curve == NULL ||
             !SymCryptEcurveIsSame(keyCtx1->curve, keyCtx2->curve))
-         {
-             goto cleanup;
-         }
+        {
+            goto cleanup;
+        }
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx1->initialized)
@@ -974,18 +974,21 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_import(_Inout_ SCOSSL_ECC_KEY_CTX *key
             }
         }
 
-        ret = p_scossl_ecc_set_encoded_key(
-            keyCtx,
-            pbPublicKey, cbPublicKey,
-            pbPrivateKey, cbPrivateKey);
-        if (ret != SCOSSL_SUCCESS)
+        if (cbPrivateKey > 0 || cbPublicKey > 0)
         {
-            goto cleanup;
-        }
+            ret = p_scossl_ecc_set_encoded_key(
+                keyCtx,
+                pbPublicKey, cbPublicKey,
+                pbPrivateKey, cbPrivateKey);
+            if (ret != SCOSSL_SUCCESS)
+            {
+                goto cleanup;
+            }
 
-#ifdef KEYSINUSE_ENABLED
-        keyCtx->isImported = TRUE;
-#endif
+            #ifdef KEYSINUSE_ENABLED
+                    keyCtx->isImported = TRUE;
+            #endif
+        }
     }
 
     ret = SCOSSL_SUCCESS;
