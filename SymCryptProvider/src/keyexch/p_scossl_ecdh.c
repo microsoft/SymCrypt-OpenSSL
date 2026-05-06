@@ -80,6 +80,18 @@ SCOSSL_STATUS p_scossl_ecdh_set_peer(SCOSSL_ECDH_CTX *ctx, SCOSSL_ECC_KEY_CTX *p
         goto cleanup;
     }
 
+    if (ctx->keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
+
+    if (ctx->keyCtx->curve == NULL || peerKeyCtx->curve == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        goto cleanup;
+    }
+
     if (!SymCryptEcurveIsSame(ctx->keyCtx->curve, peerKeyCtx->curve))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
@@ -112,8 +124,8 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->keyCtx == NULL ||
-        (secret != NULL && ctx->peerKeyCtx == NULL)) {
+    if (ctx->keyCtx == NULL || !ctx->keyCtx->initialized)
+    {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
     }
@@ -123,6 +135,11 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
     {
         *secretlen = cbSecretBuf;
         return SCOSSL_SUCCESS;
+    }
+    else if (ctx->peerKeyCtx == NULL || !ctx->peerKeyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        return SCOSSL_FAILURE;
     }
 
     numberFormat = ctx->keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
