@@ -307,3 +307,43 @@ PublicKeyRaw=LowOrder-Pub-6-Identity-NonCanonical:X25519:edfffffffffffffffffffff
 Derive=Alice-25519-Raw
 PeerKey=LowOrder-Pub-6-Identity-NonCanonical
 Result=DERIVE_ERROR
+
+# Selected vectors from Wycheproof
+# Source: https://github.com/C2SP/wycheproof/blob/main/testvectors_v1/x25519_test.json
+Title = X25519 Wycheproof targeted vectors
+
+# tcId = 2: public key on twist (Twist; result = acceptable, non-zero shared)
+PrivateKeyRaw=WP-Priv-tcId-2:X25519:d85d8c061a50804ac488ad774ac716c3f5ba714b2712e048491379a500211958
+
+PublicKeyRaw=WP-Pub-tcId-2:X25519:63aa40c6e38346c5caf23a6df0a5e6c80889a08647e551b3563449befcfc9733
+
+Derive=WP-Priv-tcId-2
+PeerKey=WP-Pub-tcId-2
+SharedSecret=279DF67A7C4611DB4708A0E8282B195E5AC0ED6F4B2F292C6FBD0ACAC30D1332
+
+# tcId = 3
+PrivateKeyRaw=WP-Priv-tcId-3:X25519:c8b45bfd32e55325d9fd648cb302848039000b390e44d521e58aab3b29a6964b
+
+PublicKeyRaw=WP-Pub-tcId-3:X25519:0f83c36fded9d32fadf4efa3ae93a90bb5cfa66893bc412c43fa7287dbb99779
+
+Derive=WP-Priv-tcId-3
+PeerKey=WP-Pub-tcId-3
+SharedSecret=4BC7E01E7D83D6CF67632BF90033487A5FC29EBA5328890EA7B1026D23B9A45F
+
+# tcId = 63
+PrivateKeyRaw=WP-Priv-tcId-63:X25519:e0f978dfcd3a8f1a5093418de54136a584c20b7b349afdf6c0520886f95b1272
+
+PublicKeyRaw=WP-Pub-tcId-63:X25519:e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800
+
+Derive=WP-Priv-tcId-63
+PeerKey=WP-Pub-tcId-63
+Result=DERIVE_ERROR
+
+# tcId = 103
+PrivateKeyRaw=WP-Priv-tcId-103:X25519:60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f
+
+PublicKeyRaw=WP-Pub-tcId-103:X25519:b7b6d39c765cb60c0c8542f4f3952ffb51d3002d4aeb9f8ff988b192043e6d0a
+
+Derive=WP-Priv-tcId-103
+PeerKey=WP-Pub-tcId-103
+SharedSecret=0200000000000000000000000000000000000000000000000000000000000000
