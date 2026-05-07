@@ -344,6 +344,8 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 
     if (pbKey != NULL)
     {
+        ctx->initialized = FALSE;
+
         if (ctx->expandedKey == NULL)
         {
             SCOSSL_COMMON_ALIGNED_ALLOC_EX(expandedKey, OPENSSL_malloc, SCOSSL_MAC_EXPANDED_KEY, ctx->pMac->expandedKeySize);
