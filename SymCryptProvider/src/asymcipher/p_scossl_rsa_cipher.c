@@ -80,7 +80,16 @@ static void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 
 static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    return OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+    SCOSSL_RSA_CIPHER_CTX *copyCtx = OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+
+    if (copyCtx != NULL && ctx->pbLabel != NULL &&
+        (copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel)) == NULL)
+    {
+        OPENSSL_free(copyCtx);
+        copyCtx = NULL;
+    }
+
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
