@@ -373,6 +373,8 @@ SCOSSL_STATUS scossl_mac_init(SCOSSL_MAC_CTX *ctx,
 
     if (!ctx->initialized)
     {
+        SCOSSL_LOG_ERROR(SCOSSL_ERR_F_MAC_INIT, SCOSSL_ERR_R_MISSING_CTX_DATA,
+            "MAC key has not been initialized");
         return SCOSSL_FAILURE;
     }
 
