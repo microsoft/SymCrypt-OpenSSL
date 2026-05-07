@@ -46,6 +46,17 @@ SCOSSL_STATUS p_scossl_encode_set_ctx_params(SCOSSL_ENCODE_CTX *ctx, const OSSL_
 {
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_ENCODER_PARAM_CIPHER)) != NULL)
     {
         OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;

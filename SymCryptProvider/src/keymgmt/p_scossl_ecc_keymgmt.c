@@ -115,6 +115,17 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_params(_Inout_ SCOSSL_ECC_KEYGEN_CT
 {
     const OSSL_PARAM *p;
 
+    if (genCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
         EC_GROUP *ecGroup = EC_GROUP_new_from_params(params, genCtx->libctx, NULL);
@@ -171,6 +182,17 @@ static SCOSSL_STATUS p_scossl_x25519_keygen_set_params(ossl_unused void *genCtx,
     const OSSL_PARAM *p;
     char *groupName = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (genCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
@@ -364,6 +386,12 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_params(_In_ SCOSSL_ECC_KEY_CTX *ke
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     OSSL_PARAM *p;
 
+    if (keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE)) != NULL &&
         !OSSL_PARAM_set_uint32(p, p_scossl_ecc_get_max_result_size(keyCtx, FALSE)))
     {
@@ -525,9 +553,23 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_set_params(_Inout_ SCOSSL_ECC_KEY_CTX 
     BN_CTX *bnCtx = NULL;
     EC_POINT *ecPoint = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    SYMCRYPT_NUMBER_FORMAT numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_NUMBER_FORMAT numFormat;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat;
     const OSSL_PARAM *p;
+
+    if (keyCtx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    numFormat = keyCtx->isX25519 ? SYMCRYPT_NUMBER_FORMAT_LSB_FIRST : SYMCRYPT_NUMBER_FORMAT_MSB_FIRST;
+    pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY)) != NULL)
     {
@@ -701,7 +743,14 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
     SIZE_T cbPrivateKey = 0;
     SIZE_T cbPublicKey = 0;
     SYMCRYPT_ERROR scError;
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx1->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat;
+
+    if (keyCtx1 == NULL || keyCtx2 == NULL)
+    {
+        goto cleanup;
+    }
+
+    pointFormat = keyCtx1->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
 
     if (keyCtx1->initialized != keyCtx2->initialized ||
         keyCtx1->isX25519 != keyCtx2->isX25519)

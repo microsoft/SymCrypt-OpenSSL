@@ -52,11 +52,14 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     SIZE_T cbPublicKey = 0;
     SIZE_T cbPrivateKey = 0;
     SCOSSL_STATUS success = SCOSSL_FAILURE;
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
+    SYMCRYPT_ECPOINT_FORMAT pointFormat;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_ECC_KEY_CTX *copyCtx;
 
-    SCOSSL_ECC_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
+    if (keyCtx == NULL)
+        return NULL;
 
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (copyCtx != NULL)
     {
         copyCtx->isX25519 = keyCtx->isX25519;
@@ -74,6 +77,8 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
         if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->initialized)
         {
+            pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : (SYMCRYPT_ECPOINT_FORMAT)keyCtx->conversionFormat;
+
             if (copyCtx->curve == NULL)
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
