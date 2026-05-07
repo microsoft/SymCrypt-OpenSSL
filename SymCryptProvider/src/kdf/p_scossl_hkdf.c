@@ -354,6 +354,7 @@ SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx
 
     if (ctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
         return SCOSSL_FAILURE;
     }
 
