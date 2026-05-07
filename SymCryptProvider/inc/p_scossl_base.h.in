@@ -34,7 +34,7 @@ static const OSSL_PARAM p_scossl_param_types[] = {
     OSSL_PARAM_int(OSSL_PROV_PARAM_STATUS, NULL),
     OSSL_PARAM_END};
 
-// Helper function from the default provider that that is used by get/set
+// Helper function from the default provider that is used by get/set
 // parameter functions to avoid iterating through an empty parameter array.
 static inline BOOL p_scossl_is_params_empty(_In_ const OSSL_PARAM params[])
 {
