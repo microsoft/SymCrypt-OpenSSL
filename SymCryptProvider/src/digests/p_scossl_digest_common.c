@@ -74,11 +74,6 @@ SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_
 {
     OSSL_PARAM *p;
 
-    if (p_scossl_is_params_empty(params))
-    {
-        return SCOSSL_SUCCESS;
-    }
-
     if ((p = OSSL_PARAM_locate(params, OSSL_DIGEST_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, size))
     {

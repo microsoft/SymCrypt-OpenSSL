@@ -96,7 +96,6 @@ static SCOSSL_KMAC_CTX *p_scossl_kmac_dupctx(_In_ SCOSSL_KMAC_CTX *ctx)
         return NULL;
 
     SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_zalloc, SCOSSL_KMAC_CTX);
-
     if (copyCtx == NULL)
     {
         return NULL;

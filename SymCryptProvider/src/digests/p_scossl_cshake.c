@@ -360,12 +360,12 @@ static SCOSSL_STATUS p_scossl_cshake_set_ctx_params(_Inout_ SCOSSL_CSHAKE_CTX *c
 
 static const OSSL_PARAM *p_scossl_cshake_settable_ctx_params(_In_ SCOSSL_CSHAKE_CTX *ctx, ossl_unused void *provctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL || ctx->xofState == SCOSSL_XOF_STATE_INIT)
     {
         return p_scossl_cshake_settable_ctx_param_types;
     }
 
-    return ctx->xofState == SCOSSL_XOF_STATE_INIT ? p_scossl_cshake_settable_ctx_param_types : p_scossl_cshake_settable_ctx_param_types_initialized;
+    return p_scossl_cshake_settable_ctx_param_types_initialized;
 }
 
 #ifdef OSSL_FUNC_DIGEST_SQUEEZE

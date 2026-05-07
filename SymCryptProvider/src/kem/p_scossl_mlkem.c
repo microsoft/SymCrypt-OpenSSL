@@ -78,7 +78,6 @@ static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
         return NULL;
 
     copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLKEM_CTX));
-
     if (copyCtx != NULL)
     {
         copyCtx->keyCtx = ctx->keyCtx;

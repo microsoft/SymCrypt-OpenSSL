@@ -101,7 +101,6 @@ static SCOSSL_KDF_KEYEXCH_CTX *p_scossl_kdf_keyexch_dupctx(_In_ SCOSSL_KDF_KEYEX
         return NULL;
 
     copyCtx = OPENSSL_malloc(sizeof(SCOSSL_KDF_KEYEXCH_CTX));
-
     if (copyCtx != NULL)
     {
         copyCtx->kdfFns = ctx->kdfFns;
