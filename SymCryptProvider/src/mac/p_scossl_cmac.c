@@ -45,12 +45,26 @@ static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ SCOSSL_MAC_CTX *ctx,
 
 }
 
-static SCOSSL_STATUS p_scossl_cmac_init_skey(_Inout_ void *ctx,
+static SCOSSL_STATUS p_scossl_cmac_init_skey(_Inout_ SCOSSL_MAC_CTX *ctx,
                                              _In_ SCOSSL_SKEY *skey,
                                              _In_ const OSSL_PARAM params[])
 {
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
     return p_scossl_cmac_set_ctx_params(ctx, params) &&
-           scossl_mac_init(ctx, skey->pbKey, skey->cbKey);
+           scossl_mac_init(ctx, pbKey, cbKey);
 }
 
 static const OSSL_PARAM *p_scossl_cmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)

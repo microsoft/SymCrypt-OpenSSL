@@ -156,14 +156,42 @@ static SCOSSL_STATUS p_scossl_aes_generic_skey_encrypt_init(_Inout_ SCOSSL_AES_C
                                                             _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                             _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, TRUE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_generic_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_skey_decrypt_init(_Inout_ SCOSSL_AES_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                             _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                             _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, FALSE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_generic_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 #define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)

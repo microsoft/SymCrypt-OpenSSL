@@ -121,18 +121,46 @@ static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX
     return p_scossl_aes_gcm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_skey_encrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_encrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_gcm_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_gcm_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_gcm_skey_decrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_gcm_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_gcm_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_gcm_final(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
@@ -418,18 +446,46 @@ static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX
     return p_scossl_aes_ccm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_skey_encrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_encrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_ccm_init_internal(ctx, 1, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_ccm_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
 }
 
-static SCOSSL_STATUS p_scossl_aes_ccm_skey_decrypt_init(_Inout_ void *ctx, _In_ SCOSSL_SKEY *skey,
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                         _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                         _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_ccm_init_internal(ctx, 0, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_ccm_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_ccm_final(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
