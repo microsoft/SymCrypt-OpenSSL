@@ -11,8 +11,6 @@
 extern "C" {
 #endif
 
-#define SCOSSL_X25519_MAX_SIZE (32)
-
 _Use_decl_annotations_
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(SCOSSL_PROVCTX *provctx)
 {
@@ -234,7 +232,7 @@ SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL is
 {
     if (keyCtx->isX25519)
     {
-        return SCOSSL_X25519_MAX_SIZE;
+        return SCOSSL_X25519_KEY_SIZE;
     }
     else if (isEcdh)
     {
