@@ -142,8 +142,8 @@ static SCOSSL_STATUS p_scossl_rsa_decrypt_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ct
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                                  _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                                  _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
@@ -215,8 +215,8 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx,
-                                                  _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
-                                                  _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
+                                                 _Out_writes_bytes_(*outlen) unsigned char *out, _Out_ size_t *outlen, size_t outsize,
+                                                 _In_reads_bytes_(inlen) const unsigned char *in, size_t inlen)
 {
     int mdnid = 0;
     INT32 cbResult;
