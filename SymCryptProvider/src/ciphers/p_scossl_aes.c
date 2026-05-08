@@ -774,7 +774,7 @@ static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX 
             return SCOSSL_FAILURE;
         }
 
-        if (ctx->tlsMacSize > EVP_MAX_MD_SIZE)
+        if (tlsMacSize > EVP_MAX_MD_SIZE)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
             return SCOSSL_FAILURE;

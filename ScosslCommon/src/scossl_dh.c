@@ -73,7 +73,7 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
                     NULL,
                     NULL);
 
-                if ((pDlgroupCopy = SymCryptDlgroupAllocate(pcbPrimeP, pcbPrimeQ)) == NULL)
+                if ((pDlgroupCopy = SymCryptDlgroupAllocate(pcbPrimeP * 8, pcbPrimeQ * 8)) == NULL)
                 {
                     goto cleanup;
                 }
