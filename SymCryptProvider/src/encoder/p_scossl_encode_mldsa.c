@@ -38,13 +38,6 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         goto cleanup;
     }
 
-    if ((p8Data = ASN1_OCTET_STRING_new()) == NULL ||
-        (p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
     if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED &&
         keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY)
     {
@@ -54,6 +47,13 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
 
     if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
+        goto cleanup;
+    }
+
+    if ((p8Data = ASN1_OCTET_STRING_new()) == NULL ||
+        (p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
@@ -107,12 +107,6 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
         goto cleanup;
     }
 
-    if ((pubKey = X509_PUBKEY_new()) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
     if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
@@ -121,6 +115,12 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
     if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
     {
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
+        goto cleanup;
+    }
+
+    if ((pubKey = X509_PUBKEY_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 

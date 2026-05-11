@@ -168,8 +168,7 @@ static void p_scossl_mldsa_keygen_cleanup(_Inout_ SCOSSL_MLDSA_KEYGEN_CTX *genCt
     OPENSSL_secure_clear_free(genCtx, sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
 }
 
-static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[],
-                                                           _In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
+static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[], _In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
     SCOSSL_MLDSA_KEYGEN_CTX *genCtx = OPENSSL_secure_zalloc(sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
 
@@ -320,7 +319,6 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
             paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
         }
     }
-
 
     if (paramEncodedKey != NULL || paramPubKey != NULL)
     {

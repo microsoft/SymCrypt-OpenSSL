@@ -61,6 +61,10 @@ extern "C" {
 #define SCOSSL_TLS_GROUP_ID_x25519mlkem768          0x11ec
 #define SCOSSL_TLS_GROUP_ID_secp384r1mlkem1024      0x11ed
 
+#define SCOSSL_TLS_CODE_POINT_MLDSA44 0x0904
+#define SCOSSL_TLS_CODE_POINT_MLDSA65 0x0905
+#define SCOSSL_TLS_CODE_POINT_MLDSA87 0x0906
+
 #define ALG(names, funcs) {     \
     names,                      \
     "provider="P_SCOSSL_NAME    \
@@ -122,7 +126,8 @@ extern "C" {
     ALG_ENCODER(provName, algorithm, SubjectPublicKeyInfo, pem),      \
     ALG_TEXT_ENCODER(provName, algorithm),
 
-typedef struct {
+typedef struct
+{
     unsigned int groupId;
     unsigned int securityBits;
     int is_kem;
@@ -132,7 +137,8 @@ typedef struct {
     int maxDtls;
 } SCOSSL_TLS_GROUP_INFO;
 
-typedef struct {
+typedef struct
+{
     unsigned int codePoint;
     unsigned int securityBits;
     int minTls;
@@ -271,15 +277,15 @@ const SCOSSL_TLS_GROUP_INFO scossl_tls_group_info_secp384r1mlkem1024 = {
     OSSL_PARAM_END}
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa44 = {
-    0x0904, 128, TLS1_3_VERSION, 0, -1, -1
+    SCOSSL_TLS_CODE_POINT_MLDSA44, 128, TLS1_3_VERSION, 0, -1, -1
 };
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa65 = {
-    0x0905, 192, TLS1_3_VERSION, 0, -1, -1
+    SCOSSL_TLS_CODE_POINT_MLDSA65, 192, TLS1_3_VERSION, 0, -1, -1
 };
 
 const SCOSSL_TLS_SIGALG_INFO scossl_tls_sigalg_info_mldsa87 = {
-    0x0906, 256, TLS1_3_VERSION, 0, -1, -1
+    SCOSSL_TLS_CODE_POINT_MLDSA87, 256, TLS1_3_VERSION, 0, -1, -1
 };
 
 #define NUM_PARAMS_SIGALG_ENTRY 10
@@ -584,8 +590,14 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
-    return p_scossl_mlkem_register_algorithms() &&
-           p_scossl_mldsa_register_algorithms();
+    if (p_scossl_mlkem_register_algorithms() != SCOSSL_SUCCESS ||
+        p_scossl_mldsa_register_algorithms() != SCOSSL_SUCCESS)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
 }
 
 static int p_scossl_get_status()

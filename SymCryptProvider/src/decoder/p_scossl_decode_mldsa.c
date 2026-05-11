@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(ossl_unused SCOSSL_DECODE_CTX *ctx, _In_ const ASN1_OBJECT *algorithm,
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(_In_ const ASN1_OBJECT *algorithm,
                                                              SYMCRYPT_MLDSA_PARAMS mldsaParams, SYMCRYPT_MLDSAKEY_FORMAT format,
                                                              _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey)
 {
@@ -56,7 +56,7 @@ cleanup:
     return keyCtx;
 }
 
-static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(_In_ SCOSSL_DECODE_CTX *ctx, SYMCRYPT_MLDSA_PARAMS mldsaParams, _In_ BIO *bio)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL_DECODE_CTX *ctx, SYMCRYPT_MLDSA_PARAMS mldsaParams, _In_ BIO *bio)
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
@@ -78,7 +78,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(_In_ SCOSSL_DECODE
 
     format = cbKey == 64 ? SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
 
-    keyCtx = p_scossl_mldsa_decode_key_bytes(ctx, algorithm,
+    keyCtx = p_scossl_mldsa_decode_key_bytes(algorithm,
                                              mldsaParams, format,
                                              ASN1_STRING_get0_data(p8Data), ASN1_STRING_length(p8Data));
 
@@ -110,7 +110,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(_In_ SCOSSL_
 
     X509_ALGOR_get0(&algorithm, NULL, NULL, subjPubKeyInfo->x509Alg);
 
-    keyCtx = p_scossl_mldsa_decode_key_bytes(ctx, algorithm,
+    keyCtx = p_scossl_mldsa_decode_key_bytes(algorithm,
                                              mldsaParams, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY,
                                              ASN1_STRING_get0_data(subjPubKeyInfo->subjectPublicKey), ASN1_STRING_length(subjPubKeyInfo->subjectPublicKey));
 
@@ -137,14 +137,13 @@ static SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(_In_ SCOSSL_DECODE_CTX 
 
 #define SCOSSL_MAKE_MLDSA_DECODER(decoderType, bits)                                                        \
     static SCOSSL_MLDSA_KEY_CTX                                                                             \
-    *p_scossl_##decoderType##_to_mldsa##bits(_In_ SCOSSL_DECODE_CTX *ctx,                                   \
-                                             _In_ BIO *bio)                                                 \
+    *p_scossl_##decoderType##_to_mldsa##bits(_In_ SCOSSL_DECODE_CTX *ctx,  _In_ BIO *bio)                   \
     {                                                                                                       \
         return p_scossl_##decoderType##_to_mldsa(ctx, SYMCRYPT_MLDSA_PARAMS_MLDSA##bits, bio);              \
     }                                                                                                       \
                                                                                                             \
     static const SCOSSL_DECODE_KEYTYPE_DESC p_scossl_mldsa##bits##_##decoderType##_desc = {                 \
-        "ML-DSA-"#bits,                                                                                       \
+        "ML-DSA-"#bits,                                                                                     \
         select_##decoderType,                                                                               \
         (PSCOSSL_DECODE_INTERNAL_FN)p_scossl_##decoderType##_to_mldsa##bits,                                \
         (OSSL_FUNC_keymgmt_free_fn *)p_scossl_mldsa_keymgmt_free_key_ctx};                                  \
@@ -152,19 +151,14 @@ static SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(_In_ SCOSSL_DECODE_CTX 
     static SCOSSL_DECODE_CTX *                                                                              \
     p_scossl_der_to_mldsa##bits##_##decoderType##_newctx(_In_ SCOSSL_PROVCTX *provctx)                      \
     {                                                                                                       \
-        return p_scossl_decode_newctx(                                                                      \
-            provctx,                                                                                        \
-            &p_scossl_mldsa##bits##_##decoderType##_desc);                                                  \
+        return p_scossl_decode_newctx(provctx, &p_scossl_mldsa##bits##_##decoderType##_desc);               \
     }                                                                                                       \
                                                                                                             \
     static BOOL                                                                                             \
-    p_scossl_der_to_mldsa##bits##_##decoderType##_does_selection(                                           \
-        ossl_unused void *provctx,                                                                          \
-        int selection)                                                                                      \
+    p_scossl_der_to_mldsa##bits##_##decoderType##_does_selection(ossl_unused void *provctx,                 \
+                                                                 int selection)                             \
     {                                                                                                       \
-        return p_scossl_decode_does_selection(                                                              \
-            &p_scossl_mldsa##bits##_##decoderType##_desc,                                                   \
-            selection);                                                                                     \
+        return p_scossl_decode_does_selection( &p_scossl_mldsa##bits##_##decoderType##_desc, selection);    \
     }                                                                                                       \
                                                                                                             \
     const OSSL_DISPATCH p_scossl_der_to_mldsa##bits##_##decoderType##_functions[] = {                       \
