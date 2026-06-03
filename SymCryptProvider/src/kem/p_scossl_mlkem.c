@@ -68,12 +68,10 @@ static SCOSSL_MLKEM_CTX *p_scossl_mlkem_dupctx(_In_ SCOSSL_MLKEM_CTX *ctx)
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->operation = ctx->operation;
         copyCtx->provCtx = ctx->provCtx;
+        copyCtx->classicKeyexchCtx = NULL;
 
-        if (ctx->classicKeyexchCtx != NULL)
-        {
-            copyCtx->classicKeyexchCtx = NULL;
-        }
-        else if ((copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
+        if (ctx->classicKeyexchCtx != NULL &&
+            (copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
         {
             OPENSSL_free(copyCtx);
             copyCtx = NULL;
@@ -329,7 +327,7 @@ static SCOSSL_STATUS p_scossl_mlkem_decapsulate_init(_Inout_ SCOSSL_MLKEM_CTX *c
         ctx->keyCtx->format != SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-        return SCOSSL_FAILURE;   
+        return SCOSSL_FAILURE;
     }
 
     if (keyCtx->groupInfo->classicGroupName != NULL &&
@@ -532,7 +530,7 @@ BOOL p_scossl_mlkem_is_hybrid(const SCOSSL_MLKEM_KEY_CTX *keyCtx)
            keyCtx->groupInfo != NULL &&
            keyCtx->groupInfo->classicGroupName != NULL;
 }
-    
+
 _Use_decl_annotations_
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info_by_nid(int nid)
 {
