@@ -14,12 +14,14 @@ extern "C" {
 //
 // Digest parameters
 //
+
 #define SCOSSL_DIGEST_PARAM_FUNCTION_NAME_STRING "function-name-string"
 #define SCOSSL_DIGEST_PARAM_CUSTOMIZATION_STRING "customization-string"
-
+  
 //
 // KDF parameters
 //
+
 #define SCOSSL_KDF_PARAM_SRTP_RATE "rate"
 #define SCOSSL_KDF_PARAM_SRTP_INDEX "index"
 #define SCOSSL_KDF_PARAM_SRTP_INDEX_WIDTH "index-width"
@@ -27,6 +29,7 @@ extern "C" {
 //
 // SRTP labels
 //
+
 #define SCOSSL_SRTP_LABEL_ENCRYPTION "encryption"
 #define SCOSSL_SRTP_LABEL_AUTHENTICATION "authentication"
 #define SCOSSL_SRTP_LABEL_SALTING "salting"
