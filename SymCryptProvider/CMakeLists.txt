@@ -38,6 +38,7 @@ set(SCOSSL_SOURCES
     ./src/kdf/p_scossl_tls1prf.c
     ./src/kem/p_scossl_mlkem.c
     ./src/kem/p_scossl_mlkem_hybrid.c
+    ./src/kem/p_scossl_mlkem_hybrid_ecc.c
     ./src/keyexch/p_scossl_dh.c
     ./src/keyexch/p_scossl_ecdh.c
     ./src/keyexch/p_scossl_kdf_keyexch.c

@@ -5,6 +5,7 @@
 #include "scossl_provider.h"
 #include "p_scossl_base.h"
 #include "p_scossl_mlkem_hybrid.h"
+#include "p_scossl_mlkem_hybrid_ecc.h"
 #include "keyexch/p_scossl_ecdh.h"
 
 #include <openssl/proverr.h>
@@ -177,15 +178,15 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_encapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         goto cleanup;
     }
 
-    if ((cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPeer, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) == 0)
+    if ((cbClassicKey = p_scossl_mlkem_hybrid_ecc_get_encoded_key_size(classicKeyCtxPeer, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) == 0)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_encoded_key_size failed");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_encoded_key_size failed");
         goto cleanup;
     }
 
-    if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPeer, TRUE)) == 0)
+    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(classicKeyCtxPeer)) == 0)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_max_result_size failed");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_max_result_size failed");
         goto cleanup;
     }
 
@@ -230,20 +231,20 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_encapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         }
 
         // Generate ephemeral ECDH key
-        if ((classicKeyCtxPrivate = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
+        if ((classicKeyCtxPrivate = p_scossl_mlkem_hybrid_ecc_new_ctx(ctx->provCtx)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        if (p_scossl_ecc_set_group(classicKeyCtxPrivate, ctx->keyCtx->classicGroupNid) != SCOSSL_SUCCESS ||
-            p_scossl_ecc_gen(classicKeyCtxPrivate) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_hybrid_ecc_set_group(classicKeyCtxPrivate, ctx->keyCtx->classicGroupNid) != SCOSSL_SUCCESS ||
+            p_scossl_mlkem_hybrid_ecc_gen(classicKeyCtxPrivate) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
         // Write encoded public key bytes
-        if (p_scossl_ecc_get_encoded_key(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_hybrid_ecc_get_encoded_key(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbClassicKey, &cbClassicKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -282,7 +283,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_encapsulate(_In_ SCOSSL_MLKEM_HYBRID_
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    p_scossl_ecc_free_ctx(classicKeyCtxPrivate);
+    p_scossl_mlkem_hybrid_ecc_free_ctx(classicKeyCtxPrivate);
 
     return ret;
 }
@@ -359,15 +360,15 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         goto cleanup;
     }
 
-    if ((cbClassicKey = p_scossl_ecc_get_encoded_key_size(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) == 0)
+    if ((cbClassicKey = p_scossl_mlkem_hybrid_ecc_get_encoded_key_size(classicKeyCtxPrivate, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) == 0)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_encoded_key_size failed");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_encoded_key_size failed");
         goto cleanup;
     }
 
-    if ((cbClassicSecret = p_scossl_ecc_get_max_result_size(classicKeyCtxPrivate, TRUE)) == 0)
+    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(classicKeyCtxPrivate)) == 0)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_ecc_get_max_result_size failed");
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_max_result_size failed");
         goto cleanup;
     }
 
@@ -414,14 +415,14 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         }
 
         // Extract ECDH public key from in
-        if ((classicKeyCtxPeer = p_scossl_ecc_new_ctx(ctx->provCtx)) == NULL)
+        if ((classicKeyCtxPeer = p_scossl_mlkem_hybrid_ecc_new_ctx(ctx->provCtx)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        if (p_scossl_ecc_set_group(classicKeyCtxPeer, ctx->keyCtx->classicGroupNid) != SCOSSL_SUCCESS ||
-            p_scossl_ecc_set_encoded_key(classicKeyCtxPeer, pbClassicKey, cbClassicKey, NULL, 0) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_hybrid_ecc_set_group(classicKeyCtxPeer, ctx->keyCtx->classicGroupNid) != SCOSSL_SUCCESS ||
+            p_scossl_mlkem_hybrid_ecc_set_encoded_key(classicKeyCtxPeer, pbClassicKey, cbClassicKey, NULL, 0) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -453,7 +454,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate(_In_ SCOSSL_MLKEM_HYBRID_
     ret = SCOSSL_SUCCESS;
 
 cleanup:
-    p_scossl_ecc_free_ctx(classicKeyCtxPeer);
+    p_scossl_mlkem_hybrid_ecc_free_ctx(classicKeyCtxPeer);
 
     return ret;
 }
