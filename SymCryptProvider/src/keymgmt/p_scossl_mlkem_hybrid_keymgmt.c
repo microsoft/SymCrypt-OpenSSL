@@ -561,6 +561,12 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
         keyCtx->key = NULL;
     }
 
+    if (keyCtx->classicKeyCtx != NULL)
+    {
+        p_scossl_mlkem_hybrid_ecc_free_ctx(keyCtx->classicKeyCtx);
+        keyCtx->classicKeyCtx = NULL;
+    }
+
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
         (p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
     {
@@ -856,6 +862,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_set_encoded_key(SCOSSL_MLKEM_HYBRID_
     if (isNewKey &&
         (keyCtx->classicKeyCtx = p_scossl_mlkem_hybrid_ecc_new_ctx(keyCtx->provCtx)) == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 

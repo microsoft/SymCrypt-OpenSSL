@@ -750,10 +750,12 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     p_ctx->handle = handle;
     p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
+    p_scossl_setup_logging(handle);
+
     p_scossl_set_core_bio(in);
     if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
     {
-        OPENSSL_free(p_ctx);
+        ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
         goto cleanup;
     }
 
@@ -766,8 +768,6 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
             break;
         }
     }
-
-    p_scossl_setup_logging(handle);
 
     if (!scossl_prov_initialized)
     {

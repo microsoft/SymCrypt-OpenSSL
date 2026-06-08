@@ -63,7 +63,8 @@ static SCOSSL_MLKEM_HYBRID_CTX *p_scossl_mlkem_hybrid_dupctx(_In_ SCOSSL_MLKEM_H
         copyCtx->provCtx = ctx->provCtx;
         copyCtx->classicKeyexchCtx = NULL;
 
-        if ((copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
+        if (ctx->classicKeyexchCtx != NULL &&
+            (copyCtx->classicKeyexchCtx = p_scossl_ecdh_dupctx(ctx->classicKeyexchCtx)) == NULL)
         {
             OPENSSL_free(copyCtx);
             copyCtx = NULL;
