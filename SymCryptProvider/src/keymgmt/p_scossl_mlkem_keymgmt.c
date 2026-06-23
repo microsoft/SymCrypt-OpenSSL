@@ -855,9 +855,19 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
         goto cleanup;
     }
 
+    if (*ppbKey != NULL)
+    {
+        if (*pcbKey < cbKey)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            goto cleanup;
+        }
+
+        pbKey = *ppbKey;
+    }
     // Always using OPENSSL_secure_malloc so caller doesn't have to worry about
     // calling separate free functions for encapsulation and decapsulation keys
-    if ((pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
+    else if ((pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -875,11 +885,10 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
     *ppbKey = pbKey;
     *pcbKey = cbKey;
 
+    pbKey = NULL;
+
 cleanup:
-    if (ret != SCOSSL_SUCCESS)
-    {
-        OPENSSL_secure_clear_free(pbKey, cbKey);
-    }
+    OPENSSL_secure_clear_free(pbKey, cbKey);
 
     return ret;
 }

@@ -84,14 +84,8 @@ void scossl_ecc_destroy_ecc_curves()
     scossl_ecc_initialized = FALSE;
 }
 
-_Use_decl_annotations_
-PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
+PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)
 {
-    if (group == NULL)
-        return NULL;
-
-    int groupNid = EC_GROUP_get_curve_name(group);
-
     // Only reroute NIST Prime curves to SymCrypt for now
     switch (groupNid)
     {
@@ -113,9 +107,13 @@ PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
     return NULL;
 }
 
-PCSYMCRYPT_ECURVE scossl_ecc_get_x25519_curve()
+_Use_decl_annotations_
+PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
 {
-    return _hidden_curve_X25519;
+    if (group == NULL)
+        return NULL;
+
+    return scossl_ecc_nid_to_symcrypt_curve(EC_GROUP_get_curve_name(group));
 }
 
 _Use_decl_annotations_

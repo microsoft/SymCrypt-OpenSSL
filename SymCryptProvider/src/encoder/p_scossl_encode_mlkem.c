@@ -24,9 +24,9 @@ static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CT
 static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
-    SIZE_T cbKey;
+    SIZE_T cbKey = 0;
     unsigned char *pbDer = NULL;
-    int cbDer;
+    int cbDer = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     ASN1_OBJECT *p8Obj;
@@ -96,11 +96,11 @@ cleanup:
 static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
-    PBYTE pbKeyNonSecure = NULL;
-    SIZE_T cbKey;
+    SIZE_T cbKey = 0;
     X509_PUBKEY *pubKey = NULL;
     ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     if (keyCtx->key == NULL)
     {
@@ -114,21 +114,24 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    scError = SymCryptMlKemSizeofKeyFormatFromParams(keyCtx->mlkemParams, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &cbKey);
+    if (scError != SYMCRYPT_NO_ERROR)
     {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlKemSizeofKeyFormatFromParams failed", scError);
         goto cleanup;
     }
 
-    // Create a non-secure copy of the key for encoding
-    // X509_PUBKEY_set0_param takes ownership of the buffer and
-    // frees with OPENSSL_free
-    pbKeyNonSecure = OPENSSL_malloc(cbKey);
-    if (pbKeyNonSecure == NULL)
+    pbKey = OPENSSL_malloc(cbKey);
+    if (pbKey == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
-    memcpy(pbKeyNonSecure, pbKey, cbKey);
+
+    if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    {
+        goto cleanup;
+    }
 
     if ((p8Obj = p_scossl_encode_mlkem_get_oid(keyCtx)) == NULL)
     {
@@ -136,12 +139,12 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbKeyNonSecure, cbKey))
+    if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbKey, cbKey))
     {
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
     }
-    pbKeyNonSecure = NULL;
+    pbKey = NULL;
 
     status = SCOSSL_SUCCESS;
 
@@ -152,8 +155,7 @@ cleanup:
         pubKey = NULL;
     }
 
-    OPENSSL_secure_free(pbKey);
-    OPENSSL_free(pbKeyNonSecure);
+    OPENSSL_free(pbKey);
 
     return pubKey;
 }

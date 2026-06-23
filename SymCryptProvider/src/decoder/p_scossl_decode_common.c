@@ -80,7 +80,7 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
                               ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArg)
 {
     BIO *bio = NULL;
-    PVOID *keyCtx = NULL;
+    PVOID keyCtx = NULL;
     OSSL_PARAM cbParams[4];
     SCOSSL_STATUS ret = SCOSSL_SUCCESS;
 
