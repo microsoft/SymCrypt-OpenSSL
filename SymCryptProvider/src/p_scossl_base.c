@@ -750,24 +750,24 @@ SCOSSL_STATUS OSSL_provider_init(_In_ const OSSL_CORE_HANDLE *handle,
     p_ctx->handle = handle;
     p_ctx->libctx = OSSL_LIB_CTX_new_child(handle, in);
 
-    for (const OSSL_DISPATCH *in_iter = in; in_iter->function_id != 0; in_iter++)
-    {
-        switch(in_iter->function_id)
-        {
-        case OSSL_FUNC_CORE_GET_PARAMS:
-            core_get_params = OSSL_FUNC_core_get_params(in_iter);
-            break;
-        }
-    }
-
-    p_scossl_setup_logging(handle);
-
     p_scossl_set_core_bio(in);
     if ((p_ctx->coreBioMeth = p_scossl_bio_init()) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
         goto cleanup;
     }
+
+    for (; in->function_id != 0; in++)
+    {
+        switch(in->function_id)
+        {
+        case OSSL_FUNC_CORE_GET_PARAMS:
+            core_get_params = OSSL_FUNC_core_get_params(in);
+            break;
+        }
+    }
+
+    p_scossl_setup_logging(handle);
 
     if (!scossl_prov_initialized)
     {
