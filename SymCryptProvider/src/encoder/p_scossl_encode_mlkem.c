@@ -376,7 +376,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         pbKey = NULL;
         cbKey = 0;
 
-        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }

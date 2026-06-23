@@ -116,6 +116,11 @@ PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(const EC_GROUP *group)
     return scossl_ecc_nid_to_symcrypt_curve(EC_GROUP_get_curve_name(group));
 }
 
+PCSYMCRYPT_ECURVE scossl_ecc_get_x25519_curve()
+{
+    return _hidden_curve_X25519;
+}
+
 _Use_decl_annotations_
 EC_GROUP *scossl_ecc_symcrypt_curve_to_ecc_group(PCSYMCRYPT_ECURVE pCurve)
 {

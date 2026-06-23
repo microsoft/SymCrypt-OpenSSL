@@ -8,13 +8,13 @@
 extern "C" {
 #endif
 
-OSSL_FUNC_BIO_read_ex_fn *core_bio_read_ex = NULL;
-OSSL_FUNC_BIO_write_ex_fn *core_bio_write_ex = NULL;
-OSSL_FUNC_BIO_up_ref_fn *core_bio_up_ref = NULL;
-OSSL_FUNC_BIO_free_fn *core_bio_free = NULL;
-OSSL_FUNC_BIO_gets_fn *core_bio_gets = NULL;
-OSSL_FUNC_BIO_puts_fn *core_bio_puts = NULL;
-OSSL_FUNC_BIO_ctrl_fn *core_bio_ctrl = NULL;
+static OSSL_FUNC_BIO_read_ex_fn *core_bio_read_ex = NULL;
+static OSSL_FUNC_BIO_write_ex_fn *core_bio_write_ex = NULL;
+static OSSL_FUNC_BIO_up_ref_fn *core_bio_up_ref = NULL;
+static OSSL_FUNC_BIO_free_fn *core_bio_free = NULL;
+static OSSL_FUNC_BIO_gets_fn *core_bio_gets = NULL;
+static OSSL_FUNC_BIO_puts_fn *core_bio_puts = NULL;
+static OSSL_FUNC_BIO_ctrl_fn *core_bio_ctrl = NULL;
 
 static SCOSSL_STATUS p_scossl_bio_core_read_ex(BIO *bio, char *data, size_t data_len,
                                                size_t *bytes_read)
