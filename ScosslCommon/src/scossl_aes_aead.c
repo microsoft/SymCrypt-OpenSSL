@@ -331,8 +331,9 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_fixed(SCOSSL_CIPHER_GCM_CTX *ctx, INT32 encr
 
     if (ivlen == (size_t)-1)
     {
-        // Set entire initial IV
-        memcpy(ctx->iv, iv, ctx->ivlen);
+        // Set entire initial IV - use EVP_GCM_TLS_IV_LEN directly (already validated == ctx->ivlen)
+        // to avoid copying based on a potentially attacker-influenced struct field size
+        memcpy(ctx->iv, iv, EVP_GCM_TLS_IV_LEN);
         // Initialize our invocation counter from the IV
         ctx->ivInvocation = SYMCRYPT_LOAD_MSBFIRST64(ctx->iv + ctx->ivlen - EVP_GCM_TLS_EXPLICIT_IV_LEN);
         ctx->useInvocation = 1;
