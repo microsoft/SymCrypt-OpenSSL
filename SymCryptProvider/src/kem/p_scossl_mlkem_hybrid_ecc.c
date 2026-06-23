@@ -249,8 +249,6 @@ SIZE_T p_scossl_mlkem_hybrid_ecc_get_max_result_size(int classicGroupNid)
 _Use_decl_annotations_
 SIZE_T p_scossl_mlkem_hybrid_ecc_get_encoded_key_size(const SCOSSL_ECC_KEY_CTX *keyCtx, int selection)
 {
-    SYMCRYPT_ECPOINT_FORMAT pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
-
     if (keyCtx->curve == NULL)
     {
         return 0;
