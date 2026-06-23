@@ -185,7 +185,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_encapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         goto cleanup;
     }
 
-    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(classicKeyCtxPeer)) == 0)
+    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(ctx->keyCtx->classicGroupNid)) == 0)
     {
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_max_result_size failed");
         goto cleanup;
@@ -367,7 +367,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_decapsulate(_In_ SCOSSL_MLKEM_HYBRID_
         goto cleanup;
     }
 
-    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(classicKeyCtxPrivate)) == 0)
+    if ((cbClassicSecret = p_scossl_mlkem_hybrid_ecc_get_max_result_size(ctx->keyCtx->classicGroupNid)) == 0)
     {
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_mlkem_hybrid_ecc_get_max_result_size failed");
         goto cleanup;

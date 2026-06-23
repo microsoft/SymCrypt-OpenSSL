@@ -31,7 +31,7 @@ SCOSSL_ECC_KEY_CTX *p_scossl_mlkem_hybrid_ecc_dup_ctx(_In_ const SCOSSL_ECC_KEY_
 SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_set_group(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx, int nid);
 SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_gen(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 
-SIZE_T p_scossl_mlkem_hybrid_ecc_get_max_result_size(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx);
+SIZE_T p_scossl_mlkem_hybrid_ecc_get_max_result_size(int classicGroupNid);
 SIZE_T p_scossl_mlkem_hybrid_ecc_get_encoded_key_size(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_get_encoded_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                                         _Inout_ PBYTE *ppbKey, _Inout_ SIZE_T *pcbKey);

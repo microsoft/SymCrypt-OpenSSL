@@ -439,7 +439,8 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_params(_In_ SCOSSL_MLKEM_
             return SCOSSL_FAILURE;
         }
 
-        cbCiphertext += p_scossl_mlkem_hybrid_ecc_get_max_result_size(keyCtx->classicKeyCtx);
+
+        cbCiphertext += p_scossl_mlkem_hybrid_ecc_get_max_result_size(keyCtx->classicGroupNid);
 
         if (!OSSL_PARAM_set_size_t(p, cbCiphertext))
         {

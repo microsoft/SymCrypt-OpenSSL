@@ -230,13 +230,20 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_gen(SCOSSL_ECC_KEY_CTX *keyCtx)
 }
 
 _Use_decl_annotations_
-SIZE_T p_scossl_mlkem_hybrid_ecc_get_max_result_size(const SCOSSL_ECC_KEY_CTX *keyCtx)
+SIZE_T p_scossl_mlkem_hybrid_ecc_get_max_result_size(int classicGroupNid)
 {
-    if (keyCtx->isX25519)
+    switch (classicGroupNid)
     {
-        return SCOSSL_HYBRID_X25519_KEY_SIZE;
+    case NID_X25519:
+    case NID_X9_62_prime256v1:
+        return 32;
+    case NID_secp384r1:
+        return 48;
+    default:
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Unsupported classic group passed to p_scossl_mlkem_hybrid_ecc_get_max_result_size: %d", classicGroupNid);
     }
-    return keyCtx->key == NULL ? 0 : SymCryptEckeySizeofPublicKey(keyCtx->key, SYMCRYPT_ECPOINT_FORMAT_X);
+
+    return 0;
 }
 
 _Use_decl_annotations_

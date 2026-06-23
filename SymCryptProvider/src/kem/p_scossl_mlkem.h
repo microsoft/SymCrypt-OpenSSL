@@ -25,8 +25,6 @@ typedef struct {
     PSYMCRYPT_MLKEMKEY key;
 } SCOSSL_MLKEM_KEY_CTX;
 
-#define SCOSSL_MLKEM_PRIVATE_SEED_LENGTH 64
-
 SCOSSL_STATUS p_scossl_mlkem_register_algorithms();
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info_by_nid(int nid);
 SCOSSL_MLKEM_GROUP_INFO *p_scossl_mlkem_get_group_info(_In_ const char *groupName);
