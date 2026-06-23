@@ -2,6 +2,8 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
+#pragma once
+
 #include "p_scossl_base.h"
 #include "p_scossl_ecc.h"
 

@@ -261,8 +261,13 @@ SIZE_T p_scossl_mlkem_hybrid_ecc_get_encoded_key_size(const SCOSSL_ECC_KEY_CTX *
         return SymCryptEcurveSizeofScalarMultiplier(keyCtx->curve);
     }
 
+    if (keyCtx->isX25519)
+    {
+        return SCOSSL_HYBRID_X25519_KEY_SIZE;
+    }
+
     // One extra byte for point conversion format prefix for non-X25519 keys
-    return SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + (keyCtx->isX25519 ? 0 : 1);
+    return 2*SymCryptEcurveSizeofFieldElement(keyCtx->curve)+1;
 }
 
 static SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_get_encoded_public_key(_In_ const SCOSSL_ECC_KEY_CTX *keyCtx,
