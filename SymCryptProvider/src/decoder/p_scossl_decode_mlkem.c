@@ -49,7 +49,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key_bytes(_In_ SCOSSL_DECODE_
 cleanup:
     if (status != SCOSSL_SUCCESS)
     {
-        OPENSSL_free(keyCtx);
+        p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
         keyCtx = NULL;
     }
 
