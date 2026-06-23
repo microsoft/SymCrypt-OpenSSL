@@ -888,7 +888,10 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_get_encoded_key(const SCOSSL_MLKEM_KEY_CTX 
     pbKey = NULL;
 
 cleanup:
-    OPENSSL_secure_clear_free(pbKey, cbKey);
+    if (*ppbKey == NULL)
+    {
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+    }
 
     return ret;
 }

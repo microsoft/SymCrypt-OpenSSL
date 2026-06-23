@@ -104,7 +104,14 @@ SCOSSL_STATUS p_scossl_decode(SCOSSL_DECODE_CTX *ctx, OSSL_CORE_BIO *in, int sel
         cbParams[2] = OSSL_PARAM_construct_octet_string(OSSL_OBJECT_PARAM_REFERENCE, &keyCtx, sizeof(keyCtx));
         cbParams[3] = OSSL_PARAM_construct_end();
 
-        ret = dataCb(cbParams, dataCbArg);
+        if (dataCb(cbParams, dataCbArg))
+        {
+            keyCtx = NULL;
+        }
+        else
+        {
+            ret = SCOSSL_FAILURE;
+        }
     }
 
     ctx->desc->freeKeyCtx(keyCtx);
