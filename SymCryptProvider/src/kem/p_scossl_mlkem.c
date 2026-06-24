@@ -371,6 +371,7 @@ int p_scossl_mlkem_get_bits(SYMCRYPT_MLKEM_PARAMS mlkemParams)
     case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
         return 1024;
     default:
+        break;
     }
 
     return 0;
@@ -387,6 +388,7 @@ int p_scossl_mlkem_get_security_bits(SYMCRYPT_MLKEM_PARAMS mlkemParams)
     case SYMCRYPT_MLKEM_PARAMS_MLKEM1024:
         return 256;
     default:
+        break;
     }
 
     return 0;

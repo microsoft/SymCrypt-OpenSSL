@@ -14,26 +14,6 @@ extern "C" {
 
 #define SCOSSL_HYBRID_X25519_KEY_SIZE (32)
 
-// Translate a curve NID to a SymCrypt curve. Only called internally with
-// curve NIDs from the ML-KEM hybrid group definitions (P-256, P-384, X25519).
-static PCSYMCRYPT_ECURVE p_scossl_mlkem_hybrid_ecc_nid_to_curve(int nid)
-{
-    PCSYMCRYPT_ECURVE curve = NULL;
-    EC_GROUP *group = NULL;
-
-    if (nid == NID_X25519)
-    {
-        return scossl_ecc_get_x25519_curve();
-    }
-
-    if ((group = EC_GROUP_new_by_curve_name(nid)) != NULL)
-    {
-        curve = scossl_ecc_group_to_symcrypt_curve(group);
-        EC_GROUP_free(group);
-    }
-    return curve;
-}
-
 _Use_decl_annotations_
 SCOSSL_ECC_KEY_CTX *p_scossl_mlkem_hybrid_ecc_new_ctx(SCOSSL_PROVCTX *provctx)
 {
@@ -189,7 +169,7 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_ecc_set_group(SCOSSL_ECC_KEY_CTX *keyCtx, in
     else
     {
         keyCtx->isX25519 = FALSE;
-        curve = p_scossl_mlkem_hybrid_ecc_nid_to_curve(nid);
+        curve = scossl_ecc_nid_to_symcrypt_curve(nid);
         if (curve == NULL)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);

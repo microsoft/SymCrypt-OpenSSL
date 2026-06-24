@@ -86,7 +86,6 @@ void scossl_ecc_destroy_ecc_curves()
 
 PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)
 {
-    // Only reroute NIST Prime curves to SymCrypt for now
     switch (groupNid)
     {
     case NID_secp192r1:
@@ -99,6 +98,8 @@ PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid)
         return _hidden_curve_P384;
     case NID_secp521r1:
         return _hidden_curve_P521;
+    case NID_X25519:
+        return _hidden_curve_X25519;
     default:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_ECC_GROUP_TO_SYMCRYPT_CURVE, SCOSSL_ERR_R_OPENSSL_FALLBACK,
             "SCOSSL does not yet support this group (nid %d).", groupNid);
