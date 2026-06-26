@@ -155,7 +155,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keymgmt_dup_key_ctx(_In_ const SCOSSL
                     NULL,
                     NULL);
 
-                if ((copyCtx->pDlGroup = SymCryptDlgroupAllocate(pcbPrimeP, pcbPrimeQ)) == NULL)
+                if ((copyCtx->pDlGroup = SymCryptDlgroupAllocate(pcbPrimeP * 8, pcbPrimeQ * 8)) == NULL)
                 {
                     OPENSSL_free(copyCtx);
                     return NULL;

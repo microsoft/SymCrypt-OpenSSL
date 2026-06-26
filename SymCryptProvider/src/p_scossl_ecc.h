@@ -42,6 +42,8 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
+#define SCOSSL_X25519_KEY_SIZE (32)
+
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(_In_ SCOSSL_PROVCTX *provctx);
 void p_scossl_ecc_free_ctx(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
