@@ -538,6 +538,9 @@ void TestRsaSignVerify(
     unsigned char message_digest[64];
     size_t message_digest_len = digest_length;
     int ret = 0;
+    EVP_PKEY_CTX *pRecoverCtx = NULL;
+    unsigned char recovered[512];
+    size_t recovered_len = sizeof(recovered);
 
     if (EVP_PKEY_bits(signingKey) <= 512 &&
         EVP_MD_size(digest) >= 32)
@@ -647,6 +650,57 @@ void TestRsaSignVerify(
         printf("EVP_PKEY_verify succeeded\n");
     }
 
+    //
+    // Verify-Recover with Public Key
+    //
+    if (padding != RSA_PKCS1_PSS_PADDING) {
+        printf("\nTesting EVP_PKEY_verify_recover* Functions\n\n");
+
+        EVP_PKEY_CTX *pRecoverCtx = EVP_PKEY_CTX_new(verificationKey, NULL);
+        if (!pRecoverCtx) {
+            handleOpenSSLError("EVP_PKEY_CTX_new failed");
+            goto end;
+        }
+
+        if (EVP_PKEY_verify_recover_init(pRecoverCtx) <= 0) {
+            handleOpenSSLError("EVP_PKEY_verify_recover_init failed");
+            goto end;
+        }
+
+        if (EVP_PKEY_CTX_set_rsa_padding(pRecoverCtx, padding) <= 0) {
+            handleOpenSSLError("EVP_PKEY_CTX_set_rsa_padding failed");
+            goto end;
+        }
+
+        if (EVP_PKEY_CTX_set_signature_md(pRecoverCtx, digest) <= 0) {
+            handleOpenSSLError("EVP_PKEY_CTX_set_signature_md failed");
+            goto end;
+        }
+
+        unsigned char recovered[256];  // adjust size based on key length
+        size_t recovered_len = sizeof(recovered);
+
+        if (EVP_PKEY_verify_recover(pRecoverCtx, recovered, &recovered_len, signature, signature_len) <= 0) {
+            handleError("EVP_PKEY_verify_recover failed\n");
+        } else {
+            
+            printf("Message Digest: (%ld)\n", message_digest_len);
+            BIO_dump_fp(stdout, (const char *)message_digest, message_digest_len);
+            
+            printf("Recovered data: (%ld)\n", recovered_len);
+            BIO_dump_fp(stdout, (const char *)recovered, recovered_len);
+
+            if (recovered_len == message_digest_len &&
+                memcmp(recovered, message_digest, message_digest_len) == 0) {
+                printf("Recovery successful\n");
+            } else {
+                handleError("Recovery failed: recovered data does not match original message digest\n");
+            }
+        }
+    } else {
+        printf("Skipping verify-recover: RSA_PSS padding is not supported\n");
+    }
+
 end:
     if (pSignContext)
         EVP_PKEY_CTX_free(pSignContext);
@@ -654,6 +708,8 @@ end:
         EVP_PKEY_CTX_free(pVerifyContext);
     if (signature)
         OPENSSL_free(signature);
+    if (pRecoverCtx)
+        EVP_PKEY_CTX_free(pRecoverCtx);
     printf("%s", SeparatorLine);
     return;
 }
@@ -797,7 +853,7 @@ void TestRsaDigestSignVerify(
     } else {
         printf("Signature Verified\n");
     }
-
+  
 end:
     if (RSASignCtx)
         EVP_MD_CTX_free(RSASignCtx);

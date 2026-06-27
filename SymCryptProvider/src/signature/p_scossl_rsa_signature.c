@@ -15,6 +15,8 @@
 extern "C" {
 #endif
 
+#define SCOSSL_MAX_RSA_MODULUS_SIZE (512)
+
 typedef struct
 {
     SCOSSL_PROV_RSA_KEY_CTX *keyCtx;
@@ -221,6 +223,12 @@ static SCOSSL_STATUS p_scossl_rsa_verify_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, 
     return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
 
+static SCOSSL_STATUS p_scossl_rsa_verify_recover_init(_Inout_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
+                                              _In_ const OSSL_PARAM params[])
+{
+    return p_scossl_rsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFYRECOVER);
+}
+
 static SCOSSL_STATUS p_scossl_rsa_sign(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                        _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
                                        _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
@@ -276,6 +284,7 @@ err:
     return ret;
 }
 
+
 static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
                                          _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
                                          _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
@@ -310,8 +319,225 @@ static SCOSSL_STATUS p_scossl_rsa_verify(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE);
     }
 
-    return SCOSSL_FAILURE;
+    return SCOSSL_FAILURE; 
 }
+#define SSL_SIG_LENGTH  36
+
+static SCOSSL_STATUS scossl_rsa_verify_recover(
+    _In_ SCOSSL_RSA_SIGN_CTX *ctx,
+    _Out_writes_bytes_(*routlen) unsigned char *rout,
+    size_t *routlen,
+    _In_reads_bytes_(siglen) const unsigned char *sig,
+    size_t siglen)
+{
+    PBYTE decrypted = NULL;
+    PBYTE encoded = NULL;
+    SIZE_T encodedLen = 0;
+    int digestLen = 0;
+    const unsigned char *digest = NULL;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+    SIZE_T cbModulus = 0;
+
+    if (ctx == NULL || ctx->keyCtx->key == NULL || routlen == NULL || sig == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+printf("\n###### Megan: Entering scossl_rsa_verify_recover()\n");
+    if (siglen != cbModulus) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DATA);
+        return SCOSSL_FAILURE;
+    }
+
+    decrypted = OPENSSL_zalloc(cbModulus);
+    if (decrypted == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return SCOSSL_FAILURE;
+    }
+
+    // Perform public key operation to recover encoded DigestInfo
+    scError = SymCryptRsaRawEncrypt(
+                ctx->keyCtx->key,
+                sig,
+                siglen,
+                SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+                0,
+                decrypted,
+                cbModulus
+                );
+
+    if (scError != SYMCRYPT_NO_ERROR) {
+        printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover) failed 0x%x\n", scError);
+        SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_ENCRYPT,
+                                 "SymCryptRsaRawEncrypt failed", scError);
+        return SCOSSL_FAILURE;
+    }
+printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good\n");
+    // Special case: TLS MD5+SHA1 !!!!!! this one doesn't have test case !!!!!!!!!!!
+    if (ctx->mdInfo->id == NID_md5_sha1) {
+        if (cbModulus != SSL_SIG_LENGTH) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+            goto cleanup;
+        }
+printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in TLS MD5+SHA1 case\n", cbModulus);
+        if (rout != NULL) {
+            memcpy(rout, decrypted, SSL_SIG_LENGTH);
+            *routlen = SSL_SIG_LENGTH;
+        } else {
+            if (*routlen != SSL_SIG_LENGTH) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+                goto cleanup;
+            }
+            if (memcmp(rout, decrypted, SSL_SIG_LENGTH) != 0) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
+                goto cleanup;
+            }
+        }
+        SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MD5+SHA1 which is not FIPS compliant");
+        OPENSSL_clear_free(decrypted, cbModulus);
+        return SCOSSL_SUCCESS;
+    }
+
+    // Special case: MDC2 !!!!!! this one doesn't have test case !!!!!!!!!!!
+    if (ctx->mdInfo->id == NID_mdc2 &&
+        cbModulus == 18 &&
+        decrypted[0] == 0x04 && decrypted[1] == 0x10) {
+    printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in MDC2 case\n", cbModulus);
+        if (rout != NULL) {
+            memcpy(rout, decrypted + 2, 16);
+            *routlen = 16;
+        } else {
+            if (*routlen != 16) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+                goto cleanup;
+            }
+            if (memcmp(rout, decrypted + 2, 16) != 0) {
+                ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
+                goto cleanup;
+            }
+        }
+        SCOSSL_PROV_LOG_ERROR(SCOSSL_ERR_R_NOT_FIPS_ALGORITHM, "Using hash algorithm MDC2 which is not FIPS compliant");
+        OPENSSL_clear_free(decrypted, cbModulus);
+        return SCOSSL_SUCCESS;
+    }
+
+    // General case: PKCS#1 v1.5
+    printf("\n###### Megan: SymCryptRsaRawEncrypt (verify-recover)  is good, cbModulus is %ld, in General case: PKCS#1 v1.5\n", cbModulus);
+    digestLen = scossl_get_expected_hash_length(ctx->mdInfo->id);
+    printf("\n##### digestLen is %d", digestLen);
+    if (digestLen <= 0) {
+        ERR_raise(ERR_LIB_RSA, RSA_R_UNKNOWN_ALGORITHM_TYPE);
+        goto cleanup;
+    }
+
+    if (rout != NULL) {
+        if (*routlen < (size_t)digestLen) {
+            *routlen = digestLen;
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);   
+            goto cleanup;
+        }
+        digest = decrypted + cbModulus - digestLen;
+    } else {
+        digest = rout;
+    }
+printf("\n##### Digest bytes: ");
+for (int i = 0; i < digestLen; i++) {
+    printf("%02x", digest[i]);
+}
+printf("\n");
+
+    if (rout != NULL) {
+        memcpy(rout, digest, digestLen);
+        *routlen = digestLen;
+    }
+    
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_clear_free(encoded, encodedLen);
+    OPENSSL_clear_free(decrypted, cbModulus);
+    return ret;
+} 
+
+static SCOSSL_STATUS p_scossl_rsa_verify_recover(_In_ SCOSSL_RSA_SIGN_CTX *ctx,
+                                                _Out_writes_bytes_(*routlen) unsigned char *rout, size_t *routlen,
+                                                size_t routsize,
+                                                _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen)
+{
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+    SIZE_T cbModulus = 0;
+
+    if (ctx == NULL || ctx->keyCtx == NULL || sig == NULL || routlen == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->operation != EVP_PKEY_OP_VERIFYRECOVER) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+    printf("\n###### Megan: cbModulus = %lu, routsize = %lu, *routlen = %lu, siglen = %lu\n",
+           cbModulus, routsize, *routlen, siglen);
+
+    printf("sig = ");
+    for (size_t i = 0; i < siglen; i++) {
+        printf("%02x", sig[i]);
+    }
+    printf("\n");
+
+    if (rout == NULL) {
+        *routlen = cbModulus;
+        return SCOSSL_SUCCESS;
+    }
+//!!!!!!!!!!!!!!!!!!!! issue here, why there is a test case with cbModulus is 257, and routsize is 256? !!!!!!!!!!!!!!!
+    if (routsize < cbModulus) {
+        printf("\n###### Megan: cbModulus %ld > routsize %lu\n", cbModulus, routsize);
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+        return SCOSSL_FAILURE;
+    }
+
+    if (ctx->md != NULL) {
+        switch (ctx->padding) {
+        case RSA_PKCS1_PADDING:
+            printf("\n###### Megan: call scossl_rsa_verify_recover(), routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
+            return scossl_rsa_verify_recover(ctx, rout, routlen, sig, siglen);
+        default:
+            printf("\n###### Megan: Only PKCS#1 v1.5 padding allowed, routsize = %lu, cbModulus = %lu\n", routsize, cbModulus);
+            ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_PADDING_MODE,
+                           "Only PKCS#1 v1.5 padding allowed");
+            return SCOSSL_FAILURE;
+        }
+    } else {
+        printf("\n###### Megan: raw decrypt path (no digest specified)\n");
+
+        scError = SymCryptRsaRawDecrypt(
+            ctx->keyCtx->key,
+            sig,
+            siglen,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0,
+            rout,
+            cbModulus
+        );
+
+        if (scError != SYMCRYPT_NO_ERROR) {
+            printf("\n###### Megan: SymCryptRsaRawDecrypt failed 0x%x\n", scError);
+            SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_RSA_DECRYPT,
+                                      "SymCryptRsaRawDecrypt failed 0x%x", scError);
+            return SCOSSL_FAILURE;
+        }
+
+        *routlen = cbModulus;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+
 
 static SCOSSL_STATUS p_scossl_rsa_digest_signverify_init(_In_ SCOSSL_RSA_SIGN_CTX *ctx, _In_ const char *mdname,
                                                          _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[], int operation)
@@ -1072,6 +1298,8 @@ const OSSL_DISPATCH p_scossl_rsa_signature_functions[] = {
     {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_rsa_sign},
     {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_rsa_verify_init},
     {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_rsa_verify},
+    {OSSL_FUNC_SIGNATURE_VERIFY_RECOVER_INIT, (void (*)(void))p_scossl_rsa_verify_recover_init},
+    {OSSL_FUNC_SIGNATURE_VERIFY_RECOVER, (void (*)(void))p_scossl_rsa_verify_recover},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_rsa_digest_sign_init},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, (void (*)(void))p_scossl_rsa_digest_signverify_update},
     {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, (void (*)(void))p_scossl_rsa_digest_sign_final},
