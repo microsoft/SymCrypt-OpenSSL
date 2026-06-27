@@ -55,6 +55,9 @@ static const OSSL_PARAM p_scossl_dh_keygen_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, NULL, 0),
     OSSL_PARAM_size_t(OSSL_PKEY_PARAM_FFC_PBITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_DH_PRIV_LEN, NULL),
+    OSSL_PARAM_size_t("dh_paramgen_prime_len", NULL),
+    OSSL_PARAM_size_t("dh_paramgen_subprime_len", NULL),
+    OSSL_PARAM_uint("dh_paramgen_generator", NULL),
     OSSL_PARAM_END};
 
 // Import/export types
@@ -519,8 +522,7 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
 static SCOSSL_STATUS p_scossl_dh_keygen_set_template(_Inout_ SCOSSL_DH_KEYGEN_CTX *genCtx, _In_ SCOSSL_PROV_DH_KEY_CTX *tmplCtx)
 {
     if (genCtx == NULL ||
-        tmplCtx == NULL ||
-        tmplCtx->groupSetByParams)
+        tmplCtx == NULL)
     {
         return SCOSSL_FAILURE;
     }

@@ -308,7 +308,7 @@ SCOSSL_STATUS scossl_dh_generate_keypair(SCOSSL_DH_KEY_CTX *ctx, int nBitsPriv, 
         }
     }
 
-    scError = SymCryptDlkeyGenerate(SYMCRYPT_FLAG_DLKEY_DH, ctx->dlkey);
+    scError = SymCryptDlkeyGenerate(SYMCRYPT_FLAG_DLKEY_DH | SYMCRYPT_FLAG_DLKEY_GEN_MODP | SYMCRYPT_FLAG_KEY_NO_FIPS, ctx->dlkey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_LOG_SYMCRYPT_ERROR(SCOSSL_ERR_F_DH_GENERATE_KEYPAIR,
