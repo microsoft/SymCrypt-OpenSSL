@@ -964,6 +964,69 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int s
     return ret;
 }
 
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection)
+{
+    SCOSSL_STATUS success = SCOSSL_SUCCESS;
+    UINT64 pubExp = 0;
+    PBYTE pbModulus = NULL;
+    PBYTE pbPrivateExponent = NULL;
+    SYMCRYPT_ERROR scError;
+
+    UINT32 cbModulus = SymCryptRsakeySizeofModulus(keyCtx->key);
+printf("\n Megan is here #####################");
+    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+    {
+        pbModulus = OPENSSL_malloc(cbModulus);
+        if (pbModulus == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+
+        scError = SymCryptRsakeyGetValue(
+            keyCtx->key,
+            pbModulus, cbModulus,
+            &pubExp, 1,
+            NULL, NULL, 0,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0);
+        OPENSSL_free(pbModulus);
+
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetValue failed", scError);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY)
+    {
+        pbPrivateExponent = OPENSSL_secure_malloc(cbModulus);
+        if (pbPrivateExponent == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            return SCOSSL_FAILURE;
+        }
+
+        scError = SymCryptRsakeyGetCrtValue(
+            keyCtx->key,
+            NULL, NULL, 0,
+            NULL, 0,
+            pbPrivateExponent, cbModulus,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            0);
+        OPENSSL_secure_clear_free(pbPrivateExponent, cbModulus);
+
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptRsakeyGetCrtValue failed", scError);
+            return SCOSSL_FAILURE;
+        }
+    }
+
+    return success;
+}
+
 static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
@@ -1373,6 +1436,7 @@ const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_rsa_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_rsa_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_rsa_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
@@ -1392,6 +1456,7 @@ const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_rsa_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_rsa_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_rsa_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},

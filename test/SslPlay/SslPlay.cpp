@@ -519,6 +519,63 @@ end:
     return;
 }
 
+#include <openssl/param_build.h>
+
+void TestRsaPrivateCheckWithIncompleteKey()
+{
+    printf("\nTesting EVP_PKEY_private_check with incomplete RSA key\n");
+
+    BIGNUM *n = NULL, *e = NULL;
+    RSA *rsa = NULL;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY_CTX *check_ctx = NULL;
+    int ret = 0;
+
+    // Construct public key parts
+    BN_hex2bn(&n, "C34F");             // Small modulus (for testing only)
+    e = BN_new();
+    BN_set_word(e, RSA_F4);            // Common exponent = 65537
+
+    // Create RSA object and assign only n and e
+    rsa = RSA_new();
+    if (!RSA_set0_key(rsa, n, e, NULL)) {
+        handleOpenSSLError("RSA_set0_key failed");
+        goto end;
+    }
+    // Ownership of n and e transferred to RSA, do not free manually
+
+    // Wrap RSA into EVP_PKEY
+    pkey = EVP_PKEY_new();
+    if (!EVP_PKEY_assign_RSA(pkey, rsa)) {
+        handleOpenSSLError("EVP_PKEY_assign_RSA failed");
+        goto end;
+    }
+    // Ownership of rsa transferred to pkey, do not free rsa manually
+
+    // Create a context to check private key validity
+    check_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+    if (!check_ctx) {
+        handleOpenSSLError("EVP_PKEY_CTX_new failed");
+        goto end;
+    }
+
+    // Perform the private check (should fail due to missing private parts)
+    ret = EVP_PKEY_private_check(check_ctx);
+    if (ret == 1) {
+        printf("❌ Unexpected success: EVP_PKEY_private_check returned 1\n");
+    } else {
+        printf("✅ Expected failure: EVP_PKEY_private_check returned error\n");
+        handleOpenSSLError("EVP_PKEY_private_check failed");
+    }
+
+end:
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_CTX_free(check_ctx);
+    // Don't free rsa, n, or e here — they're owned by EVP_PKEY now
+}
+
+
+
 void TestRsaSignVerify(
         EVP_PKEY *signingKey,
         EVP_PKEY *verificationKey,
@@ -2610,7 +2667,7 @@ int main(int argc, char** argv)
     TestEcc();
     TestDh();
     TestHMAC();
-
+TestRsaPrivateCheckWithIncompleteKey();
 #ifdef SCOSSL_SSHKDF
     TestSshKdf();
 #endif
