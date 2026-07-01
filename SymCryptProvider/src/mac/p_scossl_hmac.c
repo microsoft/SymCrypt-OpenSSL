@@ -58,6 +58,12 @@ static SCOSSL_STATUS p_scossl_hmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Ino
 {
     OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->pMac == NULL ? 0 : ctx->pMac->resultSize))
     {
@@ -146,6 +152,17 @@ static SCOSSL_STATUS p_scossl_hmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _
     EVP_MD *md = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_DIGEST)) != NULL)
     {

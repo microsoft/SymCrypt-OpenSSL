@@ -8,6 +8,7 @@
 
 #include <openssl/core_names.h>
 #include <openssl/proverr.h>
+#include <openssl/prov_ssl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,7 +80,16 @@ static void p_scossl_rsa_cipher_freectx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 
 static SCOSSL_RSA_CIPHER_CTX *p_scossl_rsa_cipher_dupctx(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx)
 {
-    return OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+    SCOSSL_RSA_CIPHER_CTX *copyCtx = OPENSSL_memdup(ctx, sizeof(SCOSSL_RSA_CIPHER_CTX));
+
+    if (copyCtx != NULL && ctx->pbLabel != NULL &&
+        (copyCtx->pbLabel = OPENSSL_memdup(ctx->pbLabel, ctx->cbLabel)) == NULL)
+    {
+        OPENSSL_free(copyCtx);
+        copyCtx = NULL;
+    }
+
+    return copyCtx;
 }
 
 static SCOSSL_STATUS p_scossl_rsa_cipher_init(_Inout_ SCOSSL_RSA_CIPHER_CTX *ctx, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx,
@@ -137,6 +147,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 {
     int mdnid = 0;
     INT32 cbResult;
+    UINT32 cbModulus;
     SCOSSL_STATUS ret;
 
     if (ctx->keyCtx == NULL)
@@ -155,6 +166,25 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_encrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     if (ctx->operation != EVP_PKEY_OP_ENCRYPT)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
+        return SCOSSL_FAILURE;
+    }
+
+    cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+    if (cbModulus == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+        return SCOSSL_FAILURE;
+    }
+
+    if (out == NULL)
+    {
+        *outlen = cbModulus;
+        return SCOSSL_SUCCESS;
+    }
+
+    if (outsize < cbModulus)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
         return SCOSSL_FAILURE;
     }
 
@@ -190,6 +220,7 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 {
     int mdnid = 0;
     INT32 cbResult;
+    UINT32 cbModulus;
     SCOSSL_STATUS ret;
 
     if (ctx->keyCtx == NULL)
@@ -202,6 +233,41 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
+    }
+
+    if (ctx->padding == RSA_PKCS1_WITH_TLS_PADDING)
+    {
+        if (out == NULL)
+        {
+            *outlen = SSL_MAX_MASTER_KEY_LENGTH;
+            return SCOSSL_SUCCESS;
+        }
+        if (outsize < SSL_MAX_MASTER_KEY_LENGTH)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
+    }
+    else
+    {
+        cbModulus = SymCryptRsakeySizeofModulus(ctx->keyCtx->key);
+        if (cbModulus == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+            return SCOSSL_FAILURE;
+        }
+
+        if (out == NULL)
+        {
+            *outlen = cbModulus;
+            return SCOSSL_SUCCESS;
+        }
+
+        if (outsize < cbModulus)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
+            return SCOSSL_FAILURE;
+        }
     }
 
     // Default to SHA1 for OAEP. Update md in context so this is
@@ -245,6 +311,12 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_decrypt(_In_ SCOSSL_RSA_CIPHER_CTX *ctx
 static SCOSSL_STATUS p_scossl_rsa_cipher_get_ctx_params(_In_ SCOSSL_RSA_CIPHER_CTX *ctx, _Out_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE)) != NULL)
     {
@@ -306,6 +378,17 @@ static SCOSSL_STATUS p_scossl_rsa_cipher_set_ctx_params(_Inout_ SCOSSL_RSA_CIPHE
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
     const char *mdName, *mdProps;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE)) != NULL)
     {

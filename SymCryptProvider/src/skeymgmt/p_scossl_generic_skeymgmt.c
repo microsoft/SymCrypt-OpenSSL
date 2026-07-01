@@ -115,7 +115,8 @@ SCOSSL_STATUS p_scossl_generic_skeymgmt_export(SCOSSL_SKEY *skey, int selection,
         return SCOSSL_FAILURE;
     }
 
-    params[0] = OSSL_PARAM_construct_octet_string(OSSL_SKEY_PARAM_RAW_BYTES, skey->cbKey > 0 ? skey->pbKey : "", skey->cbKey);
+    // The parameter data should be read only in param_cb so it's safe to cast "" to PBYTE in the case of a zero-length key.
+    params[0] = OSSL_PARAM_construct_octet_string(OSSL_SKEY_PARAM_RAW_BYTES, skey->cbKey > 0 ? skey->pbKey : (PBYTE)"", skey->cbKey);
     params[1] = OSSL_PARAM_construct_end();
 
     return param_cb(params, cbarg);

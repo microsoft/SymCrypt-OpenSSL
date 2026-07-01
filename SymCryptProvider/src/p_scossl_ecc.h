@@ -12,6 +12,8 @@
 extern "C" {
 #endif
 
+#define SCOSSL_X25519_KEY_SIZE (32)
+
 typedef struct {
     OSSL_LIB_CTX *libctx;
     BOOL initialized;
@@ -40,6 +42,8 @@ typedef struct {
 #endif
 } SCOSSL_ECC_KEY_CTX;
 
+#define SCOSSL_X25519_KEY_SIZE (32)
+
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_new_ctx(_In_ SCOSSL_PROVCTX *provctx);
 void p_scossl_ecc_free_ctx(_Inout_ SCOSSL_ECC_KEY_CTX *keyCtx);
 SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
@@ -52,6 +56,8 @@ SIZE_T p_scossl_ecc_get_max_result_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, BOOL is
 SIZE_T p_scossl_ecc_get_encoded_key_size(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection);
 SCOSSL_STATUS p_scossl_ecc_get_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int selection,
                                            _Out_writes_bytes_(*pcbKey) PBYTE *ppbKey, _Out_ SIZE_T *pcbKey);
+void p_scossl_x25519_canonicalize_public_key(_Inout_updates_(SCOSSL_X25519_KEY_SIZE) PBYTE pbPublicKey);
+
 SCOSSL_STATUS p_scossl_ecc_set_encoded_key(_In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                            _In_reads_bytes_opt_(cbEncodedPublicKey) PCBYTE pbEncodedPublicKey, SIZE_T cbEncodedPublicKey,
                                            _In_reads_bytes_opt_(cbEncodedPrivateKey) PCBYTE pbEncodedPrivateKey, SIZE_T cbEncodedPrivateKey);
