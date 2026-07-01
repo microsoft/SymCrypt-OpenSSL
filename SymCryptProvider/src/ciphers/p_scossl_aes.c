@@ -74,6 +74,9 @@ static void p_scossl_aes_generic_freectx(SCOSSL_AES_CTX *ctx)
 
 static SCOSSL_AES_CTX *p_scossl_aes_generic_dupctx(SCOSSL_AES_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copyCtx, OPENSSL_malloc, SCOSSL_AES_CTX);
     if (copyCtx != NULL)
     {
@@ -153,14 +156,42 @@ static SCOSSL_STATUS p_scossl_aes_generic_skey_encrypt_init(_Inout_ SCOSSL_AES_C
                                                             _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                             _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, TRUE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_generic_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_generic_skey_decrypt_init(_Inout_ SCOSSL_AES_CTX *ctx, _In_ SCOSSL_SKEY *skey,
                                                             _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                             _In_ const OSSL_PARAM params[])
 {
-    return p_scossl_aes_generic_init_internal(ctx, FALSE, skey->pbKey, skey->cbKey, iv, ivlen, params);
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_generic_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 #define SYMCRYPT_OPENSSL_MASK8_SELECT( _mask, _a, _b ) (SYMCRYPT_FORCE_READ8(&_mask) & _a) | (~(SYMCRYPT_FORCE_READ8(&_mask)) & _b)
@@ -702,7 +733,13 @@ SCOSSL_STATUS p_scossl_aes_generic_get_params(_Inout_ OSSL_PARAM params[],
 
 static SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(_In_ SCOSSL_AES_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->keylen))
@@ -746,7 +783,18 @@ static SCOSSL_STATUS p_scossl_aes_generic_get_ctx_params(_In_ SCOSSL_AES_CTX *ct
 
 static SCOSSL_STATUS p_scossl_aes_generic_set_ctx_params(_Inout_ SCOSSL_AES_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
+    const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_PADDING)) != NULL)
     {

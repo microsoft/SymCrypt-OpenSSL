@@ -1,11 +1,9 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
-
-#include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+#include "p_scossl_base.h"
 #include "digests/p_scossl_digest_common.h"
 
 #ifdef __cplusplus
@@ -36,6 +34,9 @@ void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
 _Use_decl_annotations_
 SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
 
     if (copyCtx != NULL)
