@@ -606,7 +606,11 @@ ECDSA_SIG* e_scossl_eckey_sign_sig(_In_reads_bytes_(dgstlen) const unsigned char
     return returnSignature;
 }
 
-SCOSSL_STATUS e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
+int e_scossl_eckey_verify(int type, _In_reads_bytes_(dgst_len) const unsigned char* dgst, int dgst_len,
                           _In_reads_bytes_(sig_len) const unsigned char* sigbuf, int sig_len, _In_ EC_KEY* eckey)
 {
     const EC_KEY_METHOD* ossl_eckey_method = NULL;

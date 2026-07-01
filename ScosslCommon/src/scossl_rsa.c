@@ -266,11 +266,9 @@ SCOSSL_STATUS scossl_rsapss_sign(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
     case RSA_PSS_SALTLEN_MAX:
         cbSalt = cbSaltMax;
         break;
-#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
     // Added in 3.1, smaller of digest length or maximized salt length
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
         cbSalt = cbSaltMax < (int)cbHashValue ? cbSaltMax : (int)cbHashValue;
-#endif
     }
 
     if (cbSalt < 0 || cbSalt > cbSaltMax)
@@ -370,10 +368,8 @@ SCOSSL_STATUS scossl_rsapss_verify(PSYMCRYPT_RSAKEY key, int mdnid, int cbSalt,
         cbSalt = cbSaltMax;
         break;
     case RSA_PSS_SALTLEN_AUTO:
-#ifdef RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
     // Added in 3.1; auto salt len for verify
     case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
-#endif
         scFlags = SYMCRYPT_FLAG_RSA_PSS_VERIFY_WITH_MINIMUM_SALT;
         cbSalt = 0;
     }

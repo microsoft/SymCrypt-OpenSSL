@@ -51,7 +51,9 @@ set(SCOSSL_SOURCES
     ./src/mac/p_scossl_hmac.c
     ./src/mac/p_scossl_kmac.c
     ./src/signature/p_scossl_ecdsa_signature.c
+    ./src/signature/p_scossl_ecdsa_sigalg_signature.c
     ./src/signature/p_scossl_rsa_signature.c
+    ./src/signature/p_scossl_rsa_sigalg_signature.c
     ./src/skeymgmt/p_scossl_aes_skeymgmt.c
     ./src/skeymgmt/p_scossl_generic_skeymgmt.c
     ./src/p_scossl_bio.c
