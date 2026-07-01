@@ -110,6 +110,10 @@ SCOSSL_STATUS p_scossl_ecdsa_signverify_init(SCOSSL_ECDSA_CTX *ctx, SCOSSL_ECC_K
     ctx->allowFinal = TRUE;
     ctx->allowOneshot = TRUE;
 
+    OPENSSL_free(ctx->pbSignature);
+    ctx->pbSignature = NULL;
+    ctx->cbSignature = 0;
+
     if (keyCtx != NULL)
     {
         if (!keyCtx->initialized)
