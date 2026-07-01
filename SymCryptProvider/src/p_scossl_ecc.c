@@ -104,7 +104,15 @@ SCOSSL_ECC_KEY_CTX *p_scossl_ecc_dup_ctx(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
 
         if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx->initialized)
         {
-            pointFormat = keyCtx->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : (SYMCRYPT_ECPOINT_FORMAT)keyCtx->conversionFormat;
+            if (keyCtx->isX25519 ||
+                keyCtx->conversionFormat == POINT_CONVERSION_COMPRESSED)
+            {
+                pointFormat = SYMCRYPT_ECPOINT_FORMAT_X;
+            }
+            else
+            {
+                pointFormat = SYMCRYPT_ECPOINT_FORMAT_XY;
+            }
 
             if (copyCtx->curve == NULL)
             {

@@ -98,7 +98,7 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
         copyCtx->operation = ctx->operation;
         copyCtx->libctx = ctx->libctx;
         copyCtx->md = ctx->md;
-        ctx->mdSize = ctx->mdSize;
+        copyCtx->mdSize = ctx->mdSize;
         copyCtx->allowMdUpdates = ctx->allowMdUpdates;
     }
 
