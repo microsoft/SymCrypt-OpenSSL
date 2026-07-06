@@ -287,7 +287,8 @@ SCOSSL_STATUS p_scossl_rsa_verify_internal(SCOSSL_RSA_SIGN_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->operation != EVP_PKEY_OP_VERIFY)
+    if (ctx->operation != EVP_PKEY_OP_VERIFY &&
+        ctx->operation != EVP_PKEY_OP_VERIFYMSG)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
