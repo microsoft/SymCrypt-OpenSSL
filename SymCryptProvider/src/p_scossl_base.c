@@ -517,18 +517,58 @@ static const OSSL_ALGORITHM p_scossl_keyexch[] = {
     ALG_TABLE_END};
 
 // Signature
+extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha1_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha224_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha384_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha512_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha512_224_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha512_256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha3_224_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha3_256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha3_384_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_rsa_sha3_512_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_ecdsa_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha1_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha224_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha384_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha512_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha3_224_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha3_256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha3_384_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_ecdsa_sha3_512_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa44_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa65_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa87_signature_functions[];
-extern const OSSL_DISPATCH p_scossl_rsa_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
+    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA1, p_scossl_rsa_sha1_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA256, p_scossl_rsa_sha256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA384, p_scossl_rsa_sha384_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA512, p_scossl_rsa_sha512_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA224, p_scossl_rsa_sha224_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA512_224, p_scossl_rsa_sha512_224_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA512_256, p_scossl_rsa_sha512_256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA3_224, p_scossl_rsa_sha3_224_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA3_256, p_scossl_rsa_sha3_256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA3_384, p_scossl_rsa_sha3_384_signature_functions),
+    ALG(SCOSSL_ALG_NAME_RSA_SHA3_512, p_scossl_rsa_sha3_512_signature_functions),
     ALG(SCOSSL_ALG_NAME_ECDSA, p_scossl_ecdsa_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA1, p_scossl_ecdsa_sha1_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA224, p_scossl_ecdsa_sha224_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA256, p_scossl_ecdsa_sha256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA384, p_scossl_ecdsa_sha384_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA512, p_scossl_ecdsa_sha512_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA3_224, p_scossl_ecdsa_sha3_224_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA3_256, p_scossl_ecdsa_sha3_256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA3_384, p_scossl_ecdsa_sha3_384_signature_functions),
+    ALG(SCOSSL_ALG_NAME_ECDSA_SHA3_512, p_scossl_ecdsa_sha3_512_signature_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_signature_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_signature_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_signature_functions),
-    ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher
@@ -586,6 +626,15 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM512, mlkem512)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM768, mlkem768)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM1024, mlkem1024)
+    ALG_TABLE_END};
+
+// Symmetric key management
+extern const OSSL_DISPATCH p_scossl_aes_skeymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_generic_skeymgmt_functions[];
+
+static const OSSL_ALGORITHM p_scossl_skeymgmt[] = {
+    ALG("AES", p_scossl_aes_skeymgmt_functions),
+    ALG("GENERIC-SECRET", p_scossl_generic_skeymgmt_functions),
     ALG_TABLE_END};
 
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
@@ -686,6 +735,8 @@ static const OSSL_ALGORITHM *p_scossl_query_operation(ossl_unused void *provctx,
         return p_scossl_decoder;
     case OSSL_OP_ENCODER:
         return p_scossl_encoder;
+    case OSSL_OP_SKEYMGMT:
+        return p_scossl_skeymgmt;
     }
 
     return NULL;
@@ -960,27 +1011,6 @@ cleanup:
 
     return ret;
 }
-
-#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR == 0
-EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
-{
-    EVP_MD_CTX *out = EVP_MD_CTX_new();
-
-    if (out != NULL && !EVP_MD_CTX_copy_ex(out, in)) {
-        EVP_MD_CTX_free(out);
-        out = NULL;
-    }
-    return out;
-}
-
-#if OPENSSL_VERSION_PATCH < 4
-int OPENSSL_strcasecmp(const char *s1, const char *s2)
-{
-    return strcasecmp(s1, s2);
-}
-#endif // OPENSSL_VERSION_PATCH < 4
-
-#endif // OPENSSL_VERSION_MINOR == 0
 
 #ifdef __cplusplus
 }

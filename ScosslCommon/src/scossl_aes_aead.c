@@ -56,6 +56,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
             return SCOSSL_FAILURE;
         }
     }
+
     if (key != NULL)
     {
         scError = SymCryptGcmExpandKey(&ctx->key, SymCryptAesBlockCipher, key, keylen);
@@ -64,6 +65,7 @@ SCOSSL_STATUS scossl_aes_gcm_init_key(SCOSSL_CIPHER_GCM_CTX *ctx,
             return SCOSSL_FAILURE;
         }
     }
+
     return SCOSSL_SUCCESS;
 }
 
@@ -299,7 +301,7 @@ SCOSSL_STATUS scossl_aes_gcm_set_iv_len(SCOSSL_CIPHER_GCM_CTX *ctx, size_t ivlen
     if (ivlen != ctx->ivlen)
     {
         ctx->ivlen = ivlen;
-    
+
         if (ctx->iv != NULL)
         {
             OPENSSL_free(ctx->iv);
@@ -455,7 +457,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(SCOSSL_CIPHER_CCM_CTX *ctx,
 
     ctx->ccmStage = SCOSSL_CCM_STAGE_INIT;
     ctx->cbData = 0;
-    if (iv)
+    if (iv != NULL)
     {
         if (!scossl_aes_ccm_set_iv_len(ctx, ivlen))
         {
@@ -466,7 +468,8 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(SCOSSL_CIPHER_CCM_CTX *ctx,
         memcpy(ctx->iv, iv, ctx->ivlen);
         ctx->ivSet = 1;
     }
-    if (key)
+
+    if (key != NULL)
     {
         scError = SymCryptAesExpandKey(&ctx->key, key, keylen);
         if (scError != SYMCRYPT_NO_ERROR)
@@ -474,6 +477,7 @@ SCOSSL_STATUS scossl_aes_ccm_init_key(SCOSSL_CIPHER_CCM_CTX *ctx,
             return SCOSSL_FAILURE;
         }
     }
+
     return SCOSSL_SUCCESS;
 }
 

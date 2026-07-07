@@ -4,6 +4,7 @@
 
 #include "scossl_mac.h"
 #include "p_scossl_base.h"
+#include "p_scossl_skey.h"
 
 #include <openssl/proverr.h>
 
@@ -44,6 +45,28 @@ static SCOSSL_STATUS p_scossl_cmac_init(_Inout_ SCOSSL_MAC_CTX *ctx,
 
 }
 
+static SCOSSL_STATUS p_scossl_cmac_init_skey(_Inout_ SCOSSL_MAC_CTX *ctx,
+                                             _In_ SCOSSL_SKEY *skey,
+                                             _In_ const OSSL_PARAM params[])
+{
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_cmac_set_ctx_params(ctx, params) &&
+           scossl_mac_init(ctx, pbKey, cbKey);
+}
+
 static const OSSL_PARAM *p_scossl_cmac_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     return p_scossl_cmac_ctx_gettable_param_types;
@@ -57,6 +80,12 @@ static const OSSL_PARAM *p_scossl_cmac_settable_ctx_params(ossl_unused void *ctx
 static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_SIZE)) != NULL &&
         !OSSL_PARAM_set_size_t(p, ctx->pMac == NULL ? 0 : ctx->pMac->resultSize))
@@ -78,6 +107,17 @@ static SCOSSL_STATUS p_scossl_cmac_get_ctx_params(_In_ SCOSSL_MAC_CTX *ctx, _Ino
 static SCOSSL_STATUS p_scossl_cmac_set_ctx_params(_Inout_ SCOSSL_MAC_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_MAC_PARAM_CIPHER)) != NULL)
     {
@@ -130,6 +170,7 @@ const OSSL_DISPATCH p_scossl_cmac_functions[] = {
     {OSSL_FUNC_MAC_FREECTX, (void (*)(void))scossl_mac_freectx},
     {OSSL_FUNC_MAC_DUPCTX, (void (*)(void))scossl_mac_dupctx},
     {OSSL_FUNC_MAC_INIT, (void (*)(void))p_scossl_cmac_init},
+    {OSSL_FUNC_MAC_INIT_SKEY, (void (*)(void))p_scossl_cmac_init_skey},
     {OSSL_FUNC_MAC_UPDATE, (void (*)(void))scossl_mac_update},
     {OSSL_FUNC_MAC_FINAL, (void (*)(void))scossl_mac_final},
     {OSSL_FUNC_MAC_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_cmac_gettable_ctx_params},

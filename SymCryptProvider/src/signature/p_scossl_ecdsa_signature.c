@@ -2,30 +2,14 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
 
-#include "scossl_ecc.h"
-#include "p_scossl_ecc.h"
-#include "p_scossl_base.h"
+#include "p_scossl_ecdsa_signature.h"
 
+#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct
-{
-    SCOSSL_ECC_KEY_CTX *keyCtx;
-    int operation;
-
-    // Needed for fetching md
-    OSSL_LIB_CTX *libctx;
-    char* propq;
-
-    EVP_MD_CTX *mdctx;
-    EVP_MD *md;
-    SIZE_T mdSize;
-    BOOL allowMdUpdates;
-} SCOSSL_ECDSA_CTX;
 
 static const OSSL_PARAM p_scossl_ecdsa_ctx_gettable_param_types[] = {
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
@@ -45,7 +29,8 @@ static const OSSL_PARAM p_scossl_ecdsa_ctx_settable_param_types_no_digest[] = {
 
 static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In_ const char *propq)
+_Use_decl_annotations_
+SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(SCOSSL_PROVCTX *provctx, const char *propq)
 {
     SCOSSL_ECDSA_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_ECDSA_CTX));
     if (ctx != NULL)
@@ -64,7 +49,7 @@ static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_newctx(_In_ SCOSSL_PROVCTX *provctx, _In
     return ctx;
 }
 
-static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
+void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
 {
     if (ctx == NULL)
         return;
@@ -72,36 +57,50 @@ static void p_scossl_ecdsa_freectx(SCOSSL_ECDSA_CTX *ctx)
     EVP_MD_CTX_free(ctx->mdctx);
     EVP_MD_free(ctx->md);
     OPENSSL_free(ctx->propq);
+    OPENSSL_free(ctx->pbSignature);
     OPENSSL_free(ctx);
 }
 
-static SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(_In_ SCOSSL_ECDSA_CTX *ctx)
+_Use_decl_annotations_
+SCOSSL_ECDSA_CTX *p_scossl_ecdsa_dupctx(SCOSSL_ECDSA_CTX *ctx)
 {
-    SCOSSL_ECDSA_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECDSA_CTX));
+    SCOSSL_ECDSA_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECDSA_CTX));
     if (copyCtx != NULL)
     {
         if ((ctx->propq != NULL && ((copyCtx->propq = OPENSSL_strdup(ctx->propq)) == NULL)) ||
             (ctx->mdctx != NULL && ((copyCtx->mdctx = EVP_MD_CTX_dup((const EVP_MD_CTX *)ctx->mdctx)) == NULL)) ||
-            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)))
+            (ctx->md    != NULL && !EVP_MD_up_ref(ctx->md)) ||
+            (ctx->pbSignature != NULL && ((copyCtx->pbSignature = OPENSSL_memdup(ctx->pbSignature, ctx->cbSignature)) == NULL)))
         {
             p_scossl_ecdsa_freectx(copyCtx);
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            copyCtx = NULL;
+            return NULL;
         }
 
         copyCtx->keyCtx = ctx->keyCtx;
         copyCtx->operation = ctx->operation;
         copyCtx->libctx = ctx->libctx;
         copyCtx->md = ctx->md;
-        ctx->mdSize = ctx->mdSize;
+        copyCtx->mdSize = ctx->mdSize;
         copyCtx->allowMdUpdates = ctx->allowMdUpdates;
+        copyCtx->isSigalg = ctx->isSigalg;
+        copyCtx->allowUpdate = ctx->allowUpdate;
+        copyCtx->allowFinal = ctx->allowFinal;
+        copyCtx->allowOneshot = ctx->allowOneshot;
+        copyCtx->cbSignature = ctx->cbSignature;
     }
 
     return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
-                                                    _In_ const OSSL_PARAM params[], int operation)
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_ecdsa_signverify_init(SCOSSL_ECDSA_CTX *ctx, SCOSSL_ECC_KEY_CTX *keyCtx,
+                                             const OSSL_PARAM params[], int operation)
 {
     if (ctx == NULL ||
         (keyCtx == NULL && ctx->keyCtx == NULL))
@@ -111,6 +110,14 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
     }
 
     ctx->operation = operation;
+    ctx->isSigalg = FALSE;
+    ctx->allowUpdate = TRUE;
+    ctx->allowFinal = TRUE;
+    ctx->allowOneshot = TRUE;
+
+    OPENSSL_free(ctx->pbSignature);
+    ctx->pbSignature = NULL;
+    ctx->cbSignature = 0;
 
     if (keyCtx != NULL)
     {
@@ -123,7 +130,7 @@ static SCOSSL_STATUS p_scossl_ecdsa_signverify_init(_Inout_ SCOSSL_ECDSA_CTX *ct
         ctx->keyCtx = keyCtx;
 #ifdef KEYSINUSE_ENABLED
         if (keysinuse_is_running() &&
-            operation == EVP_PKEY_OP_SIGN)
+            (operation == EVP_PKEY_OP_SIGN || operation == EVP_PKEY_OP_SIGNMSG))
         {
             p_scossl_ecc_init_keysinuse(keyCtx);
         }
@@ -144,22 +151,16 @@ static SCOSSL_STATUS p_scossl_ecdsa_verify_init(_Inout_ SCOSSL_ECDSA_CTX *ctx, _
 {
     return p_scossl_ecdsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
 }
-
-static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
-                                         _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
-                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_ecdsa_sign_internal(SCOSSL_ECDSA_CTX *ctx,
+                                           unsigned char *sig, size_t *siglen, size_t sigsize,
+                                           const unsigned char *tbs, size_t tbslen)
 {
     SIZE_T cbResult;
 
     if (ctx == NULL || ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->operation != EVP_PKEY_OP_SIGN)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return SCOSSL_FAILURE;
     }
 
@@ -204,19 +205,14 @@ static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
 // 1 (SCOSSL_SUCCESS) for valid signature
 // 0 (SCOSSL_FAILURE) for invalid signature
 // -1 for error
-static int p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
-                                 _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
-                                 _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+_Use_decl_annotations_
+int p_scossl_ecdsa_verify_internal(SCOSSL_ECDSA_CTX *ctx,
+                                   const unsigned char *sig, size_t siglen,
+                                   const unsigned char *tbs, size_t tbslen)
 {
-    if (ctx == NULL || ctx->keyCtx == NULL)
+    if (ctx->keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return -1;
-    }
-
-    if (ctx->operation != EVP_PKEY_OP_VERIFY)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
         return -1;
     }
 
@@ -282,10 +278,10 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_signverify_update(_In_ SCOSSL_ECDSA_C
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx,
-                                                      _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
+                                                      _Out_writes_bytes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
 
     if (ctx->mdctx == NULL)
     {
@@ -303,17 +299,24 @@ static SCOSSL_STATUS p_scossl_ecdsa_digest_sign_final(_In_ SCOSSL_ECDSA_CTX *ctx
         }
     }
 
-    return p_scossl_ecdsa_sign(ctx, sig, siglen, sigsize, digest, cbDigest);
+    return p_scossl_ecdsa_sign_internal(ctx, sig, siglen, sigsize, digest, cbDigest);
 }
 
 static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
                                               _In_reads_bytes_(siglen) unsigned char *sig, size_t siglen)
 {
     BYTE digest[EVP_MAX_MD_SIZE];
-    SIZE_T cbDigest = 0;
+    unsigned int cbDigest = 0;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
 
     if (ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return 0;
     }
 
@@ -324,13 +327,60 @@ static int p_scossl_ecdsa_digest_verify_final(_In_ SCOSSL_ECDSA_CTX *ctx,
         return 0;
     }
 
-    return p_scossl_ecdsa_verify(ctx, sig, siglen, digest, cbDigest);
+    return p_scossl_ecdsa_verify_internal(ctx, sig, siglen, digest, cbDigest);
+}
+
+static SCOSSL_STATUS p_scossl_ecdsa_sign(_In_ SCOSSL_ECDSA_CTX *ctx,
+                                         _Out_writes_bytes_opt_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
+                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+        return SCOSSL_FAILURE;
+    }
+
+    if (!ctx->allowOneshot)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
+        return SCOSSL_FAILURE;
+    }
+
+    return p_scossl_ecdsa_sign_internal(ctx, sig, siglen, sigsize, tbs, tbslen);
+}
+
+// Return
+// 1 (SCOSSL_SUCCESS) for valid signature
+// 0 (SCOSSL_FAILURE) for invalid signature
+// -1 for error
+static int p_scossl_ecdsa_verify(_In_ SCOSSL_ECDSA_CTX *ctx,
+                                 _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
+                                 _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+{
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+
+    if (!ctx->allowOneshot)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_ONESHOT_CALL_OUT_OF_ORDER);
+        return 0;
+    }
+
+    return p_scossl_ecdsa_verify_internal(ctx, sig, siglen, tbs, tbslen);
 }
 
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx,
                                                             ossl_unused void *provctx)
 {
-    return ctx->allowMdUpdates ? p_scossl_ecdsa_ctx_settable_param_types : p_scossl_ecdsa_ctx_settable_param_types_no_digest;
+    if (ctx == NULL || ctx->allowMdUpdates)
+    {
+        return p_scossl_ecdsa_ctx_settable_param_types;
+    }
+
+    return p_scossl_ecdsa_ctx_settable_param_types_no_digest;
 }
 
 static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx, _In_ const OSSL_PARAM params[])
@@ -338,6 +388,17 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
     const OSSL_PARAM *p;
     const OSSL_PARAM *param_propq;
     const char *mdname, *mdprops;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL)
     {
@@ -372,25 +433,46 @@ static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_params(_Inout_ SCOSSL_ECDSA_CTX *ctx
         return SCOSSL_FAILURE;
     }
 
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE)) != NULL)
+    {
+        unsigned int nonce_type;
+        if (!OSSL_PARAM_get_uint(p, &nonce_type))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        if (nonce_type != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
+            return SCOSSL_FAILURE;
+        }
+    }
+#endif
+
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_params(ossl_unused void *ctx,
-                                                            ossl_unused void *provctx)
+_Use_decl_annotations_
+const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_params(ossl_unused void *ctx,
+                                                     ossl_unused void *provctx)
 {
     return p_scossl_ecdsa_ctx_gettable_param_types;
 }
 
-static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _Inout_ OSSL_PARAM params[])
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(SCOSSL_ECDSA_CTX *ctx, OSSL_PARAM params[])
 {
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
     OSSL_PARAM *p;
     X509_ALGOR *x509Alg = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST)) != NULL &&
         !OSSL_PARAM_set_utf8_string(p, ctx->md == NULL ? "" : EVP_MD_get0_name(ctx->md)))
@@ -405,6 +487,15 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_params(_In_ SCOSSL_ECDSA_CTX *ctx, _
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
     }
+
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE)) != NULL &&
+        !OSSL_PARAM_set_uint(p, 0))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+        goto cleanup;
+    }
+#endif
 
     if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL)
     {
@@ -489,9 +580,9 @@ cleanup:
 
 static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_gettable_ctx_params(ctx->md);
@@ -499,8 +590,9 @@ static const OSSL_PARAM *p_scossl_ecdsa_gettable_ctx_md_params(_In_ SCOSSL_ECDSA
 
 static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx, _Inout_ OSSL_PARAM *params)
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 
@@ -509,9 +601,9 @@ static SCOSSL_STATUS p_scossl_ecdsa_get_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx
 
 static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx)
 {
-    if (ctx->md == NULL)
+    if (ctx == NULL || ctx->md == NULL)
     {
-        return SCOSSL_FAILURE;
+        return NULL;
     }
 
     return EVP_MD_settable_ctx_params(ctx->md);
@@ -519,8 +611,9 @@ static const OSSL_PARAM *p_scossl_ecdsa_settable_ctx_md_params(_In_ SCOSSL_ECDSA
 
 static SCOSSL_STATUS p_scossl_ecdsa_set_ctx_md_params(_In_ SCOSSL_ECDSA_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    if (ctx->mdctx == NULL)
+    if (ctx == NULL || ctx->mdctx == NULL)
     {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return SCOSSL_FAILURE;
     }
 

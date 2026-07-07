@@ -25,6 +25,7 @@ extern "C" {
 
 static const OSSL_PARAM p_scossl_hkdf_gettable_ctx_param_types[] = {
     HKDF_COMMON_SETTABLES,
+    OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
     OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_hkdf_settable_ctx_param_types[] = {
@@ -72,7 +73,12 @@ void p_scossl_hkdf_freectx(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx)
 
 SCOSSL_PROV_HKDF_CTX *p_scossl_hkdf_dupctx(_In_ SCOSSL_PROV_HKDF_CTX *ctx)
 {
-    SCOSSL_PROV_HKDF_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
+    SCOSSL_PROV_HKDF_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_PROV_HKDF_CTX));
     if (copyCtx != NULL)
     {
         if ((copyCtx->hkdfCtx = scossl_hkdf_dupctx(ctx->hkdfCtx)) == NULL ||
@@ -113,6 +119,12 @@ const OSSL_PARAM *p_scossl_tls13kdf_settable_ctx_params(ossl_unused void *ctx, o
 SCOSSL_STATUS p_scossl_hkdf_get_ctx_params(_In_ SCOSSL_PROV_HKDF_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
     {
@@ -208,6 +220,17 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
     SIZE_T cbInfo;
     const OSSL_PARAM *p;
 
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE)) != NULL)
     {
         int mode = -1;
@@ -301,21 +324,24 @@ SCOSSL_STATUS p_scossl_hkdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, co
     }
 
     // Parameters may contain multiple info params that must all be processed
-    for (p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO);
-         p != NULL;
-         p = OSSL_PARAM_locate_const(p + 1, OSSL_KDF_PARAM_INFO))
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_INFO)) != NULL)
     {
-        if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbInfo, &cbInfo))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
+        ctx->hkdfCtx->cbInfo = 0;
 
-        if (!scossl_hkdf_append_info(ctx->hkdfCtx, pbInfo, cbInfo))
+        do
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
-            return SCOSSL_FAILURE;
-        }
+            if (!OSSL_PARAM_get_octet_string_ptr(p, (const void **)&pbInfo, &cbInfo))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+
+            if (!scossl_hkdf_append_info(ctx->hkdfCtx, pbInfo, cbInfo))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_LENGTH_TOO_LARGE);
+                return SCOSSL_FAILURE;
+            }
+        } while ((p = OSSL_PARAM_locate_const(p + 1, OSSL_KDF_PARAM_INFO)) != NULL);
     }
 
     return SCOSSL_SUCCESS;
@@ -325,6 +351,17 @@ static
 SCOSSL_STATUS p_scossl_tls13kdf_set_ctx_params(_Inout_ SCOSSL_PROV_HKDF_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if (!p_scossl_hkdf_set_ctx_params(ctx, params))
         return SCOSSL_FAILURE;

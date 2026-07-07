@@ -7,7 +7,9 @@
 #include <openssl/proverr.h>
 
 #include "scossl_aes_aead.h"
+#include "p_scossl_base.h"
 #include "p_scossl_aes.h"
+#include "p_scossl_skey.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,6 +64,9 @@ static void p_scossl_aes_gcm_freectx(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx)
 
 static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_GCM_CTX);
     if (copy_ctx != NULL)
     {
@@ -80,6 +85,7 @@ static SCOSSL_CIPHER_GCM_CTX *p_scossl_aes_gcm_dupctx(_In_ SCOSSL_CIPHER_GCM_CTX
         }
         SymCryptGcmKeyCopy(&ctx->key, &copy_ctx->key);
     }
+
     return copy_ctx;
 }
 
@@ -88,7 +94,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_init_internal(_Inout_ SCOSSL_CIPHER_GCM_CT
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
-    if (key && keylen != ctx->keylen)
+    if (key != NULL && keylen != ctx->keylen)
     {
         return SCOSSL_FAILURE;
     }
@@ -113,6 +119,48 @@ static SCOSSL_STATUS p_scossl_aes_gcm_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX
                                                    _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_gcm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_encrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_gcm_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_gcm_skey_decrypt_init(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_gcm_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_gcm_final(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx,
@@ -146,40 +194,50 @@ static const OSSL_PARAM *p_scossl_aes_gcm_settable_ctx_params(ossl_unused void *
 
 static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->ivlen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->ivlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->taglen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? EVP_GCM_TLS_TAG_LEN : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? EVP_GCM_TLS_TAG_LEN : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
@@ -187,14 +245,15 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, ctx->iv != NULL ? (const void*)ctx->iv : "", ctx->ivlen))
         {
@@ -202,8 +261,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_size == 0 ||
             p->data_size > SCOSSL_GCM_MAX_TAG_LENGTH ||
@@ -212,14 +271,15 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->tag, p->data_size))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN);
-    if (p != NULL &&
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN)) != NULL &&
         (p->data == NULL ||
          p->data_type != OSSL_PARAM_OCTET_STRING ||
          !scossl_aes_gcm_iv_gen(ctx, p->data, p->data_size)))
@@ -233,9 +293,20 @@ static SCOSSL_STATUS p_scossl_aes_gcm_get_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
 
 static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
-    if (p != NULL)
+    const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN)) != NULL)
     {
         size_t ivlen;
 
@@ -252,8 +323,7 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
         }
     }
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -267,8 +337,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -282,8 +352,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -297,8 +367,8 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -321,6 +391,9 @@ static SCOSSL_STATUS p_scossl_aes_gcm_set_ctx_params(_Inout_ SCOSSL_CIPHER_GCM_C
  */
 static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_COMMON_ALIGNED_ALLOC(copy_ctx, OPENSSL_malloc, SCOSSL_CIPHER_CCM_CTX);
     if (copy_ctx != NULL)
     {
@@ -332,6 +405,7 @@ static SCOSSL_CIPHER_CCM_CTX *p_scossl_aes_ccm_dupctx(_In_ SCOSSL_CIPHER_CCM_CTX
         copy_ctx->state = ctx->state;
         copy_ctx->state.pExpandedKey = &copy_ctx->key;
     }
+
     return copy_ctx;
 }
 
@@ -345,7 +419,7 @@ static SCOSSL_STATUS p_scossl_aes_ccm_init_internal(_Inout_ SCOSSL_CIPHER_CCM_CT
                                                     _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
                                                     _In_ const OSSL_PARAM params[])
 {
-    if (key && keylen != ctx->keylen)
+    if (key != NULL && keylen != ctx->keylen)
     {
         return SCOSSL_FAILURE;
     }
@@ -370,6 +444,48 @@ static SCOSSL_STATUS p_scossl_aes_ccm_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX
                                                    _In_ const OSSL_PARAM params[])
 {
     return p_scossl_aes_ccm_init_internal(ctx, 0, key, keylen, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_encrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_ccm_init_internal(ctx, 1, pbKey, cbKey, iv, ivlen, params);
+}
+
+static SCOSSL_STATUS p_scossl_aes_ccm_skey_decrypt_init(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ SCOSSL_SKEY *skey,
+                                                        _In_reads_bytes_opt_(ivlen) const unsigned char *iv, size_t ivlen,
+                                                        _In_ const OSSL_PARAM params[])
+{
+    PBYTE pbKey;
+    SIZE_T cbKey;
+
+    if (skey != NULL)
+    {
+        pbKey = skey->pbKey;
+        cbKey = skey->cbKey;
+    }
+    else
+    {
+        pbKey = NULL;
+        cbKey = 0;
+    }
+
+    return p_scossl_aes_ccm_init_internal(ctx, 0, pbKey, cbKey, iv, ivlen, params);
 }
 
 static SCOSSL_STATUS p_scossl_aes_ccm_final(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx,
@@ -403,40 +519,50 @@ static const OSSL_PARAM *p_scossl_aes_ccm_settable_ctx_params(ossl_unused void *
 
 static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->keylen))
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_KEYLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->keylen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->ivlen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IVLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->ivlen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->taglen))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAGLEN)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->taglen))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? ctx->taglen : 0))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, ctx->tlsAadSet ? ctx->taglen : 0))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
@@ -444,14 +570,15 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_UPDATED_IV)) != NULL)
     {
         if (p->data_size < ctx->ivlen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->iv, ctx->ivlen) &&
             !OSSL_PARAM_set_octet_ptr(p, &ctx->iv, ctx->ivlen))
         {
@@ -459,14 +586,15 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_size < ctx->taglen)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG_LENGTH);
             return SCOSSL_FAILURE;
         }
+
         if (!OSSL_PARAM_set_octet_string(p, &ctx->tag, ctx->taglen))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
@@ -479,9 +607,20 @@ static SCOSSL_STATUS p_scossl_aes_ccm_get_ctx_params(_In_ SCOSSL_CIPHER_CCM_CTX 
 
 static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const OSSL_PARAM *p = NULL;
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
-    if (p != NULL)
+    const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN)) != NULL)
     {
         size_t ivlen;
 
@@ -497,8 +636,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -512,8 +651,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -527,8 +666,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
             return SCOSSL_FAILURE;
         }
     }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED);
-    if (p != NULL)
+
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED)) != NULL)
     {
         if (p->data_type != OSSL_PARAM_OCTET_STRING)
         {
@@ -579,6 +718,8 @@ static SCOSSL_STATUS p_scossl_aes_ccm_set_ctx_params(_Inout_ SCOSSL_CIPHER_CCM_C
         {OSSL_FUNC_CIPHER_GETTABLE_PARAMS, (void (*)(void))p_scossl_aes_generic_gettable_params},            \
         {OSSL_FUNC_CIPHER_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_##lcmode##_gettable_ctx_params}, \
         {OSSL_FUNC_CIPHER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_aes_##lcmode##_settable_ctx_params}, \
+        {OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_##lcmode##_skey_encrypt_init},     \
+        {OSSL_FUNC_CIPHER_DECRYPT_SKEY_INIT, (void (*)(void))p_scossl_aes_##lcmode##_skey_decrypt_init},     \
         {0, NULL}};
 
 IMPLEMENT_SCOSSL_AES_AEAD_CIPHER(128, SCOSSL_GCM_DEFAULT_IV_LENGTH, gcm, GCM)

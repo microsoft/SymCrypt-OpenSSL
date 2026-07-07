@@ -1,11 +1,9 @@
 //
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 //
-
-#include <openssl/core_dispatch.h>
-#include <openssl/core_names.h>
 #include <openssl/proverr.h>
 
+#include "p_scossl_base.h"
 #include "digests/p_scossl_digest_common.h"
 
 #ifdef __cplusplus
@@ -36,6 +34,9 @@ void p_scossl_digest_freectx(SCOSSL_DIGEST_CTX *ctx)
 _Use_decl_annotations_
 SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 {
+    if (ctx == NULL)
+        return NULL;
+
     SCOSSL_DIGEST_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DIGEST_CTX));
 
     if (copyCtx != NULL)
@@ -56,6 +57,17 @@ SCOSSL_DIGEST_CTX *p_scossl_digest_dupctx(SCOSSL_DIGEST_CTX *ctx)
 
     return copyCtx;
 }
+
+#ifdef OSSL_FUNC_DIGEST_COPYCTX
+_Use_decl_annotations_
+void p_scossl_digest_copy_ctx(SCOSSL_DIGEST_CTX *dstCtx, SCOSSL_DIGEST_CTX *srcCtx)
+{
+    dstCtx->pHash = srcCtx->pHash;
+    dstCtx->xofLen = srcCtx->xofLen;
+
+    srcCtx->pHash->stateCopyFunc(srcCtx->pState, dstCtx->pState);
+}
+#endif
 
 _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_digest_get_params(OSSL_PARAM params[], size_t size, size_t blocksize, UINT32 flags)

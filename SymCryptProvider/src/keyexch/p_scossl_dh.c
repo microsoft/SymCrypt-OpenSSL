@@ -60,6 +60,12 @@ static const OSSL_PARAM p_scossl_dh_ctx_gettable_param_types[] = {
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_ const OSSL_PARAM params[]);
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR < 4
+int EVP_MD_xof(const EVP_MD *md)
+{
+    return md != NULL && ((EVP_MD_get_flags(md) & EVP_MD_FLAG_XOF) != 0);
+}
+#endif // OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR < 4
 
 static SCOSSL_DH_CTX *p_scossl_dh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
@@ -87,7 +93,12 @@ static void p_scossl_dh_freectx(_In_ SCOSSL_DH_CTX *ctx)
 
 static SCOSSL_DH_CTX *p_scossl_dh_dupctx(_In_ SCOSSL_DH_CTX *ctx)
 {
-    SCOSSL_DH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_CTX));
+    SCOSSL_DH_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_CTX));
     if (copyCtx != NULL)
     {
         *copyCtx = *ctx;
@@ -323,11 +334,22 @@ static SCOSSL_STATUS p_scossl_dh_derive(_In_ SCOSSL_DH_CTX *ctx,
 
 static SCOSSL_STATUS p_scossl_dh_set_ctx_params(_Inout_ SCOSSL_DH_CTX *ctx, _In_ const OSSL_PARAM params[])
 {
-    const char *mdName = NULL;
-    const char *mdProps = NULL;
+    char *mdName = NULL;
+    char *mdProps = NULL;
     EVP_MD *md = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-    const OSSL_PARAM *p = NULL;
+    const OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
+
+    if (p_scossl_is_params_empty(params))
+    {
+        return SCOSSL_SUCCESS;
+    }
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_EXCHANGE_PARAM_PAD)) != NULL)
     {
@@ -457,7 +479,13 @@ static const OSSL_PARAM *p_scossl_dh_ctx_settable_params(ossl_unused void *ctx, 
 
 static SCOSSL_STATUS p_scossl_dh_get_ctx_params(_In_ SCOSSL_DH_CTX *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
+
+    if (ctx == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
+        return SCOSSL_FAILURE;
+    }
 
     if ((p = OSSL_PARAM_locate(params, OSSL_EXCHANGE_PARAM_PAD)) != NULL &&
         !OSSL_PARAM_set_uint(p, ctx->pad))

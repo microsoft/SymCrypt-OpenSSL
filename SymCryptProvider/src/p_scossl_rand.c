@@ -7,6 +7,7 @@
 #include <openssl/proverr.h>
 
 #include "scossl_helpers.h"
+#include "p_scossl_base.h"
 
 #define SCOSSL_DRBG_STRENGTH 256
 #define SCOSSL_DRBG_MAX_REQUEST_SIZE (1 << 16)
@@ -101,23 +102,25 @@ static const OSSL_PARAM *p_scossl_rand_gettable_ctx_params(ossl_unused void *ctx
 
 static SCOSSL_STATUS p_scossl_rand_get_ctx_params(ossl_unused void *ctx, _Inout_ OSSL_PARAM params[])
 {
-    OSSL_PARAM *p = NULL;
+    OSSL_PARAM *p;
 
     // State managed by symcrypt module
-    p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STATE);
-    if (p != NULL && !OSSL_PARAM_set_int(p, 1))
+    if ((p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STATE)) != NULL &&
+        !OSSL_PARAM_set_int(p, 1))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STRENGTH);
-    if (p != NULL && !OSSL_PARAM_set_uint(p, SCOSSL_DRBG_STRENGTH))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STRENGTH)) != NULL &&
+        !OSSL_PARAM_set_uint(p, SCOSSL_DRBG_STRENGTH))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;
     }
-    p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_MAX_REQUEST);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, SCOSSL_DRBG_MAX_REQUEST_SIZE))
+
+    if ((p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_MAX_REQUEST)) != NULL &&
+        !OSSL_PARAM_set_size_t(p, SCOSSL_DRBG_MAX_REQUEST_SIZE))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         return SCOSSL_FAILURE;

@@ -40,7 +40,12 @@ void p_scossl_ecdh_freectx(SCOSSL_ECDH_CTX *ctx)
 _Use_decl_annotations_
 SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(SCOSSL_ECDH_CTX *ctx)
 {
-    SCOSSL_ECDH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
+    SCOSSL_ECDH_CTX *copyCtx;
+
+    if (ctx == NULL)
+        return NULL;
+
+    copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (copyCtx != NULL)
     {
         *copyCtx = *ctx;
