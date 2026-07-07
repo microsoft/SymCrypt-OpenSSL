@@ -8,6 +8,14 @@
 extern "C" {
 #endif
 
+// If r and s are both 0, the DER encoding would be 8 bytes
+// (0x30 0x06 0x02 0x01 0x00 0x02 0x01 0x00)
+// integers must contain at least 1 octet of content in DER
+#define SCOSSL_ECDSA_MIN_DER_SIGNATURE_LEN (8)
+// Largest supported curve is P521 => 66 * 2 + 4 (int headers) + 3 (seq header)
+#define SCOSSL_ECDSA_MAX_DER_SIGNATURE_LEN (139)
+// Smallest supported curve is P192 => 24 * 2 byte SymCrypt signatures
+#define SCOSSL_ECDSA_MIN_SYMCRYPT_SIGNATURE_LEN (48)
 // Largest supported curve is P521 => 66 * 2 byte SymCrypt signatures
 #define SCOSSL_ECDSA_MAX_SYMCRYPT_SIGNATURE_LEN (132)
 
@@ -31,9 +39,9 @@ SIZE_T scossl_ecdsa_size(_In_ PCSYMCRYPT_ECURVE curve);
 SCOSSL_STATUS scossl_ecdsa_sign(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
                                 _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
                                 _Out_writes_bytes_opt_(*pcbSignature) PBYTE pbSignature, _Out_ unsigned int* pcbSignature);
-SCOSSL_STATUS scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
-                                  _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
-                                  _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
+int scossl_ecdsa_verify(_In_ PSYMCRYPT_ECKEY key, _In_ PCSYMCRYPT_ECURVE curve,
+                        _In_reads_bytes_(cbHashValue) PCBYTE pbHashValue, SIZE_T cbHashValue,
+                        _In_reads_bytes_(pcbSignature) PCBYTE pbSignature, SIZE_T pcbSignature);
 
 #ifdef __cplusplus
 }
