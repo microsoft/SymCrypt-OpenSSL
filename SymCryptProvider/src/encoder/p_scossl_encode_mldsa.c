@@ -100,10 +100,31 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
     X509_PUBKEY *pubKey = NULL;
     ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
     if (keyCtx->key == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
+
+    if ((pubKey = X509_PUBKEY_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    scError = SymCryptMlDsaSizeofKeyFormatFromParams(keyCtx->mldsaParams, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &cbKey);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaSizeofKeyFormatFromParams failed", scError);
+        goto cleanup;
+    }
+
+    pbKey = OPENSSL_malloc(cbKey);
+    if (pbKey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
@@ -115,12 +136,6 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
     if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
     {
         SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
-        goto cleanup;
-    }
-
-    if ((pubKey = X509_PUBKEY_new()) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
@@ -140,7 +155,7 @@ cleanup:
         pubKey = NULL;
     }
 
-    OPENSSL_secure_free(pbKey);
+    OPENSSL_free(pbKey);
 
     return pubKey;
 }
@@ -337,7 +352,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
 
         if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
         {
-            if (BIO_printf(out, "MLDSA Private-Key (512 bit private seed encoding):\nprivate-seed") <= 0)
+            if (BIO_printf(out, "MLDSA Private-Key (256 bit private seed encoding):\nprivate-seed") <= 0)
             {
                 goto cleanup;
             }
@@ -445,48 +460,48 @@ static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_text_newctx(_In_ SCOSSL_PROVCTX *pro
         return p_scossl_encode_does_selection(&p_scossl_mldsa_##encoderType##_der_desc, selection);                 \
     }
 
-#define MLDSA_ENCODER_DISPATCH(encoderType, bits)                                                                   \
-    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_##encoderType##_der_functions[] = {                               \
+#define MLDSA_ENCODER_DISPATCH(encoderType, paramSet)                                                                   \
+    const OSSL_DISPATCH p_scossl_mldsa##paramSet##_to_##encoderType##_der_functions[] = {                               \
         {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_##encoderType##_der_newctx},                   \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                         \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},               \
         {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mldsa_##encoderType##_does_selection},   \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##paramSet##_encoder_import_object},            \
         {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};                                                                                                 \
                                                                                                                     \
-    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_##encoderType##_pem_functions[] = {                               \
+    const OSSL_DISPATCH p_scossl_mldsa##paramSet##_to_##encoderType##_pem_functions[] = {                               \
         {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_##encoderType##_pem_newctx},                   \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                         \
         {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},               \
         {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_mldsa_##encoderType##_does_selection},   \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##paramSet##_encoder_import_object},            \
         {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};
 
-#define MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(bits)                                                                  \
-    static SCOSSL_MLDSA_KEY_CTX  *p_scossl_mldsa##bits##_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx,         \
+#define MAKE_MLDSA_VARIANT_ENCODER_FUNCTIONS(paramSet)                                                                  \
+    static SCOSSL_MLDSA_KEY_CTX  *p_scossl_mldsa##paramSet##_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx,         \
                                                                                int selection,                       \
                                                                                _In_ const OSSL_PARAM params[])      \
     {                                                                                                               \
-        return p_scossl_mldsa_encoder_import_object(ctx, SYMCRYPT_MLDSA_PARAMS_MLDSA##bits, selection, params);     \
+        return p_scossl_mldsa_encoder_import_object(ctx, SYMCRYPT_MLDSA_PARAMS_MLDSA##paramSet, selection, params);     \
     }                                                                                                               \
                                                                                                                     \
-    const OSSL_DISPATCH p_scossl_mldsa##bits##_to_text_functions[] = {                                              \
+    const OSSL_DISPATCH p_scossl_mldsa##paramSet##_to_text_functions[] = {                                              \
         {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_mldsa_to_text_newctx},                                  \
         {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                       \
         {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                                \
-        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##bits##_encoder_import_object},            \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_mldsa##paramSet##_encoder_import_object},            \
         {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                       \
         {0, NULL}};                                                                                                 \
                                                                                                                     \
-    MLDSA_ENCODER_DISPATCH(PrivateKeyInfo, bits)                                                                    \
-    MLDSA_ENCODER_DISPATCH(EncryptedPrivateKeyInfo, bits)                                                           \
-    MLDSA_ENCODER_DISPATCH(SubjectPublicKeyInfo, bits)
+    MLDSA_ENCODER_DISPATCH(PrivateKeyInfo, paramSet)                                                                    \
+    MLDSA_ENCODER_DISPATCH(EncryptedPrivateKeyInfo, paramSet)                                                           \
+    MLDSA_ENCODER_DISPATCH(SubjectPublicKeyInfo, paramSet)
 
 MAKE_MLDSA_ASN1_ENCODER(PrivateKeyInfo)
 MAKE_MLDSA_ASN1_ENCODER(EncryptedPrivateKeyInfo)

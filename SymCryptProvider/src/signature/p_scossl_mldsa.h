@@ -20,8 +20,6 @@ typedef struct {
 
 typedef struct
 {
-    OSSL_LIB_CTX *libctx;
-
     SYMCRYPT_MLDSA_PARAMS mldsaParams;
     SYMCRYPT_MLDSAKEY_FORMAT format;
     PSYMCRYPT_MLDSAKEY key;

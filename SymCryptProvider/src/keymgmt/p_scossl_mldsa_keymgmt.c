@@ -12,12 +12,10 @@
 extern "C" {
 #endif
 
-#define SCOSSL_MLDSA_PRIVATE_SEED_LENGTH 64
-
 typedef struct
 {
     SYMCRYPT_MLDSA_PARAMS mldsaParams;
-    BYTE abSeed[SCOSSL_MLDSA_PRIVATE_SEED_LENGTH];
+    BYTE abSeed[SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE];
     SIZE_T cbSeed;
 } SCOSSL_MLDSA_KEYGEN_CTX;
 
@@ -31,7 +29,7 @@ static const OSSL_PARAM p_scossl_mldsa_keymgmt_settable_param_types[] = {
 static const OSSL_PARAM p_scossl_mldsa_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
     OSSL_PARAM_int(OSSL_PKEY_PARAM_SECURITY_BITS, NULL),
-    OSSL_PARAM_int(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
+    OSSL_PARAM_size_t(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
     OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_MANDATORY_DIGEST, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ML_DSA_SEED, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
@@ -139,13 +137,13 @@ static SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(_Inout_ SCOSSL_MLDSA_KEYGE
         PBYTE pbSeed = genCtx->abSeed;
         SIZE_T cbSeed = 0;
 
-        if (!OSSL_PARAM_get_octet_string(p, (void **)&pbSeed, SCOSSL_MLDSA_PRIVATE_SEED_LENGTH, &cbSeed))
+        if (!OSSL_PARAM_get_octet_string(p, (void **)&pbSeed, SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE, &cbSeed))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
             return SCOSSL_FAILURE;
         }
 
-        if (cbSeed != SCOSSL_MLDSA_PRIVATE_SEED_LENGTH)
+        if (cbSeed != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
         {
             genCtx->cbSeed = 0;
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SEED_LENGTH);
@@ -168,7 +166,7 @@ static void p_scossl_mldsa_keygen_cleanup(_Inout_ SCOSSL_MLDSA_KEYGEN_CTX *genCt
     OPENSSL_secure_clear_free(genCtx, sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
 }
 
-static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[], _In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
+static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(_In_ const OSSL_PARAM params[], SYMCRYPT_MLDSA_PARAMS mldsaParams)
 {
     SCOSSL_MLDSA_KEYGEN_CTX *genCtx = OPENSSL_secure_zalloc(sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
 
@@ -423,7 +421,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(_In_ SCOSSL_MLDSA_KEY_CTX
             return SCOSSL_FAILURE;
         }
 
-        if (!OSSL_PARAM_set_int(p, cbSignature))
+        if (!OSSL_PARAM_set_size_t(p, cbSignature))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             return SCOSSL_FAILURE;
@@ -471,35 +469,20 @@ static BOOL p_scossl_mldsa_keymgmt_match(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx
     SIZE_T cbKey1 = 0;
     SIZE_T cbKey2 = 0;
     BOOL ret = FALSE;
-    SYMCRYPT_MLDSAKEY_FORMAT format;
 
     if (keyCtx1 == NULL ||
         keyCtx2 == NULL ||
         keyCtx1->mldsaParams != keyCtx2->mldsaParams)
     {
-        return FALSE;
+        goto cleanup;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
     {
         if (keyCtx1->key != NULL && keyCtx2->key != NULL)
         {
-            if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
-            {
-                format = SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY;
-            }
-            else if (keyCtx1->format != SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY &&
-                     keyCtx2->format != SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY)
-            {
-                format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
-            }
-            else
-            {
-                goto cleanup;
-            }
-
-            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx1, format, &pbKey1, &cbKey1) != SCOSSL_SUCCESS ||
-                p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx2, format, &pbKey2, &cbKey2) != SCOSSL_SUCCESS)
+            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx1, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey1, &cbKey1) != SCOSSL_SUCCESS ||
+                p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx2, SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY, &pbKey2, &cbKey2) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -511,7 +494,7 @@ static BOOL p_scossl_mldsa_keymgmt_match(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx
             }
         }
         // No match in the case where only one key is set.
-        else if (keyCtx1->key != NULL || keyCtx2->key != NULL)
+        else if ((keyCtx1->key == NULL) != (keyCtx2->key == NULL))
         {
             goto cleanup;
         }
@@ -520,8 +503,8 @@ static BOOL p_scossl_mldsa_keymgmt_match(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx
     ret = TRUE;
 
 cleanup:
-    OPENSSL_secure_clear_free(pbKey1, cbKey1);
-    OPENSSL_secure_clear_free(pbKey2, cbKey2);
+    OPENSSL_secure_free(pbKey1);
+    OPENSSL_secure_free(pbKey2);
 
     return ret;
 }
@@ -704,29 +687,29 @@ cleanup:
     return ret;
 }
 
-#define IMPLEMENT_SCOSSL_MLDSA(bits)                                                                    \
+#define IMPLEMENT_SCOSSL_MLDSA(paramSet)                                                                    \
     static SCOSSL_MLDSA_KEY_CTX                                                                         \
-    *p_scossl_mldsa_##bits##_keymgmt_new_ctx(ossl_unused SCOSSL_PROVCTX *provCtx)                       \
+    *p_scossl_mldsa_##paramSet##_keymgmt_new_ctx(ossl_unused SCOSSL_PROVCTX *provCtx)                       \
     {                                                                                                   \
-        return p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS_MLDSA##bits);                       \
+        return p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS_MLDSA##paramSet);                       \
     }                                                                                                   \
                                                                                                         \
     static SCOSSL_MLDSA_KEYGEN_CTX                                                                      \
-    *p_scossl_mldsa_##bits##_keygen_init(ossl_unused SCOSSL_PROVCTX *provCtx,                           \
+    *p_scossl_mldsa_##paramSet##_keygen_init(ossl_unused SCOSSL_PROVCTX *provCtx,                           \
                                          ossl_unused int selection,                                     \
                                          _In_ const OSSL_PARAM params[])                                \
     {                                                                                                   \
-        return p_scossl_mldsa_keygen_init(params, SYMCRYPT_MLDSA_PARAMS_MLDSA##bits);                   \
+        return p_scossl_mldsa_keygen_init(params, SYMCRYPT_MLDSA_PARAMS_MLDSA##paramSet);                   \
     }                                                                                                   \
                                                                                                         \
-    const OSSL_DISPATCH p_scossl_mldsa##bits##_keymgmt_functions[] = {                                  \
-        {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_mldsa_##bits##_keymgmt_new_ctx},               \
+    const OSSL_DISPATCH p_scossl_mldsa##paramSet##_keymgmt_functions[] = {                                  \
+        {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_mldsa_##paramSet##_keymgmt_new_ctx},               \
         {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_mldsa_keymgmt_dup_key_ctx},                    \
         {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                  \
         {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_mldsa_keygen_set_params},           \
         {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_mldsa_keygen_settable_params}, \
         {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_mldsa_keygen_cleanup},                 \
-        {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_mldsa_##bits##_keygen_init},              \
+        {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_mldsa_##paramSet##_keygen_init},              \
         {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_mldsa_keygen_set_template},       \
         {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_mldsa_keygen},                                 \
         {OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))p_scossl_mldsa_keymgmt_load},                          \
@@ -753,7 +736,6 @@ _Use_decl_annotations_
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX *keyCtx, SYMCRYPT_MLDSAKEY_FORMAT format,
                                                      PBYTE *ppbKey, SIZE_T *pcbKey)
 {
-    BOOL allocatedKey = FALSE;
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
@@ -796,18 +778,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
         goto cleanup;
     }
 
-    if (*ppbKey == NULL)
-    {
-        // Always using OPENSSL_secure_malloc so caller doesn't have to worry about
-        // calling separate free functions for public and private keys.
-        if ((pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
-        {
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-        allocatedKey = TRUE;
-    }
-    else
+    if (*ppbKey != NULL)
     {
         if (*pcbKey < cbKey)
         {
@@ -817,6 +788,13 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
 
         pbKey = *ppbKey;
     }
+    // Always using OPENSSL_secure_malloc so caller doesn't have to worry about
+    // calling separate free functions for public and private keys.
+    else if ((pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
 
     scError = SymCryptMlDsakeyGetValue(keyCtx->key, pbKey, cbKey, format, 0);
     if (scError != SYMCRYPT_NO_ERROR)
@@ -825,16 +803,15 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
         goto cleanup;
     }
 
-    if (allocatedKey)
-    {
-        *ppbKey = pbKey;
-    }
-    *pcbKey = cbKey;
-
     ret = SCOSSL_SUCCESS;
 
+    *ppbKey = pbKey;
+    *pcbKey = cbKey;
+
+    pbKey = NULL;
+
 cleanup:
-    if (ret != SCOSSL_SUCCESS && allocatedKey)
+    if (*ppbKey == NULL)
     {
         OPENSSL_secure_clear_free(pbKey, cbKey);
     }
@@ -886,11 +863,11 @@ int p_scossl_mldsa_get_bits(SYMCRYPT_MLDSA_PARAMS mldsaParams)
     switch (mldsaParams)
     {
         case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
-            return 1312;
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA44 * 8;
         case SYMCRYPT_MLDSA_PARAMS_MLDSA65:
-            return 1952;
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA65 * 8;
         case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
-            return 2592;
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA87 * 8;
         default:
             break;
     }
