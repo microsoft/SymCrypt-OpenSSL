@@ -14,6 +14,7 @@ extern "C" {
 SCOSSL_STATUS scossl_ecc_init_static();
 void scossl_ecc_destroy_ecc_curves();
 
+PCSYMCRYPT_ECURVE scossl_ecc_nid_to_symcrypt_curve(int groupNid);
 // x25519 is a separate interface in the provider and not supported in the
 // engine, so there's no need to fetch the hidden group from an EC_GROUP.
 PCSYMCRYPT_ECURVE scossl_ecc_group_to_symcrypt_curve(_In_ const EC_GROUP *group);

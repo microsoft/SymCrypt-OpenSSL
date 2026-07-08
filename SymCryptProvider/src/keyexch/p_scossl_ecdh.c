@@ -5,6 +5,7 @@
 #include "scossl_ecc.h"
 #include "p_scossl_ecc.h"
 #include "p_scossl_base.h"
+#include "p_scossl_ecdh.h"
 
 #include <openssl/proverr.h>
 
@@ -12,19 +13,12 @@
 extern "C" {
 #endif
 
-typedef struct
-{
-    OSSL_LIB_CTX *libctx;
-    SCOSSL_ECC_KEY_CTX *keyCtx;
-    SCOSSL_ECC_KEY_CTX *peerKeyCtx;
-} SCOSSL_ECDH_CTX;
-
 static const OSSL_PARAM p_scossl_ecdh_ctx_param_types[] = {
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_ecdh_set_ctx_params(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ const OSSL_PARAM params[]);
 
-static SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
+SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
 {
     SCOSSL_ECDH_CTX *ctx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (ctx != NULL)
@@ -37,12 +31,12 @@ static SCOSSL_ECDH_CTX *p_scossl_ecdh_newctx(_In_ SCOSSL_PROVCTX *provctx)
     return ctx;
 }
 
-static void p_scossl_ecdh_freectx(_In_ SCOSSL_ECDH_CTX *ctx)
+void p_scossl_ecdh_freectx(_In_ SCOSSL_ECDH_CTX *ctx)
 {
     OPENSSL_free(ctx);
 }
 
-static SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
+SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
 {
     SCOSSL_ECDH_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECDH_CTX));
     if (copyCtx != NULL)
@@ -53,7 +47,7 @@ static SCOSSL_ECDH_CTX *p_scossl_ecdh_dupctx(_In_ SCOSSL_ECDH_CTX *ctx)
     return copyCtx;
 }
 
-static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
+SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *keyCtx,
                                         ossl_unused const OSSL_PARAM params[])
 {
     if (ctx == NULL || keyCtx == NULL)
@@ -67,7 +61,7 @@ static SCOSSL_STATUS p_scossl_ecdh_init(_In_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_E
     return SCOSSL_SUCCESS;
 }
 
-static SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *peerKeyCtx)
+SCOSSL_STATUS p_scossl_ecdh_set_peer(_Inout_ SCOSSL_ECDH_CTX *ctx, _In_ SCOSSL_ECC_KEY_CTX *peerKeyCtx)
 {
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -91,7 +85,7 @@ cleanup:
     return ret;
 }
 
-static SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
+SCOSSL_STATUS p_scossl_ecdh_derive(_In_ SCOSSL_ECDH_CTX *ctx,
                                           _Out_writes_bytes_opt_(*secretlen) unsigned char *secret, _Out_ size_t *secretlen,
                                           size_t outlen)
 {
