@@ -936,10 +936,10 @@ cleanup:
         if (keyCtx->key != NULL)
         {
             SymCryptMlKemkeyFree(keyCtx->key);
+            keyCtx->key = NULL;
         }
 
         p_scossl_mlkem_hybrid_ecc_free_ctx(keyCtx->classicKeyCtx);
-        keyCtx->key = NULL;
         keyCtx->classicKeyCtx = NULL;
         keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
     }

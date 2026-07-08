@@ -276,8 +276,6 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
         }
     }
 
-    keyCtx->provCtx = genCtx->provCtx;
-    keyCtx->mlkemParams = genCtx->mlkemParams;
     keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED;
 
     status = SCOSSL_SUCCESS;
@@ -928,8 +926,11 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_set_encoded_key(SCOSSL_MLKEM_KEY_CTX *keyCt
 cleanup:
     if (ret != SCOSSL_SUCCESS)
     {
-        SymCryptMlKemkeyFree(keyCtx->key);
-        keyCtx->key = NULL;
+        if (keyCtx->key != NULL)
+        {
+            SymCryptMlKemkeyFree(keyCtx->key);
+            keyCtx->key = NULL;
+        }
         keyCtx->format = SYMCRYPT_MLKEMKEY_FORMAT_NULL;
     }
 
