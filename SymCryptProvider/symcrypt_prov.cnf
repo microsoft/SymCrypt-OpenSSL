@@ -4,6 +4,9 @@
 # value assigned does not matter, and the provider will be
 # activated as long as the "activate" key is present.
 
+[provider_sect]
+symcryptprovider = symcrypt_prov_sect
+
 [symcrypt_prov_sect]
 activate = 1
 identity = symcryptprovider
