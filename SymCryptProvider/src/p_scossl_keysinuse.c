@@ -1061,19 +1061,16 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
             pthread_mutex_unlock(&logging_thread_mutex);
 
-            if (pKeysinuseInfo != NULL)
-            {
-                p_scossl_keysinuse_info_free(pKeysinuseInfo);
+            p_scossl_keysinuse_info_free(pKeysinuseInfo);
 
-                if (keysinuseInfoTmp.refCount > 0)
-                {
-                    p_scossl_keysinuse_log_notice("%s,%d,%d,%ld,%ld",
-                    keysinuseInfoTmp.keyIdentifier,
-                    keysinuseInfoTmp.signCounter,
-                    keysinuseInfoTmp.decryptCounter,
-                    keysinuseInfoTmp.firstLogTime,
-                    keysinuseInfoTmp.lastLogTime);
-                }
+            if (keysinuseInfoTmp.refCount > 0)
+            {
+                p_scossl_keysinuse_log_notice("%s,%d,%d,%ld,%ld",
+                keysinuseInfoTmp.keyIdentifier,
+                keysinuseInfoTmp.signCounter,
+                keysinuseInfoTmp.decryptCounter,
+                keysinuseInfoTmp.firstLogTime,
+                keysinuseInfoTmp.lastLogTime);
             }
         }
     }
