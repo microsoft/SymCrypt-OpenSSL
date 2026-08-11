@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <unistd.h>
 #include <linux/limits.h>
 #include <openssl/proverr.h>
@@ -121,6 +122,8 @@ static void p_scossl_keysinuse_init_once()
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     BOOL attr_initialized = FALSE;
+    sigset_t oldSigSet;
+    sigset_t blockSigSet;
 
     // Store process PID for later use
     pid = getpid();
@@ -207,8 +210,23 @@ static void p_scossl_keysinuse_init_once()
     is_logging = TRUE;
 
     if ((pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-        (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0 ||
-        (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+        (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to initialize logging thread condition,SYS_%d", pthreadErr);
+        is_logging = FALSE;
+        goto cleanup;
+    }
+
+    // Block all signals across creation of the logging thread so it inherits a
+    // fully-blocked mask and never consumes signals intended for other threads
+    // (for example SIGIO, which the NGINX master relies on for worker channel
+    // acknowledgements). The previous mask is restored immediately afterwards.
+    sigfillset(&blockSigSet);
+    pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
+    pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
+    pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
+
+    if (pthreadErr != 0)
     {
         p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
         is_logging = FALSE;
@@ -335,6 +353,8 @@ static void p_scossl_keysinuse_child()
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     int is_parent_logging = is_logging;
     BOOL attr_initialized = FALSE;
+    sigset_t oldSigSet;
+    sigset_t blockSigSet;
 
     if (!keysinuse_enabled)
     {
@@ -411,8 +431,22 @@ static void p_scossl_keysinuse_child()
         is_logging = TRUE;
 
         if ((pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-            (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0 ||
-            (pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL)) != 0)
+            (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0)
+        {
+            p_scossl_keysinuse_log_error("Failed to initialize logging thread condition,SYS_%d", pthreadErr);
+            is_logging = FALSE;
+            goto cleanup;
+        }
+
+        // Block all signals across creation of the logging thread so it
+        // inherits a fully-blocked mask and never consumes signals intended
+        // for other threads. The previous mask is restored afterwards.
+        sigfillset(&blockSigSet);
+        pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
+        pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
+        pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
+
+        if (pthreadErr != 0)
         {
             p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
             is_logging = FALSE;
