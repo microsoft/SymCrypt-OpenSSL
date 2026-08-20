@@ -1049,9 +1049,10 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
             p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
         }
 
-        // Log all pending usage events. logging_thread_mutex is held only around
-        // during the pKeysinuseInfo update to ensure the logging thread is not
-        // holding a lock during a fork.
+        // Log all pending usage events. logging_thread_mutex is held only during
+        // the pKeysinuseInfo update and reference release to ensure the logging
+        // thread is not holding a lock during a fork. The slow log write is done
+        // outside the mutex.
         while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
         {
             if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) != 0)
@@ -1083,9 +1084,9 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
                 keysinuseInfoTmp.refCount = -1;
             }
 
-            pthread_mutex_unlock(&logging_thread_mutex);
-
             p_scossl_keysinuse_info_free(pKeysinuseInfo);
+
+            pthread_mutex_unlock(&logging_thread_mutex);
 
             if (keysinuseInfoTmp.refCount > 0)
             {
