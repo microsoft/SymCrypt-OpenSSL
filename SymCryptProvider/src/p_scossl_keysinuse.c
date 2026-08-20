@@ -26,6 +26,8 @@ static off_t max_file_size = 5 << 10; // Default to 5KB
 static long logging_delay = 60 * 60; // Default to 1 hour
 static BOOL keysinuse_enabled = FALSE;
 static BOOL p_scossl_keysinuse_child_enabled = FALSE;
+static BOOL keysinuse_initialized = FALSE;
+static UINT32 keysinuse_process_scope = KEYSINUSE_PROCESS_SCOPE_BOTH;
 static pid_t pid = 0;
 static pid_t logging_thread_tid = 0;
 
@@ -108,6 +110,72 @@ static void p_scossl_keysinuse_logging_thread_cleanup()
     }
 }
 
+// Starts the logging thread and marks keysinuse as enabled. Reainitializes
+// lock thread globals and state. On failure caller is repsonsible for cleanup.
+static SCOSSL_STATUS p_scossl_keysinuse_create_logging_thread()
+{
+    pthread_condattr_t attr;
+    int pthreadErr;
+    BOOL attr_initialized = FALSE;
+    sigset_t oldSigSet;
+    sigset_t blockSigSet;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    // Monotonic clock needs to be set to prevent wall clock changes from
+    // affecting the logging delay sleep time. Allocate condition variable,
+    // releasing any instance inherited across a fork first.
+    OPENSSL_free(logging_thread_cond_wake_early);
+    logging_thread_cond_wake_early = NULL;
+
+    if ((logging_thread_cond_wake_early = OPENSSL_malloc(sizeof(pthread_cond_t))) == NULL)
+    {
+        p_scossl_keysinuse_log_error("Failed to allocate condition variable");
+        goto cleanup;
+    }
+
+    if ((pthreadErr = pthread_condattr_init(&attr)) != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to init condition attributes,SYS_%d", pthreadErr);
+        goto cleanup;
+    }
+
+    attr_initialized = TRUE;
+    is_logging = TRUE;
+
+    if ((pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
+        (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to initialize logging thread condition,SYS_%d", pthreadErr);
+        is_logging = FALSE;
+        goto cleanup;
+    }
+
+    // Block all signals across creation of the logging thread so signal handlers
+    // never run in the logging thread.
+    sigfillset(&blockSigSet);
+    pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
+    pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
+    pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
+
+    if (pthreadErr != 0)
+    {
+        p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
+        is_logging = FALSE;
+        goto cleanup;
+    }
+
+    keysinuse_enabled = TRUE;
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (attr_initialized)
+    {
+        pthread_condattr_destroy(&attr);
+    }
+
+    return status;
+}
+
 static void p_scossl_keysinuse_init_once()
 {
     int mkdirResult;
@@ -118,12 +186,8 @@ static void p_scossl_keysinuse_init_once()
     char *procPath = NULL;
     int cbProcPath = PATH_MAX;
     int cbProcPathUsed = 0;
-    pthread_condattr_t attr;
     int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
-    BOOL attr_initialized = FALSE;
-    sigset_t oldSigSet;
-    sigset_t blockSigSet;
 
     // Store process PID for later use
     pid = getpid();
@@ -191,48 +255,6 @@ static void p_scossl_keysinuse_init_once()
         goto cleanup;
     }
 
-    // Start the logging thread. Monotonic clock needs to be set to
-    // prevent wall clock changes from affecting the logging delay sleep time
-    // Allocate condition variable
-    if ((logging_thread_cond_wake_early = OPENSSL_malloc(sizeof(pthread_cond_t))) == NULL)
-    {
-        p_scossl_keysinuse_log_error("Failed to allocate condition variable");
-        goto cleanup;
-    }
-
-    if ((pthreadErr = pthread_condattr_init(&attr)) != 0)
-    {
-        p_scossl_keysinuse_log_error("Failed to init condition attributes,SYS_%d", pthreadErr);
-        goto cleanup;
-    }
-
-    attr_initialized = TRUE;
-    is_logging = TRUE;
-
-    if ((pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-        (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0)
-    {
-        p_scossl_keysinuse_log_error("Failed to initialize logging thread condition,SYS_%d", pthreadErr);
-        is_logging = FALSE;
-        goto cleanup;
-    }
-
-    // Block all signals across creation of the logging thread so it inherits a
-    // fully-blocked mask and never consumes signals intended for other threads
-    // (for example SIGIO, which the NGINX master relies on for worker channel
-    // acknowledgements). The previous mask is restored immediately afterwards.
-    sigfillset(&blockSigSet);
-    pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
-    pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
-    pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
-
-    if (pthreadErr != 0)
-    {
-        p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
-        is_logging = FALSE;
-        goto cleanup;
-    }
-
     if ((pthreadErr = pthread_atfork(p_scossl_keysinuse_prepare,
                                      p_scossl_keysinuse_parent,
                                      p_scossl_keysinuse_child)) != 0)
@@ -241,15 +263,18 @@ static void p_scossl_keysinuse_init_once()
         goto cleanup;
     }
 
-    keysinuse_enabled = TRUE;
-    status = SCOSSL_SUCCESS;
+    keysinuse_initialized = TRUE;
 
-cleanup:
-    if (attr_initialized)
+    if ((keysinuse_process_scope & KEYSINUSE_PROCESS_SCOPE_MAIN) == 0)
     {
-        pthread_condattr_destroy(&attr);
+        status = SCOSSL_SUCCESS;
+        goto cleanup;
     }
 
+    // Start the logging thread.
+    status = p_scossl_keysinuse_create_logging_thread();
+
+cleanup:
     if (status != SCOSSL_SUCCESS)
     {
         p_scossl_keysinuse_teardown();
@@ -267,7 +292,7 @@ void p_scossl_keysinuse_init()
 // Acquire all locks to freeze state before fork
 static void p_scossl_keysinuse_prepare()
 {
-    if (!keysinuse_enabled)
+    if (!keysinuse_initialized)
     {
         return;
     }
@@ -304,7 +329,9 @@ static void p_scossl_keysinuse_prepare()
         closedir(task_dir);
 
         // Enable child logging only if no extra threads were found
-        if (!has_extra_threads && errno == 0)
+        if (!has_extra_threads &&
+            errno == 0 &&
+            (keysinuse_process_scope & KEYSINUSE_PROCESS_SCOPE_CHILD) != 0)
         {
             p_scossl_keysinuse_child_enabled = TRUE;
         }
@@ -329,7 +356,7 @@ static void p_scossl_keysinuse_prepare()
 // Release all locks in reverse order after fork
 static void p_scossl_keysinuse_parent()
 {
-    if (!keysinuse_enabled)
+    if (!keysinuse_initialized)
     {
         return;
     }
@@ -348,15 +375,10 @@ static void p_scossl_keysinuse_parent()
 static void p_scossl_keysinuse_child()
 {
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo = NULL;
-    pthread_condattr_t attr;
-    int pthreadErr;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     int is_parent_logging = is_logging;
-    BOOL attr_initialized = FALSE;
-    sigset_t oldSigSet;
-    sigset_t blockSigSet;
 
-    if (!keysinuse_enabled)
+    if (!keysinuse_initialized)
     {
         return;
     }
@@ -411,50 +433,13 @@ static void p_scossl_keysinuse_child()
 
     pthread_mutex_unlock(&logging_thread_mutex);
 
-    // Only recreate logging thread if it was running in the parent process
-    if (is_parent_logging && p_scossl_keysinuse_child_enabled)
+    // Only start the logging thread in the child process if child process
+    // logging is enabled and either the parent process was logging or
+    // parent process logging was disabled.
+    if (p_scossl_keysinuse_child_enabled &&
+        (is_parent_logging || (keysinuse_process_scope & KEYSINUSE_PROCESS_SCOPE_MAIN) == 0))
     {
-        OPENSSL_free(logging_thread_cond_wake_early);
-        if ((logging_thread_cond_wake_early = OPENSSL_malloc(sizeof(pthread_cond_t))) == NULL)
-        {
-            p_scossl_keysinuse_log_error("Failed to allocate condition variable");
-            goto cleanup;
-        }
-
-        if ((pthreadErr = pthread_condattr_init(&attr)) != 0)
-        {
-            p_scossl_keysinuse_log_error("Failed to init condition attributes,SYS_%d", pthreadErr);
-            goto cleanup;
-        }
-
-        attr_initialized = TRUE;
-        is_logging = TRUE;
-
-        if ((pthreadErr = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)) != 0 ||
-            (pthreadErr = pthread_cond_init(logging_thread_cond_wake_early, &attr)) != 0)
-        {
-            p_scossl_keysinuse_log_error("Failed to initialize logging thread condition,SYS_%d", pthreadErr);
-            is_logging = FALSE;
-            goto cleanup;
-        }
-
-        // Block all signals across creation of the logging thread so it
-        // inherits a fully-blocked mask and never consumes signals intended
-        // for other threads. The previous mask is restored afterwards.
-        sigfillset(&blockSigSet);
-        pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
-        pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
-        pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
-
-        if (pthreadErr != 0)
-        {
-            p_scossl_keysinuse_log_error("Failed to start logging thread,SYS_%d", pthreadErr);
-            is_logging = FALSE;
-            goto cleanup;
-        }
-
-        keysinuse_enabled = TRUE;
-        status = SCOSSL_SUCCESS;
+        status = p_scossl_keysinuse_create_logging_thread();
     }
 
 cleanup:
@@ -463,11 +448,6 @@ cleanup:
     {
         OPENSSL_free(logging_thread_cond_wake_early);
         logging_thread_cond_wake_early = NULL;
-    }
-
-    if (attr_initialized)
-    {
-        pthread_condattr_destroy(&attr);
     }
 
     if (status != SCOSSL_SUCCESS)
@@ -486,6 +466,7 @@ void p_scossl_keysinuse_teardown()
     int pthreadErr;
 
     keysinuse_enabled = FALSE;
+    keysinuse_initialized = FALSE;
 
     // Finish logging thread
     if (is_logging)
@@ -549,6 +530,15 @@ void p_scossl_keysinuse_set_logging_delay(INT64 delay)
     if (delay >= 0)
     {
         logging_delay = delay;
+    }
+}
+
+void p_scossl_keysinuse_set_process_scope(UINT32 scope)
+{
+    if (scope != 0 &&
+        (scope & ~(UINT32)KEYSINUSE_PROCESS_SCOPE_BOTH) == 0)
+    {
+        keysinuse_process_scope = scope;
     }
 }
 

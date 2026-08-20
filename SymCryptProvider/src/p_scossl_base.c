@@ -24,6 +24,7 @@ extern "C" {
 #define CONF_KEYSINUSE_ENABLED       "keysinuse.enabled"
 #define CONF_KEYSINUSE_MAX_FILE_SIZE "keysinuse.max_file_size"
 #define CONF_KEYSINUSE_LOGGING_DELAY "keysinuse.logging_delay_seconds"
+#define CONF_KEYSINUSE_PROCESS_SCOPE "keysinuse.process_scope"
 
 // Cap configured file size at 2GB
 #define SCOSSL_MAX_CONFIGURABLE_FILE_SIZE (2l << 30)
@@ -413,12 +414,15 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
     const char *confEnabled = NULL;
     const char *confMaxFileSize = NULL;
     const char *confLoggingDelay = NULL;
+    const char *confProcessScope = NULL;
+    const char *envProcessScope = NULL;
     const char *envEnabled = NULL;
 
     OSSL_PARAM keysinuseParams[] = {
         OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_ENABLED, &confEnabled, 0),
         OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_MAX_FILE_SIZE, &confMaxFileSize, 0),
         OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_LOGGING_DELAY, &confLoggingDelay, 0),
+        OSSL_PARAM_utf8_ptr(CONF_KEYSINUSE_PROCESS_SCOPE, &confProcessScope, 0),
         OSSL_PARAM_END};
 
     // Config related errors shouldn't surface to caller
@@ -499,6 +503,28 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
         if (confLoggingDelay != NULL)
         {
             p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
+        }
+
+        // Environment overrides config. Config value is alreday fetched core_get_params above
+        if ((envProcessScope = NCONF_get_string(NULL, NULL, "KEYSINUSE_PROCESS_SCOPE")) != NULL)
+        {
+            confProcessScope = envProcessScope;
+        }
+
+        if (confProcessScope != NULL)
+        {
+            if (OPENSSL_strcasecmp(confProcessScope, "main") == 0)
+            {
+                p_scossl_keysinuse_set_process_scope(KEYSINUSE_PROCESS_SCOPE_MAIN);
+            }
+            else if (OPENSSL_strcasecmp(confProcessScope, "child") == 0)
+            {
+                p_scossl_keysinuse_set_process_scope(KEYSINUSE_PROCESS_SCOPE_CHILD);
+            }
+            else
+            {
+                p_scossl_keysinuse_set_process_scope(KEYSINUSE_PROCESS_SCOPE_BOTH);
+            }
         }
 
         p_scossl_keysinuse_init();
