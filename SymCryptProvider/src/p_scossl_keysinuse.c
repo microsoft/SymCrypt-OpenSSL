@@ -716,7 +716,7 @@ static void p_scossl_keysinuse_add_use(SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo
         }
         else
         {
-            p_scossl_keysinuse_log_error("Add use failed to accquire mutex,SYS_%d", pthreadErr);
+            p_scossl_keysinuse_log_error("Add use failed to acquire mutex,SYS_%d", pthreadErr);
         }
     }
 }
@@ -1022,7 +1022,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
 
         if (pthreadErr != 0)
         {
-            p_scossl_keysinuse_log_error("Logging thread failed to accquire mutex,SYS_%d", pthreadErr);
+            p_scossl_keysinuse_log_error("Logging thread failed to acquire mutex,SYS_%d", pthreadErr);
             goto cleanup;
         }
 
@@ -1056,7 +1056,7 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
         {
             if ((pthreadErr = pthread_mutex_lock(&logging_thread_mutex)) != 0)
             {
-                p_scossl_keysinuse_log_error("Logging thread failed to accquire mutex,SYS_%d", pthreadErr);
+                p_scossl_keysinuse_log_error("Logging thread failed to acquire mutex,SYS_%d", pthreadErr);
                 goto cleanup;
             }
 
