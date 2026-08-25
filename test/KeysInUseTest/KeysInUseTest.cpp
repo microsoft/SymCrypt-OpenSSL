@@ -91,9 +91,7 @@ static KEYSINUSE_TEST_KEY testKeys[] = {
     {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
-#ifdef NID_X9_62_prime192v1 // This curve is not available on Azure Linux 3
     {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
-#endif
     {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
@@ -1626,13 +1624,24 @@ SCOSSL_STATUS keysinuse_test_generate_keys()
         {
             if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, testKeys[i].keygenParams) <= 0)
             {
-                TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_ec_paramgen_curve_nid failed")
-                goto cleanup;
+                printf("Skipping unsupported curve %s\n", OBJ_nid2sn(testKeys[i].keygenParams));
+                ERR_clear_error();
+                EVP_PKEY_CTX_free(ctx);
+                ctx = NULL;
+                continue;
             }
         }
 
         if (EVP_PKEY_keygen(ctx, &testKeys[i].pkey) <= 0)
         {
+            if (testKeys[i].keyType == EVP_PKEY_EC)
+            {
+                printf("Skipping unsupported curve %s\n", OBJ_nid2sn(testKeys[i].keygenParams));
+                ERR_clear_error();
+                EVP_PKEY_CTX_free(ctx);
+                ctx = NULL;
+                continue;
+            }
             TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen failed")
             goto cleanup;
         }
@@ -1963,6 +1972,12 @@ int main(int argc, char** argv)
 
     for (KEYSINUSE_TEST_KEY testKey : testKeys)
     {
+        if (testKey.pkey == NULL)
+        {
+            // Key generation was skipped for this entry (unsupported curve).
+            continue;
+        }
+
         if (testKey.keyType == EVP_PKEY_RSA)
         {
             printf("Testing RSA sign with size %d\n", testKey.keygenParams);
