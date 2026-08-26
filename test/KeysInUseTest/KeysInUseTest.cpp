@@ -13,6 +13,7 @@
 #include "scossl_helpers.h"
 #include "keysinuse.h"
 
+#include <openssl/ec.h>
 #include <openssl/evp.h>
 #if OPENSSL_VERSION_MAJOR == 3
     #include <openssl/core_names.h>
@@ -1622,26 +1623,27 @@ SCOSSL_STATUS keysinuse_test_generate_keys()
         }
         else if (testKeys[i].keyType == EVP_PKEY_EC)
         {
-            if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, testKeys[i].keygenParams) <= 0)
+            EC_GROUP *ecGroup = EC_GROUP_new_by_curve_name(testKeys[i].keygenParams);
+            if (ecGroup == NULL)
             {
-                printf("Skipping unsupported curve %s\n", OBJ_nid2sn(testKeys[i].keygenParams));
+                const char *curveName = OBJ_nid2sn(testKeys[i].keygenParams);
+                printf("Skipping unsupported curve %s\n", curveName != NULL ? curveName : "<unknown>");
                 ERR_clear_error();
                 EVP_PKEY_CTX_free(ctx);
                 ctx = NULL;
                 continue;
+            }
+            EC_GROUP_free(ecGroup);
+
+            if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, testKeys[i].keygenParams) <= 0)
+            {
+                TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_ec_paramgen_curve_nid failed")
+                goto cleanup;
             }
         }
 
         if (EVP_PKEY_keygen(ctx, &testKeys[i].pkey) <= 0)
         {
-            if (testKeys[i].keyType == EVP_PKEY_EC)
-            {
-                printf("Skipping unsupported curve %s\n", OBJ_nid2sn(testKeys[i].keygenParams));
-                ERR_clear_error();
-                EVP_PKEY_CTX_free(ctx);
-                ctx = NULL;
-                continue;
-            }
             TEST_LOG_OPENSSL_ERROR("EVP_PKEY_keygen failed")
             goto cleanup;
         }
