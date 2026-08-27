@@ -110,8 +110,8 @@ static void p_scossl_keysinuse_logging_thread_cleanup()
     }
 }
 
-// Starts the logging thread and marks keysinuse as enabled. Reainitializes
-// lock thread globals and state. On failure caller is repsonsible for cleanup.
+// Starts the logging thread and marks keysinuse as enabled. Reinitializes
+// lock thread globals and state. On failure caller is responsible for cleanup.
 static SCOSSL_STATUS p_scossl_keysinuse_create_logging_thread()
 {
     pthread_condattr_t attr;
@@ -151,8 +151,15 @@ static SCOSSL_STATUS p_scossl_keysinuse_create_logging_thread()
     }
 
     // Block all signals across creation of the logging thread so signal handlers
-    // never run in the logging thread.
+    // never run in the logging thread. Keep synchronous fault signals
+    // deliverable so a bug in the logging thread still faults and core-dumps
+    // normally (blocking these is undefined behavior if such a fault occurs).
     sigfillset(&blockSigSet);
+    sigdelset(&blockSigSet, SIGSEGV);
+    sigdelset(&blockSigSet, SIGBUS);
+    sigdelset(&blockSigSet, SIGFPE);
+    sigdelset(&blockSigSet, SIGILL);
+    sigdelset(&blockSigSet, SIGABRT);
     pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
     pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
     pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
