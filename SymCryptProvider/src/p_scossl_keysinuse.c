@@ -55,6 +55,14 @@ DEFINE_STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO);
 static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info = NULL;
 // This lock should be acquired before accessing sk_keysinuse_info
 static CRYPTO_RWLOCK *sk_keysinuse_info_lock = NULL;
+// Stack of keysinuseInfo the logging thread has removed from sk_keysinuse_info
+// and is in the process of logging. Held at file scope (rather than on the
+// logging thread's stack) so that on fork the child handler can drain any
+// in-flight entries. Only the logging thread modifies this in the
+// parent; on fork the child handler drains it while single threaded. Allocated
+// in init_once and freed when the logging thread exits or on teardown,
+// mirroring sk_keysinuse_info.
+static STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = NULL;
 
 // To minimize any overhead to crypto operations, all file writes are handled by
 // logging_thread. This thread periodically pops all pending usage data from
@@ -108,6 +116,14 @@ static void p_scossl_keysinuse_logging_thread_cleanup()
     {
         p_scossl_keysinuse_log_error("Failed to lock keysinuse info stack,OPENSSL_%d", ERR_get_error());
     }
+
+    // Drain and free the pending stack.
+    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
+    {
+        p_scossl_keysinuse_info_free(sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending));
+    }
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
+    sk_keysinuse_info_pending = NULL;
 }
 
 // Starts the logging thread and marks keysinuse as enabled. Reinitializes
@@ -234,7 +250,8 @@ static void p_scossl_keysinuse_init_once()
 
     sk_keysinuse_info_lock = CRYPTO_THREAD_lock_new();
     sk_keysinuse_info = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    if (sk_keysinuse_info_lock == NULL || sk_keysinuse_info == NULL)
+    sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
+    if (sk_keysinuse_info_lock == NULL || sk_keysinuse_info == NULL || sk_keysinuse_info_pending == NULL)
     {
         p_scossl_keysinuse_log_error("Failed to create global objects used by keysinuse");
         goto cleanup;
@@ -424,6 +441,26 @@ static void p_scossl_keysinuse_child()
         }
     }
 
+    // Drain any in-flight entries the parent's logging thread had moved into
+    // sk_keysinuse_info_pending but not yet logged. The stack is reused by the
+    // child's logging thread, so only the entries are released here.
+    while (sk_SCOSSL_PROV_KEYSINUSE_INFO_num(sk_keysinuse_info_pending) > 0)
+    {
+        pKeysinuseInfo = sk_SCOSSL_PROV_KEYSINUSE_INFO_pop(sk_keysinuse_info_pending);
+        if (pKeysinuseInfo != NULL)
+        {
+            pKeysinuseInfo->logPending = FALSE;
+            pKeysinuseInfo->decryptCounter = 0;
+            pKeysinuseInfo->signCounter = 0;
+            pKeysinuseInfo->refCount--;
+            if (pKeysinuseInfo->refCount == 0)
+            {
+                CRYPTO_THREAD_lock_free(pKeysinuseInfo->lock);
+                OPENSSL_free(pKeysinuseInfo);
+            }
+        }
+    }
+
     if (sk_keysinuse_info_lock != NULL)
     {
         CRYPTO_THREAD_unlock(sk_keysinuse_info_lock);
@@ -517,8 +554,10 @@ void p_scossl_keysinuse_teardown()
 
     CRYPTO_THREAD_lock_free(sk_keysinuse_info_lock);
     sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info);
+    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     sk_keysinuse_info_lock = NULL;
     sk_keysinuse_info = NULL;
+    sk_keysinuse_info_pending = NULL;
 }
 
 //
@@ -959,16 +998,13 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     int pthreadErr;
     int waitStatus;
 
-    // Every time the logging loop runs, all pending usage events are popped to sk_keysinuse_info_pending
-    // to minimize the time sk_keysinuse_info_lock is held.
+    // Every time the logging loop runs, all pending usage events are popped from
+    // sk_keysinuse_info to sk_keysinuse_info_pending to minimize
+    // the time sk_keysinuse_info_lock is held. sk_keysinuse_info_pending is
+    // allocated in init_once and drained/freed in the logging thread cleanup so
+    // that the child fork handler can reclaim any in-flight entries.
     SCOSSL_PROV_KEYSINUSE_INFO *pKeysinuseInfo;
     SCOSSL_PROV_KEYSINUSE_INFO keysinuseInfoTmp;
-    STACK_OF(SCOSSL_PROV_KEYSINUSE_INFO) *sk_keysinuse_info_pending = sk_SCOSSL_PROV_KEYSINUSE_INFO_new_null();
-    if (sk_keysinuse_info_pending == NULL)
-    {
-        p_scossl_keysinuse_log_error("Failed to create pending info stack");
-        goto cleanup;
-    }
 
     do
     {
@@ -1111,7 +1147,6 @@ static void *p_scossl_keysinuse_logging_thread_start(ossl_unused void *arg)
     logging_thread_exit_status = SCOSSL_SUCCESS;
 
 cleanup:
-    sk_SCOSSL_PROV_KEYSINUSE_INFO_free(sk_keysinuse_info_pending);
     keysinuse_enabled = FALSE;
     p_scossl_keysinuse_logging_thread_cleanup();
 

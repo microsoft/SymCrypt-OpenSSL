@@ -505,7 +505,7 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
             p_scossl_keysinuse_set_logging_delay(atol(confLoggingDelay));
         }
 
-        // Environment overrides config. Config value is alreday fetched core_get_params above
+        // Environment overrides config. Config value is already fetched core_get_params above
         if ((envProcessScope = NCONF_get_string(NULL, NULL, "KEYSINUSE_PROCESS_SCOPE")) != NULL)
         {
             confProcessScope = envProcessScope;
