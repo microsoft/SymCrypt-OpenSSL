@@ -175,7 +175,6 @@ static SCOSSL_STATUS p_scossl_keysinuse_create_logging_thread()
     sigdelset(&blockSigSet, SIGBUS);
     sigdelset(&blockSigSet, SIGFPE);
     sigdelset(&blockSigSet, SIGILL);
-    sigdelset(&blockSigSet, SIGABRT);
     pthread_sigmask(SIG_SETMASK, &blockSigSet, &oldSigSet);
     pthreadErr = pthread_create(&logging_thread, NULL, p_scossl_keysinuse_logging_thread_start, NULL);
     pthread_sigmask(SIG_SETMASK, &oldSigSet, NULL);
