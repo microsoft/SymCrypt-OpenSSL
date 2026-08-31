@@ -40,6 +40,12 @@ void p_scossl_keysinuse_set_logging_id(_In_ const char *id);
 void p_scossl_keysinuse_set_max_file_size(off_t size);
 void p_scossl_keysinuse_set_logging_delay(INT64 delay);
 
+#define KEYSINUSE_PROCESS_SCOPE_MAIN  0x1
+#define KEYSINUSE_PROCESS_SCOPE_CHILD 0x2
+#define KEYSINUSE_PROCESS_SCOPE_BOTH  (KEYSINUSE_PROCESS_SCOPE_MAIN | KEYSINUSE_PROCESS_SCOPE_CHILD)
+
+void p_scossl_keysinuse_set_process_scope(UINT32 scope);
+
 // KeysInUse info management
 SCOSSL_PROV_KEYSINUSE_INFO *p_scossl_keysinuse_info_new(_In_reads_bytes_(cbPublicKey) PBYTE pbPublicKey, SIZE_T cbPublicKey);
 void p_scossl_keysinuse_info_free(_Inout_ SCOSSL_PROV_KEYSINUSE_INFO *keysinuseInfo);
