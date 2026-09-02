@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.13.0)
 
 project(SymCrypt-OpenSSL
-    VERSION 1.10.0
+    VERSION 1.10.1
     DESCRIPTION "The SymCrypt engine and provider for OpenSSL (SCOSSL)"
     HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
 set(SYMCRYPT_MINIMUM_MAJOR "103")
-set(SYMCRYPT_MINIMUM_MINOR "6")
+set(SYMCRYPT_MINIMUM_MINOR "8")
 
 find_package(OpenSSL REQUIRED)
 
