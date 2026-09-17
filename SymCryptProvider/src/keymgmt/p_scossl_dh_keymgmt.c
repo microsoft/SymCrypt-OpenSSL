@@ -1526,14 +1526,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     ret = param_cb(params, cbarg);
 
 cleanup:
-    if (pbGroupParams != NULL)
-    {
-        OPENSSL_clear_free(pbGroupParams, cbGroupParams);
-    }
-    if (pbKeyData != NULL)
-    {
-        OPENSSL_clear_free(pbKeyData, cbKeyData);
-    }
+    OPENSSL_clear_free(pbGroupParams, cbGroupParams);
+    OPENSSL_clear_free(pbKeyData, cbKeyData);
     BN_free(bnPrimeP);
     BN_free(bnPrimeQ);
     BN_free(bnGenG);
