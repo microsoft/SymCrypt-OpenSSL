@@ -649,8 +649,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
 SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
                                             _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    PBYTE pbKey = NULL;
-    SIZE_T cbKey = 0;
+    PBYTE pbEncapsKey = NULL;
+    SIZE_T cbEncapsKey = 0;
+    PBYTE pbSeed = NULL;
+    SIZE_T cbSeed = 0;
+    PBYTE pbDecapsKey = NULL;
+    SIZE_T cbDecapsKey = 0;
     OSSL_PARAM_BLD *bld = NULL;
     OSSL_PARAM *params = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -677,22 +681,18 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
         ret = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
             SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
-            &pbKey, &cbKey);
+            &pbEncapsKey, &cbEncapsKey);
 
         if (ret != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbKey, cbKey))
+        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbEncapsKey, cbEncapsKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
-        OPENSSL_secure_free(pbKey);
-        pbKey = NULL;
-        cbKey = 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
@@ -703,43 +703,37 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
             ret = p_scossl_mlkem_keymgmt_get_encoded_key(
                 keyCtx,
                 SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED,
-                &pbKey, &cbKey);
+                &pbSeed, &cbSeed);
 
             if (ret != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
-            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_ML_KEM_SEED, pbKey, cbKey))
+            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_ML_KEM_SEED, pbSeed, cbSeed))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
 
-            OPENSSL_secure_clear_free(pbKey, cbKey);
-            pbKey = NULL;
-            cbKey = 0;
             /* fall through */
         case SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY:
             ret = p_scossl_mlkem_keymgmt_get_encoded_key(
                 keyCtx,
                 SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
-                &pbKey, &cbKey);
+                &pbDecapsKey, &cbDecapsKey);
 
             if (ret != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
-            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbKey, cbKey))
+            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbDecapsKey, cbDecapsKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
 
-            OPENSSL_secure_clear_free(pbKey, cbKey);
-            pbKey = NULL;
-            cbKey = 0;
             break;
         default:
             break;
@@ -757,7 +751,9 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
 cleanup:
     OSSL_PARAM_BLD_free(bld);
     OSSL_PARAM_free(params);
-    OPENSSL_secure_clear_free(pbKey, cbKey);
+    OPENSSL_secure_free(pbEncapsKey);
+    OPENSSL_secure_clear_free(pbSeed, cbSeed);
+    OPENSSL_secure_clear_free(pbDecapsKey, cbDecapsKey);
 
     return ret;
 }
