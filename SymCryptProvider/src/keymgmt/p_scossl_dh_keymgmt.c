@@ -1308,6 +1308,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     PBYTE  pbPublicKey;
     PBYTE  pbCur;
     PBYTE  pbData = NULL;
+    PBYTE  pbKeyData = NULL;
     SIZE_T cbPrimeP;
     SIZE_T cbPrimeQ;
     SIZE_T cbGenG;
@@ -1315,6 +1316,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     SIZE_T cbPublicKey;
     SIZE_T cbPrivateKey;
     SIZE_T cbData = 0;
+    SIZE_T cbKeyData = 0;
     BIGNUM *bnPrimeP = NULL;
     BIGNUM *bnPrimeQ = NULL;
     BIGNUM *bnGenG = NULL;
@@ -1456,16 +1458,15 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         cbPrivateKey = includePrivate ? SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) : 0;
         cbPublicKey = includePublic ? SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) : 0;
 
-        OPENSSL_free(pbData);
-        cbData = cbPrivateKey + cbPublicKey;
-        if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
+        cbKeyData = cbPrivateKey + cbPublicKey;
+        if ((pbKeyData = OPENSSL_zalloc(cbKeyData)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        pbPrivateKey = includePrivate ? pbData : NULL;
-        pbPublicKey = includePublic ? pbData + cbPrivateKey : NULL;
+        pbPrivateKey = includePrivate ? pbKeyData : NULL;
+        pbPublicKey = includePublic ? pbKeyData + cbPrivateKey : NULL;
 
         scError = SymCryptDlkeyGetValue(
             ctx->keyCtx->dlkey,
@@ -1528,6 +1529,10 @@ cleanup:
     if (pbData != NULL)
     {
         OPENSSL_clear_free(pbData, cbData);
+    }
+    if (pbKeyData != NULL)
+    {
+        OPENSSL_clear_free(pbKeyData, cbKeyData);
     }
     BN_free(bnPrimeP);
     BN_free(bnPrimeQ);

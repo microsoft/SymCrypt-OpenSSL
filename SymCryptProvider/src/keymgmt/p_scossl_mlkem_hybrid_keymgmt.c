@@ -615,8 +615,10 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_import(_Inout_ SCOSSL_MLKEM_HYBRID_K
 SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx, int selection,
                                                    _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    PBYTE pbKey = NULL;
-    SIZE_T cbKey = 0;
+    PBYTE pbPubKey = NULL;
+    SIZE_T cbPubKey = 0;
+    PBYTE pbPrivKey = NULL;
+    SIZE_T cbPrivKey = 0;
     OSSL_PARAM_BLD *bld = NULL;
     OSSL_PARAM *params = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -643,22 +645,18 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
         ret = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
             keyCtx,
             OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
-            &pbKey, &cbKey);
+            &pbPubKey, &cbPubKey);
 
         if (ret != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbKey, cbKey))
+        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbPubKey, cbPubKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
-        OPENSSL_secure_free(pbKey);
-        pbKey = NULL;
-        cbKey = 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
@@ -667,22 +665,18 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
         ret = p_scossl_mlkem_hybrid_keymgmt_get_encoded_key(
             keyCtx,
             OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-            &pbKey, &cbKey);
+            &pbPrivKey, &cbPrivKey);
 
         if (ret != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbKey, cbKey))
+        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbPrivKey, cbPrivKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
-        OPENSSL_secure_clear_free(pbKey, cbKey);
-        pbKey = NULL;
-        cbKey = 0;
     }
 
     if ((params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
@@ -696,7 +690,8 @@ SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_export(_In_ SCOSSL_MLKEM_HYBRID_KEY_
 cleanup:
     OSSL_PARAM_BLD_free(bld);
     OSSL_PARAM_free(params);
-    OPENSSL_secure_clear_free(pbKey, cbKey);
+    OPENSSL_secure_free(pbPubKey);
+    OPENSSL_secure_clear_free(pbPrivKey, cbPrivKey);
 
     return ret;
 }
