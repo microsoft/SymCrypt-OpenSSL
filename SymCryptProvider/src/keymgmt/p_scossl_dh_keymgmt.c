@@ -1307,14 +1307,16 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     PBYTE  pbPrivateKey;
     PBYTE  pbPublicKey;
     PBYTE  pbCur;
-    PBYTE  pbData = NULL;
+    PBYTE  pbGroupParams = NULL;
+    PBYTE  pbKeyData = NULL;
     SIZE_T cbPrimeP;
     SIZE_T cbPrimeQ;
     SIZE_T cbGenG;
     SIZE_T cbSeed;
     SIZE_T cbPublicKey;
     SIZE_T cbPrivateKey;
-    SIZE_T cbData = 0;
+    SIZE_T cbGroupParams = 0;
+    SIZE_T cbKeyData = 0;
     BIGNUM *bnPrimeP = NULL;
     BIGNUM *bnPrimeQ = NULL;
     BIGNUM *bnGenG = NULL;
@@ -1356,13 +1358,13 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         goto cleanup;
     }
 
-    cbData =
+    cbGroupParams =
         cbPrimeP +
         cbPrimeQ +
         cbGenG +
         cbSeed;
 
-    if ((pbData = OPENSSL_malloc(cbData)) == NULL ||
+    if ((pbGroupParams = OPENSSL_malloc(cbGroupParams)) == NULL ||
         (cbPrimeP != 0 && (bnPrimeP = BN_new()) == NULL) ||
         (cbPrimeQ != 0 && (bnPrimeQ = BN_new()) == NULL) ||
         (cbGenG != 0 && (bnGenG = BN_new()) == NULL))
@@ -1371,9 +1373,9 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         goto cleanup;
     }
 
-    pbPrimeP = pbData;
+    pbPrimeP = pbGroupParams;
 
-    pbCur = pbData + cbPrimeP;
+    pbCur = pbGroupParams + cbPrimeP;
     pbPrimeQ = cbPrimeQ == 0 ? NULL : pbCur;
 
     pbCur += cbPrimeQ;
@@ -1456,16 +1458,15 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         cbPrivateKey = includePrivate ? SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) : 0;
         cbPublicKey = includePublic ? SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) : 0;
 
-        OPENSSL_free(pbData);
-        cbData = cbPrivateKey + cbPublicKey;
-        if ((pbData = OPENSSL_zalloc(cbData)) == NULL)
+        cbKeyData = cbPrivateKey + cbPublicKey;
+        if ((pbKeyData = OPENSSL_zalloc(cbKeyData)) == NULL)
         {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             goto cleanup;
         }
 
-        pbPrivateKey = includePrivate ? pbData : NULL;
-        pbPublicKey = includePublic ? pbData + cbPrivateKey : NULL;
+        pbPrivateKey = includePrivate ? pbKeyData : NULL;
+        pbPublicKey = includePublic ? pbKeyData + cbPrivateKey : NULL;
 
         scError = SymCryptDlkeyGetValue(
             ctx->keyCtx->dlkey,
@@ -1525,10 +1526,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     ret = param_cb(params, cbarg);
 
 cleanup:
-    if (pbData != NULL)
-    {
-        OPENSSL_clear_free(pbData, cbData);
-    }
+    OPENSSL_clear_free(pbGroupParams, cbGroupParams);
+    OPENSSL_clear_free(pbKeyData, cbKeyData);
     BN_free(bnPrimeP);
     BN_free(bnPrimeQ);
     BN_free(bnGenG);
