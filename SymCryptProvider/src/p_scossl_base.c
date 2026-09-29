@@ -14,6 +14,7 @@
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
 #include "signature/p_scossl_mldsa.h"
+#include "signature/p_scossl_composite_mldsa.h"
 
 #ifdef KEYSINUSE_ENABLED
 #include "keysinuse.h"
@@ -472,6 +473,10 @@ extern const OSSL_DISPATCH p_scossl_kdf_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa44_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa65_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa87_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa44_ecdsa_p256_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa65_ecdsa_p256_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa65_ecdsa_p384_keymgmt_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa87_ecdsa_p384_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem512_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem768_keymgmt_functions[];
 extern const OSSL_DISPATCH p_scossl_mlkem1024_keymgmt_functions[];
@@ -490,6 +495,10 @@ static const OSSL_ALGORITHM p_scossl_keymgmt[] = {
     ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA44_ECDSA_P256_SHA256, p_scossl_composite_mldsa44_ecdsa_p256_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65_ECDSA_P256_SHA512, p_scossl_composite_mldsa65_ecdsa_p256_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65_ECDSA_P384_SHA512, p_scossl_composite_mldsa65_ecdsa_p384_keymgmt_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA87_ECDSA_P384_SHA512, p_scossl_composite_mldsa87_ecdsa_p384_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM512, p_scossl_mlkem512_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM768, p_scossl_mlkem768_keymgmt_functions),
     ALG(SCOSSL_ALG_NAME_MLKEM1024, p_scossl_mlkem1024_keymgmt_functions),
@@ -542,6 +551,10 @@ extern const OSSL_DISPATCH p_scossl_ecdsa_sha3_512_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa44_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa65_signature_functions[];
 extern const OSSL_DISPATCH p_scossl_mldsa87_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa44_ecdsa_p256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa65_ecdsa_p256_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa65_ecdsa_p384_signature_functions[];
+extern const OSSL_DISPATCH p_scossl_composite_mldsa87_ecdsa_p384_signature_functions[];
 
 static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG(SCOSSL_ALG_NAME_RSA, p_scossl_rsa_signature_functions),
@@ -569,6 +582,10 @@ static const OSSL_ALGORITHM p_scossl_signature[] = {
     ALG(SCOSSL_ALG_NAME_MLDSA44, p_scossl_mldsa44_signature_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA65, p_scossl_mldsa65_signature_functions),
     ALG(SCOSSL_ALG_NAME_MLDSA87, p_scossl_mldsa87_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA44_ECDSA_P256_SHA256, p_scossl_composite_mldsa44_ecdsa_p256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65_ECDSA_P256_SHA512, p_scossl_composite_mldsa65_ecdsa_p256_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA65_ECDSA_P384_SHA512, p_scossl_composite_mldsa65_ecdsa_p384_signature_functions),
+    ALG(SCOSSL_ALG_NAME_MLDSA87_ECDSA_P384_SHA512, p_scossl_composite_mldsa87_ecdsa_p384_signature_functions),
     ALG_TABLE_END};
 
 // Asymmetric Cipher
@@ -598,6 +615,10 @@ static const OSSL_ALGORITHM p_scossl_kem[] = {
 DECODER_DISPATCH_ALL(mldsa44)
 DECODER_DISPATCH_ALL(mldsa65)
 DECODER_DISPATCH_ALL(mldsa87)
+DECODER_DISPATCH_ALL(composite_mldsa44_ecdsa_p256)
+DECODER_DISPATCH_ALL(composite_mldsa65_ecdsa_p256)
+DECODER_DISPATCH_ALL(composite_mldsa65_ecdsa_p384)
+DECODER_DISPATCH_ALL(composite_mldsa87_ecdsa_p384)
 DECODER_DISPATCH_ALL(mlkem512)
 DECODER_DISPATCH_ALL(mlkem768)
 DECODER_DISPATCH_ALL(mlkem1024)
@@ -606,6 +627,10 @@ static const OSSL_ALGORITHM p_scossl_decoder[] = {
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA44, mldsa44)
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65, mldsa65)
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA87, mldsa87)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256, composite_mldsa44_ecdsa_p256)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512, composite_mldsa65_ecdsa_p256)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512, composite_mldsa65_ecdsa_p384)
+    DECODER_ENTRIES_ALL(SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512, composite_mldsa87_ecdsa_p384)
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM512, mlkem512)
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM768, mlkem768)
     DECODER_ENTRIES_ALL(SCOSSL_LN_MLKEM1024, mlkem1024)
@@ -615,6 +640,10 @@ static const OSSL_ALGORITHM p_scossl_decoder[] = {
 ENCODER_DISPATCH_ALL(mldsa44)
 ENCODER_DISPATCH_ALL(mldsa65)
 ENCODER_DISPATCH_ALL(mldsa87)
+ENCODER_DISPATCH_ALL(composite_mldsa44_ecdsa_p256)
+ENCODER_DISPATCH_ALL(composite_mldsa65_ecdsa_p256)
+ENCODER_DISPATCH_ALL(composite_mldsa65_ecdsa_p384)
+ENCODER_DISPATCH_ALL(composite_mldsa87_ecdsa_p384)
 ENCODER_DISPATCH_ALL(mlkem512)
 ENCODER_DISPATCH_ALL(mlkem768)
 ENCODER_DISPATCH_ALL(mlkem1024)
@@ -623,6 +652,10 @@ static const OSSL_ALGORITHM p_scossl_encoder[] = {
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA44, mldsa44)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65, mldsa65)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA87, mldsa87)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256, composite_mldsa44_ecdsa_p256)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512, composite_mldsa65_ecdsa_p256)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512, composite_mldsa65_ecdsa_p384)
+    ENCODER_ENTRIES_ALL(SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512, composite_mldsa87_ecdsa_p384)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM512, mlkem512)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM768, mlkem768)
     ENCODER_ENTRIES_ALL(SCOSSL_LN_MLKEM1024, mlkem1024)
@@ -640,7 +673,8 @@ static const OSSL_ALGORITHM p_scossl_skeymgmt[] = {
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
     if (p_scossl_mlkem_register_algorithms() != SCOSSL_SUCCESS ||
-        p_scossl_mldsa_register_algorithms() != SCOSSL_SUCCESS)
+        p_scossl_mldsa_register_algorithms() != SCOSSL_SUCCESS ||
+        p_scossl_composite_mldsa_register_algorithms() != SCOSSL_SUCCESS)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
         return SCOSSL_FAILURE;

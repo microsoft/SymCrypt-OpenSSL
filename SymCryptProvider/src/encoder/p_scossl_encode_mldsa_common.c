@@ -1,0 +1,437 @@
+//
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+//
+
+#include "scossl_provider.h"
+#include "p_scossl_encode_common.h"
+#include "signature/p_scossl_mldsa_common.h"
+
+#include <openssl/asn1t.h>
+#include <openssl/pkcs12.h>
+#include <openssl/proverr.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static ASN1_OBJECT *p_scossl_encode_mldsa_get_oid(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
+{
+    int nid = p_scossl_mldsa_params_to_nid(keyCtx->backend, keyCtx->params);
+
+    return nid == NID_undef ? NULL : OBJ_nid2obj(nid);
+}
+
+static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
+{
+    PBYTE pbKey = NULL;
+    SIZE_T cbKey = 0;
+    unsigned char *pbDer = NULL;
+    int cbDer = 0;
+    ASN1_OCTET_STRING *p8Data = NULL;
+    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
+    ASN1_OBJECT *p8Obj;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+
+    if (keyCtx->key == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
+
+    if (keyCtx->format != keyCtx->backend->formatPrivateSeed &&
+        keyCtx->format != keyCtx->backend->formatPrivateKey)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+        goto cleanup;
+    }
+
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    {
+        goto cleanup;
+    }
+
+    if ((p8Data = ASN1_OCTET_STRING_new()) == NULL ||
+        (p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
+        (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
+        goto cleanup;
+    }
+
+    if (!PKCS8_pkey_set0(p8Info, p8Obj, 0, V_ASN1_UNDEF, NULL, pbDer, cbDer))
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+    pbDer = NULL;
+
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        PKCS8_PRIV_KEY_INFO_free(p8Info);
+        p8Info = NULL;
+    }
+
+    OPENSSL_clear_free(pbDer, cbDer);
+    OPENSSL_secure_clear_free(pbKey, cbKey);
+    ASN1_OCTET_STRING_free(p8Data);
+
+    return p8Info;
+}
+
+static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
+{
+    PBYTE pbKey = NULL;
+    SIZE_T cbKey = 0;
+    X509_PUBKEY *pubKey = NULL;
+    ASN1_OBJECT *p8Obj;
+    SCOSSL_STATUS status = SCOSSL_FAILURE;
+    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
+
+    if (keyCtx->key == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
+
+    if ((pubKey = X509_PUBKEY_new()) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    scError = keyCtx->backend->sizeofKeyFormat(keyCtx->params, keyCtx->backend->formatPublicKey, &cbKey);
+    if (scError != SYMCRYPT_NO_ERROR)
+    {
+        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("sizeofKeyFormat failed", scError);
+        goto cleanup;
+    }
+
+    pbKey = OPENSSL_malloc(cbKey);
+    if (pbKey == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    {
+        goto cleanup;
+    }
+
+    if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
+    {
+        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "p_scossl_encode_mldsa_get_oid returned NULL");
+        goto cleanup;
+    }
+
+    if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbKey, cbKey))
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+    pbKey = NULL;
+
+    status = SCOSSL_SUCCESS;
+
+cleanup:
+    if (status != SCOSSL_SUCCESS)
+    {
+        X509_PUBKEY_free(pubKey);
+        pubKey = NULL;
+    }
+
+    OPENSSL_free(pbKey);
+
+    return pubKey;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(PVOID vctx, BIO *out,
+                                                        const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                                        int selection,
+                                                        OSSL_PASSPHRASE_CALLBACK *passphraseCb, void *passphraseCbArgs)
+{
+    SCOSSL_ENCODE_CTX *ctx = (SCOSSL_ENCODE_CTX *)vctx;
+    OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
+    int encodeSuccess;
+    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
+    X509_SIG *p8 = NULL;
+    char pbPass[PEM_BUFSIZE];
+    SIZE_T cbPass = 0;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
+
+    if (ctx->cipher == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
+        goto cleanup;
+    }
+
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
+    {
+        goto cleanup;
+    }
+
+    if (!passphraseCb(pbPass, sizeof(pbPass), &cbPass, NULL, passphraseCbArgs))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_UNABLE_TO_GET_PASSPHRASE);
+        goto cleanup;
+    }
+
+    if ((p8 = PKCS8_encrypt_ex(-1, ctx->cipher, pbPass, cbPass, NULL, 0, 0, p8Info, libctx, NULL)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+        goto cleanup;
+    }
+
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_PKCS8(out, p8);
+    }
+    else
+    {
+        encodeSuccess = i2d_PKCS8_bio(out, p8);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_cleanse(pbPass, sizeof(pbPass));
+    PKCS8_PRIV_KEY_INFO_free(p8Info);
+    X509_SIG_free(p8);
+
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(PVOID vctx, BIO *out,
+                                               const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                               int selection,
+                                               OSSL_PASSPHRASE_CALLBACK *passphraseCb, void *passphraseCbArgs)
+{
+    SCOSSL_ENCODE_CTX *ctx = (SCOSSL_ENCODE_CTX *)vctx;
+    int encodeSuccess;
+    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
+
+    if (ctx->cipher != NULL)
+    {
+        return p_scossl_mldsa_to_EncryptedPrivateKeyInfo(ctx, out, keyCtx, selection, passphraseCb, passphraseCbArgs);
+    }
+
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
+    {
+        goto cleanup;
+    }
+
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
+    }
+    else
+    {
+        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    PKCS8_PRIV_KEY_INFO_free(p8Info);
+
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(PVOID vctx, BIO *out,
+                                                     const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                                     int selection,
+                                                     ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
+{
+    SCOSSL_ENCODE_CTX *ctx = (SCOSSL_ENCODE_CTX *)vctx;
+    int encodeSuccess;
+    X509_PUBKEY *pubKey = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
+
+    if ((pubKey = p_scossl_mldsa_key_to_pubkey(keyCtx)) == NULL)
+    {
+        goto cleanup;
+    }
+
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
+    }
+    else
+    {
+        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    X509_PUBKEY_free(pubKey);
+
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
+                                     const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                     int selection,
+                                     ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
+{
+    BOOL printedPrivateKey = FALSE;
+    PBYTE pbKey = NULL;
+    SIZE_T cbKey = 0;
+    int nid;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (keyCtx->key == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
+        goto cleanup;
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
+    {
+        if (keyCtx->format != keyCtx->backend->formatPrivateSeed &&
+            keyCtx->format != keyCtx->backend->formatPrivateKey)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
+            goto cleanup;
+        }
+
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        if (keyCtx->backend->supportsSeed &&
+            keyCtx->format == keyCtx->backend->formatPrivateSeed)
+        {
+            if (BIO_printf(out, "%s Private-Key (256 bit private seed encoding):\nprivate-seed", keyCtx->backend->textName) <= 0)
+            {
+                goto cleanup;
+            }
+        }
+        else if (BIO_printf(out, "%s Private-Key (%ld bit private key encoding):\nprivate-key", keyCtx->backend->textName, cbKey * 8) <= 0)
+        {
+            goto cleanup;
+        }
+
+        if (p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        printedPrivateKey = TRUE;
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+        pbKey = NULL;
+        cbKey = 0;
+
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        if ((!printedPrivateKey && BIO_printf(out, "%s Public-Key (%ld bit):\n", keyCtx->backend->textName, cbKey * 8) <= 0) ||
+                 BIO_printf(out, "public-key") <= 0)
+        {
+            goto cleanup;
+        }
+
+        if (p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+    }
+
+    nid = p_scossl_mldsa_params_to_nid(keyCtx->backend, keyCtx->params);
+
+    if (nid != NID_undef &&
+        BIO_printf(out, "ALGORITHM: %s\n", OBJ_nid2ln(nid)) <= 0)
+    {
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    OPENSSL_secure_clear_free(pbKey, cbKey);
+
+    return ret;
+}
+
+_Use_decl_annotations_
+SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int symcryptParams,
+                                                           int selection, const OSSL_PARAM osslParams[])
+{
+    SCOSSL_MLDSA_KEY_CTX *keyCtx = p_scossl_mldsa_keymgmt_new_ctx(backend, symcryptParams);
+
+    if (keyCtx != NULL &&
+        p_scossl_mldsa_keymgmt_import(keyCtx, selection, osslParams) != SCOSSL_SUCCESS)
+    {
+        p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
+        keyCtx = NULL;
+    }
+
+    return keyCtx;
+}
+
+#ifdef __cplusplus
+}
+#endif

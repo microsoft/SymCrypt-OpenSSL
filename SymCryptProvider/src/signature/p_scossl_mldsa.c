@@ -13,24 +13,10 @@ extern "C" {
 
 #define SCOSSL_MLDSA_MSG_ENCODING_PURE 1
 
-static SCOSSL_MLDSA_ALG_INFO p_scossl_mldsa_algs[] = {
+SCOSSL_MLDSA_ALG_INFO p_scossl_mldsa_algs[] = {
     {NID_undef, SCOSSL_OID_MLDSA44, SCOSSL_SN_MLDSA44, SCOSSL_LN_MLDSA44, SYMCRYPT_MLDSA_PARAMS_MLDSA44},
     {NID_undef, SCOSSL_OID_MLDSA65, SCOSSL_SN_MLDSA65, SCOSSL_LN_MLDSA65, SYMCRYPT_MLDSA_PARAMS_MLDSA65},
     {NID_undef, SCOSSL_OID_MLDSA87, SCOSSL_SN_MLDSA87, SCOSSL_LN_MLDSA87, SYMCRYPT_MLDSA_PARAMS_MLDSA87}};
-
-typedef struct
-{
-    SYMCRYPT_MLDSA_PARAMS mldsaParams;
-    SCOSSL_MLDSA_KEY_CTX *keyCtx;
-    int operation;
-
-    BYTE abContext[SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH];
-    SIZE_T cbContext;
-} SCOSSL_MLDSA_SIGNATURE_CTX;
-
-static const OSSL_PARAM p_scossl_mldsa_ctx_gettable_param_types[] = {
-    OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
-    OSSL_PARAM_END};
 
 static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, NULL, 0),
@@ -40,247 +26,115 @@ static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
     OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[]);
+static const OSSL_PARAM p_scossl_mldsa_keygen_settable_param_types[] = {
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ML_DSA_SEED, NULL, 0),
+    OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
-                                               _Out_writes_bytes_(*pcbAlgId) PBYTE *ppbAlgId, _Out_ SIZE_T *pcbAlgId);
+//
+// Backend wrappers. Each casts the generic PVOID key handle and int format/
+// parameter values to the concrete "pure" ML-DSA SymCrypt types.
+//
 
-static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(_In_ SYMCRYPT_MLDSA_PARAMS mldsaParams)
+static PVOID p_scossl_mldsa_backend_key_allocate(int params)
 {
-    SCOSSL_MLDSA_SIGNATURE_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_SIGNATURE_CTX));
-    if (ctx != NULL)
-    {
-        ctx->mldsaParams = mldsaParams;
-    }
-
-    return ctx;
+    return SymCryptMlDsakeyAllocate((SYMCRYPT_MLDSA_PARAMS)params);
 }
 
-static void p_scossl_mldsa_freectx(SCOSSL_MLDSA_SIGNATURE_CTX *ctx)
+static void p_scossl_mldsa_backend_key_free(_In_ PVOID key)
 {
-    if (ctx == NULL)
-        return;
-
-    OPENSSL_free(ctx);
+    SymCryptMlDsakeyFree((PSYMCRYPT_MLDSAKEY)key);
 }
 
-static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_dupctx(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx)
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_generate(_Inout_ PVOID key, UINT32 flags)
 {
-    SCOSSL_MLDSA_SIGNATURE_CTX *copyCtx = OPENSSL_malloc(sizeof(SCOSSL_MLDSA_SIGNATURE_CTX));
-    if (copyCtx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        return NULL;
-    }
-
-    copyCtx->mldsaParams = ctx->mldsaParams;
-    copyCtx->keyCtx = ctx->keyCtx;
-    copyCtx->operation = ctx->operation;
-    copyCtx->cbContext = ctx->cbContext;
-    memcpy(copyCtx->abContext, ctx->abContext, ctx->cbContext);
-
-    return copyCtx;
+    return SymCryptMlDsakeyGenerate((PSYMCRYPT_MLDSAKEY)key, flags);
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                    _In_ const OSSL_PARAM params[], int operation)
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_set_value(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, int format, UINT32 flags, _Inout_ PVOID key)
 {
-    if (ctx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->keyCtx == NULL &&
-        (keyCtx == NULL || keyCtx->key == NULL))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
-    }
-
-    if (keyCtx != NULL)
-    {
-        if (operation == EVP_PKEY_OP_SIGN &&
-            keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY &&
-            keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
-            return SCOSSL_FAILURE;
-        }
-
-        if (keyCtx->mldsaParams != ctx->mldsaParams)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
-            return SCOSSL_FAILURE;
-        }
-    }
-
-    ctx->keyCtx = keyCtx;
-    ctx->operation = operation;
-
-    return p_scossl_mldsa_set_ctx_params(ctx, params);
+    return SymCryptMlDsakeySetValue(pbSrc, cbSrc, (SYMCRYPT_MLDSAKEY_FORMAT)format, flags, (PSYMCRYPT_MLDSAKEY)key);
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_sign_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                              _In_ const OSSL_PARAM params[])
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_get_value(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, int format, UINT32 flags)
 {
-    return p_scossl_mldsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_SIGN);
+    return SymCryptMlDsakeyGetValue((PCSYMCRYPT_MLDSAKEY)key, pbDst, cbDst, (SYMCRYPT_MLDSAKEY_FORMAT)format, flags);
 }
 
-
-static SCOSSL_STATUS p_scossl_mldsa_sign(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
-                                         _Out_writes_bytes_(*siglen) unsigned char *sig, _Out_ size_t *siglen, size_t sigsize,
-                                         _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_key_format(int params, int format, _Out_ SIZE_T *pcbKeyFormat)
 {
-    SIZE_T cbSignature;
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-
-    if (ctx == NULL || ctx->keyCtx == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
-    }
-
-    if (ctx->operation != EVP_PKEY_OP_SIGN)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
-        return SCOSSL_FAILURE;
-    }
-
-    scError = SymCryptMlDsaSizeofSignatureFromParams(ctx->mldsaParams, &cbSignature);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaSizeofSignatureFromParams failed", scError);
-        return SCOSSL_FAILURE;
-    }
-
-    if (sig != NULL)
-    {
-        if (sigsize < cbSignature)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
-            return SCOSSL_FAILURE;
-        }
-
-        scError = SymCryptMlDsaSign(
-            ctx->keyCtx->key,
-            tbs, tbslen,
-            ctx->abContext, ctx->cbContext,
-            0,
-            sig, cbSignature);
-        if (scError != SYMCRYPT_NO_ERROR)
-        {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaSign failed", scError);
-            return SCOSSL_FAILURE;
-        }
-    }
-
-    if (siglen != NULL)
-    {
-        *siglen = cbSignature;
-    }
-
-    return SCOSSL_SUCCESS;
+    return SymCryptMlDsaSizeofKeyFormatFromParams((SYMCRYPT_MLDSA_PARAMS)params, (SYMCRYPT_MLDSAKEY_FORMAT)format, pcbKeyFormat);
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_verify_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                _In_ const OSSL_PARAM params[])
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_signature(int params, _Out_ SIZE_T *pcbSignature)
 {
-    return p_scossl_mldsa_signverify_init(ctx, keyCtx, params, EVP_PKEY_OP_VERIFY);
+    return SymCryptMlDsaSizeofSignatureFromParams((SYMCRYPT_MLDSA_PARAMS)params, pcbSignature);
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_verify(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
-                                           _In_reads_bytes_(siglen) const unsigned char *sig, size_t siglen,
-                                           _In_reads_bytes_(tbslen) const unsigned char *tbs, size_t tbslen)
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_sign(_In_ PVOID key,
+                                                  _In_reads_bytes_(cbMsg) PCBYTE pbMsg, SIZE_T cbMsg,
+                                                  _In_reads_bytes_opt_(cbCtx) PCBYTE pbCtx, SIZE_T cbCtx,
+                                                  UINT32 flags,
+                                                  _Out_writes_bytes_(cbSig) PBYTE pbSig, SIZE_T cbSig, _Out_ SIZE_T *pcbResult)
 {
-    SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
-
-    if (ctx == NULL || ctx->keyCtx == NULL)
+    // "Pure" ML-DSA signatures are always exactly cbSig bytes long.
+    SYMCRYPT_ERROR scError = SymCryptMlDsaSign((PCSYMCRYPT_MLDSAKEY)key, pbMsg, cbMsg, pbCtx, cbCtx, flags, pbSig, cbSig);
+    if (scError == SYMCRYPT_NO_ERROR && pcbResult != NULL)
     {
-        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
-        return SCOSSL_FAILURE;
+        *pcbResult = cbSig;
     }
 
-    if (ctx->operation != EVP_PKEY_OP_VERIFY)
+    return scError;
+}
+
+static SYMCRYPT_ERROR p_scossl_mldsa_backend_verify(_In_ PVOID key,
+                                                    _In_reads_bytes_(cbMsg) PCBYTE pbMsg, SIZE_T cbMsg,
+                                                    _In_reads_bytes_opt_(cbCtx) PCBYTE pbCtx, SIZE_T cbCtx,
+                                                    _In_reads_bytes_(cbSig) PCBYTE pbSig, SIZE_T cbSig,
+                                                    UINT32 flags)
+{
+    return SymCryptMlDsaVerify((PCSYMCRYPT_MLDSAKEY)key, pbMsg, cbMsg, pbCtx, cbCtx, pbSig, cbSig, flags);
+}
+
+static int p_scossl_mldsa_backend_get_bits(int params)
+{
+    switch ((SYMCRYPT_MLDSA_PARAMS)params)
     {
-        ERR_raise(ERR_LIB_PROV, ERR_R_OPERATION_FAIL);
-        return SCOSSL_FAILURE;
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA44 * 8;
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA65:
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA65 * 8;
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
+            return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA87 * 8;
+        default:
+            break;
     }
 
-    scError = SymCryptMlDsaVerify(
-        ctx->keyCtx->key,
-        tbs, tbslen,
-        ctx->abContext, ctx->cbContext,
-        sig, siglen,
-        0);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
-        {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaVerify returned unexpected error", scError);
-        }
+    return 0;
+}
 
-        return SCOSSL_FAILURE;
+static int p_scossl_mldsa_backend_get_security_bits(int params)
+{
+    switch ((SYMCRYPT_MLDSA_PARAMS)params)
+    {
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
+            return 128;
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA65:
+            return 192;
+        case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
+            return 256;
+        default:
+            break;
     }
 
-    return SCOSSL_SUCCESS;
+    return 0;
 }
 
-static SCOSSL_STATUS p_scossl_mldsa_digest_signverify_init(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const char *mdname,
-                                                           _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[],
-                                                           int operation)
-{
-    if (mdname != NULL && mdname[0] != '\0')
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST);
-        return SCOSSL_FAILURE;
-    }
-
-    if (keyCtx == NULL &&
-        ctx != NULL &&
-        ctx->keyCtx != NULL)
-    {
-        ctx->operation = operation;
-        return p_scossl_mldsa_set_ctx_params(ctx, params);
-    }
-
-    return p_scossl_mldsa_signverify_init(ctx, keyCtx, params, operation);
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_digest_sign_init(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const char *mdname,
-                                                     _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_mldsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_SIGN);
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_digest_verify_init(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const char *mdname,
-                                                       _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[])
-{
-    return p_scossl_mldsa_digest_signverify_init(ctx, mdname, keyCtx, params, EVP_PKEY_OP_VERIFY);
-}
-
-static const OSSL_PARAM *p_scossl_mldsa_settable_ctx_params(ossl_unused SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
-                                                            ossl_unused void *provctx)
-{
-    return p_scossl_mldsa_ctx_settable_param_types;
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[])
+// "Pure" ML-DSA exposes several additional signature context parameters that are
+// not supported yet. Validate that they are absent or set to their default value.
+static SCOSSL_STATUS p_scossl_mldsa_validate_extra_sig_ctx_params(_In_ const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_CONTEXT_STRING)) != NULL)
-    {
-        PVOID pbContext = ctx->abContext;
-        if (!OSSL_PARAM_get_octet_string(p, (void **)&pbContext, sizeof(ctx->abContext), &ctx->cbContext))
-        {
-            ctx->cbContext = 0;
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-    }
-
-    // Unsupported parameters, check value matches default
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING)) != NULL)
     {
         int messageEncoding;
@@ -339,211 +193,41 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
     return SCOSSL_SUCCESS;
 }
 
-static const OSSL_PARAM *p_scossl_mldsa_gettable_ctx_params(ossl_unused void *ctx,
-                                                            ossl_unused void *provctx)
-{
-    return p_scossl_mldsa_ctx_gettable_param_types;
-}
+const SCOSSL_MLDSA_BACKEND p_scossl_mldsa_backend = {
+    "MLDSA",
+    SYMCRYPT_MLDSAKEY_FORMAT_NULL,
+    SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY,
+    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY,
+    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
+    TRUE,
+    SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE,
+    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
+    p_scossl_mldsa_algs,
+    sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO),
+    p_scossl_mldsa_ctx_settable_param_types,
+    p_scossl_mldsa_validate_extra_sig_ctx_params,
+    p_scossl_mldsa_keygen_settable_param_types,
+    p_scossl_mldsa_backend_key_allocate,
+    p_scossl_mldsa_backend_key_free,
+    p_scossl_mldsa_backend_key_generate,
+    p_scossl_mldsa_backend_key_set_value,
+    p_scossl_mldsa_backend_key_get_value,
+    p_scossl_mldsa_backend_sizeof_key_format,
+    p_scossl_mldsa_backend_sizeof_signature,
+    p_scossl_mldsa_backend_sign,
+    p_scossl_mldsa_backend_verify,
+    p_scossl_mldsa_backend_get_bits,
+    p_scossl_mldsa_backend_get_security_bits};
 
-static SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _Inout_ OSSL_PARAM params[])
-{
-    OSSL_PARAM *p;
-
-    if (params == NULL)
-    {
-        return SCOSSL_SUCCESS;
-    }
-
-    if ((p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID)) != NULL)
-    {
-        PBYTE pbAid = NULL;
-        SIZE_T cbAid;
-
-        if (p_scossl_mldsa_get_alg_id(ctx->mldsaParams, &pbAid, &cbAid) != SCOSSL_SUCCESS)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        if (!OSSL_PARAM_set_octet_string(p, pbAid, cbAid))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            OPENSSL_free(pbAid);
-            return SCOSSL_FAILURE;
-        }
-
-        OPENSSL_free(pbAid);
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-#define SCOSSL_MLDSA_FNS(paramSet)                                                                          \
-    static SCOSSL_MLDSA_SIGNATURE_CTX                                                                   \
-    *p_scossl_mldsa##paramSet##_newctx(ossl_unused SCOSSL_PROVCTX *provctx, ossl_unused const char *propq)  \
-    {                                                                                                   \
-        return p_scossl_mldsa_newctx(SYMCRYPT_MLDSA_PARAMS_MLDSA##paramSet);                                \
-    }                                                                                                   \
-                                                                                                        \
-    const OSSL_DISPATCH p_scossl_mldsa##paramSet##_signature_functions[] = {                                \
-        {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))p_scossl_mldsa##paramSet##_newctx},                    \
-        {OSSL_FUNC_SIGNATURE_DUPCTX, (void (*)(void))p_scossl_mldsa_dupctx},                            \
-        {OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))p_scossl_mldsa_freectx},                          \
-        {OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))p_scossl_mldsa_sign_init},                      \
-        {OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))p_scossl_mldsa_sign},                                \
-        {OSSL_FUNC_SIGNATURE_VERIFY_INIT, (void (*)(void))p_scossl_mldsa_verify_init},                  \
-        {OSSL_FUNC_SIGNATURE_VERIFY, (void (*)(void))p_scossl_mldsa_verify},                            \
-        {OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))p_scossl_mldsa_digest_sign_init},        \
-        {OSSL_FUNC_SIGNATURE_DIGEST_SIGN, (void (*)(void))p_scossl_mldsa_sign},                         \
-        {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, (void (*)(void))p_scossl_mldsa_digest_verify_init},    \
-        {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY, (void (*)(void))p_scossl_mldsa_verify},                     \
-        {OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_get_ctx_params},            \
-        {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_gettable_ctx_params},  \
-        {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_set_ctx_params},            \
-        {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_mldsa_settable_ctx_params},  \
-
-#define SCOSSL_MLDSA_SIGN_MESSAGE_FNS                                                       \
-    {OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_sign_init},      \
-    {OSSL_FUNC_SIGNATURE_VERIFY_MESSAGE_INIT, (void (*)(void))p_scossl_mldsa_verify_init},
-
-#ifdef OSSL_FUNC_SIGNATURE_SIGN_MESSAGE_INIT
-    #define IMPLEMENT_SCOSSL_MLDSA(paramSet)    \
-        SCOSSL_MLDSA_FNS(paramSet)              \
-        SCOSSL_MLDSA_SIGN_MESSAGE_FNS       \
-        {0, NULL}};
-#else
-    #define IMPLEMENT_SCOSSL_MLDSA(paramSet)    \
-        SCOSSL_MLDSA_FNS(paramSet)              \
-        {0, NULL}};
-#endif
-
-IMPLEMENT_SCOSSL_MLDSA(44)
-IMPLEMENT_SCOSSL_MLDSA(65)
-IMPLEMENT_SCOSSL_MLDSA(87)
-
-//
-// Helper functions
-//
-
-_Use_decl_annotations_
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(SYMCRYPT_MLDSA_PARAMS mldsaParams,
-                                               PBYTE *ppbAlgId, SIZE_T *pcbAlgId)
-{
-    ASN1_OBJECT *aobj = NULL;
-    X509_ALGOR *x509Alg = NULL;
-    PBYTE pbAlgId = NULL;
-    int cbAid;
-    SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
-    if (ppbAlgId == NULL || pcbAlgId == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_NULL_PARAMETER);
-        return SCOSSL_FAILURE;
-    }
-
-    *ppbAlgId = NULL;
-
-    const char *oid = NULL;
-    switch (mldsaParams)
-    {
-    case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
-        oid = SCOSSL_OID_MLDSA44;
-        break;
-    case SYMCRYPT_MLDSA_PARAMS_MLDSA65:
-        oid = SCOSSL_OID_MLDSA65;
-        break;
-    case SYMCRYPT_MLDSA_PARAMS_MLDSA87:
-        oid = SCOSSL_OID_MLDSA87;
-        break;
-    default:
-        return SCOSSL_FAILURE;
-    }
-
-    if ((x509Alg = X509_ALGOR_new()) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
-
-    aobj = OBJ_txt2obj(oid, 1);
-    if (aobj == NULL)
-    {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "OBJ_txt2obj failed");
-        goto cleanup;
-    }
-
-    if (!X509_ALGOR_set0(x509Alg, aobj, V_ASN1_UNDEF, NULL))
-    {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "X509_ALGOR_set0 failed");
-        goto cleanup;
-    }
-    aobj = NULL; // X509_ALGOR_set0 takes ownership on success
-
-    if ((cbAid = i2d_X509_ALGOR(x509Alg, &pbAlgId)) < 0)
-    {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "i2d_X509_ALGOR failed");
-        goto cleanup;
-    }
-
-    *ppbAlgId = pbAlgId;
-    pbAlgId = NULL;
-    *pcbAlgId = (SIZE_T)cbAid;
-
-    ret = SCOSSL_SUCCESS;
-
-cleanup:
-    OPENSSL_free(pbAlgId);
-    X509_ALGOR_free(x509Alg);
-    ASN1_OBJECT_free(aobj);
-
-    return ret;
-}
-
-_Use_decl_annotations_
-SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(int nid)
-{
-    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
-    {
-        if (p_scossl_mldsa_algs[i].nid == nid)
-        {
-            return &p_scossl_mldsa_algs[i];
-        }
-    }
-
-    return NULL;
-}
-
-int p_scossl_mldsa_params_to_nid(SYMCRYPT_MLDSA_PARAMS mldsaParams)
-{
-    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
-    {
-        if (p_scossl_mldsa_algs[i].mldsaParams == mldsaParams)
-        {
-            return p_scossl_mldsa_algs[i].nid;
-        }
-    }
-
-    return NID_undef;
-}
+IMPLEMENT_SCOSSL_MLDSA_SIGNATURE(mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44)
+IMPLEMENT_SCOSSL_MLDSA_SIGNATURE(mldsa65, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA65)
+IMPLEMENT_SCOSSL_MLDSA_SIGNATURE(mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87)
 
 SCOSSL_STATUS p_scossl_mldsa_register_algorithms()
 {
-    for (SIZE_T i = 0; i < sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO); i++)
-    {
-        // Don't double register MLDSA algorithms. These should already be registered on
-        // OpenSSL 3.5+
-        p_scossl_mldsa_algs[i].nid = OBJ_sn2nid(p_scossl_mldsa_algs[i].snGroupName);
-        if (p_scossl_mldsa_algs[i].nid == NID_undef)
-        {
-            p_scossl_mldsa_algs[i].nid = OBJ_create(p_scossl_mldsa_algs[i].oid, p_scossl_mldsa_algs[i].snGroupName, p_scossl_mldsa_algs[i].lnGroupName);
-            if (p_scossl_mldsa_algs[i].nid == NID_undef)
-            {
-                return SCOSSL_FAILURE;
-            }
-        }
-    }
-
-    return SCOSSL_SUCCESS;
+    // Don't double register ML-DSA algorithms. These should already be registered
+    // on OpenSSL 3.5+.
+    return p_scossl_mldsa_register_backend(&p_scossl_mldsa_backend);
 }
 
 #ifdef __cplusplus
