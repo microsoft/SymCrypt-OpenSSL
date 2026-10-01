@@ -5,6 +5,7 @@
 #include "scossl_provider.h"
 #include "p_scossl_decode_common.h"
 #include "signature/p_scossl_mldsa.h"
+#include "signature/p_scossl_composite_mldsa.h"
 
 #include <openssl/proverr.h>
 
@@ -147,7 +148,7 @@ SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
 
 //
 // Per-variant decoder dispatch tables for the pure ML-DSA family. The shared
-// core above is also used by the Composite-ML-DSA decoder translation unit.
+// core above is also used by the Composite-ML-DSA variants below.
 //
 IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44, SCOSSL_LN_MLDSA44)
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44, SCOSSL_LN_MLDSA44)
@@ -155,6 +156,18 @@ IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, mldsa65, &p_scossl_mldsa_backend,
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, mldsa65, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA65, SCOSSL_LN_MLDSA65)
 IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87, SCOSSL_LN_MLDSA87)
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87, SCOSSL_LN_MLDSA87)
+
+//
+// Per-variant decoder dispatch tables for the Composite-ML-DSA family.
+//
+IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, composite_mldsa65_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, composite_mldsa65_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, composite_mldsa65_ecdsa_p384, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, composite_mldsa65_ecdsa_p384, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, composite_mldsa87_ecdsa_p384, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA87_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512)
+IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, composite_mldsa87_ecdsa_p384, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA87_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512)
 
 #ifdef __cplusplus
 }
