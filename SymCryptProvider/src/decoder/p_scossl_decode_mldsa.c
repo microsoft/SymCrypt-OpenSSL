@@ -147,8 +147,7 @@ SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
 }
 
 //
-// Per-variant decoder dispatch tables for the pure ML-DSA family. The shared
-// core above is also used by the Composite-ML-DSA variants below.
+// ML-DSA standalone
 //
 IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44, SCOSSL_LN_MLDSA44)
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44, SCOSSL_LN_MLDSA44)
@@ -158,7 +157,7 @@ IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, mldsa87, &p_scossl_mldsa_backend,
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87, SCOSSL_LN_MLDSA87)
 
 //
-// Per-variant decoder dispatch tables for the Composite-ML-DSA family.
+// ML-DSA composite
 //
 IMPLEMENT_SCOSSL_MLDSA_DECODER(PrivateKeyInfo, composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256)
 IMPLEMENT_SCOSSL_MLDSA_DECODER(SubjectPublicKeyInfo, composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256)

@@ -47,8 +47,6 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_kdf_keymgmt.c
     ./src/keymgmt/p_scossl_mldsa_keymgmt.c
-    ./src/keymgmt/p_scossl_mldsa_keymgmt_common.c
-    ./src/keymgmt/p_scossl_composite_mldsa_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_hybrid_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c

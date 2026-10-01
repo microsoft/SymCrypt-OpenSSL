@@ -434,15 +434,14 @@ SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vct
 }
 
 //
-// Per-variant encoder dispatch tables for the pure ML-DSA family. The shared
-// core above is also used by the Composite-ML-DSA variants below.
+// ML-DSA standalone
 //
 IMPLEMENT_SCOSSL_MLDSA_ENCODER(mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44)
 IMPLEMENT_SCOSSL_MLDSA_ENCODER(mldsa65, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA65)
 IMPLEMENT_SCOSSL_MLDSA_ENCODER(mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87)
 
 //
-// Per-variant encoder dispatch tables for the Composite-ML-DSA family.
+// ML-DSA composite
 //
 IMPLEMENT_SCOSSL_MLDSA_ENCODER(composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256)
 IMPLEMENT_SCOSSL_MLDSA_ENCODER(composite_mldsa65_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512)
