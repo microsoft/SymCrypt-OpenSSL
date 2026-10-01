@@ -23,6 +23,7 @@ typedef struct
     SYMCRYPT_MLDSA_PARAMS mldsaParams;
     SCOSSL_MLDSA_KEY_CTX *keyCtx;
     int operation;
+    BOOL externalMu;
 
     BYTE abContext[SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH];
     SIZE_T cbContext;
@@ -76,6 +77,7 @@ static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_dupctx(_In_ SCOSSL_MLDSA_SIGNA
     copyCtx->mldsaParams = ctx->mldsaParams;
     copyCtx->keyCtx = ctx->keyCtx;
     copyCtx->operation = ctx->operation;
+    copyCtx->externalMu = ctx->externalMu;
     copyCtx->cbContext = ctx->cbContext;
     memcpy(copyCtx->abContext, ctx->abContext, ctx->cbContext);
 
@@ -162,15 +164,28 @@ static SCOSSL_STATUS p_scossl_mldsa_sign(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
             return SCOSSL_FAILURE;
         }
 
-        scError = SymCryptMlDsaSign(
-            ctx->keyCtx->key,
-            tbs, tbslen,
-            ctx->abContext, ctx->cbContext,
-            0,
-            sig, cbSignature);
+        if (ctx->externalMu)
+        {
+            scError = SymCryptExternalMuMlDsaSign(
+                ctx->keyCtx->key,
+                tbs, tbslen,
+                0,
+                sig, cbSignature);
+        }
+        else
+        {
+            scError = SymCryptMlDsaSign(
+                ctx->keyCtx->key,
+                tbs, tbslen,
+                ctx->abContext, ctx->cbContext,
+                0,
+                sig, cbSignature);
+        }
         if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaSign failed", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR(
+                ctx->externalMu ? "SymCryptExternalMuMlDsaSign failed" : "SymCryptMlDsaSign failed",
+                scError);
             return SCOSSL_FAILURE;
         }
     }
@@ -207,17 +222,31 @@ static SCOSSL_STATUS p_scossl_mldsa_verify(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    scError = SymCryptMlDsaVerify(
-        ctx->keyCtx->key,
-        tbs, tbslen,
-        ctx->abContext, ctx->cbContext,
-        sig, siglen,
-        0);
+    if (ctx->externalMu)
+    {
+        scError = SymCryptExternalMuMlDsaVerify(
+            ctx->keyCtx->key,
+            tbs, tbslen,
+            sig, siglen,
+            0);
+    }
+    else
+    {
+        scError = SymCryptMlDsaVerify(
+            ctx->keyCtx->key,
+            tbs, tbslen,
+            ctx->abContext, ctx->cbContext,
+            sig, siglen,
+            0);
+    }
     if (scError != SYMCRYPT_NO_ERROR)
     {
         if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaVerify returned unexpected error", scError);
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR(
+                ctx->externalMu ? "SymCryptExternalMuMlDsaVerify returned unexpected error" :
+                                  "SymCryptMlDsaVerify returned unexpected error",
+                scError);
         }
 
         return SCOSSL_FAILURE;
@@ -280,6 +309,18 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
         }
     }
 
+    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MU)) != NULL)
+    {
+        int mu;
+        if (!OSSL_PARAM_get_int(p, &mu))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+            return SCOSSL_FAILURE;
+        }
+
+        ctx->externalMu = mu != 0;
+    }
+
     // Unsupported parameters, check value matches default
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING)) != NULL)
     {
@@ -318,22 +359,6 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
         return SCOSSL_FAILURE;
-    }
-
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MU)) != NULL)
-    {
-        int mu;
-        if (!OSSL_PARAM_get_int(p, &mu))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        if (mu != 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-            return SCOSSL_FAILURE;
-        }
     }
 
     return SCOSSL_SUCCESS;
