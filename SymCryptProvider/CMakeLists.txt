@@ -24,7 +24,6 @@ set(SCOSSL_SOURCES
     ./src/decoder/p_scossl_decode_common.c
     ./src/decoder/p_scossl_decode_mlkem.c
     ./src/decoder/p_scossl_decode_mldsa.c
-    ./src/decoder/p_scossl_decode_mldsa_common.c
     ./src/decoder/p_scossl_decode_composite_mldsa.c
     ./src/digests/p_scossl_digest_common.c
     ./src/digests/p_scossl_digest_generic.c
@@ -32,7 +31,6 @@ set(SCOSSL_SOURCES
     ./src/digests/p_scossl_cshake.c
     ./src/encoder/p_scossl_encode_common.c
     ./src/encoder/p_scossl_encode_mldsa.c
-    ./src/encoder/p_scossl_encode_mldsa_common.c
     ./src/encoder/p_scossl_encode_composite_mldsa.c
     ./src/encoder/p_scossl_encode_mlkem.c
     ./src/kdf/p_scossl_hkdf.c
