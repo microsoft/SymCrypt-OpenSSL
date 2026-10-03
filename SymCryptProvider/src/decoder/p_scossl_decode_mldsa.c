@@ -4,7 +4,7 @@
 
 #include "scossl_provider.h"
 #include "p_scossl_decode_common.h"
-#include "signature/p_scossl_mldsa.h"
+#include "keymgmt/p_scossl_mldsa_keymgmt.h"
 #include "signature/p_scossl_composite_mldsa.h"
 
 #include <openssl/proverr.h>
@@ -59,7 +59,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
@@ -97,7 +97,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
 {
     SCOSSL_DECODE_CTX *ctx = (SCOSSL_DECODE_CTX *)vctx;
     OSSL_LIB_CTX *libCtx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
@@ -130,7 +130,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
+static SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
                                                   const void *pbObjRef, size_t cbObjRef,
                                                   OSSL_CALLBACK *exportCb, void *exportCbArg)
 {
@@ -145,6 +145,45 @@ SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
 
     return p_scossl_mldsa_keymgmt_export(keyCtx, ctx->desc->selection, exportCb, exportCbArg);
 }
+
+//
+// Per-variant decoder dispatch table generation
+//
+#define IMPLEMENT_SCOSSL_MLDSA_DECODER(decoderType, variant, backendPtr, symcryptParams, keytypeName)               \
+    static SCOSSL_MLDSA_KEY_CTX                                                                                     \
+    *p_scossl_##decoderType##_to_##variant(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)                              \
+    {                                                                                                              \
+        return p_scossl_##decoderType##_to_mldsa(ctx, backendPtr, symcryptParams, bio);                            \
+    }                                                                                                              \
+                                                                                                                   \
+    static const SCOSSL_DECODE_KEYTYPE_DESC p_scossl_##variant##_##decoderType##_desc = {                          \
+        keytypeName,                                                                                               \
+        select_##decoderType,                                                                                      \
+        (PSCOSSL_DECODE_INTERNAL_FN)p_scossl_##decoderType##_to_##variant,                                         \
+        (OSSL_FUNC_keymgmt_free_fn *)p_scossl_mldsa_keymgmt_free_key_ctx};                                         \
+                                                                                                                   \
+    static SCOSSL_DECODE_CTX *                                                                                     \
+    p_scossl_der_to_##variant##_##decoderType##_newctx(_In_ SCOSSL_PROVCTX *provctx)                               \
+    {                                                                                                              \
+        return p_scossl_decode_newctx(provctx, &p_scossl_##variant##_##decoderType##_desc);                        \
+    }                                                                                                              \
+                                                                                                                   \
+    static BOOL                                                                                                    \
+    p_scossl_der_to_##variant##_##decoderType##_does_selection(ossl_unused void *provctx, int selection)           \
+    {                                                                                                              \
+        return p_scossl_decode_does_selection(&p_scossl_##variant##_##decoderType##_desc, selection);              \
+    }                                                                                                              \
+                                                                                                                   \
+    const OSSL_DISPATCH p_scossl_der_to_##variant##_##decoderType##_functions[] = {                                \
+        {OSSL_FUNC_DECODER_NEWCTX, (void (*)(void))p_scossl_der_to_##variant##_##decoderType##_newctx},             \
+        {OSSL_FUNC_DECODER_FREECTX, (void (*)(void))p_scossl_decode_freectx},                                      \
+        {OSSL_FUNC_DECODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_decode_set_ctx_params},                        \
+        {OSSL_FUNC_DECODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_decode_settable_ctx_params},              \
+        {OSSL_FUNC_DECODER_DOES_SELECTION, (void (*)(void))                                                        \
+            p_scossl_der_to_##variant##_##decoderType##_does_selection},                                           \
+        {OSSL_FUNC_DECODER_DECODE, (void (*)(void))p_scossl_decode},                                               \
+        {OSSL_FUNC_DECODER_EXPORT_OBJECT, (void (*)(void))p_scossl_der_to_mldsa_export_object},                    \
+        {0, NULL}};
 
 //
 // ML-DSA standalone

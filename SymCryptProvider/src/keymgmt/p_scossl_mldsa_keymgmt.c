@@ -3,7 +3,7 @@
 //
 
 #include "scossl_provider.h"
-#include "signature/p_scossl_mldsa.h"
+#include "p_scossl_mldsa_keymgmt.h"
 #include "signature/p_scossl_composite_mldsa.h"
 
 #include <openssl/param_build.h>

@@ -4,7 +4,7 @@
 
 #include "scossl_provider.h"
 #include "p_scossl_encode_common.h"
-#include "signature/p_scossl_mldsa.h"
+#include "keymgmt/p_scossl_mldsa_keymgmt.h"
 #include "signature/p_scossl_composite_mldsa.h"
 
 #include <openssl/asn1t.h>
@@ -162,7 +162,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(PVOID vctx, BIO *out,
+static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(PVOID vctx, BIO *out,
                                                         const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                         int selection,
                                                         OSSL_PASSPHRASE_CALLBACK *passphraseCb, void *passphraseCbArgs)
@@ -231,7 +231,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(PVOID vctx, BIO *out,
+static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(PVOID vctx, BIO *out,
                                                const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                int selection,
                                                OSSL_PASSPHRASE_CALLBACK *passphraseCb, void *passphraseCbArgs)
@@ -281,7 +281,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(PVOID vctx, BIO *out,
+static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(PVOID vctx, BIO *out,
                                                      const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                                      int selection,
                                                      ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
@@ -326,7 +326,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
+static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
                                      const SCOSSL_MLDSA_KEY_CTX *keyCtx,
                                      int selection,
                                      ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
@@ -418,7 +418,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int symcryptParams,
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int symcryptParams,
                                                            int selection, const OSSL_PARAM osslParams[])
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = p_scossl_mldsa_keymgmt_new_ctx(backend, symcryptParams);
@@ -432,6 +432,90 @@ SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vct
 
     return keyCtx;
 }
+
+// Per-variant encoder dispatch table generation
+//
+#define IMPLEMENT_SCOSSL_MLDSA_ASN1_ENCODER(variant, encoderType)                                                  \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_##variant##_##encoderType##_der_desc = {                            \
+        select_##encoderType,                                                                                      \
+        SCOSSL_ENCODE_DER,                                                                                         \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                             \
+                                                                                                                   \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_##variant##_##encoderType##_pem_desc = {                            \
+        select_##encoderType,                                                                                      \
+        SCOSSL_ENCODE_PEM,                                                                                         \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                             \
+                                                                                                                   \
+    static SCOSSL_ENCODE_CTX *p_scossl_##variant##_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)     \
+    {                                                                                                              \
+        return p_scossl_encode_newctx(provctx, &p_scossl_##variant##_##encoderType##_der_desc);                   \
+    }                                                                                                              \
+                                                                                                                   \
+    static SCOSSL_ENCODE_CTX *p_scossl_##variant##_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)     \
+    {                                                                                                              \
+        return p_scossl_encode_newctx(provctx, &p_scossl_##variant##_##encoderType##_pem_desc);                   \
+    }                                                                                                              \
+                                                                                                                   \
+    static BOOL p_scossl_der_to_##variant##_##encoderType##_does_selection(ossl_unused void *provctx, int selection) \
+    {                                                                                                              \
+        return p_scossl_encode_does_selection(&p_scossl_##variant##_##encoderType##_der_desc, selection);         \
+    }
+
+#define IMPLEMENT_SCOSSL_MLDSA_ENCODER_DISPATCH(variant, encoderType)                                              \
+    const OSSL_DISPATCH p_scossl_##variant##_to_##encoderType##_der_functions[] = {                                \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_##variant##_to_##encoderType##_der_newctx},            \
+        {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                     \
+        {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                       \
+        {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},             \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_##variant##_##encoderType##_does_selection}, \
+        {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                              \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_##variant##_encoder_import_object},             \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                     \
+        {0, NULL}};                                                                                                \
+                                                                                                                   \
+    const OSSL_DISPATCH p_scossl_##variant##_to_##encoderType##_pem_functions[] = {                                \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_##variant##_to_##encoderType##_pem_newctx},            \
+        {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                     \
+        {OSSL_FUNC_ENCODER_SET_CTX_PARAMS, (void (*)(void))p_scossl_encode_set_ctx_params},                       \
+        {OSSL_FUNC_ENCODER_SETTABLE_CTX_PARAMS, (void (*)(void))p_scossl_encode_settable_ctx_params},             \
+        {OSSL_FUNC_ENCODER_DOES_SELECTION, (void (*)(void))p_scossl_der_to_##variant##_##encoderType##_does_selection}, \
+        {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                              \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_##variant##_encoder_import_object},             \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                     \
+        {0, NULL}};
+
+#define IMPLEMENT_SCOSSL_MLDSA_ENCODER(variant, backendPtr, symcryptParams)                                       \
+    static SCOSSL_MLDSA_KEY_CTX *p_scossl_##variant##_encoder_import_object(_In_ SCOSSL_ENCODE_CTX *ctx,           \
+                                                                            int selection,                        \
+                                                                            _In_ const OSSL_PARAM params[])       \
+    {                                                                                                              \
+        return p_scossl_mldsa_encoder_import_object(ctx, backendPtr, symcryptParams, selection, params);          \
+    }                                                                                                              \
+                                                                                                                   \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_##variant##_text_desc = {                                          \
+        0,                                                                                                        \
+        SCOSSL_ENCODE_TEXT,                                                                                       \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_text};                                                      \
+                                                                                                                   \
+    static SCOSSL_ENCODE_CTX *p_scossl_##variant##_to_text_newctx(_In_ SCOSSL_PROVCTX *provctx)                   \
+    {                                                                                                              \
+        return p_scossl_encode_newctx(provctx, &p_scossl_##variant##_text_desc);                                  \
+    }                                                                                                              \
+                                                                                                                   \
+    const OSSL_DISPATCH p_scossl_##variant##_to_text_functions[] = {                                              \
+        {OSSL_FUNC_ENCODER_NEWCTX, (void (*)(void))p_scossl_##variant##_to_text_newctx},                          \
+        {OSSL_FUNC_ENCODER_FREECTX, (void (*)(void))p_scossl_encode_freectx},                                     \
+        {OSSL_FUNC_ENCODER_ENCODE, (void (*)(void))p_scossl_encode},                                              \
+        {OSSL_FUNC_ENCODER_IMPORT_OBJECT, (void (*)(void))p_scossl_##variant##_encoder_import_object},             \
+        {OSSL_FUNC_ENCODER_FREE_OBJECT, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                     \
+        {0, NULL}};                                                                                                \
+                                                                                                                   \
+    IMPLEMENT_SCOSSL_MLDSA_ASN1_ENCODER(variant, PrivateKeyInfo)                                                  \
+    IMPLEMENT_SCOSSL_MLDSA_ASN1_ENCODER(variant, EncryptedPrivateKeyInfo)                                         \
+    IMPLEMENT_SCOSSL_MLDSA_ASN1_ENCODER(variant, SubjectPublicKeyInfo)                                            \
+    IMPLEMENT_SCOSSL_MLDSA_ENCODER_DISPATCH(variant, PrivateKeyInfo)                                              \
+    IMPLEMENT_SCOSSL_MLDSA_ENCODER_DISPATCH(variant, EncryptedPrivateKeyInfo)                                     \
+    IMPLEMENT_SCOSSL_MLDSA_ENCODER_DISPATCH(variant, SubjectPublicKeyInfo)
 
 //
 // ML-DSA standalone

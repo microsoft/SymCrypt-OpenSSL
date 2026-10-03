@@ -3,7 +3,7 @@
 //
 
 #include "scossl_provider.h"
-#include "p_scossl_mldsa_common.h"
+#include "p_scossl_mldsa.h"
 
 #include <openssl/proverr.h>
 

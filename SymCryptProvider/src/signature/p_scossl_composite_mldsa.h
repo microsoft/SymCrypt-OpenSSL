@@ -5,7 +5,7 @@
 #pragma once
 
 #include "p_scossl_base.h"
-#include "p_scossl_mldsa_common.h"
+#include "p_scossl_mldsa.h"
 
 #ifdef __cplusplus
 extern "C" {
