@@ -15,11 +15,11 @@ static const OSSL_PARAM p_scossl_mldsa_ctx_gettable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
     OSSL_PARAM_END};
 
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(_In_ const SCOSSL_MLDSA_BACKEND *backend, int params,
+static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(_In_ const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params,
                                                _Out_writes_bytes_(*pcbAlgId) PBYTE *ppbAlgId, _Out_ SIZE_T *pcbAlgId);
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(const SCOSSL_MLDSA_BACKEND *backend, int params)
+SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params)
 {
     SCOSSL_MLDSA_SIGNATURE_CTX *ctx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_SIGNATURE_CTX));
     if (ctx != NULL)
@@ -87,7 +87,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
         }
 
         if (keyCtx->backend != ctx->backend ||
-            keyCtx->params != ctx->params)
+            keyCtx->params.raw != ctx->params.raw)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
             return SCOSSL_FAILURE;
@@ -324,7 +324,7 @@ SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(SCOSSL_MLDSA_SIGNATURE_CTX *ctx, OSS
 //
 
 _Use_decl_annotations_
-static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(const SCOSSL_MLDSA_BACKEND *backend, int params,
+static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params,
                                                PBYTE *ppbAlgId, SIZE_T *pcbAlgId)
 {
     ASN1_OBJECT *aobj = NULL;
@@ -344,7 +344,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(const SCOSSL_MLDSA_BACKEND *backe
 
     for (SIZE_T i = 0; i < backend->cAlgInfos; i++)
     {
-        if (backend->algInfos[i].params == params)
+        if (backend->algInfos[i].params.raw == params.raw)
         {
             oid = backend->algInfos[i].oid;
             break;
@@ -411,11 +411,11 @@ SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(const SCOSSL_MLDSA_BAC
 }
 
 _Use_decl_annotations_
-int p_scossl_mldsa_params_to_nid(const SCOSSL_MLDSA_BACKEND *backend, int params)
+int p_scossl_mldsa_params_to_nid(const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params)
 {
     for (SIZE_T i = 0; i < backend->cAlgInfos; i++)
     {
-        if (backend->algInfos[i].params == params)
+        if (backend->algInfos[i].params.raw == params.raw)
         {
             return backend->algInfos[i].nid;
         }

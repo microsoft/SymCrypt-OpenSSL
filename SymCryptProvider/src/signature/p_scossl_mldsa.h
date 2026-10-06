@@ -19,6 +19,21 @@ extern "C" {
 // Both ML-DSA and Composite-ML-DSA use the same maximum context length.
 #define SCOSSL_MLDSA_CONTEXT_MAX_LENGTH SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH
 
+// SymCrypt parameter-set value for either family. "Pure" ML-DSA and
+// Composite-ML-DSA use distinct, int-backed parameter-set enums, which a single
+// shared signature cannot name at once. The shared core manipulates the value
+// through the family-agnostic 'raw' member (for storage and comparison), while
+// each backend reads the member matching its own family (mldsa or composite).
+// Because the two enums share the same underlying representation, this union is
+// a documentation aid that makes the intended type explicit at each call site;
+// it does not add compile-time enforcement.
+typedef union
+{
+    int raw;
+    SYMCRYPT_MLDSA_PARAMS mldsa;
+    SYMCRYPT_COMPOSITE_MLDSA_PARAMS composite;
+} SCOSSL_MLDSA_PARAMS;
+
 typedef struct _SCOSSL_MLDSA_BACKEND SCOSSL_MLDSA_BACKEND;
 
 typedef struct
@@ -27,18 +42,19 @@ typedef struct
     const char *oid;
     const char *snGroupName;
     const char *lnGroupName;
-    // SymCrypt parameter set for this algorithm, stored as the underlying enum value.
-    int params;
+    // SymCrypt parameter set for this algorithm.
+    SCOSSL_MLDSA_PARAMS params;
 } SCOSSL_MLDSA_ALG_INFO;
 
 // Unified key context for both ML-DSA and Composite-ML-DSA. The family specific
 // behavior is dispatched through the backend descriptor. The raw SymCrypt key
 // handle is stored as a PVOID and the current key format as a plain int because
-// the underlying enum values differ between families.
+// the underlying enum values differ between families. The parameter set is held
+// in the SCOSSL_MLDSA_PARAMS union (see above).
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
-    int params;
+    SCOSSL_MLDSA_PARAMS params;
     int format;
     PVOID key;
 } SCOSSL_MLDSA_KEY_CTX;
@@ -82,15 +98,16 @@ struct _SCOSSL_MLDSA_BACKEND
     const OSSL_PARAM *keygenSettableParams;
 
     // SymCrypt operation wrappers. The key handle is passed as a PVOID and key
-    // formats/parameter sets as ints; each wrapper casts to the concrete
-    // SymCrypt types before calling the underlying function.
-    PVOID          (*keyAllocate)(int params);
+    // formats as ints; the parameter set is passed in the SCOSSL_MLDSA_PARAMS
+    // union. Each wrapper reads its family's union member / casts the format to
+    // the concrete SymCrypt types before calling the underlying function.
+    PVOID          (*keyAllocate)(SCOSSL_MLDSA_PARAMS params);
     void           (*keyFree)(_In_ PVOID key);
     SYMCRYPT_ERROR (*keyGenerate)(_Inout_ PVOID key, UINT32 flags);
     SYMCRYPT_ERROR (*keySetValue)(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, int format, UINT32 flags, _Inout_ PVOID key);
     SYMCRYPT_ERROR (*keyGetValue)(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, int format, UINT32 flags);
-    SYMCRYPT_ERROR (*sizeofKeyFormat)(int params, int format, _Out_ SIZE_T *pcbKeyFormat);
-    SYMCRYPT_ERROR (*sizeofSignature)(int params, _Out_ SIZE_T *pcbSignature);
+    SYMCRYPT_ERROR (*sizeofKeyFormat)(SCOSSL_MLDSA_PARAMS params, int format, _Out_ SIZE_T *pcbKeyFormat);
+    SYMCRYPT_ERROR (*sizeofSignature)(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature);
     // Common signing wrapper. pcbResult receives the number of bytes written,
     // which for fixed-size families is simply the maximum signature size.
     SYMCRYPT_ERROR (*sign)(_In_ PVOID key,
@@ -103,8 +120,8 @@ struct _SCOSSL_MLDSA_BACKEND
                              _In_reads_bytes_opt_(cbCtx) PCBYTE pbCtx, SIZE_T cbCtx,
                              _In_reads_bytes_(cbSig) PCBYTE pbSig, SIZE_T cbSig,
                              UINT32 flags);
-    int            (*getBits)(int params);
-    int            (*getSecurityBits)(int params);
+    int            (*getBits)(SCOSSL_MLDSA_PARAMS params);
+    int            (*getSecurityBits)(SCOSSL_MLDSA_PARAMS params);
 };
 
 // Key generation context, shared by both families. The seed fields are only
@@ -112,7 +129,7 @@ struct _SCOSSL_MLDSA_BACKEND
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
-    int params;
+    SCOSSL_MLDSA_PARAMS params;
     BYTE abSeed[SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE];
     SIZE_T cbSeed;
 } SCOSSL_MLDSA_KEYGEN_CTX;
@@ -121,7 +138,7 @@ typedef struct
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
-    int params;
+    SCOSSL_MLDSA_PARAMS params;
     SCOSSL_MLDSA_KEY_CTX *keyCtx;
     int operation;
 
@@ -134,12 +151,12 @@ typedef struct
 //
 SCOSSL_STATUS p_scossl_mldsa_register_backend(_In_ const SCOSSL_MLDSA_BACKEND *backend);
 SCOSSL_MLDSA_ALG_INFO *p_scossl_mldsa_get_alg_info_by_nid(_In_ const SCOSSL_MLDSA_BACKEND *backend, int nid);
-int p_scossl_mldsa_params_to_nid(_In_ const SCOSSL_MLDSA_BACKEND *backend, int params);
+int p_scossl_mldsa_params_to_nid(_In_ const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params);
 
 //
 // Shared signature core (referenced by the per-variant dispatch tables)
 //
-SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(_In_ const SCOSSL_MLDSA_BACKEND *backend, int params);
+SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_newctx(_In_ const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params);
 void p_scossl_mldsa_freectx(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx);
 SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_dupctx(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx);
 SCOSSL_STATUS p_scossl_mldsa_sign_init(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, _In_ const OSSL_PARAM params[]);
@@ -164,7 +181,7 @@ SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx
     static SCOSSL_MLDSA_SIGNATURE_CTX                                                                                   \
     *p_scossl_##variant##_newctx(ossl_unused SCOSSL_PROVCTX *provctx, ossl_unused const char *propq)                    \
     {                                                                                                                  \
-        return p_scossl_mldsa_newctx(backendPtr, symcryptParams);                                                      \
+        return p_scossl_mldsa_newctx(backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams});                      \
     }                                                                                                                  \
                                                                                                                        \
     const OSSL_DISPATCH p_scossl_##variant##_signature_functions[] = {                                                 \

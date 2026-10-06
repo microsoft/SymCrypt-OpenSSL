@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(_In_ const SCOSSL_MLDSA_BACKEND *backend, int params);
+SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(_In_ const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params);
 void p_scossl_mldsa_keymgmt_free_key_ctx(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx);
 
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[]);

@@ -15,7 +15,7 @@ extern "C" {
 
 static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(_In_ const SCOSSL_MLDSA_BACKEND *backend,
                                                              _In_ const ASN1_OBJECT *algorithm,
-                                                             int params, int format,
+                                                             SCOSSL_MLDSA_PARAMS params, int format,
                                                              _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
@@ -34,7 +34,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(_In_ const SCOSSL_M
         goto cleanup;
     }
 
-    if (params != algInfo->params)
+    if (params.raw != algInfo->params.raw)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
         goto cleanup;
@@ -59,7 +59,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params, BIO *bio)
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
@@ -97,7 +97,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int params, BIO *bio)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLDSA_PARAMS params, BIO *bio)
 {
     SCOSSL_DECODE_CTX *ctx = (SCOSSL_DECODE_CTX *)vctx;
     OSSL_LIB_CTX *libCtx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
@@ -153,7 +153,7 @@ static SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
     static SCOSSL_MLDSA_KEY_CTX                                                                                     \
     *p_scossl_##decoderType##_to_##variant(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)                              \
     {                                                                                                              \
-        return p_scossl_##decoderType##_to_mldsa(ctx, backendPtr, symcryptParams, bio);                            \
+        return p_scossl_##decoderType##_to_mldsa(ctx, backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams}, bio);  \
     }                                                                                                              \
                                                                                                                    \
     static const SCOSSL_DECODE_KEYTYPE_DESC p_scossl_##variant##_##decoderType##_desc = {                          \
