@@ -42,7 +42,7 @@ SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(const SCOSSL_MLDSA_BACKEND 
     {
         keyCtx->backend = backend;
         keyCtx->params = params;
-        keyCtx->format = backend->formatNull;
+        keyCtx->format = SCOSSL_MLDSA_KEY_FORMAT_NULL;
     }
 
     return keyCtx;
@@ -67,7 +67,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(const SCOSSL_MLD
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
-    SCOSSL_MLDSA_KEY_FORMAT format = keyCtx->backend->formatNull;
+    SCOSSL_MLDSA_KEY_FORMAT format = SCOSSL_MLDSA_KEY_FORMAT_NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SCOSSL_MLDSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_KEY_CTX));
 
@@ -79,19 +79,19 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(const SCOSSL_MLD
 
     copyCtx->backend = keyCtx->backend;
     copyCtx->params = keyCtx->params;
-    copyCtx->format = keyCtx->backend->formatNull;
+    copyCtx->format = SCOSSL_MLDSA_KEY_FORMAT_NULL;
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 &&
         keyCtx->key != NULL)
     {
         if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
-            keyCtx->format != keyCtx->backend->formatPublicKey)
+            keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PUBLIC)
         {
             format = keyCtx->format;
         }
         else
         {
-            format = keyCtx->backend->formatPublicKey;
+            format = SCOSSL_MLDSA_KEY_FORMAT_PUBLIC;
         }
 
         status = p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, format, &pbKey, &cbKey);
@@ -246,7 +246,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(SCOSSL_MLDSA_KEYGEN_CTX *genC
         scError = genCtx->backend->keySetValue(
             genCtx->abSeed,
             genCtx->cbSeed,
-            genCtx->backend->formatPrivateSeed,
+            SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED,
             0,
             keyCtx->key);
 
@@ -269,7 +269,8 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(SCOSSL_MLDSA_KEYGEN_CTX *genC
         }
     }
 
-    keyCtx->format = genCtx->backend->generatedFormat;
+    keyCtx->format = genCtx->backend->supportsSeed ?
+        SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED : SCOSSL_MLDSA_KEY_FORMAT_PRIVATE;
 
     status = SCOSSL_SUCCESS;
 
@@ -331,12 +332,12 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
         paramPubKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY);
 
         if (keyCtx->backend->supportsSeed &&
-            keyCtx->format == keyCtx->backend->formatPrivateSeed)
+            keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
             paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
             paramPrivateSeed = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ML_DSA_SEED);
         }
-        else if (keyCtx->format == keyCtx->backend->formatPrivateKey)
+        else if (keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
         {
             paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
         }
@@ -344,7 +345,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
 
     if (paramEncodedKey != NULL || paramPubKey != NULL)
     {
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get encoded public key");
             goto cleanup;
@@ -371,7 +372,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
 
     if (paramPrivKey != NULL)
     {
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPrivateKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PRIVATE, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get encoded private key");
             goto cleanup;
@@ -390,7 +391,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
 
     if (paramPrivateSeed != NULL)
     {
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPrivateSeed, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get private seed");
             goto cleanup;
@@ -478,8 +479,8 @@ static BOOL p_scossl_mldsa_keymgmt_has(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int s
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
-        keyCtx->format != keyCtx->backend->formatPrivateSeed &&
-        keyCtx->format != keyCtx->backend->formatPrivateKey)
+        keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED &&
+        keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
     {
         return FALSE;
     }
@@ -509,8 +510,8 @@ static BOOL p_scossl_mldsa_keymgmt_match(const SCOSSL_MLDSA_KEY_CTX *keyCtx1, co
     {
         if (keyCtx1->key != NULL && keyCtx2->key != NULL)
         {
-            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx1, keyCtx1->backend->formatPublicKey, &pbKey1, &cbKey1) != SCOSSL_SUCCESS ||
-                p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx2, keyCtx2->backend->formatPublicKey, &pbKey2, &cbKey2) != SCOSSL_SUCCESS)
+            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx1, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbKey1, &cbKey1) != SCOSSL_SUCCESS ||
+                p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx2, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbKey2, &cbKey2) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -573,7 +574,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
                 return SCOSSL_FAILURE;
             }
 
-            format = keyCtx->backend->formatPrivateSeed;
+            format = SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED;
         }
         else if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
         {
@@ -582,7 +583,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
                 return SCOSSL_FAILURE;
             }
-            format = keyCtx->backend->formatPrivateKey;
+            format = SCOSSL_MLDSA_KEY_FORMAT_PRIVATE;
         }
     }
 
@@ -596,7 +597,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
             return SCOSSL_FAILURE;
         }
 
-        format = keyCtx->backend->formatPublicKey;
+        format = SCOSSL_MLDSA_KEY_FORMAT_PUBLIC;
     }
 
     if (pbKey == NULL)
@@ -646,7 +647,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
 
     if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
     {
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbPubKey, &cbPubKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbPubKey, &cbPubKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
@@ -663,9 +664,9 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
         // Export the seed alongside the private key when the key was created from
         // one and the family supports it.
         if (keyCtx->backend->supportsSeed &&
-            keyCtx->format == keyCtx->backend->formatPrivateSeed)
+            keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
-            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPrivateSeed, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
+            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -677,10 +678,10 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
             }
         }
 
-        if (keyCtx->format == keyCtx->backend->formatPrivateSeed ||
-            keyCtx->format == keyCtx->backend->formatPrivateKey)
+        if (keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED ||
+            keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
         {
-            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPrivateKey, &pbPrivKey, &cbPrivKey) != SCOSSL_SUCCESS)
+            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PRIVATE, &pbPrivKey, &cbPrivKey) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -729,24 +730,24 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
         return SCOSSL_FAILURE;
     }
 
-    if (keyCtx->backend->supportsSeed && format == keyCtx->backend->formatPrivateSeed)
+    if (keyCtx->backend->supportsSeed && format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
     {
-        if (keyCtx->format != keyCtx->backend->formatPrivateSeed)
+        if (keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_SEED);
             goto cleanup;
         }
     }
-    else if (format == keyCtx->backend->formatPrivateKey)
+    else if (format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
     {
-        if (keyCtx->format != keyCtx->backend->formatPrivateSeed &&
-            keyCtx->format != keyCtx->backend->formatPrivateKey)
+        if (keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED &&
+            keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
             goto cleanup;
         }
     }
-    else if (format == keyCtx->backend->formatNull)
+    else if (format == SCOSSL_MLDSA_KEY_FORMAT_NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
         goto cleanup;
@@ -833,7 +834,7 @@ cleanup:
             keyCtx->backend->keyFree(keyCtx->key);
             keyCtx->key = NULL;
         }
-        keyCtx->format = keyCtx->backend->formatNull;
+        keyCtx->format = SCOSSL_MLDSA_KEY_FORMAT_NULL;
     }
 
     return ret;

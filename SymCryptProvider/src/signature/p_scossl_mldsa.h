@@ -10,29 +10,23 @@
 extern "C" {
 #endif
 
-// Sentinel used by a backend to indicate that a particular key format is not
-// supported by the family (e.g. the private seed format for Composite-ML-DSA).
-// No real SymCrypt key format value is negative, so this never collides with a
-// valid format.
-#define SCOSSL_MLDSA_FORMAT_NONE (-1)
-
 // Both ML-DSA and Composite-ML-DSA use the same maximum context length.
 #define SCOSSL_MLDSA_CONTEXT_MAX_LENGTH SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH
 
-// SymCrypt parameter-set value for either family. "Pure" ML-DSA and
-// Composite-ML-DSA use distinct, int-backed parameter-set enums
-// (SYMCRYPT_MLDSA_PARAMS and SYMCRYPT_COMPOSITE_MLDSA_PARAMS), which a single
-// shared signature cannot name at once. The value is carried through this named
-// int typedef; each backend casts it to the concrete enum for its own family.
+// The two families use distinct parameter-set enums (SYMCRYPT_MLDSA_PARAMS and
+// SYMCRYPT_COMPOSITE_MLDSA_PARAMS) that a shared signature cannot name at once,
+// so the value is carried as an int and each backend casts it to its own enum.
 typedef int SCOSSL_MLDSA_PARAMS;
 
-// SymCrypt key format value for either family. As with the parameter set, the
-// two families use distinct, int-backed key format enums
-// (SYMCRYPT_MLDSAKEY_FORMAT and SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT), so the
-// shared code carries the value through this named int typedef and each backend
-// casts it to the concrete enum for its own family. SCOSSL_MLDSA_FORMAT_NONE is
-// a valid value here (see above).
-typedef int SCOSSL_MLDSA_KEY_FORMAT;
+// Family independent key format. Each backend translates it to the concrete
+// SymCrypt format enum for its family.
+typedef enum
+{
+    SCOSSL_MLDSA_KEY_FORMAT_NULL = 0,
+    SCOSSL_MLDSA_KEY_FORMAT_PUBLIC,
+    SCOSSL_MLDSA_KEY_FORMAT_PRIVATE,
+    SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED,
+} SCOSSL_MLDSA_KEY_FORMAT;
 
 typedef struct _SCOSSL_MLDSA_BACKEND SCOSSL_MLDSA_BACKEND;
 
@@ -42,16 +36,11 @@ typedef struct
     const char *oid;
     const char *snGroupName;
     const char *lnGroupName;
-    // SymCrypt parameter set for this algorithm.
     SCOSSL_MLDSA_PARAMS params;
 } SCOSSL_MLDSA_ALG_INFO;
 
-// Unified key context for both ML-DSA and Composite-ML-DSA. The family specific
-// behavior is dispatched through the backend descriptor. The raw SymCrypt key
-// handle is stored as a PVOID and the current key format in the
-// SCOSSL_MLDSA_KEY_FORMAT int typedef because the underlying enum values differ
-// between families. The parameter set is held in the SCOSSL_MLDSA_PARAMS int
-// typedef (see above).
+// Key context shared by both families; family specific behavior is dispatched
+// through the backend descriptor.
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
@@ -60,48 +49,27 @@ typedef struct
     PVOID key;
 } SCOSSL_MLDSA_KEY_CTX;
 
-// Backend descriptor encapsulating every family specific difference between the
-// "pure" ML-DSA and Composite-ML-DSA implementations. The shared core operates
-// exclusively through this vtable, which lets both families share a single
-// implementation of the signature, keymgmt, decoder and encoder logic.
+// Backend descriptor capturing every family specific difference between "pure"
+// ML-DSA and Composite-ML-DSA. The shared core operates only through this vtable.
 struct _SCOSSL_MLDSA_BACKEND
 {
     // Human readable family name used when printing keys (e.g. "MLDSA").
     const char *textName;
 
-    // Key format enum values for this family. Values differ between families,
-    // so the shared code always compares against these instead of hardcoded
-    // constants. formatPrivateSeed is SCOSSL_MLDSA_FORMAT_NONE when the family
-    // does not support the private seed format.
-    SCOSSL_MLDSA_KEY_FORMAT formatNull;
-    SCOSSL_MLDSA_KEY_FORMAT formatPublicKey;
-    SCOSSL_MLDSA_KEY_FORMAT formatPrivateKey;
-    SCOSSL_MLDSA_KEY_FORMAT formatPrivateSeed;
-
     // Whether the family supports the private seed format, and the seed size.
     BOOL supportsSeed;
     SIZE_T cbPrivateSeed;
 
-    // Key format assigned to a freshly generated key.
-    SCOSSL_MLDSA_KEY_FORMAT generatedFormat;
-
-    // Algorithm/OID table and its length.
     SCOSSL_MLDSA_ALG_INFO *algInfos;
     SIZE_T cAlgInfos;
 
-    // Settable signature context parameters for this family, and an optional
-    // validator for the additional (currently unsupported) parameters exposed
-    // by "pure" ML-DSA. validateExtraSigCtxParams is NULL when there are none.
     const OSSL_PARAM *sigSettableCtxParams;
+    // NULL when the family has no extra signature context parameters to validate.
     SCOSSL_STATUS (*validateExtraSigCtxParams)(_In_ const OSSL_PARAM params[]);
-
-    // Settable key generation parameters for this family.
     const OSSL_PARAM *keygenSettableParams;
 
-    // SymCrypt operation wrappers. The key handle is passed as a PVOID and the
-    // key format/parameter set as named int typedefs (SCOSSL_MLDSA_KEY_FORMAT
-    // and SCOSSL_MLDSA_PARAMS). Each wrapper casts those to the concrete
-    // SymCrypt types for its own family before calling the underlying function.
+    // SymCrypt operation wrappers. Each casts the PVOID key handle and translates
+    // the family independent params/format to the concrete SymCrypt types.
     PVOID          (*keyAllocate)(SCOSSL_MLDSA_PARAMS params);
     void           (*keyFree)(_In_ PVOID key);
     SYMCRYPT_ERROR (*keyGenerate)(_Inout_ PVOID key, UINT32 flags);
@@ -109,8 +77,6 @@ struct _SCOSSL_MLDSA_BACKEND
     SYMCRYPT_ERROR (*keyGetValue)(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags);
     SYMCRYPT_ERROR (*sizeofKeyFormat)(SCOSSL_MLDSA_PARAMS params, SCOSSL_MLDSA_KEY_FORMAT format, _Out_ SIZE_T *pcbKeyFormat);
     SYMCRYPT_ERROR (*sizeofSignature)(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature);
-    // Common signing wrapper. pcbResult receives the number of bytes written,
-    // which for fixed-size families is simply the maximum signature size.
     SYMCRYPT_ERROR (*sign)(_In_ PVOID key,
                            _In_reads_bytes_(cbMsg) PCBYTE pbMsg, SIZE_T cbMsg,
                            _In_reads_bytes_opt_(cbCtx) PCBYTE pbCtx, SIZE_T cbCtx,

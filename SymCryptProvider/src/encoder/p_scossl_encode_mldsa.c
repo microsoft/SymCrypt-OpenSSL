@@ -39,8 +39,8 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         goto cleanup;
     }
 
-    if (keyCtx->format != keyCtx->backend->formatPrivateSeed &&
-        keyCtx->format != keyCtx->backend->formatPrivateKey)
+    if (keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED &&
+        keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
         goto cleanup;
@@ -115,7 +115,7 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
         goto cleanup;
     }
 
-    scError = keyCtx->backend->sizeofKeyFormat(keyCtx->params, keyCtx->backend->formatPublicKey, &cbKey);
+    scError = keyCtx->backend->sizeofKeyFormat(keyCtx->params, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &cbKey);
     if (scError != SYMCRYPT_NO_ERROR)
     {
         SCOSSL_PROV_LOG_SYMCRYPT_ERROR("sizeofKeyFormat failed", scError);
@@ -129,7 +129,7 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -345,8 +345,8 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        if (keyCtx->format != keyCtx->backend->formatPrivateSeed &&
-            keyCtx->format != keyCtx->backend->formatPrivateKey)
+        if (keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED &&
+            keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
             goto cleanup;
@@ -358,7 +358,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
         }
 
         if (keyCtx->backend->supportsSeed &&
-            keyCtx->format == keyCtx->backend->formatPrivateSeed)
+            keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
             if (BIO_printf(out, "%s Private-Key (256 bit private seed encoding):\nprivate-seed", keyCtx->backend->textName) <= 0)
             {
@@ -384,7 +384,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused PVOID vctx, BIO *out,
         pbKey = NULL;
         cbKey = 0;
 
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->backend->formatPublicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }

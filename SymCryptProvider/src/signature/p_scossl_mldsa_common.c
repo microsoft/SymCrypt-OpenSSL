@@ -79,8 +79,8 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
     if (keyCtx != NULL)
     {
         if (operation == EVP_PKEY_OP_SIGN &&
-            keyCtx->format != ctx->backend->formatPrivateKey &&
-            keyCtx->format != ctx->backend->formatPrivateSeed)
+            keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE &&
+            keyCtx->format != SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_NOT_A_PRIVATE_KEY);
             return SCOSSL_FAILURE;

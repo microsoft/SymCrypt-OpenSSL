@@ -30,10 +30,19 @@ static const OSSL_PARAM p_scossl_mldsa_keygen_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ML_DSA_SEED, NULL, 0),
     OSSL_PARAM_END};
 
-//
-// Backend wrappers. Each casts the generic PVOID key handle and the named int
-// typedef format/parameter values to the concrete "pure" ML-DSA SymCrypt types.
-//
+// Backend wrappers translating the family independent key handle, params and
+// format to the concrete "pure" ML-DSA SymCrypt types.
+
+static SYMCRYPT_MLDSAKEY_FORMAT p_scossl_mldsa_backend_format(SCOSSL_MLDSA_KEY_FORMAT format)
+{
+    switch (format)
+    {
+        case SCOSSL_MLDSA_KEY_FORMAT_PUBLIC:       return SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY;
+        case SCOSSL_MLDSA_KEY_FORMAT_PRIVATE:      return SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+        case SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED: return SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
+        default:                                   return SYMCRYPT_MLDSAKEY_FORMAT_NULL;
+    }
+}
 
 static PVOID p_scossl_mldsa_backend_key_allocate(SCOSSL_MLDSA_PARAMS params)
 {
@@ -52,17 +61,17 @@ static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_generate(_Inout_ PVOID key, UIN
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_set_value(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags, _Inout_ PVOID key)
 {
-    return SymCryptMlDsakeySetValue(pbSrc, cbSrc, (SYMCRYPT_MLDSAKEY_FORMAT)format, flags, (PSYMCRYPT_MLDSAKEY)key);
+    return SymCryptMlDsakeySetValue(pbSrc, cbSrc, p_scossl_mldsa_backend_format(format), flags, (PSYMCRYPT_MLDSAKEY)key);
 }
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_get_value(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags)
 {
-    return SymCryptMlDsakeyGetValue((PCSYMCRYPT_MLDSAKEY)key, pbDst, cbDst, (SYMCRYPT_MLDSAKEY_FORMAT)format, flags);
+    return SymCryptMlDsakeyGetValue((PCSYMCRYPT_MLDSAKEY)key, pbDst, cbDst, p_scossl_mldsa_backend_format(format), flags);
 }
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_key_format(SCOSSL_MLDSA_PARAMS params, SCOSSL_MLDSA_KEY_FORMAT format, _Out_ SIZE_T *pcbKeyFormat)
 {
-    return SymCryptMlDsaSizeofKeyFormatFromParams((SYMCRYPT_MLDSA_PARAMS)params, (SYMCRYPT_MLDSAKEY_FORMAT)format, pcbKeyFormat);
+    return SymCryptMlDsaSizeofKeyFormatFromParams((SYMCRYPT_MLDSA_PARAMS)params, p_scossl_mldsa_backend_format(format), pcbKeyFormat);
 }
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_signature(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature)
@@ -195,13 +204,8 @@ static SCOSSL_STATUS p_scossl_mldsa_validate_extra_sig_ctx_params(_In_ const OSS
 
 const SCOSSL_MLDSA_BACKEND p_scossl_mldsa_backend = {
     "MLDSA",
-    SYMCRYPT_MLDSAKEY_FORMAT_NULL,
-    SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY,
-    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY,
-    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
     TRUE,
     SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE,
-    SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
     p_scossl_mldsa_algs,
     sizeof(p_scossl_mldsa_algs) / sizeof(SCOSSL_MLDSA_ALG_INFO),
     p_scossl_mldsa_ctx_settable_param_types,

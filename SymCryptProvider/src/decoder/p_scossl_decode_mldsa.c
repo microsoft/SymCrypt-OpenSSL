@@ -83,7 +83,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const 
     // 32-byte private seed. Composite-ML-DSA has no seed format, so its keys are
     // always the raw private key.
     format = (backend->supportsSeed && (SIZE_T)cbKey == backend->cbPrivateSeed) ?
-        backend->formatPrivateSeed : backend->formatPrivateKey;
+        SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED : SCOSSL_MLDSA_KEY_FORMAT_PRIVATE;
 
     keyCtx = p_scossl_mldsa_decode_key_bytes(backend, algorithm,
                                              params, format,
@@ -120,7 +120,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(PVOID vctx, 
     X509_ALGOR_get0(&algorithm, NULL, NULL, subjPubKeyInfo->x509Alg);
 
     keyCtx = p_scossl_mldsa_decode_key_bytes(backend, algorithm,
-                                             params, backend->formatPublicKey,
+                                             params, SCOSSL_MLDSA_KEY_FORMAT_PUBLIC,
                                              ASN1_STRING_get0_data(subjPubKeyInfo->subjectPublicKey), ASN1_STRING_length(subjPubKeyInfo->subjectPublicKey));
 
 cleanup:
