@@ -211,7 +211,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keygen_set_template(SCOSSL_MLDSA_KEYGEN_CTX 
         return SCOSSL_FAILURE;
     }
 
-    if (genCtx->params.raw != tmplCtx->params.raw)
+    if (genCtx->params != tmplCtx->params)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISMATCHING_DOMAIN_PARAMETERS);
         return SCOSSL_FAILURE;
@@ -500,7 +500,7 @@ static BOOL p_scossl_mldsa_keymgmt_match(const SCOSSL_MLDSA_KEY_CTX *keyCtx1, co
     if (keyCtx1 == NULL ||
         keyCtx2 == NULL ||
         keyCtx1->backend != keyCtx2->backend ||
-        keyCtx1->params.raw != keyCtx2->params.raw)
+        keyCtx1->params != keyCtx2->params)
     {
         goto cleanup;
     }
@@ -848,7 +848,7 @@ cleanup:
     static SCOSSL_MLDSA_KEY_CTX                                                                                         \
     *p_scossl_##variant##_keymgmt_new_ctx(ossl_unused SCOSSL_PROVCTX *provCtx)                                          \
     {                                                                                                                  \
-        return p_scossl_mldsa_keymgmt_new_ctx(backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams});               \
+        return p_scossl_mldsa_keymgmt_new_ctx(backendPtr, symcryptParams);                                             \
     }                                                                                                                  \
                                                                                                                        \
     static SCOSSL_MLDSA_KEYGEN_CTX                                                                                      \
@@ -856,7 +856,7 @@ cleanup:
                                       ossl_unused int selection,                                                        \
                                       _In_ const OSSL_PARAM params[])                                                   \
     {                                                                                                                  \
-        return p_scossl_mldsa_keygen_init(params, backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams});           \
+        return p_scossl_mldsa_keygen_init(params, backendPtr, symcryptParams);                                         \
     }                                                                                                                  \
                                                                                                                        \
     const OSSL_DISPATCH p_scossl_##variant##_keymgmt_functions[] = {                                                   \

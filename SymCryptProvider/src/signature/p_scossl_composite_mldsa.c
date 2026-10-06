@@ -12,10 +12,10 @@ extern "C" {
 #endif
 
 SCOSSL_MLDSA_ALG_INFO p_scossl_composite_mldsa_algs[] = {
-    {NID_undef, SCOSSL_OID_MLDSA44_ECDSA_P256_SHA256, SCOSSL_SN_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256, {.composite = SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256}},
-    {NID_undef, SCOSSL_OID_MLDSA65_ECDSA_P256_SHA512, SCOSSL_SN_MLDSA65_ECDSA_P256_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512, {.composite = SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512}},
-    {NID_undef, SCOSSL_OID_MLDSA65_ECDSA_P384_SHA512, SCOSSL_SN_MLDSA65_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512, {.composite = SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P384_SHA512}},
-    {NID_undef, SCOSSL_OID_MLDSA87_ECDSA_P384_SHA512, SCOSSL_SN_MLDSA87_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512, {.composite = SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA87_ECDSA_P384_SHA512}}};
+    {NID_undef, SCOSSL_OID_MLDSA44_ECDSA_P256_SHA256, SCOSSL_SN_MLDSA44_ECDSA_P256_SHA256, SCOSSL_LN_MLDSA44_ECDSA_P256_SHA256, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256},
+    {NID_undef, SCOSSL_OID_MLDSA65_ECDSA_P256_SHA512, SCOSSL_SN_MLDSA65_ECDSA_P256_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P256_SHA512, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512},
+    {NID_undef, SCOSSL_OID_MLDSA65_ECDSA_P384_SHA512, SCOSSL_SN_MLDSA65_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA65_ECDSA_P384_SHA512, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P384_SHA512},
+    {NID_undef, SCOSSL_OID_MLDSA87_ECDSA_P384_SHA512, SCOSSL_SN_MLDSA87_ECDSA_P384_SHA512, SCOSSL_LN_MLDSA87_ECDSA_P384_SHA512, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA87_ECDSA_P384_SHA512}};
 
 static const OSSL_PARAM p_scossl_composite_mldsa_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, NULL, 0),
@@ -33,7 +33,7 @@ static const OSSL_PARAM p_scossl_composite_mldsa_keygen_settable_param_types[] =
 
 static PVOID p_scossl_composite_mldsa_backend_key_allocate(SCOSSL_MLDSA_PARAMS params)
 {
-    return SymCryptCompositeMlDsakeyAllocate(params.composite);
+    return SymCryptCompositeMlDsakeyAllocate((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params);
 }
 
 static void p_scossl_composite_mldsa_backend_key_free(_In_ PVOID key)
@@ -58,12 +58,12 @@ static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_get_value(_In_ PVOID 
 
 static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_sizeof_key_format(SCOSSL_MLDSA_PARAMS params, int format, _Out_ SIZE_T *pcbKeyFormat)
 {
-    return SymCryptCompositeMlDsaSizeofKeyFormatFromParams(params.composite, (SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT)format, pcbKeyFormat);
+    return SymCryptCompositeMlDsaSizeofKeyFormatFromParams((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params, (SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT)format, pcbKeyFormat);
 }
 
 static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_sizeof_signature(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature)
 {
-    return SymCryptCompositeMlDsaSizeofSignatureFromParams(params.composite, pcbSignature);
+    return SymCryptCompositeMlDsaSizeofSignatureFromParams((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params, pcbSignature);
 }
 
 static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_sign(_In_ PVOID key,
@@ -88,7 +88,7 @@ static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_verify(_In_ PVOID key,
 
 static int p_scossl_composite_mldsa_backend_get_bits(SCOSSL_MLDSA_PARAMS params)
 {
-    switch (params.composite)
+    switch ((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params)
     {
         case SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256:
             return SYMCRYPT_COMPOSITE_MLDSA_PUBLIC_KEY_SIZE_MLDSA44_ECDSA_P256_SHA256 * 8;
@@ -107,7 +107,7 @@ static int p_scossl_composite_mldsa_backend_get_bits(SCOSSL_MLDSA_PARAMS params)
 
 static int p_scossl_composite_mldsa_backend_get_security_bits(SCOSSL_MLDSA_PARAMS params)
 {
-    switch (params.composite)
+    switch ((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params)
     {
         case SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256:
             return 128;

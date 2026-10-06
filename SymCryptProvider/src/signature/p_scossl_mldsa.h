@@ -20,19 +20,11 @@ extern "C" {
 #define SCOSSL_MLDSA_CONTEXT_MAX_LENGTH SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH
 
 // SymCrypt parameter-set value for either family. "Pure" ML-DSA and
-// Composite-ML-DSA use distinct, int-backed parameter-set enums, which a single
-// shared signature cannot name at once. The shared core manipulates the value
-// through the family-agnostic 'raw' member (for storage and comparison), while
-// each backend reads the member matching its own family (mldsa or composite).
-// Because the two enums share the same underlying representation, this union is
-// a documentation aid that makes the intended type explicit at each call site;
-// it does not add compile-time enforcement.
-typedef union
-{
-    int raw;
-    SYMCRYPT_MLDSA_PARAMS mldsa;
-    SYMCRYPT_COMPOSITE_MLDSA_PARAMS composite;
-} SCOSSL_MLDSA_PARAMS;
+// Composite-ML-DSA use distinct, int-backed parameter-set enums
+// (SYMCRYPT_MLDSA_PARAMS and SYMCRYPT_COMPOSITE_MLDSA_PARAMS), which a single
+// shared signature cannot name at once. The value is carried through this named
+// int typedef; each backend casts it to the concrete enum for its own family.
+typedef int SCOSSL_MLDSA_PARAMS;
 
 typedef struct _SCOSSL_MLDSA_BACKEND SCOSSL_MLDSA_BACKEND;
 
@@ -50,7 +42,7 @@ typedef struct
 // behavior is dispatched through the backend descriptor. The raw SymCrypt key
 // handle is stored as a PVOID and the current key format as a plain int because
 // the underlying enum values differ between families. The parameter set is held
-// in the SCOSSL_MLDSA_PARAMS union (see above).
+// in the SCOSSL_MLDSA_PARAMS int typedef (see above).
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
@@ -97,10 +89,10 @@ struct _SCOSSL_MLDSA_BACKEND
     // Settable key generation parameters for this family.
     const OSSL_PARAM *keygenSettableParams;
 
-    // SymCrypt operation wrappers. The key handle is passed as a PVOID and key
-    // formats as ints; the parameter set is passed in the SCOSSL_MLDSA_PARAMS
-    // union. Each wrapper reads its family's union member / casts the format to
-    // the concrete SymCrypt types before calling the underlying function.
+    // SymCrypt operation wrappers. The key handle is passed as a PVOID and the
+    // key format/parameter set as ints (the latter via SCOSSL_MLDSA_PARAMS).
+    // Each wrapper casts those to the concrete SymCrypt types for its own family
+    // before calling the underlying function.
     PVOID          (*keyAllocate)(SCOSSL_MLDSA_PARAMS params);
     void           (*keyFree)(_In_ PVOID key);
     SYMCRYPT_ERROR (*keyGenerate)(_Inout_ PVOID key, UINT32 flags);
@@ -181,7 +173,7 @@ SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx
     static SCOSSL_MLDSA_SIGNATURE_CTX                                                                                   \
     *p_scossl_##variant##_newctx(ossl_unused SCOSSL_PROVCTX *provctx, ossl_unused const char *propq)                    \
     {                                                                                                                  \
-        return p_scossl_mldsa_newctx(backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams});                      \
+        return p_scossl_mldsa_newctx(backendPtr, symcryptParams);                                                   \
     }                                                                                                                  \
                                                                                                                        \
     const OSSL_DISPATCH p_scossl_##variant##_signature_functions[] = {                                                 \

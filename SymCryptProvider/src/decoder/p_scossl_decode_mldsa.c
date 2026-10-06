@@ -34,7 +34,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(_In_ const SCOSSL_M
         goto cleanup;
     }
 
-    if (params.raw != algInfo->params.raw)
+    if (params != algInfo->params)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
         goto cleanup;
@@ -153,7 +153,7 @@ static SCOSSL_STATUS p_scossl_der_to_mldsa_export_object(PVOID vctx,
     static SCOSSL_MLDSA_KEY_CTX                                                                                     \
     *p_scossl_##decoderType##_to_##variant(_In_ SCOSSL_DECODE_CTX *ctx, _In_ BIO *bio)                              \
     {                                                                                                              \
-        return p_scossl_##decoderType##_to_mldsa(ctx, backendPtr, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams}, bio);  \
+        return p_scossl_##decoderType##_to_mldsa(ctx, backendPtr, symcryptParams, bio);                               \
     }                                                                                                              \
                                                                                                                    \
     static const SCOSSL_DECODE_KEYTYPE_DESC p_scossl_##variant##_##decoderType##_desc = {                          \

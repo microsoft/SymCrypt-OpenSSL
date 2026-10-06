@@ -14,9 +14,9 @@ extern "C" {
 #define SCOSSL_MLDSA_MSG_ENCODING_PURE 1
 
 SCOSSL_MLDSA_ALG_INFO p_scossl_mldsa_algs[] = {
-    {NID_undef, SCOSSL_OID_MLDSA44, SCOSSL_SN_MLDSA44, SCOSSL_LN_MLDSA44, {.mldsa = SYMCRYPT_MLDSA_PARAMS_MLDSA44}},
-    {NID_undef, SCOSSL_OID_MLDSA65, SCOSSL_SN_MLDSA65, SCOSSL_LN_MLDSA65, {.mldsa = SYMCRYPT_MLDSA_PARAMS_MLDSA65}},
-    {NID_undef, SCOSSL_OID_MLDSA87, SCOSSL_SN_MLDSA87, SCOSSL_LN_MLDSA87, {.mldsa = SYMCRYPT_MLDSA_PARAMS_MLDSA87}}};
+    {NID_undef, SCOSSL_OID_MLDSA44, SCOSSL_SN_MLDSA44, SCOSSL_LN_MLDSA44, SYMCRYPT_MLDSA_PARAMS_MLDSA44},
+    {NID_undef, SCOSSL_OID_MLDSA65, SCOSSL_SN_MLDSA65, SCOSSL_LN_MLDSA65, SYMCRYPT_MLDSA_PARAMS_MLDSA65},
+    {NID_undef, SCOSSL_OID_MLDSA87, SCOSSL_SN_MLDSA87, SCOSSL_LN_MLDSA87, SYMCRYPT_MLDSA_PARAMS_MLDSA87}};
 
 static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, NULL, 0),
@@ -37,7 +37,7 @@ static const OSSL_PARAM p_scossl_mldsa_keygen_settable_param_types[] = {
 
 static PVOID p_scossl_mldsa_backend_key_allocate(SCOSSL_MLDSA_PARAMS params)
 {
-    return SymCryptMlDsakeyAllocate(params.mldsa);
+    return SymCryptMlDsakeyAllocate((SYMCRYPT_MLDSA_PARAMS)params);
 }
 
 static void p_scossl_mldsa_backend_key_free(_In_ PVOID key)
@@ -62,12 +62,12 @@ static SYMCRYPT_ERROR p_scossl_mldsa_backend_key_get_value(_In_ PVOID key, _Out_
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_key_format(SCOSSL_MLDSA_PARAMS params, int format, _Out_ SIZE_T *pcbKeyFormat)
 {
-    return SymCryptMlDsaSizeofKeyFormatFromParams(params.mldsa, (SYMCRYPT_MLDSAKEY_FORMAT)format, pcbKeyFormat);
+    return SymCryptMlDsaSizeofKeyFormatFromParams((SYMCRYPT_MLDSA_PARAMS)params, (SYMCRYPT_MLDSAKEY_FORMAT)format, pcbKeyFormat);
 }
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_sizeof_signature(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature)
 {
-    return SymCryptMlDsaSizeofSignatureFromParams(params.mldsa, pcbSignature);
+    return SymCryptMlDsaSizeofSignatureFromParams((SYMCRYPT_MLDSA_PARAMS)params, pcbSignature);
 }
 
 static SYMCRYPT_ERROR p_scossl_mldsa_backend_sign(_In_ PVOID key,
@@ -97,7 +97,7 @@ static SYMCRYPT_ERROR p_scossl_mldsa_backend_verify(_In_ PVOID key,
 
 static int p_scossl_mldsa_backend_get_bits(SCOSSL_MLDSA_PARAMS params)
 {
-    switch (params.mldsa)
+    switch ((SYMCRYPT_MLDSA_PARAMS)params)
     {
         case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
             return SYMCRYPT_MLDSA_PUBLIC_KEY_SIZE_MLDSA44 * 8;
@@ -114,7 +114,7 @@ static int p_scossl_mldsa_backend_get_bits(SCOSSL_MLDSA_PARAMS params)
 
 static int p_scossl_mldsa_backend_get_security_bits(SCOSSL_MLDSA_PARAMS params)
 {
-    switch (params.mldsa)
+    switch ((SYMCRYPT_MLDSA_PARAMS)params)
     {
         case SYMCRYPT_MLDSA_PARAMS_MLDSA44:
             return 128;

@@ -421,7 +421,7 @@ _Use_decl_annotations_
 static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PVOID vctx, const SCOSSL_MLDSA_BACKEND *backend, int symcryptParams,
                                                            int selection, const OSSL_PARAM osslParams[])
 {
-    SCOSSL_MLDSA_KEY_CTX *keyCtx = p_scossl_mldsa_keymgmt_new_ctx(backend, (SCOSSL_MLDSA_PARAMS){.raw = symcryptParams});
+    SCOSSL_MLDSA_KEY_CTX *keyCtx = p_scossl_mldsa_keymgmt_new_ctx(backend, symcryptParams);
 
     if (keyCtx != NULL &&
         p_scossl_mldsa_keymgmt_import(keyCtx, selection, osslParams) != SCOSSL_SUCCESS)

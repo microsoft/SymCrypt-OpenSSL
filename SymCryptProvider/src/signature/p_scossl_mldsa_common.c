@@ -87,7 +87,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
         }
 
         if (keyCtx->backend != ctx->backend ||
-            keyCtx->params.raw != ctx->params.raw)
+            keyCtx->params != ctx->params)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
             return SCOSSL_FAILURE;
@@ -344,7 +344,7 @@ static SCOSSL_STATUS p_scossl_mldsa_get_alg_id(const SCOSSL_MLDSA_BACKEND *backe
 
     for (SIZE_T i = 0; i < backend->cAlgInfos; i++)
     {
-        if (backend->algInfos[i].params.raw == params.raw)
+        if (backend->algInfos[i].params == params)
         {
             oid = backend->algInfos[i].oid;
             break;
@@ -415,7 +415,7 @@ int p_scossl_mldsa_params_to_nid(const SCOSSL_MLDSA_BACKEND *backend, SCOSSL_MLD
 {
     for (SIZE_T i = 0; i < backend->cAlgInfos; i++)
     {
-        if (backend->algInfos[i].params.raw == params.raw)
+        if (backend->algInfos[i].params == params)
         {
             return backend->algInfos[i].nid;
         }
