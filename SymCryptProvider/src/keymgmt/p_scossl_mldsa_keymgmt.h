@@ -17,9 +17,9 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection,
                                             _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg);
 
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, int format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSA_KEY_FORMAT format,
                                                      _Inout_ PBYTE *ppbKey, _Inout_ SIZE_T *pcbKey);
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSA_KEY_FORMAT format,
                                                      _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
 
 #ifdef __cplusplus

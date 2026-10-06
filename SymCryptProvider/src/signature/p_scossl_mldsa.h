@@ -26,6 +26,14 @@ extern "C" {
 // int typedef; each backend casts it to the concrete enum for its own family.
 typedef int SCOSSL_MLDSA_PARAMS;
 
+// SymCrypt key format value for either family. As with the parameter set, the
+// two families use distinct, int-backed key format enums
+// (SYMCRYPT_MLDSAKEY_FORMAT and SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT), so the
+// shared code carries the value through this named int typedef and each backend
+// casts it to the concrete enum for its own family. SCOSSL_MLDSA_FORMAT_NONE is
+// a valid value here (see above).
+typedef int SCOSSL_MLDSA_KEY_FORMAT;
+
 typedef struct _SCOSSL_MLDSA_BACKEND SCOSSL_MLDSA_BACKEND;
 
 typedef struct
@@ -40,14 +48,15 @@ typedef struct
 
 // Unified key context for both ML-DSA and Composite-ML-DSA. The family specific
 // behavior is dispatched through the backend descriptor. The raw SymCrypt key
-// handle is stored as a PVOID and the current key format as a plain int because
-// the underlying enum values differ between families. The parameter set is held
-// in the SCOSSL_MLDSA_PARAMS int typedef (see above).
+// handle is stored as a PVOID and the current key format in the
+// SCOSSL_MLDSA_KEY_FORMAT int typedef because the underlying enum values differ
+// between families. The parameter set is held in the SCOSSL_MLDSA_PARAMS int
+// typedef (see above).
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
     SCOSSL_MLDSA_PARAMS params;
-    int format;
+    SCOSSL_MLDSA_KEY_FORMAT format;
     PVOID key;
 } SCOSSL_MLDSA_KEY_CTX;
 
@@ -64,17 +73,17 @@ struct _SCOSSL_MLDSA_BACKEND
     // so the shared code always compares against these instead of hardcoded
     // constants. formatPrivateSeed is SCOSSL_MLDSA_FORMAT_NONE when the family
     // does not support the private seed format.
-    int formatNull;
-    int formatPublicKey;
-    int formatPrivateKey;
-    int formatPrivateSeed;
+    SCOSSL_MLDSA_KEY_FORMAT formatNull;
+    SCOSSL_MLDSA_KEY_FORMAT formatPublicKey;
+    SCOSSL_MLDSA_KEY_FORMAT formatPrivateKey;
+    SCOSSL_MLDSA_KEY_FORMAT formatPrivateSeed;
 
     // Whether the family supports the private seed format, and the seed size.
     BOOL supportsSeed;
     SIZE_T cbPrivateSeed;
 
     // Key format assigned to a freshly generated key.
-    int generatedFormat;
+    SCOSSL_MLDSA_KEY_FORMAT generatedFormat;
 
     // Algorithm/OID table and its length.
     SCOSSL_MLDSA_ALG_INFO *algInfos;
@@ -90,15 +99,15 @@ struct _SCOSSL_MLDSA_BACKEND
     const OSSL_PARAM *keygenSettableParams;
 
     // SymCrypt operation wrappers. The key handle is passed as a PVOID and the
-    // key format/parameter set as ints (the latter via SCOSSL_MLDSA_PARAMS).
-    // Each wrapper casts those to the concrete SymCrypt types for its own family
-    // before calling the underlying function.
+    // key format/parameter set as named int typedefs (SCOSSL_MLDSA_KEY_FORMAT
+    // and SCOSSL_MLDSA_PARAMS). Each wrapper casts those to the concrete
+    // SymCrypt types for its own family before calling the underlying function.
     PVOID          (*keyAllocate)(SCOSSL_MLDSA_PARAMS params);
     void           (*keyFree)(_In_ PVOID key);
     SYMCRYPT_ERROR (*keyGenerate)(_Inout_ PVOID key, UINT32 flags);
-    SYMCRYPT_ERROR (*keySetValue)(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, int format, UINT32 flags, _Inout_ PVOID key);
-    SYMCRYPT_ERROR (*keyGetValue)(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, int format, UINT32 flags);
-    SYMCRYPT_ERROR (*sizeofKeyFormat)(SCOSSL_MLDSA_PARAMS params, int format, _Out_ SIZE_T *pcbKeyFormat);
+    SYMCRYPT_ERROR (*keySetValue)(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags, _Inout_ PVOID key);
+    SYMCRYPT_ERROR (*keyGetValue)(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags);
+    SYMCRYPT_ERROR (*sizeofKeyFormat)(SCOSSL_MLDSA_PARAMS params, SCOSSL_MLDSA_KEY_FORMAT format, _Out_ SIZE_T *pcbKeyFormat);
     SYMCRYPT_ERROR (*sizeofSignature)(SCOSSL_MLDSA_PARAMS params, _Out_ SIZE_T *pcbSignature);
     // Common signing wrapper. pcbResult receives the number of bytes written,
     // which for fixed-size families is simply the maximum signature size.

@@ -27,8 +27,8 @@ static const OSSL_PARAM p_scossl_composite_mldsa_keygen_settable_param_types[] =
     OSSL_PARAM_END};
 
 //
-// Backend wrappers. Each casts the generic PVOID key handle and int format/
-// parameter values to the concrete Composite-ML-DSA SymCrypt types.
+// Backend wrappers. Each casts the generic PVOID key handle and the named int
+// typedef format/parameter values to the concrete Composite-ML-DSA SymCrypt types.
 //
 
 static PVOID p_scossl_composite_mldsa_backend_key_allocate(SCOSSL_MLDSA_PARAMS params)
@@ -46,17 +46,17 @@ static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_generate(_Inout_ PVOI
     return SymCryptCompositeMlDsakeyGenerate((PSYMCRYPT_COMPOSITE_MLDSAKEY)key, flags);
 }
 
-static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_set_value(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, int format, UINT32 flags, _Inout_ PVOID key)
+static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_set_value(_In_reads_bytes_(cbSrc) PCBYTE pbSrc, SIZE_T cbSrc, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags, _Inout_ PVOID key)
 {
     return SymCryptCompositeMlDsakeySetValue(pbSrc, cbSrc, (SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT)format, flags, (PSYMCRYPT_COMPOSITE_MLDSAKEY)key);
 }
 
-static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_get_value(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, int format, UINT32 flags)
+static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_key_get_value(_In_ PVOID key, _Out_writes_bytes_(cbDst) PBYTE pbDst, SIZE_T cbDst, SCOSSL_MLDSA_KEY_FORMAT format, UINT32 flags)
 {
     return SymCryptCompositeMlDsakeyGetValue((PCSYMCRYPT_COMPOSITE_MLDSAKEY)key, pbDst, cbDst, (SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT)format, flags);
 }
 
-static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_sizeof_key_format(SCOSSL_MLDSA_PARAMS params, int format, _Out_ SIZE_T *pcbKeyFormat)
+static SYMCRYPT_ERROR p_scossl_composite_mldsa_backend_sizeof_key_format(SCOSSL_MLDSA_PARAMS params, SCOSSL_MLDSA_KEY_FORMAT format, _Out_ SIZE_T *pcbKeyFormat)
 {
     return SymCryptCompositeMlDsaSizeofKeyFormatFromParams((SYMCRYPT_COMPOSITE_MLDSA_PARAMS)params, (SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT)format, pcbKeyFormat);
 }

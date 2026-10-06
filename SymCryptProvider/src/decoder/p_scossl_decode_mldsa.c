@@ -15,7 +15,7 @@ extern "C" {
 
 static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(_In_ const SCOSSL_MLDSA_BACKEND *backend,
                                                              _In_ const ASN1_OBJECT *algorithm,
-                                                             SCOSSL_MLDSA_PARAMS params, int format,
+                                                             SCOSSL_MLDSA_PARAMS params, SCOSSL_MLDSA_KEY_FORMAT format,
                                                              _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
@@ -67,7 +67,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const 
     int cbKey;
     ASN1_OCTET_STRING *p8Data = NULL;
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
-    int format;
+    SCOSSL_MLDSA_KEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
         !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info) ||

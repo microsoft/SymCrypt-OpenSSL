@@ -67,7 +67,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(const SCOSSL_MLD
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
-    int format = keyCtx->backend->formatNull;
+    SCOSSL_MLDSA_KEY_FORMAT format = keyCtx->backend->formatNull;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SCOSSL_MLDSA_KEY_CTX *copyCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLDSA_KEY_CTX));
 
@@ -548,7 +548,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
 {
     PCBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
-    int format;
+    SCOSSL_MLDSA_KEY_FORMAT format;
     const OSSL_PARAM *p;
 
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
@@ -715,7 +715,7 @@ cleanup:
 // Helper functions
 //
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSA_KEY_FORMAT format,
                                                      PBYTE *ppbKey, SIZE_T *pcbKey)
 {
     PBYTE pbKey = NULL;
@@ -801,7 +801,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(SCOSSL_MLDSA_KEY_CTX *keyCtx, int format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSA_KEY_FORMAT format,
                                                      PCBYTE pbKey, SIZE_T cbKey)
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
