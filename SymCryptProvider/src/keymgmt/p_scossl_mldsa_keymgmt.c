@@ -63,7 +63,7 @@ void p_scossl_mldsa_keymgmt_free_key_ctx(SCOSSL_MLDSA_KEY_CTX *keyCtx)
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection)
 {
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
@@ -122,7 +122,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, const OSSL_PARAM params[])
 {
     const OSSL_PARAM *p;
 
@@ -157,13 +157,13 @@ SCOSSL_STATUS p_scossl_mldsa_keygen_set_params(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, 
 }
 
 _Use_decl_annotations_
-const OSSL_PARAM *p_scossl_mldsa_keygen_settable_params(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, ossl_unused void *provCtx)
+static const OSSL_PARAM *p_scossl_mldsa_keygen_settable_params(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, ossl_unused void *provCtx)
 {
     return genCtx->backend->keygenSettableParams;
 }
 
 _Use_decl_annotations_
-void p_scossl_mldsa_keygen_cleanup(SCOSSL_MLDSA_KEYGEN_CTX *genCtx)
+static void p_scossl_mldsa_keygen_cleanup(SCOSSL_MLDSA_KEYGEN_CTX *genCtx)
 {
     if (genCtx == NULL)
         return;
@@ -181,7 +181,7 @@ void p_scossl_mldsa_keygen_cleanup(SCOSSL_MLDSA_KEYGEN_CTX *genCtx)
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(const OSSL_PARAM params[], const SCOSSL_MLDSA_BACKEND *backend, int mldsaParams)
+static SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(const OSSL_PARAM params[], const SCOSSL_MLDSA_BACKEND *backend, int mldsaParams)
 {
     SCOSSL_MLDSA_KEYGEN_CTX *genCtx = backend->supportsSeed ?
         OPENSSL_secure_zalloc(sizeof(SCOSSL_MLDSA_KEYGEN_CTX)) :
@@ -203,7 +203,7 @@ SCOSSL_MLDSA_KEYGEN_CTX *p_scossl_mldsa_keygen_init(const OSSL_PARAM params[], c
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keygen_set_template(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, SCOSSL_MLDSA_KEY_CTX *tmplCtx)
+static SCOSSL_STATUS p_scossl_mldsa_keygen_set_template(SCOSSL_MLDSA_KEYGEN_CTX *genCtx, SCOSSL_MLDSA_KEY_CTX *tmplCtx)
 {
     if (genCtx == NULL || tmplCtx == NULL)
     {
@@ -221,7 +221,7 @@ SCOSSL_STATUS p_scossl_mldsa_keygen_set_template(SCOSSL_MLDSA_KEYGEN_CTX *genCtx
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(SCOSSL_MLDSA_KEYGEN_CTX *genCtx,
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(SCOSSL_MLDSA_KEYGEN_CTX *genCtx,
                                             ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
@@ -284,7 +284,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_load(const void *reference, size_t reference_size)
+static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_load(const void *reference, size_t reference_size)
 {
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
 
@@ -298,19 +298,19 @@ SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_load(const void *reference, size_t 
 }
 
 _Use_decl_annotations_
-const OSSL_PARAM *p_scossl_mldsa_keymgmt_settable_params(ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_mldsa_keymgmt_settable_params(ossl_unused void *provctx)
 {
     return p_scossl_mldsa_keymgmt_settable_param_types;
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_params(ossl_unused SCOSSL_MLDSA_KEY_CTX *keyCtx, ossl_unused const OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_params(ossl_unused SCOSSL_MLDSA_KEY_CTX *keyCtx, ossl_unused const OSSL_PARAM params[])
 {
     return SCOSSL_SUCCESS;
 }
 
 _Use_decl_annotations_
-const OSSL_PARAM *p_scossl_mldsa_keymgmt_gettable_params(ossl_unused void *provctx)
+static const OSSL_PARAM *p_scossl_mldsa_keymgmt_gettable_params(ossl_unused void *provctx)
 {
     return p_scossl_mldsa_keymgmt_gettable_param_types;
 }
@@ -416,7 +416,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(SCOSSL_MLDSA_KEY_CTX *keyCtx, OSSL_PARAM params[])
+static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(SCOSSL_MLDSA_KEY_CTX *keyCtx, OSSL_PARAM params[])
 {
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
     OSSL_PARAM *p;
@@ -464,7 +464,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_params(SCOSSL_MLDSA_KEY_CTX *keyCtx, OS
 }
 
 _Use_decl_annotations_
-BOOL p_scossl_mldsa_keymgmt_has(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection)
+static BOOL p_scossl_mldsa_keymgmt_has(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection)
 {
     if (keyCtx == NULL)
     {
@@ -488,7 +488,7 @@ BOOL p_scossl_mldsa_keymgmt_has(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selectio
 }
 
 _Use_decl_annotations_
-BOOL p_scossl_mldsa_keymgmt_match(const SCOSSL_MLDSA_KEY_CTX *keyCtx1, const SCOSSL_MLDSA_KEY_CTX *keyCtx2,
+static BOOL p_scossl_mldsa_keymgmt_match(const SCOSSL_MLDSA_KEY_CTX *keyCtx1, const SCOSSL_MLDSA_KEY_CTX *keyCtx2,
                                   int selection)
 {
     PBYTE pbKey1 = NULL;
@@ -538,7 +538,7 @@ cleanup:
 }
 
 _Use_decl_annotations_
-const OSSL_PARAM *p_scossl_mldsa_keymgmt_impexp_types(ossl_unused int selection)
+static const OSSL_PARAM *p_scossl_mldsa_keymgmt_impexp_types(ossl_unused int selection)
 {
     return p_scossl_mldsa_impexp_types;
 }
@@ -838,6 +838,49 @@ cleanup:
 
     return ret;
 }
+
+//
+// Per-variant keymgmt dispatch table generation. The generated new_ctx and
+// keygen_init thunks bind the shared core above to a specific backend vtable
+// and SymCrypt parameter set.
+//
+#define IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(variant, backendPtr, symcryptParams)                                             \
+    static SCOSSL_MLDSA_KEY_CTX                                                                                         \
+    *p_scossl_##variant##_keymgmt_new_ctx(ossl_unused SCOSSL_PROVCTX *provCtx)                                          \
+    {                                                                                                                  \
+        return p_scossl_mldsa_keymgmt_new_ctx(backendPtr, symcryptParams);                                             \
+    }                                                                                                                  \
+                                                                                                                       \
+    static SCOSSL_MLDSA_KEYGEN_CTX                                                                                      \
+    *p_scossl_##variant##_keygen_init(ossl_unused SCOSSL_PROVCTX *provCtx,                                              \
+                                      ossl_unused int selection,                                                        \
+                                      _In_ const OSSL_PARAM params[])                                                   \
+    {                                                                                                                  \
+        return p_scossl_mldsa_keygen_init(params, backendPtr, symcryptParams);                                         \
+    }                                                                                                                  \
+                                                                                                                       \
+    const OSSL_DISPATCH p_scossl_##variant##_keymgmt_functions[] = {                                                   \
+        {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))p_scossl_##variant##_keymgmt_new_ctx},                                 \
+        {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))p_scossl_mldsa_keymgmt_dup_key_ctx},                                   \
+        {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))p_scossl_mldsa_keymgmt_free_key_ctx},                                 \
+        {OSSL_FUNC_KEYMGMT_GEN_SET_PARAMS, (void (*)(void))p_scossl_mldsa_keygen_set_params},                          \
+        {OSSL_FUNC_KEYMGMT_GEN_SETTABLE_PARAMS, (void (*)(void))p_scossl_mldsa_keygen_settable_params},                \
+        {OSSL_FUNC_KEYMGMT_GEN_CLEANUP, (void (*)(void))p_scossl_mldsa_keygen_cleanup},                                \
+        {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))p_scossl_##variant##_keygen_init},                                \
+        {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))p_scossl_mldsa_keygen_set_template},                      \
+        {OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))p_scossl_mldsa_keygen},                                                \
+        {OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))p_scossl_mldsa_keymgmt_load},                                         \
+        {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*)(void))p_scossl_mldsa_keymgmt_settable_params},                   \
+        {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))p_scossl_mldsa_keymgmt_set_params},                             \
+        {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_mldsa_keymgmt_gettable_params},                   \
+        {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_mldsa_keymgmt_get_params},                             \
+        {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_mldsa_keymgmt_has},                                           \
+        {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_mldsa_keymgmt_match},                                       \
+        {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_mldsa_keymgmt_impexp_types},                         \
+        {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_mldsa_keymgmt_impexp_types},                         \
+        {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))p_scossl_mldsa_keymgmt_import},                                     \
+        {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))p_scossl_mldsa_keymgmt_export},                                     \
+        {0, NULL}};
 
 //
 // Per-variant keymgmt dispatch tables for the pure ML-DSA family. The shared
