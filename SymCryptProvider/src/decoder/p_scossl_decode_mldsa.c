@@ -79,9 +79,8 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(PVOID vctx, const 
 
     cbKey = ASN1_STRING_length(p8Data);
 
-    // ML-DSA private keys may be encoded either as a raw private key or as the
-    // 32-byte private seed. Composite-ML-DSA has no seed format, so its keys are
-    // always the raw private key.
+    // ML-DSA private keys may be the raw private key or the 32-byte private seed.
+    // Composite-ML-DSA has no seed format, so its keys are always the raw key.
     format = (backend->supportsSeed && (SIZE_T)cbKey == backend->cbPrivateSeed) ?
         SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED : SCOSSL_MLDSA_KEY_FORMAT_PRIVATE;
 

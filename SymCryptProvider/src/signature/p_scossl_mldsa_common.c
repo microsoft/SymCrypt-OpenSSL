@@ -134,10 +134,9 @@ SCOSSL_STATUS p_scossl_mldsa_sign(SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    // The actual signature may be smaller than the maximum for some families
-    // (e.g. Composite-ML-DSA due to variations in Ecdsa-Sig-Value encoding), so
-    // query the maximum size when sig is NULL and report the exact number of
-    // bytes written otherwise.
+    // The signature may be smaller than the maximum for some families (e.g.
+    // Composite-ML-DSA), so report the maximum when sig is NULL and the exact
+    // number of bytes written otherwise.
     if (sig == NULL)
     {
         *siglen = cbSignatureMax;
@@ -269,8 +268,7 @@ SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(SCOSSL_MLDSA_SIGNATURE_CTX *ctx, con
         }
     }
 
-    // Some families (e.g. "pure" ML-DSA) expose additional parameters that are
-    // not supported yet; delegate their validation to the backend.
+    // Backends may expose additional, unsupported parameters to validate.
     if (ctx->backend->validateExtraSigCtxParams != NULL)
     {
         return ctx->backend->validateExtraSigCtxParams(params);
@@ -429,9 +427,7 @@ SCOSSL_STATUS p_scossl_mldsa_register_backend(const SCOSSL_MLDSA_BACKEND *backen
 {
     for (SIZE_T i = 0; i < backend->cAlgInfos; i++)
     {
-        // Don't double register algorithms. Some (e.g. "pure" ML-DSA on OpenSSL
-        // 3.5+) are already registered; others (e.g. Composite-ML-DSA) must be
-        // created if they have not already been registered.
+        // Reuse an existing registration, creating the object only if needed.
         backend->algInfos[i].nid = OBJ_sn2nid(backend->algInfos[i].snGroupName);
         if (backend->algInfos[i].nid == NID_undef)
         {

@@ -32,7 +32,6 @@ static const OSSL_PARAM p_scossl_mldsa_keygen_settable_param_types[] = {
 
 // Backend wrappers translating the family independent key handle, params and
 // format to the concrete "pure" ML-DSA SymCrypt types.
-
 static SYMCRYPT_MLDSAKEY_FORMAT p_scossl_mldsa_backend_format(SCOSSL_MLDSA_KEY_FORMAT format)
 {
     switch (format)

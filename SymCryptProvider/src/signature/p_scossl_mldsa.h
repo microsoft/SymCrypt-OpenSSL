@@ -10,15 +10,13 @@
 extern "C" {
 #endif
 
-// Both ML-DSA and Composite-ML-DSA use the same maximum context length.
 #define SCOSSL_MLDSA_CONTEXT_MAX_LENGTH SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH
 
-// The two families use distinct parameter-set enums (SYMCRYPT_MLDSA_PARAMS and
-// SYMCRYPT_COMPOSITE_MLDSA_PARAMS) that a shared signature cannot name at once,
-// so the value is carried as an int and each backend casts it to its own enum.
+// Carried as an int because the two families use distinct SymCrypt parameter-set
+// enums; each backend casts it to the enum for its family.
 typedef int SCOSSL_MLDSA_PARAMS;
 
-// Family independent key format. Each backend translates it to the concrete
+// Family independent key format; each backend translates it to the concrete
 // SymCrypt format enum for its family.
 typedef enum
 {
@@ -39,8 +37,6 @@ typedef struct
     SCOSSL_MLDSA_PARAMS params;
 } SCOSSL_MLDSA_ALG_INFO;
 
-// Key context shared by both families; family specific behavior is dispatched
-// through the backend descriptor.
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
@@ -49,14 +45,12 @@ typedef struct
     PVOID key;
 } SCOSSL_MLDSA_KEY_CTX;
 
-// Backend descriptor capturing every family specific difference between "pure"
-// ML-DSA and Composite-ML-DSA. The shared core operates only through this vtable.
+// Vtable capturing every difference between "pure" ML-DSA and Composite-ML-DSA.
+// The shared core operates only through this descriptor.
 struct _SCOSSL_MLDSA_BACKEND
 {
-    // Human readable family name used when printing keys (e.g. "MLDSA").
     const char *textName;
 
-    // Whether the family supports the private seed format, and the seed size.
     BOOL supportsSeed;
     SIZE_T cbPrivateSeed;
 
@@ -64,12 +58,10 @@ struct _SCOSSL_MLDSA_BACKEND
     SIZE_T cAlgInfos;
 
     const OSSL_PARAM *sigSettableCtxParams;
-    // NULL when the family has no extra signature context parameters to validate.
+    // NULL if the family has no extra signature context params to validate.
     SCOSSL_STATUS (*validateExtraSigCtxParams)(_In_ const OSSL_PARAM params[]);
     const OSSL_PARAM *keygenSettableParams;
 
-    // SymCrypt operation wrappers. Each casts the PVOID key handle and translates
-    // the family independent params/format to the concrete SymCrypt types.
     PVOID          (*keyAllocate)(SCOSSL_MLDSA_PARAMS params);
     void           (*keyFree)(_In_ PVOID key);
     SYMCRYPT_ERROR (*keyGenerate)(_Inout_ PVOID key, UINT32 flags);
@@ -91,8 +83,7 @@ struct _SCOSSL_MLDSA_BACKEND
     int            (*getSecurityBits)(SCOSSL_MLDSA_PARAMS params);
 };
 
-// Key generation context, shared by both families. The seed fields are only
-// used by families that support the private seed format.
+// Seed fields are only used by families that support the private seed format.
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
@@ -101,7 +92,6 @@ typedef struct
     SIZE_T cbSeed;
 } SCOSSL_MLDSA_KEYGEN_CTX;
 
-// Signature context, shared by both families.
 typedef struct
 {
     const SCOSSL_MLDSA_BACKEND *backend;
@@ -184,8 +174,7 @@ SCOSSL_STATUS p_scossl_mldsa_get_ctx_params(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx
 #endif
 
 //
-// "Pure" ML-DSA backend descriptor, shared by the signature, keymgmt, decoder
-// and encoder translation units for this family.
+// "Pure" ML-DSA backend descriptor, shared across this family's translation units.
 //
 extern const SCOSSL_MLDSA_BACKEND p_scossl_mldsa_backend;
 

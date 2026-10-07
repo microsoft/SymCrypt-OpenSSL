@@ -29,7 +29,6 @@ static const OSSL_PARAM p_scossl_composite_mldsa_keygen_settable_param_types[] =
 // Backend wrappers translating the family independent key handle, params and
 // format to the concrete Composite-ML-DSA SymCrypt types. Composite-ML-DSA has
 // no private seed format, so it is never requested (guarded by supportsSeed).
-
 static SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT p_scossl_composite_mldsa_backend_format(SCOSSL_MLDSA_KEY_FORMAT format)
 {
     switch (format)

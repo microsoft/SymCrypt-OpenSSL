@@ -168,8 +168,7 @@ static void p_scossl_mldsa_keygen_cleanup(SCOSSL_MLDSA_KEYGEN_CTX *genCtx)
     if (genCtx == NULL)
         return;
 
-    // The seed is sensitive, so families that support it allocate the context in
-    // secure memory and must clear it before freeing.
+    // The seed is sensitive; families that support it allocate in secure memory.
     if (genCtx->backend->supportsSeed)
     {
         OPENSSL_secure_clear_free(genCtx, sizeof(SCOSSL_MLDSA_KEYGEN_CTX));
@@ -661,8 +660,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
-        // Export the seed alongside the private key when the key was created from
-        // one and the family supports it.
+        // Export the seed alongside the private key when the key was created from one.
         if (keyCtx->backend->supportsSeed &&
             keyCtx->format == SCOSSL_MLDSA_KEY_FORMAT_PRIVATE_SEED)
         {
@@ -770,8 +768,8 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
 
         pbKey = *ppbKey;
     }
-    // Always using OPENSSL_secure_malloc so caller doesn't have to worry about
-    // calling separate free functions for public and private keys.
+    // Allocate with OPENSSL_secure_malloc so the caller frees public and private
+    // keys the same way.
     else if ((pbKey = OPENSSL_secure_malloc(cbKey)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -841,9 +839,7 @@ cleanup:
 }
 
 //
-// Per-variant keymgmt dispatch table generation. The generated new_ctx and
-// keygen_init thunks bind the shared core above to a specific backend vtable
-// and SymCrypt parameter set.
+// Per-variant keymgmt dispatch table generation
 //
 #define IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(variant, backendPtr, symcryptParams)                                             \
     static SCOSSL_MLDSA_KEY_CTX                                                                                         \
@@ -884,15 +880,14 @@ cleanup:
         {0, NULL}};
 
 //
-// Per-variant keymgmt dispatch tables for the pure ML-DSA family. The shared
-// core above is also used by the Composite-ML-DSA variants below.
+// ML-DSA standalone
 //
 IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(mldsa44, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA44)
 IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(mldsa65, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA65)
 IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(mldsa87, &p_scossl_mldsa_backend, SYMCRYPT_MLDSA_PARAMS_MLDSA87)
 
 //
-// Per-variant keymgmt dispatch tables for the Composite-ML-DSA family.
+// ML-DSA composite
 //
 IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(composite_mldsa44_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA44_ECDSA_P256_SHA256)
 IMPLEMENT_SCOSSL_MLDSA_KEYMGMT(composite_mldsa65_ecdsa_p256, &p_scossl_composite_mldsa_backend, SYMCRYPT_COMPOSITE_MLDSA_PARAMS_MLDSA65_ECDSA_P256_SHA512)

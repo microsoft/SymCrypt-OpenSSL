@@ -433,6 +433,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_encoder_import_object(ossl_unused PV
     return keyCtx;
 }
 
+//
 // Per-variant encoder dispatch table generation
 //
 #define IMPLEMENT_SCOSSL_MLDSA_ASN1_ENCODER(variant, encoderType)                                                  \

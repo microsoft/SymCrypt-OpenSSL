@@ -11,8 +11,7 @@
 extern "C" {
 #endif
 
-// Composite-ML-DSA backend descriptor, shared by the signature, keymgmt, decoder
-// and encoder translation units for this family.
+// Composite-ML-DSA backend descriptor, shared across this family's translation units.
 extern const SCOSSL_MLDSA_BACKEND p_scossl_composite_mldsa_backend;
 
 SCOSSL_STATUS p_scossl_composite_mldsa_register_algorithms();
