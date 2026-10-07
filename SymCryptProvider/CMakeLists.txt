@@ -47,6 +47,7 @@ set(SCOSSL_SOURCES
     ./src/keymgmt/p_scossl_ecc_keymgmt.c
     ./src/keymgmt/p_scossl_kdf_keymgmt.c
     ./src/keymgmt/p_scossl_mldsa_keymgmt.c
+    ./src/keymgmt/p_scossl_composite_mldsa_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_keymgmt.c
     ./src/keymgmt/p_scossl_mlkem_hybrid_keymgmt.c
     ./src/keymgmt/p_scossl_rsa_keymgmt.c
@@ -56,7 +57,6 @@ set(SCOSSL_SOURCES
     ./src/signature/p_scossl_ecdsa_signature.c
     ./src/signature/p_scossl_ecdsa_sigalg_signature.c
     ./src/signature/p_scossl_mldsa.c
-    ./src/signature/p_scossl_mldsa_common.c
     ./src/signature/p_scossl_composite_mldsa.c
     ./src/signature/p_scossl_rsa_signature.c
     ./src/signature/p_scossl_rsa_sigalg_signature.c
