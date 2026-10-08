@@ -162,35 +162,17 @@ cleanup:
 }
 
 
-static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                               _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                               int selection,
-                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
+// Key-type independent write helpers shared by the pure and composite encoders.
+static SCOSSL_STATUS p_scossl_mldsa_write_encrypted_p8info(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                           _In_ PKCS8_PRIV_KEY_INFO *p8Info,
+                                                           _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
     OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     int encodeSuccess;
-    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     X509_SIG *p8 = NULL;
     char pbPass[PEM_BUFSIZE];
     SIZE_T cbPass = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
-    if (((selection & ctx->desc->selection) == 0))
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
-        goto cleanup;
-    }
-
-    if (ctx->cipher == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
-        goto cleanup;
-    }
-
-    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
-    {
-        goto cleanup;
-    }
 
     if (!passphraseCb(pbPass, sizeof(pbPass), &cbPass, NULL, passphraseCbArgs))
     {
@@ -223,8 +205,86 @@ static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCOD
 
 cleanup:
     OPENSSL_cleanse(pbPass, sizeof(pbPass));
-    PKCS8_PRIV_KEY_INFO_free(p8Info);
     X509_SIG_free(p8);
+
+    return ret;
+}
+
+static SCOSSL_STATUS p_scossl_mldsa_write_p8info(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                 _In_ PKCS8_PRIV_KEY_INFO *p8Info)
+{
+    int encodeSuccess;
+
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
+    }
+    else
+    {
+        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+static SCOSSL_STATUS p_scossl_mldsa_write_pubkey(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                 _In_ X509_PUBKEY *pubKey)
+{
+    int encodeSuccess;
+
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
+    }
+    else
+    {
+        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                               _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                                               int selection,
+                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
+{
+    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
+
+    if (ctx->cipher == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
+        goto cleanup;
+    }
+
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
+    {
+        goto cleanup;
+    }
+
+    ret = p_scossl_mldsa_write_encrypted_p8info(ctx, out, p8Info, passphraseCb, passphraseCbArgs);
+
+cleanup:
+    PKCS8_PRIV_KEY_INFO_free(p8Info);
 
     return ret;
 }
@@ -234,7 +294,6 @@ static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
                                                       int selection,
                                                       _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
-    int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -254,22 +313,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
         goto cleanup;
     }
 
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
-    }
-    else
-    {
-        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
-    }
-
-    ret = SCOSSL_SUCCESS;
+    ret = p_scossl_mldsa_write_p8info(ctx, out, p8Info);
 
 cleanup:
     PKCS8_PRIV_KEY_INFO_free(p8Info);
@@ -282,7 +326,6 @@ static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
                                                             int selection,
                                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
-    int encodeSuccess;
     X509_PUBKEY *pubKey = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -297,22 +340,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
         goto cleanup;
     }
 
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
-    }
-    else
-    {
-        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
-    }
-
-    ret = SCOSSL_SUCCESS;
+    ret = p_scossl_mldsa_write_pubkey(ctx, out, pubKey);
 
 cleanup:
     X509_PUBKEY_free(pubKey);
@@ -663,12 +691,7 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_EncryptedPrivateKeyInfo(_In_ SC
                                                                          int selection,
                                                                          _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
-    OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
-    int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
-    X509_SIG *p8 = NULL;
-    char pbPass[PEM_BUFSIZE];
-    SIZE_T cbPass = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (((selection & ctx->desc->selection) == 0))
@@ -688,39 +711,10 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_EncryptedPrivateKeyInfo(_In_ SC
         goto cleanup;
     }
 
-    if (!passphraseCb(pbPass, sizeof(pbPass), &cbPass, NULL, passphraseCbArgs))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_UNABLE_TO_GET_PASSPHRASE);
-        goto cleanup;
-    }
-
-    if ((p8 = PKCS8_encrypt_ex(-1, ctx->cipher, pbPass, cbPass, NULL, 0, 0, p8Info, libctx, NULL)) == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-        goto cleanup;
-    }
-
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_PKCS8(out, p8);
-    }
-    else
-    {
-        encodeSuccess = i2d_PKCS8_bio(out, p8);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
-    }
-
-    ret = SCOSSL_SUCCESS;
+    ret = p_scossl_mldsa_write_encrypted_p8info(ctx, out, p8Info, passphraseCb, passphraseCbArgs);
 
 cleanup:
-    OPENSSL_cleanse(pbPass, sizeof(pbPass));
     PKCS8_PRIV_KEY_INFO_free(p8Info);
-    X509_SIG_free(p8);
 
     return ret;
 }
@@ -730,7 +724,6 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCO
                                                                 int selection,
                                                                 _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
-    int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -750,22 +743,7 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCO
         goto cleanup;
     }
 
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
-    }
-    else
-    {
-        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
-    }
-
-    ret = SCOSSL_SUCCESS;
+    ret = p_scossl_mldsa_write_p8info(ctx, out, p8Info);
 
 cleanup:
     PKCS8_PRIV_KEY_INFO_free(p8Info);
@@ -778,7 +756,6 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSS
                                                                       int selection,
                                                                       ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
-    int encodeSuccess;
     X509_PUBKEY *pubKey = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -793,22 +770,7 @@ static SCOSSL_STATUS p_scossl_composite_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSS
         goto cleanup;
     }
 
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
-    }
-    else
-    {
-        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
-    }
-
-    ret = SCOSSL_SUCCESS;
+    ret = p_scossl_mldsa_write_pubkey(ctx, out, pubKey);
 
 cleanup:
     X509_PUBKEY_free(pubKey);
