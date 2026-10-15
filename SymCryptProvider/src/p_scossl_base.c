@@ -14,7 +14,6 @@
 #include "p_scossl_names.h"
 #include "kem/p_scossl_mlkem.h"
 #include "signature/p_scossl_mldsa.h"
-#include "signature/p_scossl_composite_mldsa.h"
 
 #ifdef KEYSINUSE_ENABLED
 #include "keysinuse.h"
@@ -673,8 +672,7 @@ static const OSSL_ALGORITHM p_scossl_skeymgmt[] = {
 static SCOSSL_STATUS p_scossl_register_extended_algorithms()
 {
     if (p_scossl_mlkem_register_algorithms() != SCOSSL_SUCCESS ||
-        p_scossl_mldsa_register_algorithms() != SCOSSL_SUCCESS ||
-        p_scossl_composite_mldsa_register_algorithms() != SCOSSL_SUCCESS)
+        p_scossl_mldsa_register_algorithms() != SCOSSL_SUCCESS)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_INIT_FAIL);
         return SCOSSL_FAILURE;
