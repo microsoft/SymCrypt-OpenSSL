@@ -119,6 +119,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
 
     ctx->keyCtx = keyCtx;
     ctx->operation = operation;
+    ctx->externalMu = FALSE;
 
     return p_scossl_mldsa_set_ctx_params(ctx, params);
 }
@@ -270,6 +271,7 @@ static SCOSSL_STATUS p_scossl_mldsa_digest_signverify_init(_In_ SCOSSL_MLDSA_SIG
         ctx->keyCtx != NULL)
     {
         ctx->operation = operation;
+        ctx->externalMu = FALSE;
         return p_scossl_mldsa_set_ctx_params(ctx, params);
     }
 
