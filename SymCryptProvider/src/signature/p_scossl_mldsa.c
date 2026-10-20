@@ -30,6 +30,7 @@ typedef struct
     SCOSSL_MLDSA_PARAMS mldsaParams;
     SCOSSL_MLDSA_KEY_CTX *keyCtx;
     int operation;
+    BOOL externalMu;
 
     BYTE abContext[SCOSSL_MLDSA_CONTEXT_MAX_LENGTH];
     SIZE_T cbContext;
@@ -50,7 +51,6 @@ static const OSSL_PARAM p_scossl_mldsa_ctx_settable_param_types[] = {
 static const OSSL_PARAM p_scossl_composite_mldsa_ctx_settable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_CONTEXT_STRING, NULL, 0),
     OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, 0),
-    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_MU, 0),
     OSSL_PARAM_END};
 
 static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx, _In_ const OSSL_PARAM params[]);
@@ -91,6 +91,7 @@ static SCOSSL_MLDSA_SIGNATURE_CTX *p_scossl_mldsa_dupctx(_In_ SCOSSL_MLDSA_SIGNA
     copyCtx->mldsaParams = ctx->mldsaParams;
     copyCtx->keyCtx = ctx->keyCtx;
     copyCtx->operation = ctx->operation;
+    copyCtx->externalMu = ctx->externalMu;
     copyCtx->cbContext = ctx->cbContext;
     memcpy(copyCtx->abContext, ctx->abContext, ctx->cbContext);
 
@@ -132,6 +133,7 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
 
     ctx->keyCtx = keyCtx;
     ctx->operation = operation;
+    ctx->externalMu = FALSE;
 
     return p_scossl_mldsa_set_ctx_params(ctx, params);
 }
@@ -205,6 +207,19 @@ static SCOSSL_STATUS p_scossl_mldsa_sign(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
 
             cbSignature = cbResult;
         }
+        else if (ctx->externalMu)
+        {
+            scError = SymCryptExternalMuMlDsaSign(
+                ctx->keyCtx->key,
+                tbs, tbslen,
+                0,
+                sig, cbSignature);
+            if (scError != SYMCRYPT_NO_ERROR)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptExternalMuMlDsaSign failed", scError);
+                return SCOSSL_FAILURE;
+            }
+        }
         else
         {
             scError = SymCryptMlDsaSign(
@@ -261,6 +276,34 @@ static SCOSSL_STATUS p_scossl_mldsa_verify(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
             ctx->abContext, ctx->cbContext,
             sig, siglen,
             0);
+      
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptCompositeMlDsaVerify returned unexpected error", scError);
+            }
+
+            return SCOSSL_FAILURE;
+        }
+    }
+    else if (ctx->externalMu)
+    {
+        scError = SymCryptExternalMuMlDsaVerify(
+            ctx->keyCtx->key,
+            tbs, tbslen,
+            sig, siglen,
+            0);
+      
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptExternalMuMlDsaVerify returned unexpected error", scError);
+            }
+
+            return SCOSSL_FAILURE;
+        }
     }
     else
     {
@@ -270,16 +313,16 @@ static SCOSSL_STATUS p_scossl_mldsa_verify(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
             ctx->abContext, ctx->cbContext,
             sig, siglen,
             0);
-    }
-
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+        
+        if (scError != SYMCRYPT_NO_ERROR)
         {
-            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaVerify returned unexpected error", scError);
-        }
+            if (scError != SYMCRYPT_SIGNATURE_VERIFICATION_FAILURE)
+            {
+                SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptMlDsaVerify returned unexpected error", scError);
+            }
 
-        return SCOSSL_FAILURE;
+            return SCOSSL_FAILURE;
+        }
     }
 
     return SCOSSL_SUCCESS;
@@ -300,6 +343,7 @@ static SCOSSL_STATUS p_scossl_mldsa_digest_signverify_init(_In_ SCOSSL_MLDSA_SIG
         ctx->keyCtx != NULL)
     {
         ctx->operation = operation;
+        ctx->externalMu = FALSE;
         return p_scossl_mldsa_set_ctx_params(ctx, params);
     }
 
@@ -333,7 +377,7 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
         }
     }
 
-    // Unsupported parameters, check value matches default
+    // Unsupported parameter, check value matches default
     if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DETERMINISTIC)) != NULL)
     {
         int deterministic;
@@ -350,24 +394,20 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
         }
     }
 
-    if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MU)) != NULL)
-    {
-        int mu;
-        if (!OSSL_PARAM_get_int(p, &mu))
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return SCOSSL_FAILURE;
-        }
-
-        if (mu != 0)
-        {
-            ERR_raise(ERR_LIB_PROV, PROV_R_NOT_SUPPORTED);
-            return SCOSSL_FAILURE;
-        }
-    }
-
     if (!ctx->isComposite)
     {
+        if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MU)) != NULL)
+        {
+            int mu;
+            if (!OSSL_PARAM_get_int(p, &mu))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                return SCOSSL_FAILURE;
+            }
+
+            ctx->externalMu = mu != 0;
+        }  
+      
         if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_MESSAGE_ENCODING)) != NULL)
         {
             int messageEncoding;
@@ -384,6 +424,7 @@ static SCOSSL_STATUS p_scossl_mldsa_set_ctx_params(_Inout_ SCOSSL_MLDSA_SIGNATUR
             }
         }
 
+        // Unsupported parameter, check value matches default
         if ((p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_TEST_ENTROPY)) != NULL &&
             p->data_size != 0)
         {
