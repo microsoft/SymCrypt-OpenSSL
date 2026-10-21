@@ -71,31 +71,42 @@ static PVOID p_scossl_PrivateKeyInfo_to_mldsa(_In_ SCOSSL_DECODE_CTX *ctx, BOOL 
     SCOSSL_MLDSAKEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
-        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info) ||
-        d2i_ASN1_OCTET_STRING(&p8Data, &pbKey, cbKey) == NULL)
+        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
     }
 
-    cbKey = ASN1_STRING_length(p8Data);
-
+    // Composite private keys are placed directly in the PKCS#8 privateKey
+    // OCTET STRING without further encoding (draft-ietf-lamps-pq-composite-sigs)
     if (isComposite)
     {
         format = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PRIVATE_KEY;
     }
-    else if (cbKey == SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
-    {
-        format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
-    }
     else
     {
-        format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+        if (d2i_ASN1_OCTET_STRING(&p8Data, &pbKey, cbKey) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+            goto cleanup;
+        }
+
+        pbKey = ASN1_STRING_get0_data(p8Data);
+        cbKey = ASN1_STRING_length(p8Data);
+
+        if (cbKey == SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
+        {
+            format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
+        }
+        else
+        {
+            format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+        }
     }
 
     keyCtx = p_scossl_mldsa_decode_key_bytes(ctx, isComposite, algorithm,
                                              mldsaParams, format,
-                                             ASN1_STRING_get0_data(p8Data), cbKey);
+                                             pbKey, cbKey);
 
 cleanup:
     ASN1_STRING_clear_free(p8Data);

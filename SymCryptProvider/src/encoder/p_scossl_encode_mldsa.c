@@ -50,18 +50,37 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         goto cleanup;
     }
 
-    if ((p8Data = ASN1_OCTET_STRING_new()) == NULL ||
-        (p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
+    if ((p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
-    if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
-        (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+    // Composite private keys are placed directly in the PKCS#8 privateKey
+    // OCTET STRING without further encoding (draft-ietf-lamps-pq-composite-sigs)
+    if (keyCtx->isComposite)
     {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        goto cleanup;
+        if ((pbDer = OPENSSL_memdup(pbKey, cbKey)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+        cbDer = (int)cbKey;
+    }
+    else
+    {
+        if ((p8Data = ASN1_OCTET_STRING_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
+            (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+            goto cleanup;
+        }
     }
 
     if ((p8Obj = p_scossl_encode_mldsa_get_oid(keyCtx)) == NULL)
