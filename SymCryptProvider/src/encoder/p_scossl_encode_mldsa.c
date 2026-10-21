@@ -436,7 +436,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
 
     ret = p_scossl_mldsa_write_text(out, keyCtx->isComposite ? "Composite-MLDSA" : "MLDSA",
                                     pbPrivKey, cbPrivKey,
-                                    !keyCtx->isComposite && keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
+                                    keyCtx->format == keyCtx->formats->privateSeed,
                                     pbPubKey, cbPubKey,
                                     p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams, keyCtx->isComposite));
 

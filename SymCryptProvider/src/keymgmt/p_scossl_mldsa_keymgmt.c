@@ -22,22 +22,17 @@ typedef struct
     SIZE_T cbSeed;
 } SCOSSL_MLDSA_KEYGEN_CTX;
 
-struct SCOSSL_MLDSA_KEY_FORMATS_st
-{
-    SCOSSL_MLDSAKEY_FORMAT null;
-    SCOSSL_MLDSAKEY_FORMAT publicKey;
-    SCOSSL_MLDSAKEY_FORMAT privateKey;
-};
-
 static const SCOSSL_MLDSA_KEY_FORMATS p_scossl_mldsa_formats = {
     .null = SYMCRYPT_MLDSAKEY_FORMAT_NULL,
-    .publicKey = SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY,
-    .privateKey = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY};
+    .privateSeed = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
+    .privateKey = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY,
+    .publicKey = SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY};
 
 static const SCOSSL_MLDSA_KEY_FORMATS p_scossl_composite_mldsa_formats = {
     .null = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_NULL,
-    .publicKey = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PUBLIC_KEY,
-    .privateKey = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PRIVATE_KEY};
+    .privateSeed = SCOSSL_MLDSAKEY_FORMAT_UNSUPPORTED,
+    .privateKey = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PRIVATE_KEY,
+    .publicKey = SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PUBLIC_KEY};
 
 // Standalone ML-DSA keymgmt parameters
 static const OSSL_PARAM p_scossl_mldsa_keygen_settable_param_types[] = {
@@ -320,7 +315,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(_In_ SCOSSL_MLDSA_KEYGEN_CTX 
             }
         }
 
-        keyCtx->format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
+        keyCtx->format = keyCtx->formats->privateSeed;
     }
 
     status = SCOSSL_SUCCESS;
@@ -376,7 +371,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
         {
             paramPrivKey = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PRIV_KEY);
 
-            if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+            if (keyCtx->format == keyCtx->formats->privateSeed)
             {
                 paramPrivateSeed = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ML_DSA_SEED);
             }
@@ -423,7 +418,7 @@ static SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_key_params(_In_ SCOSSL_MLDSA_KEY
 
     if (paramPrivateSeed != NULL)
     {
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->formats->privateSeed, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get private seed");
             goto cleanup;
@@ -506,7 +501,7 @@ BOOL p_scossl_mldsa_keymgmt_has(const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selectio
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
         keyCtx->format != keyCtx->formats->privateKey &&
-        (keyCtx->isComposite || keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED))
+        keyCtx->format != keyCtx->formats->privateSeed)
     {
         return FALSE;
     }
@@ -582,9 +577,6 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
         return SCOSSL_FAILURE;
     }
 
-    p_scossl_mldsa_key_free(keyCtx->isComposite, keyCtx->key);
-    keyCtx->key = NULL;
-
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
     {
         if (!keyCtx->isComposite &&
@@ -596,7 +588,7 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
                 return SCOSSL_FAILURE;
             }
 
-            format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
+            format = keyCtx->formats->privateSeed;
         }
         else if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY)) != NULL)
         {
@@ -680,10 +672,9 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(SCOSSL_MLDSA_KEY_CTX *keyCtx, int se
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0 &&
         p_scossl_mldsa_keymgmt_has(keyCtx, OSSL_KEYMGMT_SELECT_PRIVATE_KEY))
     {
-        if (!keyCtx->isComposite &&
-            keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+        if (keyCtx->format == keyCtx->formats->privateSeed)
         {
-            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
+            if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->formats->privateSeed, &pbSeed, &cbSeed) != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
@@ -776,10 +767,9 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(const SCOSSL_MLDSA_KEY_CTX 
         goto cleanup;
     }
 
-    if (!keyCtx->isComposite &&
-        format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+    if (format == keyCtx->formats->privateSeed)
     {
-        if (keyCtx->format != SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+        if (keyCtx->format != keyCtx->formats->privateSeed)
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_SEED);
             goto cleanup;

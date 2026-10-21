@@ -25,9 +25,17 @@ typedef struct {
     BOOL isComposite;
 } SCOSSL_MLDSA_ALG_INFO;
 
-// The pure and composite SymCrypt key format enumerations overlap numerically, so the
-// format values are selected by the keymgmt, which owns the definition of this struct
-typedef struct SCOSSL_MLDSA_KEY_FORMATS_st SCOSSL_MLDSA_KEY_FORMATS;
+// Used for key formats a variant does not support. Never matches a SymCrypt key format.
+#define SCOSSL_MLDSAKEY_FORMAT_UNSUPPORTED (-1)
+
+// The pure and composite SymCrypt key format enumerations overlap numerically, so
+// each key context references the format values for its variant
+typedef struct {
+    SCOSSL_MLDSAKEY_FORMAT null;
+    SCOSSL_MLDSAKEY_FORMAT privateSeed;
+    SCOSSL_MLDSAKEY_FORMAT privateKey;
+    SCOSSL_MLDSAKEY_FORMAT publicKey;
+} SCOSSL_MLDSA_KEY_FORMATS;
 
 #define SCOSSL_MLDSA_CONTEXT_MAX_LENGTH                                                \
     (SYMCRYPT_MLDSA_CONTEXT_MAX_LENGTH > SYMCRYPT_COMPOSITE_MLDSA_CONTEXT_MAX_LENGTH ? \
