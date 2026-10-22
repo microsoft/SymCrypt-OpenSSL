@@ -53,7 +53,7 @@ static const OSSL_PARAM p_scossl_mldsa_keymgmt_gettable_param_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-static const OSSL_PARAM p_scossl_mldsa_impexp_param_types[] = {
+static const OSSL_PARAM p_scossl_mldsa_impexp_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ML_DSA_SEED, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
@@ -77,7 +77,7 @@ static const OSSL_PARAM p_scossl_composite_mldsa_keymgmt_gettable_param_types[] 
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
     OSSL_PARAM_END};
 
-static const OSSL_PARAM p_scossl_composite_mldsa_impexp_param_types[] = {
+static const OSSL_PARAM p_scossl_composite_mldsa_impexp_types[] = {
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
     OSSL_PARAM_END};
@@ -721,12 +721,6 @@ cleanup:
 //
 
 _Use_decl_annotations_
-SCOSSL_MLDSAKEY_FORMAT p_scossl_mldsa_keymgmt_get_public_key_format(const SCOSSL_MLDSA_KEY_CTX *keyCtx)
-{
-    return keyCtx->formats->publicKey;
-}
-
-_Use_decl_annotations_
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key_size(const SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSAKEY_FORMAT format,
                                                           SIZE_T *pcbKey)
 {
@@ -1006,7 +1000,7 @@ static SIZE_T p_scossl_mldsa_get_max_size(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx)
                                                                                                           \
     static const OSSL_PARAM *p_scossl_##alg##_keymgmt_impexp_types(ossl_unused int selection)             \
     {                                                                                                     \
-        return paramPrefix##_impexp_param_types;                                                          \
+        return paramPrefix##_impexp_types;                                                                \
     }                                                                                                     \
                                                                                                           \
     const OSSL_DISPATCH p_scossl_##alg##_keymgmt_functions[] = {                                          \

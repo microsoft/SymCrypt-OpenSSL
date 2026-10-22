@@ -14,7 +14,6 @@
 extern "C" {
 #endif
 
-
 static ASN1_OBJECT *p_scossl_encode_mldsa_get_oid(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
     int nid = p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams, keyCtx->isComposite);
@@ -132,7 +131,7 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mldsa_keymgmt_get_encoded_key_size(keyCtx, p_scossl_mldsa_keymgmt_get_public_key_format(keyCtx), &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mldsa_keymgmt_get_encoded_key_size(keyCtx, keyCtx->formats->publicKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -146,7 +145,7 @@ static X509_PUBKEY *p_scossl_mldsa_key_to_pubkey(_In_ const SCOSSL_MLDSA_KEY_CTX
         goto cleanup;
     }
 
-    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, p_scossl_mldsa_keymgmt_get_public_key_format(keyCtx), &pbKey, &cbKey) != SCOSSL_SUCCESS)
+    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->formats->publicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
     {
         goto cleanup;
     }
@@ -179,17 +178,35 @@ cleanup:
 }
 
 
-// Key-type independent write helpers shared by the pure and composite encoders.
-static SCOSSL_STATUS p_scossl_mldsa_write_encrypted_p8info(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                           _In_ PKCS8_PRIV_KEY_INFO *p8Info,
-                                                           _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
+static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
+                                                               _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
+                                                               int selection,
+                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
     OSSL_LIB_CTX *libctx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     int encodeSuccess;
+    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     X509_SIG *p8 = NULL;
     char pbPass[PEM_BUFSIZE];
     SIZE_T cbPass = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    if (((selection & ctx->desc->selection) == 0))
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        goto cleanup;
+    }
+
+    if (ctx->cipher == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
+        goto cleanup;
+    }
+
+    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
+    {
+        goto cleanup;
+    }
 
     if (!passphraseCb(pbPass, sizeof(pbPass), &cbPass, NULL, passphraseCbArgs))
     {
@@ -222,137 +239,8 @@ static SCOSSL_STATUS p_scossl_mldsa_write_encrypted_p8info(_In_ SCOSSL_ENCODE_CT
 
 cleanup:
     OPENSSL_cleanse(pbPass, sizeof(pbPass));
-    X509_SIG_free(p8);
-
-    return ret;
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_write_p8info(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                 _In_ PKCS8_PRIV_KEY_INFO *p8Info)
-{
-    int encodeSuccess;
-
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
-    }
-    else
-    {
-        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_write_pubkey(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                 _In_ X509_PUBKEY *pubKey)
-{
-    int encodeSuccess;
-
-    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
-    {
-        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
-    }
-    else
-    {
-        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
-    }
-
-    if (!encodeSuccess)
-    {
-        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-// The text form of a pure and a composite key differ only in the algorithm label and in whether the
-// private half may be a seed, so both encoders extract their own bytes and share the printing here.
-// A NULL key pointer means that half was not selected.
-static SCOSSL_STATUS p_scossl_mldsa_write_text(_Inout_ BIO *out, _In_z_ const char *label,
-                                               _In_reads_bytes_opt_(cbPrivKey) PCBYTE pbPrivKey, SIZE_T cbPrivKey, BOOL isSeed,
-                                               _In_reads_bytes_opt_(cbPubKey) PCBYTE pbPubKey, SIZE_T cbPubKey,
-                                               int nid)
-{
-    if (pbPrivKey != NULL)
-    {
-        if (isSeed)
-        {
-            if (BIO_printf(out, "%s Private-Key (256 bit private seed encoding):\nprivate-seed", label) <= 0)
-            {
-                return SCOSSL_FAILURE;
-            }
-        }
-        else if (BIO_printf(out, "%s Private-Key (%zu bit private key encoding):\nprivate-key", label, cbPrivKey * 8) <= 0)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        if (p_scossl_encode_write_key_bytes(pbPrivKey, cbPrivKey, out) != SCOSSL_SUCCESS)
-        {
-            return SCOSSL_FAILURE;
-        }
-    }
-
-    if (pbPubKey != NULL)
-    {
-        if ((pbPrivKey == NULL && BIO_printf(out, "%s Public-Key (%zu bit):\n", label, cbPubKey * 8) <= 0) ||
-            BIO_printf(out, "public-key") <= 0)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        if (p_scossl_encode_write_key_bytes(pbPubKey, cbPubKey, out) != SCOSSL_SUCCESS)
-        {
-            return SCOSSL_FAILURE;
-        }
-    }
-
-    if (nid != NID_undef &&
-        BIO_printf(out, "ALGORITHM: %s\n", OBJ_nid2ln(nid)) <= 0)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-static SCOSSL_STATUS p_scossl_mldsa_to_EncryptedPrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ctx, _Inout_ BIO *out,
-                                                               _In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                               int selection,
-                                                               _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
-{
-    PKCS8_PRIV_KEY_INFO *p8Info = NULL;
-    SCOSSL_STATUS ret = SCOSSL_FAILURE;
-
-    if (((selection & ctx->desc->selection) == 0))
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
-        goto cleanup;
-    }
-
-    if (ctx->cipher == NULL)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_CIPHER);
-        goto cleanup;
-    }
-
-    if ((p8Info = p_scossl_mldsa_key_to_p8info(keyCtx)) == NULL)
-    {
-        goto cleanup;
-    }
-
-    ret = p_scossl_mldsa_write_encrypted_p8info(ctx, out, p8Info, passphraseCb, passphraseCbArgs);
-
-cleanup:
     PKCS8_PRIV_KEY_INFO_free(p8Info);
+    X509_SIG_free(p8);
 
     return ret;
 }
@@ -362,6 +250,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
                                                       int selection,
                                                       _In_ OSSL_PASSPHRASE_CALLBACK *passphraseCb, _In_ void *passphraseCbArgs)
 {
+    int encodeSuccess;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -381,7 +270,22 @@ static SCOSSL_STATUS p_scossl_mldsa_to_PrivateKeyInfo(_In_ SCOSSL_ENCODE_CTX *ct
         goto cleanup;
     }
 
-    ret = p_scossl_mldsa_write_p8info(ctx, out, p8Info);
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_PKCS8_PRIV_KEY_INFO(out, p8Info);
+    }
+    else
+    {
+        encodeSuccess = i2d_PKCS8_PRIV_KEY_INFO_bio(out, p8Info);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     PKCS8_PRIV_KEY_INFO_free(p8Info);
@@ -394,6 +298,7 @@ static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
                                                             int selection,
                                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
+    int encodeSuccess;
     X509_PUBKEY *pubKey = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
@@ -408,7 +313,22 @@ static SCOSSL_STATUS p_scossl_mldsa_to_SubjectPublicKeyInfo(_In_ SCOSSL_ENCODE_C
         goto cleanup;
     }
 
-    ret = p_scossl_mldsa_write_pubkey(ctx, out, pubKey);
+    if (ctx->desc->outFormat == SCOSSL_ENCODE_PEM)
+    {
+        encodeSuccess = PEM_write_bio_X509_PUBKEY(out, pubKey);
+    }
+    else
+    {
+        encodeSuccess = i2d_X509_PUBKEY_bio(out, pubKey);
+    }
+
+    if (!encodeSuccess)
+    {
+        ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+        goto cleanup;
+    }
+
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
     X509_PUBKEY_free(pubKey);
@@ -421,10 +341,11 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
                                             int selection,
                                             ossl_unused OSSL_PASSPHRASE_CALLBACK *passphraseCb, ossl_unused void *passphraseCbArgs)
 {
-    PBYTE pbPrivKey = NULL;
-    SIZE_T cbPrivKey = 0;
-    PBYTE pbPubKey = NULL;
-    SIZE_T cbPubKey = 0;
+    const char *label = keyCtx->isComposite ? "Composite-MLDSA" : "MLDSA";
+    BOOL printedPrivateKey = FALSE;
+    PBYTE pbKey = NULL;
+    SIZE_T cbKey = 0;
+    int nid;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (keyCtx->key == NULL)
@@ -441,27 +362,66 @@ static SCOSSL_STATUS p_scossl_mldsa_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
             goto cleanup;
         }
 
-        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbPrivKey, &cbPrivKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->format, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        if (keyCtx->format == keyCtx->formats->privateSeed)
+        {
+            if (BIO_printf(out, "%s Private-Key (256 bit private seed encoding):\nprivate-seed", label) <= 0)
+            {
+                goto cleanup;
+            }
+        }
+        else if (BIO_printf(out, "%s Private-Key (%ld bit private key encoding):\nprivate-key", label, cbKey * 8) <= 0)
+        {
+            goto cleanup;
+        }
+
+        if (p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        printedPrivateKey = TRUE;
+    }
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0)
+    {
+        OPENSSL_secure_clear_free(pbKey, cbKey);
+        pbKey = NULL;
+        cbKey = 0;
+
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->formats->publicKey, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        if ((!printedPrivateKey && BIO_printf(out, "%s Public-Key (%ld bit):\n", label, cbKey * 8) <= 0) ||
+                 BIO_printf(out, "public-key") <= 0)
+        {
+            goto cleanup;
+        }
+
+        if (p_scossl_encode_write_key_bytes(pbKey, cbKey, out) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0 &&
-        p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, p_scossl_mldsa_keymgmt_get_public_key_format(keyCtx), &pbPubKey, &cbPubKey) != SCOSSL_SUCCESS)
+    nid = p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams, keyCtx->isComposite);
+
+    if (nid != NID_undef &&
+        BIO_printf(out, "ALGORITHM: %s\n", OBJ_nid2ln(nid)) <= 0)
     {
         goto cleanup;
     }
 
-    ret = p_scossl_mldsa_write_text(out, keyCtx->isComposite ? "Composite-MLDSA" : "MLDSA",
-                                    pbPrivKey, cbPrivKey,
-                                    keyCtx->format == keyCtx->formats->privateSeed,
-                                    pbPubKey, cbPubKey,
-                                    p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams, keyCtx->isComposite));
+    ret = SCOSSL_SUCCESS;
 
 cleanup:
-    OPENSSL_secure_clear_free(pbPrivKey, cbPrivKey);
-    OPENSSL_secure_clear_free(pbPubKey, cbPubKey);
+    OPENSSL_secure_clear_free(pbKey, cbKey);
 
     return ret;
 }
@@ -492,30 +452,30 @@ static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_text_newctx(_In_ SCOSSL_PROVCTX *pro
     return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_text_desc);
 }
 
-#define MAKE_MLDSA_ASN1_ENCODER(encoderType)                                                                         \
-    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_der_desc = {                                    \
-        select_##encoderType,                                                                                        \
-        SCOSSL_ENCODE_DER,                                                                                           \
-        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                                \
-                                                                                                                     \
-    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_pem_desc = {                                    \
-        select_##encoderType,                                                                                        \
-        SCOSSL_ENCODE_PEM,                                                                                           \
-        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                                \
-                                                                                                                     \
-    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)             \
-    {                                                                                                                \
-        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_der_desc);                            \
-    }                                                                                                                \
-                                                                                                                     \
-    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)             \
-    {                                                                                                                \
-        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_pem_desc);                            \
-    }                                                                                                                \
-                                                                                                                     \
-    static BOOL p_scossl_der_to_mldsa_##encoderType##_does_selection(ossl_unused void *provctx, int selection)       \
-    {                                                                                                                \
-        return p_scossl_encode_does_selection(&p_scossl_mldsa_##encoderType##_der_desc, selection);                  \
+#define MAKE_MLDSA_ASN1_ENCODER(encoderType)                                                                        \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_der_desc = {                                   \
+        select_##encoderType,                                                                                       \
+        SCOSSL_ENCODE_DER,                                                                                          \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                               \
+                                                                                                                    \
+    static SCOSSL_ENCODE_KEYTYPE_DESC p_scossl_mldsa_##encoderType##_pem_desc = {                                   \
+        select_##encoderType,                                                                                       \
+        SCOSSL_ENCODE_PEM,                                                                                          \
+        (PSCOSSL_ENCODE_INTERNAL_FN)p_scossl_mldsa_to_##encoderType};                                               \
+                                                                                                                    \
+    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_der_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
+    {                                                                                                               \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_der_desc);                           \
+    }                                                                                                               \
+                                                                                                                    \
+    static SCOSSL_ENCODE_CTX *p_scossl_mldsa_to_##encoderType##_pem_newctx(_In_ SCOSSL_PROVCTX *provctx)            \
+    {                                                                                                               \
+        return p_scossl_encode_newctx(provctx, &p_scossl_mldsa_##encoderType##_pem_desc);                           \
+    }                                                                                                               \
+                                                                                                                    \
+    static BOOL p_scossl_der_to_mldsa_##encoderType##_does_selection(ossl_unused void *provctx, int selection)      \
+    {                                                                                                               \
+        return p_scossl_encode_does_selection(&p_scossl_mldsa_##encoderType##_der_desc, selection);                 \
     }
 
 // alg is the exported-symbol infix naming one algorithm (mldsa44, composite_mldsa44_ecdsa_p256, ...)

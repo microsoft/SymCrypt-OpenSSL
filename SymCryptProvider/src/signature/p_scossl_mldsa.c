@@ -648,6 +648,13 @@ SCOSSL_STATUS p_scossl_mldsa_register_algorithms()
                 return SCOSSL_FAILURE;
             }
         }
+
+        // Map the signature algorithm to its key type with no separate digest. This is
+        // required for X.509 certificate and CSR verification.
+        if (!OBJ_add_sigid(p_scossl_mldsa_algs[i].nid, NID_undef, p_scossl_mldsa_algs[i].nid))
+        {
+            return SCOSSL_FAILURE;
+        }
     }
 
     return SCOSSL_SUCCESS;
