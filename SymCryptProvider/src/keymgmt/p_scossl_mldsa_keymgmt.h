@@ -9,16 +9,20 @@
 extern "C" {
 #endif
 
-SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(SYMCRYPT_MLDSA_PARAMS mldsaParams);
+SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_new_ctx(SCOSSL_MLDSA_PARAMS mldsaParams, BOOL isComposite);
 void p_scossl_mldsa_keymgmt_free_key_ctx(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx);
+
+BOOL p_scossl_mldsa_keymgmt_has(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection);
 
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_import(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection, _In_ const OSSL_PARAM params[]);
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_export(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx, int selection,
                                             _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg);
 
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, SYMCRYPT_MLDSAKEY_FORMAT format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key_size(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSAKEY_FORMAT format,
+                                                          _Out_ SIZE_T *pcbKey);
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSAKEY_FORMAT format,
                                                      _Inout_ PBYTE *ppbKey, _Inout_ SIZE_T *pcbKey);
-SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, SYMCRYPT_MLDSAKEY_FORMAT format,
+SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSAKEY_FORMAT format,
                                                      _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
 
 #ifdef __cplusplus

@@ -7,7 +7,7 @@ project(SymCrypt-OpenSSL
     HOMEPAGE_URL "https://github.com/microsoft/SymCrypt-OpenSSL")
 
 set(SYMCRYPT_MINIMUM_MAJOR "103")
-set(SYMCRYPT_MINIMUM_MINOR "9")
+set(SYMCRYPT_MINIMUM_MINOR "12")
 
 find_package(OpenSSL REQUIRED)
 
