@@ -124,6 +124,9 @@ void p_scossl_mldsa_keymgmt_free_key_ctx(SCOSSL_MLDSA_KEY_CTX *keyCtx)
         return;
 
     p_scossl_mldsa_key_free(keyCtx->isComposite, keyCtx->key);
+#ifdef KEYSINUSE_ENABLED
+    p_scossl_mldsa_reset_keysinuse(keyCtx);
+#endif
 
     OPENSSL_free(keyCtx);
 }
@@ -158,6 +161,11 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keymgmt_dup_key_ctx(_In_ const SCOSS
         {
             goto cleanup;
         }
+
+#ifdef KEYSINUSE_ENABLED
+        copyCtx->isImported = keyCtx->isImported;
+        copyCtx->keysinuseCtx = keysinuse_load_key_by_ctx(keyCtx->keysinuseCtx);
+#endif
     }
 
     status = SCOSSL_SUCCESS;
@@ -265,6 +273,11 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_keygen(_In_ SCOSSL_MLDSA_KEYGEN_CTX 
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
+
+#ifdef KEYSINUSE_ENABLED
+    keyCtx->isImported = FALSE;
+    keyCtx->keysinuseCtx = NULL;
+#endif
 
     keyCtx->key = genCtx->isComposite ?
             (PSCOSSL_MLDSA_KEY)SymCryptCompositeMlDsakeyAllocate(genCtx->mldsaParams) :
@@ -858,6 +871,12 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(SCOSSL_MLDSA_KEY_CTX *keyCt
 
     p_scossl_mldsa_key_free(keyCtx->isComposite, keyCtx->key);
 
+#ifdef KEYSINUSE_ENABLED
+    // Reset keysinuse in case new key material is overwriting existing
+    p_scossl_mldsa_reset_keysinuse(keyCtx);
+    keyCtx->isImported = TRUE;
+#endif
+
     keyCtx->key = key;
     keyCtx->format = format;
     key = NULL;
@@ -869,6 +888,45 @@ cleanup:
 
     return ret;
 }
+
+#ifdef KEYSINUSE_ENABLED
+_Use_decl_annotations_
+void p_scossl_mldsa_init_keysinuse(SCOSSL_MLDSA_KEY_CTX *keyCtx)
+{
+    PBYTE pbPublicKey = NULL;
+    SIZE_T cbPublicKey;
+
+    // Initialize keysinuse for private keys. Generated keys are
+    // ignored to avoid noise from ephemeral keys.
+    if (keyCtx->isImported && keyCtx->keysinuseCtx == NULL)
+    {
+        // KeysInUse related errors shouldn't surface to caller, including errors
+        // from p_scossl_mldsa_keymgmt_get_encoded_key
+        ERR_set_mark();
+
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, keyCtx->formats->publicKey, &pbPublicKey, &cbPublicKey))
+        {
+            keyCtx->keysinuseCtx = keysinuse_load_key(pbPublicKey, cbPublicKey);
+        }
+        else
+        {
+            SCOSSL_PROV_LOG_DEBUG(SCOSSL_ERR_R_KEYSINUSE_FAILURE,
+                "p_scossl_mldsa_keymgmt_get_encoded_key failed: %s", ERR_error_string(ERR_get_error(), NULL));
+        }
+
+        ERR_pop_to_mark();
+
+        OPENSSL_secure_free(pbPublicKey);
+    }
+}
+
+_Use_decl_annotations_
+void p_scossl_mldsa_reset_keysinuse(SCOSSL_MLDSA_KEY_CTX *keyCtx)
+{
+    keysinuse_unload_key(keyCtx->keysinuseCtx);
+    keyCtx->keysinuseCtx = NULL;
+}
+#endif
 
 static int p_scossl_mldsa_get_bits(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
