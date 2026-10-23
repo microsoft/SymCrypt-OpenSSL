@@ -121,7 +121,7 @@ static KEYSINUSE_TEST_KEY testKeys[] = {
 };
 
 static char *processName;
-static time_t processStartTime;
+static time_t testStartTime;
 // KeysInUse may be initialized as soon as the provider is loaded, which can
 // be before the tests start. The logged process start time is checked against this.
 static time_t keysinuseStartTime;
@@ -308,7 +308,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         }
 
         // Only look at events since this test started
-        if (eventTimestamp / 1000000 < processStartTime)
+        if (eventTimestamp / 1000000 < testStartTime)
         {
             break;
         }
@@ -393,10 +393,10 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
             goto cleanup;
         }
 
-        if (events[i]->firstLogTime < processStartTime)
+        if (events[i]->firstLogTime < testStartTime)
         {
             TEST_LOG_ERROR("Logged first log time is before the test started. Expected >= %ld, Logged: %ld",
-                processStartTime, events[i]->firstLogTime)
+                testStartTime, events[i]->firstLogTime)
             goto cleanup;
         }
 
@@ -657,11 +657,11 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
         lastLogTime = atol(pbCurToken);
 
-        // Check the first log time >= processStartTime
-        if (firstLogTime < processStartTime)
+        // Check the first log time >= testStartTime
+        if (firstLogTime < testStartTime)
         {
             TEST_LOG_ERROR("First log time is before the test started. Expected >= %ld, Logged: %ld",
-                processStartTime, firstLogTime)
+                testStartTime, firstLogTime)
             goto cleanup;
         }
 
@@ -1055,6 +1055,10 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
+    // RSA decrypt requires an output buffer of at least the modulus size
+    PBYTE pbDecrypted = NULL;
+    SIZE_T cbDecryptedMax = 0;
+    SIZE_T cbDecrypted = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
@@ -1067,6 +1071,13 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     if (RAND_bytes(pbPlainText, cbPlainText) != 1)
     {
         TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    cbDecryptedMax = EVP_PKEY_get_size(pkeyBase);
+    if ((pbDecrypted = (PBYTE)OPENSSL_malloc(cbDecryptedMax)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
         goto cleanup;
     }
 
@@ -1164,7 +1175,8 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     }
 
     // Decrypt
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1175,10 +1187,17 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third decrypt. Only the first event should be logged.
-    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0 ||
-        EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopy, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopyByRef, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
     }
     expectedEvents[1].decryptCount = 2;
@@ -1221,7 +1240,8 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
         goto cleanup;
     }
 
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1245,6 +1265,7 @@ cleanup:
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
     OPENSSL_free(pbCipherText);
+    OPENSSL_free(pbDecrypted);
 
     return ret;
 }
@@ -1427,6 +1448,10 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
+    // RSA decrypt requires an output buffer of at least the modulus size
+    PBYTE pbDecrypted = NULL;
+    SIZE_T cbDecryptedMax = 0;
+    SIZE_T cbDecrypted = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
@@ -1437,6 +1462,13 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     if (RAND_bytes(pbPlainText, cbPlainText) != 1)
     {
         TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    cbDecryptedMax = EVP_PKEY_get_size(pkeyBase);
+    if ((pbDecrypted = (PBYTE)OPENSSL_malloc(cbDecryptedMax)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
         goto cleanup;
     }
 
@@ -1518,8 +1550,8 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     }
 
     // Decrypt
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1530,11 +1562,17 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third decrypt. Only the first event should be logged.
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0 ||
-        EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopy, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopyByRef, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
     }
     expectedEvents[1].decryptCount = 2;
@@ -1577,8 +1615,8 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
         goto cleanup;
     }
 
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1600,6 +1638,7 @@ cleanup:
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
     OPENSSL_free(pbCipherText);
+    OPENSSL_free(pbDecrypted);
 
     return ret;
 }
@@ -2088,7 +2127,7 @@ int main(int argc, char** argv)
     vector<PVOID> providers;
 
     char abKeyId[KEYSINUSE_KEYID_SIZE];
-    int ret = 0;
+    int ret = 1;
 
     keysinuse_test_cleanup();
 
@@ -2218,7 +2257,7 @@ int main(int argc, char** argv)
     keysinuse_init();
 
     processName = realpath(argv[0], NULL);
-    processStartTime = time(NULL);
+    testStartTime = time(NULL);
 
     if (keysinuse_test_create_fakeroot() == SCOSSL_FAILURE)
     {
@@ -2281,7 +2320,7 @@ int main(int argc, char** argv)
     }
 
     printf("All tests passed\n");
-    ret = 1;
+    ret = 0;
 
 cleanup:
 #if OPENSSL_VERSION_MAJOR == 3
