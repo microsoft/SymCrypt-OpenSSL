@@ -122,6 +122,9 @@ static KEYSINUSE_TEST_KEY testKeys[] = {
 
 static char *processName;
 static time_t processStartTime;
+// KeysInUse may be initialized as soon as the provider is loaded, which can
+// be before the tests start. The logged process start time is checked against this.
+static time_t keysinuseStartTime;
 
 static bool logVerbose = false;
 static bool checkSyslog = false;
@@ -493,17 +496,17 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
     pbExpectedHeader = strdup(pbHeader);
 
-    // Check the logged start time >= processStartTime
+    // Check the logged start time >= keysinuseStartTime
     if ((pbCurToken = strtok(pbHeader, ",")) == NULL)
     {
         TEST_LOG_ERROR("Failed to parse process start time")
         goto cleanup;
     }
 
-    if ((loggedStartTime = atol(pbCurToken)) < processStartTime)
+    if ((loggedStartTime = atol(pbCurToken)) < keysinuseStartTime)
     {
-        TEST_LOG_ERROR("Logged process start time is before the test started. Expected >= %ld, Logged: %ld",
-            processStartTime, loggedStartTime)
+        TEST_LOG_ERROR("Logged process start time is before KeysInUse could have started. Expected >= %ld, Logged: %ld",
+            keysinuseStartTime, loggedStartTime)
         goto cleanup;
     }
 
@@ -2088,6 +2091,11 @@ int main(int argc, char** argv)
     int ret = 0;
 
     keysinuse_test_cleanup();
+
+    // KeysInUse is disabled by default in the provider. Opt in through the
+    // environment since the test loads providers without a keysinuse config.
+    setenv("KEYSINUSE_ENABLED", "1", 1);
+    keysinuseStartTime = time(NULL);
 
     OPENSSL_init_crypto(0, NULL);
 
