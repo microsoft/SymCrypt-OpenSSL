@@ -5,6 +5,9 @@
 #pragma once
 
 #include "p_scossl_base.h"
+#ifdef KEYSINUSE_ENABLED
+#include "keysinuse.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +53,11 @@ typedef struct
     SCOSSL_MLDSAKEY_FORMAT format;
 
     PSCOSSL_MLDSA_KEY key;
+
+#ifdef KEYSINUSE_ENABLED
+    BOOL isImported;
+    SCOSSL_KEYSINUSE_CTX *keysinuseCtx;
+#endif
 } SCOSSL_MLDSA_KEY_CTX;
 
 SCOSSL_STATUS p_scossl_mldsa_register_algorithms();

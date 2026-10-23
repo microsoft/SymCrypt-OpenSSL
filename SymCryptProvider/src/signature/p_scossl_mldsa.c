@@ -129,6 +129,14 @@ static SCOSSL_STATUS p_scossl_mldsa_signverify_init(_Inout_ SCOSSL_MLDSA_SIGNATU
             ERR_raise(ERR_LIB_PROV, PROV_R_ALGORITHM_MISMATCH);
             return SCOSSL_FAILURE;
         }
+
+#ifdef KEYSINUSE_ENABLED
+        if (keysinuse_is_running() &&
+            operation == EVP_PKEY_OP_SIGN)
+        {
+            p_scossl_mldsa_init_keysinuse(keyCtx);
+        }
+#endif
     }
 
     ctx->keyCtx = keyCtx;
@@ -234,6 +242,10 @@ static SCOSSL_STATUS p_scossl_mldsa_sign(_In_ SCOSSL_MLDSA_SIGNATURE_CTX *ctx,
                 return SCOSSL_FAILURE;
             }
         }
+
+#ifdef KEYSINUSE_ENABLED
+        keysinuse_on_use(ctx->keyCtx->keysinuseCtx, KEYSINUSE_SIGN);
+#endif
     }
 
     if (siglen != NULL)

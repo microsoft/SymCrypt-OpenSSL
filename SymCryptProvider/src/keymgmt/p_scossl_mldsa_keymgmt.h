@@ -25,6 +25,11 @@ SCOSSL_STATUS p_scossl_mldsa_keymgmt_get_encoded_key(_In_ const SCOSSL_MLDSA_KEY
 SCOSSL_STATUS p_scossl_mldsa_keymgmt_set_encoded_key(_Inout_ SCOSSL_MLDSA_KEY_CTX *keyCtx, SCOSSL_MLDSAKEY_FORMAT format,
                                                      _In_reads_bytes_(cbKey) PCBYTE pbKey, SIZE_T cbKey);
 
+#ifdef KEYSINUSE_ENABLED
+void p_scossl_mldsa_init_keysinuse(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx);
+void p_scossl_mldsa_reset_keysinuse(_In_ SCOSSL_MLDSA_KEY_CTX *keyCtx);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
