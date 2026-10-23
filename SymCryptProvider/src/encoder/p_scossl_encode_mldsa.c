@@ -66,6 +66,27 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         }
         cbDer = (int)cbKey;
     }
+    else if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+    {
+        // ML-DSA-PrivateKey seed choice is an IMPLICIT [0] OCTET STRING (RFC 9881)
+        if (cbKey != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
+        {
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Unexpected ML-DSA seed size");
+            goto cleanup;
+        }
+
+        cbDer = (int)(2 + cbKey);
+        if ((pbDer = OPENSSL_malloc(cbDer)) == NULL)
+        {
+            cbDer = 0;
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbDer[0] = V_ASN1_CONTEXT_SPECIFIC | 0;
+        pbDer[1] = (unsigned char)cbKey;
+        memcpy(pbDer + 2, pbKey, cbKey);
+    }
     else
     {
         if ((p8Data = ASN1_OCTET_STRING_new()) == NULL)
