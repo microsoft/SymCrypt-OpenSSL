@@ -162,6 +162,8 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
+    const X509_ALGOR *algorithmIdentifier;
+    int paramType;
     const unsigned char *pbKey;
     int cbKey;
     PCBYTE pbSeed = NULL;
@@ -171,7 +173,15 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL
     SCOSSL_MLDSAKEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
-        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info))
+        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, &algorithmIdentifier, p8Info))
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
+
+    // AlgorithmIdentifier parameters must be absent (RFC 9881, draft-ietf-lamps-pq-composite-sigs)
+    X509_ALGOR_get0(NULL, &paramType, NULL, algorithmIdentifier);
+    if (paramType != V_ASN1_UNDEF)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
@@ -228,6 +238,7 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(_In_ SCOSSL_
     OSSL_LIB_CTX *libCtx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     SUBJECT_PUBKEY_INFO *subjPubKeyInfo = NULL;
     const ASN1_OBJECT *algorithm;
+    int paramType;
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
     SCOSSL_MLDSAKEY_FORMAT format = isComposite ? SYMCRYPT_COMPOSITE_MLDSAKEY_FORMAT_PUBLIC_KEY : SYMCRYPT_MLDSAKEY_FORMAT_PUBLIC_KEY;
 
@@ -243,7 +254,14 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mldsa(_In_ SCOSSL_
         goto cleanup;
     }
 
-    X509_ALGOR_get0(&algorithm, NULL, NULL, subjPubKeyInfo->x509Alg);
+    X509_ALGOR_get0(&algorithm, &paramType, NULL, subjPubKeyInfo->x509Alg);
+
+    // AlgorithmIdentifier parameters must be absent (RFC 9881, draft-ietf-lamps-pq-composite-sigs)
+    if (paramType != V_ASN1_UNDEF)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
 
     keyCtx = p_scossl_mldsa_decode_key_bytes(isComposite, algorithm,
                                              mldsaParams, format,
