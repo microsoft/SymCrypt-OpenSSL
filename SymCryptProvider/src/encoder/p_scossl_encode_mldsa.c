@@ -26,6 +26,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
     PBYTE pbKey = NULL;
     SIZE_T cbKey = 0;
     unsigned char *pbDer = NULL;
+    unsigned char *pbDerCursor = NULL;
     int cbDer = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
@@ -50,15 +51,49 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         goto cleanup;
     }
 
-    if ((p8Data = ASN1_OCTET_STRING_new()) == NULL ||
-        (p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
+    if ((p8Info = PKCS8_PRIV_KEY_INFO_new()) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
     }
 
-    if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
-        (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+    if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
+    {
+        if (cbKey != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SEED_LENGTH);
+            goto cleanup;
+        }
+
+        cbDer = ASN1_object_size(0, (int)cbKey, 0);
+        if (cbDer <= 0 ||
+            (pbDer = OPENSSL_malloc(cbDer)) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        pbDerCursor = pbDer;
+        ASN1_put_object(&pbDerCursor, 0, (int)cbKey, 0, V_ASN1_CONTEXT_SPECIFIC);
+        memcpy(pbDerCursor, pbKey, cbKey);
+    }
+    else
+    {
+        if ((p8Data = ASN1_OCTET_STRING_new()) == NULL)
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
+
+        if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
+            (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+        {
+            ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
+            goto cleanup;
+        }
+    }
+
+    if (pbDer == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
