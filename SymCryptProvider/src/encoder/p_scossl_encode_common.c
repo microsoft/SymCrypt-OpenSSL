@@ -38,6 +38,7 @@ void p_scossl_encode_freectx(SCOSSL_ENCODE_CTX *ctx)
     if (ctx == NULL)
         return;
 
+    EVP_CIPHER_free(ctx->cipher);
     OPENSSL_free(ctx);
 }
 
