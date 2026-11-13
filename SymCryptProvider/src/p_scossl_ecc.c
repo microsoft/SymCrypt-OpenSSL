@@ -315,7 +315,8 @@ SIZE_T p_scossl_ecc_get_encoded_key_size(SCOSSL_ECC_KEY_CTX *keyCtx, int selecti
     }
 
     // One extra byte for point compression type for non-X25519
-    return SymCryptEckeySizeofPublicKey(keyCtx->key, pointFormat) + (keyCtx->isX25519 ? 0 : 1);
+    return SymCryptEcurveSizeofFieldElement(keyCtx->curve) *
+           (pointFormat == SYMCRYPT_ECPOINT_FORMAT_XY ? 2 : 1) + (keyCtx->isX25519 ? 0 : 1);
 }
 
 // Gets the public key as an encoded octet string

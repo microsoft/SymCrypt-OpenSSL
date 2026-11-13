@@ -21,6 +21,7 @@ typedef struct
     OSSL_LIB_CTX *libctx;
     PCSYMCRYPT_ECURVE curve;
     BOOL isX25519;
+    int selection;
     point_conversion_form_t conversionFormat;
 } SCOSSL_ECC_KEYGEN_CTX;
 
@@ -220,10 +221,16 @@ static void p_scossl_ecc_keygen_cleanup(_Inout_ SCOSSL_ECC_KEYGEN_CTX *genCtx)
     OPENSSL_free(genCtx);
 }
 
-static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
+static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                               _In_ const OSSL_PARAM params[], BOOL isX25519)
 {
-    SCOSSL_ECC_KEYGEN_CTX *genCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEYGEN_CTX));
+    if (!isX25519 &&
+        (selection & (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_ALL_PARAMETERS)) == 0)
+    {
+        return NULL;
+    }
+
+    SCOSSL_ECC_KEYGEN_CTX *genCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEYGEN_CTX));
     if (genCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -232,6 +239,7 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCT
 
     genCtx->libctx = provctx->libctx;
     genCtx->isX25519 = isX25519;
+    genCtx->selection = selection;
     genCtx->conversionFormat = POINT_CONVERSION_UNCOMPRESSED;
 
     if (!p_scossl_ecc_keygen_set_params(genCtx, params))
@@ -243,13 +251,13 @@ static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_common_keygen_init(_In_ SCOSSL_PROVCT
     return genCtx;
 }
 
-static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
+static SCOSSL_ECC_KEYGEN_CTX *p_scossl_ecc_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                        _In_ const OSSL_PARAM params[])
 {
     return p_scossl_ecc_common_keygen_init(provctx, selection, params, FALSE);
 }
 
-static SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(_In_ SCOSSL_PROVCTX *provctx, ossl_unused int selection,
+static SCOSSL_ECC_KEYGEN_CTX *p_scossl_x25519_keygen_init(_In_ SCOSSL_PROVCTX *provctx, int selection,
                                                           _In_ const OSSL_PARAM params[])
 {
     SCOSSL_ECC_KEYGEN_CTX *genCtx = p_scossl_ecc_common_keygen_init(provctx, selection, params, TRUE);
@@ -275,7 +283,13 @@ static SCOSSL_STATUS p_scossl_ecc_keygen_set_template(_Inout_ SCOSSL_ECC_KEYGEN_
 
 static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCtx, ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_malloc(sizeof(SCOSSL_ECC_KEY_CTX));
+    if (genCtx->curve == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_PARAMETERS_SET);
+        return NULL;
+    }
+
+    SCOSSL_ECC_KEY_CTX *keyCtx = OPENSSL_zalloc(sizeof(SCOSSL_ECC_KEY_CTX));
     if (keyCtx == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
@@ -286,9 +300,10 @@ static SCOSSL_ECC_KEY_CTX *p_scossl_ecc_keygen(_In_ SCOSSL_ECC_KEYGEN_CTX *genCt
     keyCtx->curve = genCtx->curve;
     keyCtx->isX25519 = genCtx->isX25519;
     keyCtx->conversionFormat = genCtx->conversionFormat;
-    keyCtx->key = NULL;
+    keyCtx->includePublic = 1;
 
-    if (p_scossl_ecc_gen(keyCtx) != SCOSSL_SUCCESS)
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 &&
+        p_scossl_ecc_gen(keyCtx) != SCOSSL_SUCCESS)
     {
         p_scossl_ecc_free_ctx(keyCtx);
         return NULL;
@@ -309,8 +324,8 @@ static SCOSSL_STATUS p_scossl_ecc_keymgmt_get_pubkey_point(_In_ SCOSSL_ECC_KEY_C
     OSSL_PARAM *paramPubX = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_PUB_X);
     OSSL_PARAM *paramPubY = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_EC_PUB_Y);
 
-    if (paramPubX == NULL &&
-        paramPubY == NULL)
+    if (!keyCtx->initialized ||
+        (paramPubX == NULL && paramPubY == NULL))
     {
         return SCOSSL_SUCCESS;
     }
@@ -716,7 +731,7 @@ static BOOL p_scossl_ecc_keymgmt_has(_In_ SCOSSL_ECC_KEY_CTX *keyCtx, int select
         }
         if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
         {
-            hasSelection = hasSelection && SymCryptEckeyHasPrivateKey(keyCtx->key);
+            hasSelection = hasSelection && keyCtx->initialized && SymCryptEckeyHasPrivateKey(keyCtx->key);
         }
         if ((selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) != 0)
         {

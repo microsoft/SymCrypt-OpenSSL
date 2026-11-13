@@ -14,11 +14,15 @@
 extern "C" {
 #endif
 
+#define SCOSSL_P256_UNCOMPRESSED_PUBLIC_KEY_SIZE 65
+#define SCOSSL_P384_UNCOMPRESSED_PUBLIC_KEY_SIZE 97
+
 typedef struct {
     SCOSSL_PROVCTX *provCtx;
 
     SYMCRYPT_MLKEM_PARAMS mlkemParams;
     int classicGroupNid;
+    int selection;
 } SCOSSL_MLKEM_HYBRID_KEYGEN_CTX;
 
 // Forward declarations for helper functions
@@ -188,11 +192,16 @@ static void p_scossl_mlkem_hybrid_keygen_cleanup(_Inout_ SCOSSL_MLKEM_HYBRID_KEY
     OPENSSL_free(genCtx);
 }
 
-static SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *p_scossl_mlkem_hybrid_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, ossl_unused int selection,
+static SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *p_scossl_mlkem_hybrid_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, int selection,
                                                                          _In_ const OSSL_PARAM params[],
                                                                          SYMCRYPT_MLKEM_PARAMS mlkemParams,
                                                                          int classicGroupNid)
 {
+    if ((selection & (OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS | OSSL_KEYMGMT_SELECT_PRIVATE_KEY)) == 0)
+    {
+        return NULL;
+    }
+
     SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *genCtx = OPENSSL_zalloc(sizeof(SCOSSL_MLKEM_HYBRID_KEYGEN_CTX));
 
     if (genCtx != NULL)
@@ -200,6 +209,7 @@ static SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *p_scossl_mlkem_hybrid_keygen_init(_In_ SC
         genCtx->provCtx = provCtx;
         genCtx->mlkemParams = mlkemParams;
         genCtx->classicGroupNid = classicGroupNid;
+        genCtx->selection = selection;
 
         if (p_scossl_mlkem_hybrid_keygen_set_params(genCtx, params) != SCOSSL_SUCCESS)
         {
@@ -232,7 +242,7 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keygen_set_template(_Inout_ SCOSSL_ML
 static SCOSSL_MLKEM_HYBRID_KEY_CTX *p_scossl_mlkem_hybrid_keygen(_In_ SCOSSL_MLKEM_HYBRID_KEYGEN_CTX *genCtx,
                                                                  ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx;
+    SCOSSL_MLKEM_HYBRID_KEY_CTX *keyCtx = NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -242,8 +252,23 @@ static SCOSSL_MLKEM_HYBRID_KEY_CTX *p_scossl_mlkem_hybrid_keygen(_In_ SCOSSL_MLK
         goto cleanup;
     }
 
-    if ((keyCtx = p_scossl_mlkem_hybrid_keymgmt_new_ctx(genCtx->provCtx, genCtx->mlkemParams, genCtx->classicGroupNid)) == NULL ||
-        (keyCtx->key = SymCryptMlKemkeyAllocate(genCtx->mlkemParams)) == NULL)
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+    {
+        return NULL;
+    }
+
+    if ((keyCtx = p_scossl_mlkem_hybrid_keymgmt_new_ctx(genCtx->provCtx, genCtx->mlkemParams, genCtx->classicGroupNid)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
+    {
+        return keyCtx;
+    }
+
+    if ((keyCtx->key = SymCryptMlKemkeyAllocate(genCtx->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -459,7 +484,21 @@ static SCOSSL_STATUS p_scossl_mlkem_hybrid_keymgmt_get_params(_In_ SCOSSL_MLKEM_
             return SCOSSL_FAILURE;
         }
 
-        cbCiphertext += p_scossl_ecc_get_max_result_size(keyCtx->classicKeyCtx, TRUE);
+        switch (keyCtx->classicGroupNid)
+        {
+            case NID_X25519:
+                cbCiphertext += SCOSSL_X25519_KEY_SIZE;
+                break;
+            case NID_X9_62_prime256v1:
+                cbCiphertext += SCOSSL_P256_UNCOMPRESSED_PUBLIC_KEY_SIZE;
+                break;
+            case NID_secp384r1:
+                cbCiphertext += SCOSSL_P384_UNCOMPRESSED_PUBLIC_KEY_SIZE;
+                break;
+            default:
+                ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
+                return SCOSSL_FAILURE;
+        }
 
         if (!OSSL_PARAM_set_size_t(p, cbCiphertext))
         {
@@ -706,7 +745,7 @@ cleanup:
                                                                                                                 \
     static SCOSSL_MLKEM_HYBRID_KEYGEN_CTX                                                                       \
     *p_scossl_##classicGroup##_mlkem##bits##_keygen_init(_In_ SCOSSL_PROVCTX *provCtx,                         \
-                                                          ossl_unused int selection,                            \
+                                                          int selection,                                        \
                                                           _In_ const OSSL_PARAM params[])                       \
     {                                                                                                           \
         return p_scossl_mlkem_hybrid_keygen_init(provCtx, selection, params,                                    \

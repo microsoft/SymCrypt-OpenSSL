@@ -33,6 +33,7 @@ typedef struct
     PCSYMCRYPT_DLGROUP pDlGroup;
     SIZE_T nBitsPub;
     int nBitsPriv;
+    int selection;
 } SCOSSL_DH_KEYGEN_CTX;
 
 #define SCOSSL_DH_PARAMETER_TYPES                                      \
@@ -520,6 +521,7 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
         genCtx->nBitsPub = SCOSSL_DH_PBITS_DEFAULT;
         genCtx->nBitsPriv = SCOSSL_DH_PRIVATE_BITS_DEFAULT;
         genCtx->provCtx = provCtx;
+        genCtx->selection = selection;
 
         if (!p_scossl_dh_keygen_set_params(genCtx, params))
         {
@@ -594,9 +596,10 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
         return NULL;
     }
 
-    if (!scossl_dh_generate_keypair(ctx->keyCtx, genCtx->nBitsPriv, genCtx->pDlGroup))
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 &&
+        !scossl_dh_generate_keypair(ctx->keyCtx, genCtx->nBitsPriv, genCtx->pDlGroup))
     {
-        OPENSSL_free(ctx);
+        p_scossl_dh_keymgmt_free_key_ctx(ctx);
         return NULL;
     }
 
@@ -999,7 +1002,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_get_params(_In_ SCOSSL_PROV_DH_KEY_CTX 
 
     if ((p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_GROUP_NAME)) != NULL)
     {
-        int dlGroupNid = scossl_dh_get_group_nid(SymCryptDlkeyGetGroup(ctx->keyCtx->dlkey));
+        int dlGroupNid = scossl_dh_get_group_nid(ctx->pDlGroup);
         if (dlGroupNid == 0)
         {
             SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Failed to get NID for previously set group in DH key context");
@@ -1022,7 +1025,7 @@ static BOOL p_scossl_dh_keymgmt_has(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx, int select
 {
     BOOL ret = TRUE;
 
-    if (ctx == NULL || ctx->keyCtx->dlkey == NULL)
+    if (ctx == NULL)
     {
         return FALSE;
     }
