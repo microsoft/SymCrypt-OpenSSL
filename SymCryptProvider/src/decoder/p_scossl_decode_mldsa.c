@@ -6,6 +6,7 @@
 #include "p_scossl_decode_common.h"
 #include "keymgmt/p_scossl_mldsa_keymgmt.h"
 
+#include <openssl/asn1.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
@@ -61,28 +62,119 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
     const unsigned char *pbKey;
+    const unsigned char *pbKeyCursor;
     int cbKey;
+    const unsigned char *pbEncodedKey = NULL;
+    int cbEncodedKey = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
+    STACK_OF(ASN1_TYPE) *p8Both = NULL;
+    ASN1_TYPE *p8Seed = NULL;
+    ASN1_TYPE *p8ExpandedKey = NULL;
+    PBYTE pbDerivedExpandedKey = NULL;
+    SIZE_T cbDerivedExpandedKey = 0;
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
     SYMCRYPT_MLDSAKEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
         !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info) ||
-        d2i_ASN1_OCTET_STRING(&p8Data, &pbKey, cbKey) == NULL)
+        cbKey <= 0)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
     }
 
-    cbKey = ASN1_STRING_length(p8Data);
+    if (pbKey[0] == V_ASN1_CONTEXT_SPECIFIC)
+    {
+        if (cbKey != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE + 2 ||
+            pbKey[1] != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+            goto cleanup;
+        }
 
-    format = cbKey == SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE ? SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+        format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
+        pbEncodedKey = pbKey + 2;
+        cbEncodedKey = SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE;
+    }
+    else if (pbKey[0] == V_ASN1_OCTET_STRING)
+    {
+        pbKeyCursor = pbKey;
+        if (d2i_ASN1_OCTET_STRING(&p8Data, &pbKeyCursor, cbKey) == NULL ||
+            pbKeyCursor != pbKey + cbKey)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+            goto cleanup;
+        }
+
+        cbEncodedKey = ASN1_STRING_length(p8Data);
+        pbEncodedKey = ASN1_STRING_get0_data(p8Data);
+
+        // Accept the seed encoding emitted by older SCOSSL versions.
+        format = cbEncodedKey == SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE
+            ? SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED
+            : SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+    }
+    else if (pbKey[0] == (V_ASN1_CONSTRUCTED | V_ASN1_SEQUENCE))
+    {
+        pbKeyCursor = pbKey;
+        if ((p8Both = d2i_ASN1_SEQUENCE_ANY(NULL, &pbKeyCursor, cbKey)) == NULL ||
+            pbKeyCursor != pbKey + cbKey ||
+            sk_ASN1_TYPE_num(p8Both) != 2)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+            goto cleanup;
+        }
+
+        p8Seed = sk_ASN1_TYPE_value(p8Both, 0);
+        p8ExpandedKey = sk_ASN1_TYPE_value(p8Both, 1);
+        if (p8Seed == NULL ||
+            p8ExpandedKey == NULL ||
+            p8Seed->type != V_ASN1_OCTET_STRING ||
+            p8ExpandedKey->type != V_ASN1_OCTET_STRING ||
+            ASN1_STRING_length(p8Seed->value.octet_string) != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+            goto cleanup;
+        }
+
+        keyCtx = p_scossl_mldsa_decode_key_bytes(
+            algorithm, mldsaParams, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED,
+            ASN1_STRING_get0_data(p8Seed->value.octet_string),
+            ASN1_STRING_length(p8Seed->value.octet_string));
+        if (keyCtx == NULL)
+        {
+            goto cleanup;
+        }
+
+        if (p_scossl_mldsa_keymgmt_get_encoded_key(
+                keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY,
+                &pbDerivedExpandedKey, &cbDerivedExpandedKey) != SCOSSL_SUCCESS ||
+            cbDerivedExpandedKey != (SIZE_T)ASN1_STRING_length(p8ExpandedKey->value.octet_string) ||
+            CRYPTO_memcmp(
+                pbDerivedExpandedKey,
+                ASN1_STRING_get0_data(p8ExpandedKey->value.octet_string),
+                cbDerivedExpandedKey) != 0)
+        {
+            p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
+            keyCtx = NULL;
+            ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        }
+
+        goto cleanup;
+    }
+    else
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
 
     keyCtx = p_scossl_mldsa_decode_key_bytes(algorithm,
                                              mldsaParams, format,
-                                             ASN1_STRING_get0_data(p8Data), ASN1_STRING_length(p8Data));
+                                             pbEncodedKey, cbEncodedKey);
 
 cleanup:
+    OPENSSL_secure_clear_free(pbDerivedExpandedKey, cbDerivedExpandedKey);
+    sk_ASN1_TYPE_pop_free(p8Both, ASN1_TYPE_free);
     ASN1_OCTET_STRING_free(p8Data);
     PKCS8_PRIV_KEY_INFO_free(p8Info);
 
