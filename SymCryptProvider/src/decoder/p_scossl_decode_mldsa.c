@@ -6,11 +6,43 @@
 #include "p_scossl_decode_common.h"
 #include "keymgmt/p_scossl_mldsa_keymgmt.h"
 
+#include <openssl/asn1t.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Private key CHOICE { seed [0] IMPLICIT OCTET STRING, expandedKey OCTET STRING,
+//                      both SEQUENCE { seed OCTET STRING, expandedKey OCTET STRING } } (RFC 9881)
+typedef struct {
+    ASN1_OCTET_STRING *seed;
+    ASN1_OCTET_STRING *expandedKey;
+} SCOSSL_MLDSA_PRIVATE_KEY_BOTH;
+
+typedef struct {
+    int type;
+    union {
+        ASN1_OCTET_STRING *seed;
+        ASN1_OCTET_STRING *expandedKey;
+        SCOSSL_MLDSA_PRIVATE_KEY_BOTH *both;
+    } value;
+} SCOSSL_MLDSA_PRIVATE_KEY;
+
+#define SCOSSL_MLDSA_PRIVATE_KEY_TYPE_SEED         0
+#define SCOSSL_MLDSA_PRIVATE_KEY_TYPE_EXPANDED_KEY 1
+#define SCOSSL_MLDSA_PRIVATE_KEY_TYPE_BOTH         2
+
+ASN1_SEQUENCE(SCOSSL_MLDSA_PRIVATE_KEY_BOTH) = {
+    ASN1_SIMPLE(SCOSSL_MLDSA_PRIVATE_KEY_BOTH, seed, ASN1_OCTET_STRING),
+    ASN1_SIMPLE(SCOSSL_MLDSA_PRIVATE_KEY_BOTH, expandedKey, ASN1_OCTET_STRING)
+} static_ASN1_SEQUENCE_END(SCOSSL_MLDSA_PRIVATE_KEY_BOTH)
+
+ASN1_CHOICE(SCOSSL_MLDSA_PRIVATE_KEY) = {
+    ASN1_IMP(SCOSSL_MLDSA_PRIVATE_KEY, value.seed, ASN1_OCTET_STRING, 0),
+    ASN1_SIMPLE(SCOSSL_MLDSA_PRIVATE_KEY, value.expandedKey, ASN1_OCTET_STRING),
+    ASN1_SIMPLE(SCOSSL_MLDSA_PRIVATE_KEY, value.both, SCOSSL_MLDSA_PRIVATE_KEY_BOTH)
+} static_ASN1_CHOICE_END(SCOSSL_MLDSA_PRIVATE_KEY)
 
 static SCOSSL_MLDSA_KEY_CTX *p_scossl_mldsa_decode_key_bytes(BOOL isComposite, _In_ const ASN1_OBJECT *algorithm,
                                                              SCOSSL_MLDSA_PARAMS mldsaParams, SCOSSL_MLDSAKEY_FORMAT format,
@@ -57,107 +89,6 @@ cleanup:
     return keyCtx;
 }
 
-// Parses the ML-DSA-PrivateKey CHOICE (RFC 9881):
-//   seed        [0] IMPLICIT OCTET STRING (SIZE (32))
-//   expandedKey OCTET STRING
-//   both        SEQUENCE { seed OCTET STRING (SIZE (32)), expandedKey OCTET STRING }
-// Returned pointers reference pbDer. *ppbSeed and *ppbExpanded
-// are set to NULL if the respective component is not present.
-static SCOSSL_STATUS p_scossl_mldsa_parse_private_key(_In_reads_bytes_(cbDer) PCBYTE pbDer, SIZE_T cbDer,
-                                                      _Out_ PCBYTE *ppbSeed,
-                                                      _Out_ PCBYTE *ppbExpanded, _Out_ SIZE_T *pcbExpanded)
-{
-    const unsigned char *pbCur = pbDer;
-    const unsigned char *pbEnd = pbDer + cbDer;
-    long cbContent;
-    int tag;
-    int xclass;
-    int ret;
-
-    *ppbSeed = NULL;
-    *ppbExpanded = NULL;
-    *pcbExpanded = 0;
-
-    ret = ASN1_get_object(&pbCur, &cbContent, &tag, &xclass, (long)cbDer);
-    if ((ret & 0x80) != 0 || ret == (V_ASN1_CONSTRUCTED | 1) ||
-        pbCur + cbContent != pbEnd)
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    if (xclass == V_ASN1_CONTEXT_SPECIFIC && tag == 0 && ret == 0)
-    {
-        if (cbContent != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        *ppbSeed = pbCur;
-    }
-    else if (xclass == V_ASN1_UNIVERSAL && tag == V_ASN1_OCTET_STRING && ret == 0)
-    {
-        *ppbExpanded = pbCur;
-        *pcbExpanded = (SIZE_T)cbContent;
-    }
-    else if (xclass == V_ASN1_UNIVERSAL && tag == V_ASN1_SEQUENCE && ret == V_ASN1_CONSTRUCTED)
-    {
-        ret = ASN1_get_object(&pbCur, &cbContent, &tag, &xclass, (long)(pbEnd - pbCur));
-        if (ret != 0 || xclass != V_ASN1_UNIVERSAL || tag != V_ASN1_OCTET_STRING ||
-            cbContent != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
-        {
-            return SCOSSL_FAILURE;
-        }
-
-        *ppbSeed = pbCur;
-        pbCur += cbContent;
-
-        ret = ASN1_get_object(&pbCur, &cbContent, &tag, &xclass, (long)(pbEnd - pbCur));
-        if (ret != 0 || xclass != V_ASN1_UNIVERSAL || tag != V_ASN1_OCTET_STRING ||
-            pbCur + cbContent != pbEnd)
-        {
-            *ppbSeed = NULL;
-            return SCOSSL_FAILURE;
-        }
-
-        *ppbExpanded = pbCur;
-        *pcbExpanded = (SIZE_T)cbContent;
-    }
-    else
-    {
-        return SCOSSL_FAILURE;
-    }
-
-    return SCOSSL_SUCCESS;
-}
-
-// Checks that the expanded private key matches the key derived from the seed
-static SCOSSL_STATUS p_scossl_mldsa_check_expanded_key(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx,
-                                                       _In_reads_bytes_(cbExpanded) PCBYTE pbExpanded, SIZE_T cbExpanded)
-{
-    PBYTE pbKey = NULL;
-    SIZE_T cbKey = 0;
-    SCOSSL_STATUS status = SCOSSL_FAILURE;
-
-    if (p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
-    {
-        goto cleanup;
-    }
-
-    if (cbKey != cbExpanded ||
-        CRYPTO_memcmp(pbKey, pbExpanded, cbKey) != 0)
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
-        goto cleanup;
-    }
-
-    status = SCOSSL_SUCCESS;
-
-cleanup:
-    OPENSSL_secure_clear_free(pbKey, cbKey);
-
-    return status;
-}
-
 static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL_DECODE_CTX *ctx, BOOL isComposite, SCOSSL_MLDSA_PARAMS mldsaParams, _In_ BIO *bio)
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
@@ -165,9 +96,13 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL
     const X509_ALGOR *algorithmIdentifier;
     int paramType;
     const unsigned char *pbKey;
+    const unsigned char *pbEnd;
     int cbKey;
-    PCBYTE pbSeed = NULL;
-    PCBYTE pbExpanded = NULL;
+    SCOSSL_MLDSA_PRIVATE_KEY *p8Data = NULL;
+    ASN1_OCTET_STRING *seed = NULL;
+    ASN1_OCTET_STRING *expandedKey = NULL;
+    ASN1_OCTET_STRING *privateKey;
+    PBYTE pbExpanded = NULL;
     SIZE_T cbExpanded = 0;
     SCOSSL_MLDSA_KEY_CTX *keyCtx = NULL;
     SCOSSL_MLDSAKEY_FORMAT format;
@@ -197,37 +132,80 @@ static SCOSSL_MLDSA_KEY_CTX *p_scossl_PrivateKeyInfo_to_mldsa(ossl_unused SCOSSL
         goto cleanup;
     }
 
-    if (cbKey <= 0 ||
-        p_scossl_mldsa_parse_private_key(pbKey, (SIZE_T)cbKey, &pbSeed, &pbExpanded, &cbExpanded) != SCOSSL_SUCCESS)
+    if (cbKey <= 0)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
     }
 
-    // Prefer the seed when present
-    if (pbSeed != NULL)
+    pbEnd = pbKey + cbKey;
+    if ((p8Data = (SCOSSL_MLDSA_PRIVATE_KEY *)ASN1_item_d2i(NULL, &pbKey, cbKey, ASN1_ITEM_rptr(SCOSSL_MLDSA_PRIVATE_KEY))) == NULL ||
+        pbKey != pbEnd)
     {
-        format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED;
-        keyCtx = p_scossl_mldsa_decode_key_bytes(isComposite, algorithm,
-                                                 mldsaParams, format,
-                                                 pbSeed, SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE);
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
 
-        if (keyCtx != NULL && pbExpanded != NULL &&
-            p_scossl_mldsa_check_expanded_key(keyCtx, pbExpanded, cbExpanded) != SCOSSL_SUCCESS)
+    switch (p8Data->type)
+    {
+    case SCOSSL_MLDSA_PRIVATE_KEY_TYPE_SEED:
+        seed = p8Data->value.seed;
+        break;
+    case SCOSSL_MLDSA_PRIVATE_KEY_TYPE_EXPANDED_KEY:
+        expandedKey = p8Data->value.expandedKey;
+        break;
+    case SCOSSL_MLDSA_PRIVATE_KEY_TYPE_BOTH:
+        seed = p8Data->value.both->seed;
+        expandedKey = p8Data->value.both->expandedKey;
+        break;
+    default:
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
+
+    // Retain the seed when present
+    privateKey = seed != NULL ? seed : expandedKey;
+    format = seed != NULL ? SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
+    keyCtx = p_scossl_mldsa_decode_key_bytes(isComposite, algorithm,
+                                             mldsaParams, format,
+                                             ASN1_STRING_get0_data(privateKey), ASN1_STRING_length(privateKey));
+
+    if (keyCtx == NULL)
+    {
+        goto cleanup;
+    }
+
+    // Both seed and expanded key are present. The expanded key
+    // must match the one derived from the seed.
+    if (p8Data->type == SCOSSL_MLDSA_PRIVATE_KEY_TYPE_BOTH)
+    {
+        if (!p_scossl_mldsa_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY, &pbExpanded, &cbExpanded))
         {
+            p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
+            keyCtx = NULL;
+            goto cleanup;
+        }
+
+        if (cbExpanded != (SIZE_T)ASN1_STRING_length(expandedKey) ||
+            CRYPTO_memcmp(pbExpanded, ASN1_STRING_get0_data(expandedKey), cbExpanded) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
             p_scossl_mldsa_keymgmt_free_key_ctx(keyCtx);
             keyCtx = NULL;
         }
     }
-    else
-    {
-        format = SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_KEY;
-        keyCtx = p_scossl_mldsa_decode_key_bytes(isComposite, algorithm,
-                                                 mldsaParams, format,
-                                                 pbExpanded, cbExpanded);
-    }
 
 cleanup:
+    if (seed != NULL)
+    {
+        OPENSSL_cleanse(seed->data, seed->length);
+    }
+    if (expandedKey != NULL)
+    {
+        OPENSSL_cleanse(expandedKey->data, expandedKey->length);
+    }
+    ASN1_item_free((ASN1_VALUE *)p8Data, ASN1_ITEM_rptr(SCOSSL_MLDSA_PRIVATE_KEY));
+    OPENSSL_secure_clear_free(pbExpanded, cbExpanded);
     PKCS8_PRIV_KEY_INFO_free(p8Info);
 
     return keyCtx;

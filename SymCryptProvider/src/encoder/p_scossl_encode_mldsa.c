@@ -14,6 +14,11 @@
 extern "C" {
 #endif
 
+// seed [0] IMPLICIT OCTET STRING (RFC 9881)
+ASN1_ITEM_TEMPLATE(SCOSSL_MLDSA_SEED) =
+    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_IMPLICIT, 0, SCOSSL_MLDSA_SEED, ASN1_OCTET_STRING)
+static_ASN1_ITEM_TEMPLATE_END(SCOSSL_MLDSA_SEED)
+
 static ASN1_OBJECT *p_scossl_encode_mldsa_get_oid(_In_ const SCOSSL_MLDSA_KEY_CTX *keyCtx)
 {
     int nid = p_scossl_mldsa_params_to_nid(keyCtx->mldsaParams, keyCtx->isComposite);
@@ -28,6 +33,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
     unsigned char *pbDer = NULL;
     int cbDer = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
+    const ASN1_ITEM *p8DataItem;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
@@ -66,27 +72,6 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
         }
         cbDer = (int)cbKey;
     }
-    else if (keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED)
-    {
-        // ML-DSA-PrivateKey seed choice is an IMPLICIT [0] OCTET STRING (RFC 9881)
-        if (cbKey != SYMCRYPT_MLDSA_PRIVATE_SEED_SIZE)
-        {
-            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "Unexpected ML-DSA seed size");
-            goto cleanup;
-        }
-
-        cbDer = (int)(2 + cbKey);
-        if ((pbDer = OPENSSL_malloc(cbDer)) == NULL)
-        {
-            cbDer = 0;
-            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-            goto cleanup;
-        }
-
-        pbDer[0] = V_ASN1_CONTEXT_SPECIFIC | 0;
-        pbDer[1] = (unsigned char)cbKey;
-        memcpy(pbDer + 2, pbKey, cbKey);
-    }
     else
     {
         if ((p8Data = ASN1_OCTET_STRING_new()) == NULL)
@@ -95,9 +80,14 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mldsa_key_to_p8info(_In_ const SCOSSL_MLDSA
             goto cleanup;
         }
 
+        p8DataItem = keyCtx->format == SYMCRYPT_MLDSAKEY_FORMAT_PRIVATE_SEED ?
+            ASN1_ITEM_rptr(SCOSSL_MLDSA_SEED) :
+            ASN1_ITEM_rptr(ASN1_OCTET_STRING);
+
         if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
-            (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+            (cbDer = ASN1_item_i2d((ASN1_VALUE *)p8Data, &pbDer, p8DataItem)) <= 0)
         {
+            cbDer = 0;
             ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
             goto cleanup;
         }
