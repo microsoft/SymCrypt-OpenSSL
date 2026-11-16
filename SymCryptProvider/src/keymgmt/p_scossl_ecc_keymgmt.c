@@ -783,8 +783,10 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
         goto cleanup;
     }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_OTHER_PARAMETERS) != 0 &&
-        !SymCryptEcurveIsSame(keyCtx1->curve, keyCtx2->curve))
+    if ((selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0 &&
+        (keyCtx1->curve == NULL ||
+         keyCtx2->curve == NULL ||
+         !SymCryptEcurveIsSame(keyCtx1->curve, keyCtx2->curve)))
     {
         goto cleanup;
     }
