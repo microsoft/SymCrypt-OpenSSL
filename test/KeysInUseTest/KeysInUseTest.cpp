@@ -1465,7 +1465,7 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
         goto cleanup;
     }
 
-    cbDecryptedMax = EVP_PKEY_get_size(pkeyBase);
+    cbDecryptedMax = EVP_PKEY_size(pkeyBase);
     if ((pbDecrypted = (PBYTE)OPENSSL_malloc(cbDecryptedMax)) == NULL)
     {
         TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
