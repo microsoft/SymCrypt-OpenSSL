@@ -565,6 +565,13 @@ static BOOL p_scossl_mlkem_keymgmt_has(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int se
     return TRUE;
 }
 
+// Key checking is handled by SymCrypt on import. This function just needs to
+// check whether the data indicated by selection has been set.
+static SCOSSL_STATUS p_scossl_mlkem_keymgmt_validate(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
+{
+    return p_scossl_mlkem_keymgmt_has(keyCtx, selection) ? SCOSSL_SUCCESS : SCOSSL_FAILURE;
+}
+
 static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx2,
                                          int selection)
 {
@@ -845,6 +852,7 @@ cleanup:
         {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_gettable_params},    \
         {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_get_params},              \
         {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_mlkem_keymgmt_has},                            \
+        {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_mlkem_keymgmt_validate},                  \
         {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_mlkem_keymgmt_match},                        \
         {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_mlkem_keymgmt_impexp_types},          \
         {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_mlkem_keymgmt_impexp_types},          \
