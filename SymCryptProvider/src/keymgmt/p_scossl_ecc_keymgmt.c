@@ -777,8 +777,8 @@ static BOOL p_scossl_ecc_keymgmt_match(_In_ SCOSSL_ECC_KEY_CTX *keyCtx1, _In_ SC
 
     pointFormat = keyCtx1->isX25519 ? SYMCRYPT_ECPOINT_FORMAT_X : SYMCRYPT_ECPOINT_FORMAT_XY;
 
-    if (keyCtx1->initialized != keyCtx2->initialized ||
-        keyCtx1->isX25519 != keyCtx2->isX25519)
+    if (keyCtx1->isX25519 != keyCtx2->isX25519 ||
+        ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && keyCtx1->initialized != keyCtx2->initialized))
     {
         goto cleanup;
     }
@@ -1283,6 +1283,12 @@ static SCOSSL_STATUS p_scossl_x25519_keymgmt_export(_In_ SCOSSL_ECC_KEY_CTX *key
     // Caller must request keypair for export
     if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
     {
+        goto cleanup;
+    }
+
+    if (!keyCtx->initialized)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
         goto cleanup;
     }
 
