@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-#define SCOSSL_DH_KEYGEN_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
+#define SCOSSL_DH_POSSIBLE_SELECTIONS (OSSL_KEYMGMT_SELECT_KEYPAIR | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS)
 
 #define SCOSSL_DH_PBITS_DEFAULT 2048
 // Private key length determined by group
@@ -514,7 +514,7 @@ static SCOSSL_DH_KEYGEN_CTX *p_scossl_dh_keygen_init(_In_ SCOSSL_PROVCTX *provCt
 {
     SCOSSL_DH_KEYGEN_CTX *genCtx = NULL;
 
-    if ((selection & SCOSSL_DH_KEYGEN_POSSIBLE_SELECTIONS) != 0 &&
+    if ((selection & SCOSSL_DH_POSSIBLE_SELECTIONS) != 0 &&
         (genCtx = OPENSSL_malloc(sizeof(SCOSSL_DH_KEYGEN_CTX))) != NULL)
     {
         genCtx->pDlGroup = NULL;
@@ -604,6 +604,7 @@ static SCOSSL_PROV_DH_KEY_CTX *p_scossl_dh_keygen(_In_ SCOSSL_DH_KEYGEN_CTX *gen
     }
 
     ctx->pDlGroup = (PSYMCRYPT_DLGROUP) genCtx->pDlGroup;
+    ctx->nBitsPriv = genCtx->nBitsPriv;
 
     return ctx;
 }
@@ -1308,7 +1309,6 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
 {
     OSSL_PARAM_BLD *bld = NULL;
     OSSL_PARAM *params = NULL;
-    BOOL includePublic = (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0;
     BOOL includePrivate = (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0;
     PBYTE pbPrimeP = NULL;
     PBYTE pbPrimeQ = NULL;
@@ -1334,7 +1334,6 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     BIGNUM *bnPubKey = NULL;
     int mdNid;
     int dlGroupNid;
-    int privateKeyBits;
     const char *dlGroupName;
     PCSYMCRYPT_HASH pHashAlgorithm;
     UINT32 genCounter;
@@ -1343,8 +1342,8 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     if (ctx->keyCtx == NULL ||
-        (selection & OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) == 0 ||
-        ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && !ctx->keyCtx->initialized))
+        ctx->pDlGroup == NULL ||
+        (selection & SCOSSL_DH_POSSIBLE_SELECTIONS) == 0)
     {
         return SCOSSL_FAILURE;
     }
@@ -1355,118 +1354,135 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         goto cleanup;
     }
 
-    SymCryptDlgroupGetSizes(
-        ctx->pDlGroup,
-        &cbPrimeP,
-        &cbPrimeQ,
-        &cbGenG,
-        &cbSeed);
-
-    if (cbPrimeP == 0)
+    if ((selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0)
     {
-        SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptDlgroupGetSizes returned 0 for prime P size");
-        goto cleanup;
-    }
+        SymCryptDlgroupGetSizes(
+            ctx->pDlGroup,
+            &cbPrimeP,
+            &cbPrimeQ,
+            &cbGenG,
+            &cbSeed);
 
-    cbGroupParams =
-        cbPrimeP +
-        cbPrimeQ +
-        cbGenG +
-        cbSeed;
+        if (cbPrimeP == 0)
+        {
+            SCOSSL_PROV_LOG_ERROR(ERR_R_INTERNAL_ERROR, "SymCryptDlgroupGetSizes returned 0 for prime P size");
+            goto cleanup;
+        }
 
-    if ((pbGroupParams = OPENSSL_malloc(cbGroupParams)) == NULL ||
-        (cbPrimeP != 0 && (bnPrimeP = BN_new()) == NULL) ||
-        (cbPrimeQ != 0 && (bnPrimeQ = BN_new()) == NULL) ||
-        (cbGenG != 0 && (bnGenG = BN_new()) == NULL))
-    {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-        goto cleanup;
-    }
+        cbGroupParams =
+            cbPrimeP +
+            cbPrimeQ +
+            cbGenG +
+            cbSeed;
 
-    pbPrimeP = pbGroupParams;
+        if ((pbGroupParams = OPENSSL_malloc(cbGroupParams)) == NULL ||
+            (cbPrimeP != 0 && (bnPrimeP = BN_new()) == NULL) ||
+            (cbPrimeQ != 0 && (bnPrimeQ = BN_new()) == NULL) ||
+            (cbGenG != 0 && (bnGenG = BN_new()) == NULL))
+        {
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
 
-    pbCur = pbGroupParams + cbPrimeP;
-    pbPrimeQ = cbPrimeQ == 0 ? NULL : pbCur;
+        pbPrimeP = pbGroupParams;
 
-    pbCur += cbPrimeQ;
-    pbGenG = cbGenG == 0 ? NULL : pbCur;
+        pbCur = pbGroupParams + cbPrimeP;
+        pbPrimeQ = cbPrimeQ == 0 ? NULL : pbCur;
 
-    pbCur += cbGenG;
-    pbSeed = cbSeed == 0 ? NULL : pbCur;
+        pbCur += cbPrimeQ;
+        pbGenG = cbGenG == 0 ? NULL : pbCur;
 
-    // Always export group parameters
-    scError = SymCryptDlgroupGetValue(
-        ctx->pDlGroup,
-        pbPrimeP, cbPrimeP,
-        pbPrimeQ, cbPrimeQ,
-        pbGenG, cbGenG,
-        SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
-        &pHashAlgorithm,
-        pbSeed, cbSeed,
-        &genCounter);
-    if (scError != SYMCRYPT_NO_ERROR)
-    {
-        SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlgroupGetValue failed", scError);
-        goto cleanup;
-    }
+        pbCur += cbGenG;
+        pbSeed = cbSeed == 0 ? NULL : pbCur;
 
-    if (pbPrimeP != NULL &&
-            (BN_bin2bn(pbPrimeP, cbPrimeP, bnPrimeP) == NULL ||
-            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, bnPrimeP)))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
-    }
+        scError = SymCryptDlgroupGetValue(
+            ctx->pDlGroup,
+            pbPrimeP, cbPrimeP,
+            pbPrimeQ, cbPrimeQ,
+            pbGenG, cbGenG,
+            SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
+            &pHashAlgorithm,
+            pbSeed, cbSeed,
+            &genCounter);
+        if (scError != SYMCRYPT_NO_ERROR)
+        {
+            SCOSSL_PROV_LOG_SYMCRYPT_ERROR("SymCryptDlgroupGetValue failed", scError);
+            goto cleanup;
+        }
 
-    if (pbPrimeQ != NULL &&
-            (BN_bin2bn(pbPrimeQ, cbPrimeQ, bnPrimeQ) == NULL ||
-            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, bnPrimeQ)))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
-    }
+        if (pbPrimeP != NULL &&
+                (BN_bin2bn(pbPrimeP, cbPrimeP, bnPrimeP) == NULL ||
+                !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, bnPrimeP)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
 
-    if (pbGenG != NULL &&
-            (BN_bin2bn(pbGenG, cbGenG, bnGenG) == NULL ||
-            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, bnGenG)))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
-    }
+        if (pbPrimeQ != NULL &&
+                (BN_bin2bn(pbPrimeQ, cbPrimeQ, bnPrimeQ) == NULL ||
+                !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, bnPrimeQ)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
 
-    if (pbSeed != NULL &&
-        !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_FFC_SEED, pbSeed, cbSeed))
-    {
-        ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-        goto cleanup;
-    }
+        if (pbGenG != NULL &&
+                (BN_bin2bn(pbGenG, cbGenG, bnGenG) == NULL ||
+                !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, bnGenG)))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
 
-    if ((mdNid = scossl_get_mdnid_from_symcrypt_hash_algorithm(pHashAlgorithm)) != NID_undef)
-    {
-        const char *mdName = OBJ_nid2sn(mdNid);
+        if (pbSeed != NULL &&
+            !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_FFC_SEED, pbSeed, cbSeed))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
+        }
 
-        if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_FFC_DIGEST, mdName, strlen(mdName)))
+        if ((mdNid = scossl_get_mdnid_from_symcrypt_hash_algorithm(pHashAlgorithm)) != NID_undef)
+        {
+            const char *mdName = OBJ_nid2sn(mdNid);
+
+            if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_FFC_DIGEST, mdName, strlen(mdName)))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
+        }
+
+        // Group name may not be available if the group was imported by params
+        if ((dlGroupNid = scossl_dh_get_group_nid(ctx->pDlGroup)) != 0)
+        {
+            if ((dlGroupName = OBJ_nid2sn(dlGroupNid)) == NULL ||
+                !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, dlGroupName, strlen(dlGroupName)))
+            {
+                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+                goto cleanup;
+            }
+        }
+
+        // Only export the private key length if it was explicitly set, matching OpenSSL
+        if (ctx->nBitsPriv > 0 &&
+            !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, ctx->nBitsPriv))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
     }
 
-    // Group name may not be available if the group was imported by params
-    if ((dlGroupNid = scossl_dh_get_group_nid(ctx->pDlGroup)) != 0)
+    // Match OpenSSL: parameter-only keys export no key material, the public key is
+    // exported with any key selection, and the private key only if requested and present
+    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0 && ctx->keyCtx->initialized)
     {
-        if ((dlGroupName = OBJ_nid2sn(dlGroupNid)) == NULL ||
-            !OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, dlGroupName, strlen(dlGroupName)))
+        if (!SymCryptDlkeyHasPrivateKey(ctx->keyCtx->dlkey))
         {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-            goto cleanup;
+            includePrivate = FALSE;
         }
-    }
 
-    if ((selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0)
-    {
         cbPrivateKey = includePrivate ? SymCryptDlkeySizeofPrivateKey(ctx->keyCtx->dlkey) : 0;
-        cbPublicKey = includePublic ? SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey) : 0;
+        cbPublicKey = SymCryptDlkeySizeofPublicKey(ctx->keyCtx->dlkey);
 
         cbKeyData = cbPrivateKey + cbPublicKey;
         if ((pbKeyData = OPENSSL_zalloc(cbKeyData)) == NULL)
@@ -1476,7 +1492,7 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
         }
 
         pbPrivateKey = includePrivate ? pbKeyData : NULL;
-        pbPublicKey = includePublic ? pbKeyData + cbPrivateKey : NULL;
+        pbPublicKey = pbKeyData + cbPrivateKey;
 
         scError = SymCryptDlkeyGetValue(
             ctx->keyCtx->dlkey,
@@ -1506,28 +1522,21 @@ static SCOSSL_STATUS p_scossl_dh_keymgmt_export(_In_ SCOSSL_PROV_DH_KEY_CTX *ctx
             }
         }
 
-        if (includePublic)
+        if ((bnPubKey = BN_new()) == NULL)
         {
-            if ((bnPubKey = BN_new()) == NULL)
-            {
-                ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
-                goto cleanup;
-            }
+            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+            goto cleanup;
+        }
 
-            if (BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey) == NULL ||
-                !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, bnPubKey))
-            {
-                ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
-                goto cleanup;
-            }
+        if (BN_bin2bn(pbPublicKey, cbPublicKey, bnPubKey) == NULL ||
+            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, bnPubKey))
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            goto cleanup;
         }
     }
 
-    privateKeyBits = p_scossl_dh_privkey_bits(ctx);
-
-    if (privateKeyBits < 0 ||
-        !OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_DH_PRIV_LEN, privateKeyBits) ||
-        (params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
+    if ((params = OSSL_PARAM_BLD_to_param(bld)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
         goto cleanup;
