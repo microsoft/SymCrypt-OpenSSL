@@ -6,12 +6,44 @@
 #include "p_scossl_decode_common.h"
 #include "keymgmt/p_scossl_mlkem_keymgmt.h"
 
+#include <openssl/asn1t.h>
 #include <openssl/core_object.h>
 #include <openssl/proverr.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Private key CHOICE { seed [0] IMPLICIT OCTET STRING, expandedKey OCTET STRING,
+//                      both SEQUENCE { seed OCTET STRING, expandedKey OCTET STRING } } (RFC 9935)
+typedef struct {
+    ASN1_OCTET_STRING *seed;
+    ASN1_OCTET_STRING *expandedKey;
+} SCOSSL_MLKEM_PRIVATE_KEY_BOTH;
+
+typedef struct {
+    int type;
+    union {
+        ASN1_OCTET_STRING *seed;
+        ASN1_OCTET_STRING *expandedKey;
+        SCOSSL_MLKEM_PRIVATE_KEY_BOTH *both;
+    } value;
+} SCOSSL_MLKEM_PRIVATE_KEY;
+
+#define SCOSSL_MLKEM_PRIVATE_KEY_TYPE_SEED         0
+#define SCOSSL_MLKEM_PRIVATE_KEY_TYPE_EXPANDED_KEY 1
+#define SCOSSL_MLKEM_PRIVATE_KEY_TYPE_BOTH         2
+
+ASN1_SEQUENCE(SCOSSL_MLKEM_PRIVATE_KEY_BOTH) = {
+    ASN1_SIMPLE(SCOSSL_MLKEM_PRIVATE_KEY_BOTH, seed, ASN1_OCTET_STRING),
+    ASN1_SIMPLE(SCOSSL_MLKEM_PRIVATE_KEY_BOTH, expandedKey, ASN1_OCTET_STRING)
+} static_ASN1_SEQUENCE_END(SCOSSL_MLKEM_PRIVATE_KEY_BOTH)
+
+ASN1_CHOICE(SCOSSL_MLKEM_PRIVATE_KEY) = {
+    ASN1_IMP(SCOSSL_MLKEM_PRIVATE_KEY, value.seed, ASN1_OCTET_STRING, 0),
+    ASN1_SIMPLE(SCOSSL_MLKEM_PRIVATE_KEY, value.expandedKey, ASN1_OCTET_STRING),
+    ASN1_SIMPLE(SCOSSL_MLKEM_PRIVATE_KEY, value.both, SCOSSL_MLKEM_PRIVATE_KEY_BOTH)
+} static_ASN1_CHOICE_END(SCOSSL_MLKEM_PRIVATE_KEY)
 
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_decode_key_bytes(_In_ SCOSSL_DECODE_CTX *ctx, _In_ const ASN1_OBJECT *algorithm,
                                                              SYMCRYPT_MLKEM_PARAMS mlkemParams, SYMCRYPT_MLKEMKEY_FORMAT format,
@@ -60,28 +92,109 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_PrivateKeyInfo_to_mlkem(_In_ SCOSSL_DECODE
 {
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     const ASN1_OBJECT *algorithm;
+    const X509_ALGOR *algorithmIdentifier;
+    int paramType;
     const unsigned char *pbKey;
+    const unsigned char *pbEnd;
     int cbKey;
-    ASN1_OCTET_STRING *p8Data = NULL;
+    SCOSSL_MLKEM_PRIVATE_KEY *p8Data = NULL;
+    ASN1_OCTET_STRING *seed = NULL;
+    ASN1_OCTET_STRING *expandedKey = NULL;
+    ASN1_OCTET_STRING *privateKey;
+    PBYTE pbExpanded = NULL;
+    SIZE_T cbExpanded = 0;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
     SYMCRYPT_MLKEMKEY_FORMAT format;
 
     if (d2i_PKCS8_PRIV_KEY_INFO_bio(bio, &p8Info) == NULL ||
-        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, NULL, p8Info) ||
-        d2i_ASN1_OCTET_STRING(&p8Data, &pbKey, cbKey) == NULL)
+        !PKCS8_pkey_get0(&algorithm, &pbKey, &cbKey, &algorithmIdentifier, p8Info))
     {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         goto cleanup;
     }
 
-    format = cbKey == 64 ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
+    // AlgorithmIdentifier parameters must be absent (RFC 9935)
+    X509_ALGOR_get0(NULL, &paramType, NULL, algorithmIdentifier);
+    if (paramType != V_ASN1_UNDEF)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
 
+    if (cbKey <= 0)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
+
+    pbEnd = pbKey + cbKey;
+    if ((p8Data = (SCOSSL_MLKEM_PRIVATE_KEY *)ASN1_item_d2i(NULL, &pbKey, cbKey, ASN1_ITEM_rptr(SCOSSL_MLKEM_PRIVATE_KEY))) == NULL ||
+        pbKey != pbEnd)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
+
+    switch (p8Data->type)
+    {
+    case SCOSSL_MLKEM_PRIVATE_KEY_TYPE_SEED:
+        seed = p8Data->value.seed;
+        break;
+    case SCOSSL_MLKEM_PRIVATE_KEY_TYPE_EXPANDED_KEY:
+        expandedKey = p8Data->value.expandedKey;
+        break;
+    case SCOSSL_MLKEM_PRIVATE_KEY_TYPE_BOTH:
+        seed = p8Data->value.both->seed;
+        expandedKey = p8Data->value.both->expandedKey;
+        break;
+    default:
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
+
+    // Retain the seed when present
+    privateKey = seed != NULL ? seed : expandedKey;
+    format = seed != NULL ? SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED : SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY;
     keyCtx = p_scossl_mlkem_decode_key_bytes(ctx, algorithm,
                                              mlkemParams, format,
-                                             ASN1_STRING_get0_data(p8Data), ASN1_STRING_length(p8Data));
+                                             ASN1_STRING_get0_data(privateKey), ASN1_STRING_length(privateKey));
+
+    if (keyCtx == NULL)
+    {
+        goto cleanup;
+    }
+
+    // Both seed and expanded key are present. The expanded key
+    // must match the one derived from the seed.
+    if (p8Data->type == SCOSSL_MLKEM_PRIVATE_KEY_TYPE_BOTH)
+    {
+        if (!p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY, &pbExpanded, &cbExpanded))
+        {
+            p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
+            keyCtx = NULL;
+            goto cleanup;
+        }
+
+        if (cbExpanded != (SIZE_T)ASN1_STRING_length(expandedKey) ||
+            CRYPTO_memcmp(pbExpanded, ASN1_STRING_get0_data(expandedKey), cbExpanded) != 0)
+        {
+            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY);
+            p_scossl_mlkem_keymgmt_free_key_ctx(keyCtx);
+            keyCtx = NULL;
+        }
+    }
 
 cleanup:
-    ASN1_OCTET_STRING_free(p8Data);
+    if (seed != NULL)
+    {
+        OPENSSL_cleanse(seed->data, seed->length);
+    }
+    if (expandedKey != NULL)
+    {
+        OPENSSL_cleanse(expandedKey->data, expandedKey->length);
+    }
+    ASN1_item_free((ASN1_VALUE *)p8Data, ASN1_ITEM_rptr(SCOSSL_MLKEM_PRIVATE_KEY));
+    OPENSSL_secure_clear_free(pbExpanded, cbExpanded);
     PKCS8_PRIV_KEY_INFO_free(p8Info);
 
     return keyCtx;
@@ -92,6 +205,7 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_
     OSSL_LIB_CTX *libCtx = ctx->provctx == NULL ? NULL : ctx->provctx->libctx;
     SUBJECT_PUBKEY_INFO *subjPubKeyInfo = NULL;
     const ASN1_OBJECT *algorithm;
+    int paramType;
     SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
 
     if ((subjPubKeyInfo = OPENSSL_zalloc(sizeof(SUBJECT_PUBKEY_INFO))) == NULL)
@@ -106,7 +220,14 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_SubjectPublicKeyInfo_to_mlkem(_In_ SCOSSL_
         goto cleanup;
     }
 
-    X509_ALGOR_get0(&algorithm, NULL, NULL, subjPubKeyInfo->x509Alg);
+    X509_ALGOR_get0(&algorithm, &paramType, NULL, subjPubKeyInfo->x509Alg);
+
+    // AlgorithmIdentifier parameters must be absent (RFC 9935)
+    if (paramType != V_ASN1_UNDEF)
+    {
+        ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
+        goto cleanup;
+    }
 
     keyCtx = p_scossl_mlkem_decode_key_bytes(ctx, algorithm,
                                              mlkemParams, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,

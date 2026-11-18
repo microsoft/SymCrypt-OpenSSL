@@ -55,6 +55,7 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 
     if (copyCtx != NULL)
     {
+        copyCtx->dlkey = NULL;
         copyCtx->initialized = ctx->initialized;
         if (ctx->initialized)
         {
@@ -94,7 +95,7 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
             // The private key is only allocated with a call to SymCryptDlkeySetValue
             // or SymCryptDlkeyGenerate, so instead we need to copy the key
             cbPublicKey = SymCryptDlkeySizeofPublicKey(ctx->dlkey);
-            cbPrivateKey = SymCryptDlkeySizeofPrivateKey(ctx->dlkey);
+            cbPrivateKey = SymCryptDlkeyHasPrivateKey(ctx->dlkey) ? SymCryptDlkeySizeofPrivateKey(ctx->dlkey) : 0;
             cbData = cbPublicKey + cbPrivateKey;
 
             if ((pbData = OPENSSL_secure_malloc(cbData)) == NULL)
@@ -103,7 +104,7 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
             }
 
             pbPublicKey = pbData;
-            pbPrivateKey = pbData + cbPublicKey;
+            pbPrivateKey = cbPrivateKey > 0 ? pbData + cbPublicKey : NULL;
 
             scError = SymCryptDlkeyGetValue(
                 ctx->dlkey,
@@ -139,12 +140,14 @@ SCOSSL_DH_KEY_CTX *scossl_dh_dup_key_ctx(SCOSSL_DH_KEY_CTX *ctx, BOOL copyGroup)
 cleanup:
     if (!success)
     {
+        // The key references the group, so it must be freed first
+        scossl_dh_free_key_ctx(copyCtx);
+        copyCtx = NULL;
+
         if (pDlgroupCopy != NULL)
         {
             SymCryptDlgroupFree(pDlgroupCopy);
         }
-        scossl_dh_free_key_ctx(copyCtx);
-        copyCtx = NULL;
     }
 
     if (cbData > 0)

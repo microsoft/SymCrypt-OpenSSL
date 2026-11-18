@@ -982,6 +982,13 @@ static BOOL p_scossl_rsa_keymgmt_has(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int s
     return ret;
 }
 
+// Key checking is handled by SymCrypt on import. This function just needs to
+// check whether the data indicated by selection has been set.
+static SCOSSL_STATUS p_scossl_rsa_keymgmt_validate(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
+{
+    return p_scossl_rsa_keymgmt_has(keyCtx, selection) ? SCOSSL_SUCCESS : SCOSSL_FAILURE;
+}
+
 static BOOL p_scossl_rsa_keymgmt_match(_In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx1, _In_ SCOSSL_PROV_RSA_KEY_CTX *keyCtx2,
                                        int selection)
 {
@@ -1398,6 +1405,7 @@ const OSSL_DISPATCH p_scossl_rsa_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_rsa_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_rsa_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_rsa_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
@@ -1417,6 +1425,7 @@ const OSSL_DISPATCH p_scossl_rsapss_keymgmt_functions[] = {
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_rsa_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_rsa_keymgmt_has},
+    {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_rsa_keymgmt_validate},
     {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_rsa_keymgmt_match},
     {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_rsa_keymgmt_impexp_types},

@@ -21,6 +21,7 @@ typedef struct {
     SCOSSL_PROVCTX *provCtx;
 
     SYMCRYPT_MLKEM_PARAMS mlkemParams;
+    int selection;
 
     BYTE abSeed[SCOSSL_MLKEM_PRIVATE_SEED_LENGTH];
     SIZE_T cbSeed;
@@ -206,16 +207,22 @@ static void p_scossl_mlkem_keygen_cleanup(_Inout_ SCOSSL_MLKEM_KEYGEN_CTX *genCt
     OPENSSL_secure_clear_free(genCtx, sizeof(SCOSSL_MLKEM_KEYGEN_CTX));
 }
 
-static SCOSSL_MLKEM_KEYGEN_CTX *p_scossl_mlkem_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, ossl_unused int selection,
+static SCOSSL_MLKEM_KEYGEN_CTX *p_scossl_mlkem_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, int selection,
                                                            _In_ const OSSL_PARAM params[],
                                                            SYMCRYPT_MLKEM_PARAMS mlkemParams)
 {
+    if ((selection & (OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS | OSSL_KEYMGMT_SELECT_PRIVATE_KEY)) == 0)
+    {
+        return NULL;
+    }
+
     SCOSSL_MLKEM_KEYGEN_CTX *genCtx = OPENSSL_secure_zalloc(sizeof(SCOSSL_MLKEM_KEYGEN_CTX));
 
     if (genCtx != NULL)
     {
         genCtx->provCtx = provCtx;
         genCtx->mlkemParams = mlkemParams;
+        genCtx->selection = selection;
         if (p_scossl_mlkem_keygen_set_params(genCtx, params) != SCOSSL_SUCCESS)
         {
             p_scossl_mlkem_keygen_cleanup(genCtx);
@@ -246,7 +253,7 @@ static SCOSSL_STATUS p_scossl_mlkem_keygen_set_template(_Inout_ SCOSSL_MLKEM_KEY
 static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX *genCtx,
                                                    ossl_unused OSSL_CALLBACK *cb, ossl_unused void *cbarg)
 {
-    SCOSSL_MLKEM_KEY_CTX *keyCtx;
+    SCOSSL_MLKEM_KEY_CTX *keyCtx = NULL;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
     SYMCRYPT_ERROR scError = SYMCRYPT_NO_ERROR;
 
@@ -256,8 +263,23 @@ static SCOSSL_MLKEM_KEY_CTX *p_scossl_mlkem_keygen(_In_ SCOSSL_MLKEM_KEYGEN_CTX 
         goto cleanup;
     }
 
-    if ((keyCtx = p_scossl_mlkem_keymgmt_new_ctx(genCtx->provCtx, genCtx->mlkemParams)) == NULL ||
-        (keyCtx->key = SymCryptMlKemkeyAllocate(genCtx->mlkemParams)) == NULL)
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+    {
+        return NULL;
+    }
+
+    if ((keyCtx = p_scossl_mlkem_keymgmt_new_ctx(genCtx->provCtx, genCtx->mlkemParams)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if ((genCtx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) == 0)
+    {
+        return keyCtx;
+    }
+
+    if ((keyCtx->key = SymCryptMlKemkeyAllocate(genCtx->mlkemParams)) == NULL)
     {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto cleanup;
@@ -543,6 +565,13 @@ static BOOL p_scossl_mlkem_keymgmt_has(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int se
     return TRUE;
 }
 
+// Key checking is handled by SymCrypt on import. This function just needs to
+// check whether the data indicated by selection has been set.
+static SCOSSL_STATUS p_scossl_mlkem_keymgmt_validate(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection, ossl_unused int checktype)
+{
+    return p_scossl_mlkem_keymgmt_has(keyCtx, selection) ? SCOSSL_SUCCESS : SCOSSL_FAILURE;
+}
+
 static BOOL p_scossl_mlkem_keymgmt_match(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx1, _In_ SCOSSL_MLKEM_KEY_CTX *keyCtx2,
                                          int selection)
 {
@@ -683,8 +712,12 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_import(_Inout_ SCOSSL_MLKEM_KEY_CTX *keyCtx
 SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, int selection,
                                             _In_ OSSL_CALLBACK *param_cb, _In_ void *cbarg)
 {
-    PBYTE pbKey = NULL;
-    SIZE_T cbKey = 0;
+    PBYTE pbEncapsKey = NULL;
+    SIZE_T cbEncapsKey = 0;
+    PBYTE pbSeed = NULL;
+    SIZE_T cbSeed = 0;
+    PBYTE pbDecapsKey = NULL;
+    SIZE_T cbDecapsKey = 0;
     OSSL_PARAM_BLD *bld = NULL;
     OSSL_PARAM *params = NULL;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
@@ -711,22 +744,18 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
         ret = p_scossl_mlkem_keymgmt_get_encoded_key(
             keyCtx,
             SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY,
-            &pbKey, &cbKey);
+            &pbEncapsKey, &cbEncapsKey);
 
         if (ret != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }
 
-        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbKey, cbKey))
+        if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pbEncapsKey, cbEncapsKey))
         {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
             goto cleanup;
         }
-
-        OPENSSL_secure_free(pbKey);
-        pbKey = NULL;
-        cbKey = 0;
     }
 
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0)
@@ -737,43 +766,37 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
             ret = p_scossl_mlkem_keymgmt_get_encoded_key(
                 keyCtx,
                 SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED,
-                &pbKey, &cbKey);
+                &pbSeed, &cbSeed);
 
             if (ret != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
-            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_ML_KEM_SEED, pbKey, cbKey))
+            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_ML_KEM_SEED, pbSeed, cbSeed))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
 
-            OPENSSL_secure_clear_free(pbKey, cbKey);
-            pbKey = NULL;
-            cbKey = 0;
             /* fall through */
         case SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY:
             ret = p_scossl_mlkem_keymgmt_get_encoded_key(
                 keyCtx,
                 SYMCRYPT_MLKEMKEY_FORMAT_DECAPSULATION_KEY,
-                &pbKey, &cbKey);
+                &pbDecapsKey, &cbDecapsKey);
 
             if (ret != SCOSSL_SUCCESS)
             {
                 goto cleanup;
             }
 
-            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbKey, cbKey))
+            if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PRIV_KEY, pbDecapsKey, cbDecapsKey))
             {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 goto cleanup;
             }
 
-            OPENSSL_secure_clear_free(pbKey, cbKey);
-            pbKey = NULL;
-            cbKey = 0;
             break;
         default:
             break;
@@ -791,7 +814,9 @@ SCOSSL_STATUS p_scossl_mlkem_keymgmt_export(_In_ SCOSSL_MLKEM_KEY_CTX *keyCtx, i
 cleanup:
     OSSL_PARAM_BLD_free(bld);
     OSSL_PARAM_free(params);
-    OPENSSL_secure_clear_free(pbKey, cbKey);
+    OPENSSL_secure_free(pbEncapsKey);
+    OPENSSL_secure_clear_free(pbSeed, cbSeed);
+    OPENSSL_secure_clear_free(pbDecapsKey, cbDecapsKey);
 
     return ret;
 }
@@ -804,7 +829,7 @@ cleanup:
     }                                                                                                   \
                                                                                                         \
     static SCOSSL_MLKEM_KEYGEN_CTX                                                                      \
-    *p_scossl_mlkem_##bits##_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, ossl_unused int selection,       \
+    *p_scossl_mlkem_##bits##_keygen_init(_In_ SCOSSL_PROVCTX *provCtx, int selection,                   \
                                          _In_ const OSSL_PARAM params[])                                \
     {                                                                                                   \
         return p_scossl_mlkem_keygen_init(provCtx, selection, params,                                   \
@@ -827,6 +852,7 @@ cleanup:
         {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_gettable_params},    \
         {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))p_scossl_mlkem_keymgmt_get_params},              \
         {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))p_scossl_mlkem_keymgmt_has},                            \
+        {OSSL_FUNC_KEYMGMT_VALIDATE, (void (*)(void))p_scossl_mlkem_keymgmt_validate},                  \
         {OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))p_scossl_mlkem_keymgmt_match},                        \
         {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))p_scossl_mlkem_keymgmt_impexp_types},          \
         {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))p_scossl_mlkem_keymgmt_impexp_types},          \

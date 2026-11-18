@@ -148,11 +148,23 @@ void TestEccCurve(int nid)
     printf("Command EC_KEY_new_by_curve_name\n");
     key1 = EC_KEY_new_by_curve_name(nid);
     key2 = EC_KEY_new_by_curve_name(nid);
+    if (key1 == NULL || key2 == NULL)
+    {
+        // The curve is not supported by this OpenSSL build (e.g. secp192k1 on
+        // Azure Linux). Skip it gracefully instead of failing: clear the error
+        // queue so the leftover EC error does not trip SSLPLAY_EXIT_ON_ERROR.
+        printf("Curve not supported, skipping\n");
+        ERR_clear_error();
+        goto end;
+    }
+
     printf("Command EC_KEY_generate_key\n");
     EC_KEY_generate_key(key1);
     EC_KEY_generate_key(key2);
     TestEcdsa(key1);
     TestEcdh(key1, key2);
+
+end:
     EC_KEY_free(key1);
     EC_KEY_free(key2);
     return;

@@ -13,6 +13,7 @@
 #include "scossl_helpers.h"
 #include "keysinuse.h"
 
+#include <openssl/ec.h>
 #include <openssl/evp.h>
 #if OPENSSL_VERSION_MAJOR == 3
     #include <openssl/core_names.h>
@@ -80,27 +81,50 @@ typedef struct
 typedef struct
 {
     const int keyType;
-    const int keygenParams; // Type specific keygen params. Key size for RSA, group nid for ECDSA
+    const int keygenParams; // Type specific keygen params. Key size for RSA, group nid for ECDSA,
+                            // group nid of the ECDSA component for composite ML-DSA, 0 for ML-DSA
     EVP_PKEY *pkey;
     PBYTE pbEncodedKey;
     SIZE_T cbEncodedKey;
     char abKeyId[KEYSINUSE_KEYID_SIZE];
 } KEYSINUSE_TEST_KEY;
 
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+    #define KEYSINUSE_TEST_IS_MLDSA(keyType) \
+        ((keyType) == EVP_PKEY_ML_DSA_44 || (keyType) == EVP_PKEY_ML_DSA_65 || (keyType) == EVP_PKEY_ML_DSA_87)
+    #define KEYSINUSE_TEST_IS_COMPOSITE_MLDSA(testKey) \
+        (KEYSINUSE_TEST_IS_MLDSA((testKey).keyType) && (testKey).keygenParams != 0)
+    #define KEYSINUSE_TEST_MLDSA_SEED_SIZE 32
+#else
+    #define KEYSINUSE_TEST_IS_MLDSA(keyType) 0
+    #define KEYSINUSE_TEST_IS_COMPOSITE_MLDSA(testKey) 0
+#endif
+
 static KEYSINUSE_TEST_KEY testKeys[] = {
     {EVP_PKEY_RSA,      2048,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      3072,                   nullptr, nullptr, 0, {}},
     {EVP_PKEY_RSA,      4096,                   nullptr, nullptr, 0, {}},
-#ifdef NID_X9_62_prime192v1 // This curve is not available on Azure Linux 3
     {EVP_PKEY_EC,       NID_X9_62_prime192v1,   nullptr, nullptr, 0, {}},
-#endif
     {EVP_PKEY_EC,       NID_secp224r1,          nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_X9_62_prime256v1,   nullptr, nullptr, 0, {}},
     {EVP_PKEY_EC,       NID_secp384r1,          nullptr, nullptr, 0, {}},
-    {EVP_PKEY_EC,       NID_secp521r1,          nullptr, nullptr, 0, {}}};
+    {EVP_PKEY_EC,       NID_secp521r1,          nullptr, nullptr, 0, {}},
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+    {EVP_PKEY_ML_DSA_44, 0,                     nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_65, 0,                     nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_87, 0,                     nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_44, NID_X9_62_prime256v1,  nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_65, NID_X9_62_prime256v1,  nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_65, NID_secp384r1,         nullptr, nullptr, 0, {}},
+    {EVP_PKEY_ML_DSA_87, NID_secp384r1,         nullptr, nullptr, 0, {}},
+#endif
+};
 
 static char *processName;
-static time_t processStartTime;
+static time_t testStartTime;
+// KeysInUse may be initialized as soon as the provider is loaded, which can
+// be before the tests start. The logged process start time is checked against this.
+static time_t keysinuseStartTime;
 
 static bool logVerbose = false;
 static bool checkSyslog = false;
@@ -284,7 +308,7 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
         }
 
         // Only look at events since this test started
-        if (eventTimestamp / 1000000 < processStartTime)
+        if (eventTimestamp / 1000000 < testStartTime)
         {
             break;
         }
@@ -369,10 +393,10 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
             goto cleanup;
         }
 
-        if (events[i]->firstLogTime < processStartTime)
+        if (events[i]->firstLogTime < testStartTime)
         {
             TEST_LOG_ERROR("Logged first log time is before the test started. Expected >= %ld, Logged: %ld",
-                processStartTime, events[i]->firstLogTime)
+                testStartTime, events[i]->firstLogTime)
             goto cleanup;
         }
 
@@ -472,17 +496,17 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
     pbExpectedHeader = strdup(pbHeader);
 
-    // Check the logged start time >= processStartTime
+    // Check the logged start time >= keysinuseStartTime
     if ((pbCurToken = strtok(pbHeader, ",")) == NULL)
     {
         TEST_LOG_ERROR("Failed to parse process start time")
         goto cleanup;
     }
 
-    if ((loggedStartTime = atol(pbCurToken)) < processStartTime)
+    if ((loggedStartTime = atol(pbCurToken)) < keysinuseStartTime)
     {
-        TEST_LOG_ERROR("Logged process start time is before the test started. Expected >= %ld, Logged: %ld",
-            processStartTime, loggedStartTime)
+        TEST_LOG_ERROR("Logged process start time is before KeysInUse could have started. Expected >= %ld, Logged: %ld",
+            keysinuseStartTime, loggedStartTime)
         goto cleanup;
     }
 
@@ -633,11 +657,11 @@ static SCOSSL_STATUS keysinuse_test_check_log(char abKeyId[KEYSINUSE_KEYID_SIZE]
 
         lastLogTime = atol(pbCurToken);
 
-        // Check the first log time >= processStartTime
-        if (firstLogTime < processStartTime)
+        // Check the first log time >= testStartTime
+        if (firstLogTime < testStartTime)
         {
             TEST_LOG_ERROR("First log time is before the test started. Expected >= %ld, Logged: %ld",
-                processStartTime, firstLogTime)
+                testStartTime, firstLogTime)
             goto cleanup;
         }
 
@@ -1031,6 +1055,10 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
+    // RSA decrypt requires an output buffer of at least the modulus size
+    PBYTE pbDecrypted = NULL;
+    SIZE_T cbDecryptedMax = 0;
+    SIZE_T cbDecrypted = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
@@ -1043,6 +1071,13 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     if (RAND_bytes(pbPlainText, cbPlainText) != 1)
     {
         TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    cbDecryptedMax = EVP_PKEY_get_size(pkeyBase);
+    if ((pbDecrypted = (PBYTE)OPENSSL_malloc(cbDecryptedMax)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
         goto cleanup;
     }
 
@@ -1140,7 +1175,8 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     }
 
     // Decrypt
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1151,10 +1187,17 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third decrypt. Only the first event should be logged.
-    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0 ||
-        EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopy, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopyByRef, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
     }
     expectedEvents[1].decryptCount = 2;
@@ -1197,7 +1240,8 @@ SCOSSL_STATUS keysinuse_test_provider_decrypt(EVP_PKEY *pkeyBase, char abKeyId[K
         goto cleanup;
     }
 
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1221,6 +1265,7 @@ cleanup:
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
     OPENSSL_free(pbCipherText);
+    OPENSSL_free(pbDecrypted);
 
     return ret;
 }
@@ -1403,6 +1448,10 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     SIZE_T cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
     PBYTE pbCipherText = NULL;
     SIZE_T cbCipherText = 0;
+    // RSA decrypt requires an output buffer of at least the modulus size
+    PBYTE pbDecrypted = NULL;
+    SIZE_T cbDecryptedMax = 0;
+    SIZE_T cbDecrypted = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
 
     KEYSINUSE_EXPECTED_EVENT expectedEvents[3] = {
@@ -1413,6 +1462,13 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     if (RAND_bytes(pbPlainText, cbPlainText) != 1)
     {
         TEST_LOG_ERROR("RAND_bytes failed")
+        goto cleanup;
+    }
+
+    cbDecryptedMax = EVP_PKEY_size(pkeyBase);
+    if ((pbDecrypted = (PBYTE)OPENSSL_malloc(cbDecryptedMax)) == NULL)
+    {
+        TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
         goto cleanup;
     }
 
@@ -1494,8 +1550,8 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     }
 
     // Decrypt
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1506,11 +1562,17 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
     usleep(KEYSINUSE_TEST_LOG_THREAD_WAIT_TIME);
 
     // Test second and third decrypt. Only the first event should be logged.
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctxCopy, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0 ||
-        EVP_PKEY_decrypt(ctxCopyByRef, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopy, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
-        TEST_LOG_OPENSSL_ERROR("EVP_DigestSign failed")
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
+        goto cleanup;
+    }
+
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctxCopyByRef, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
     }
     expectedEvents[1].decryptCount = 2;
@@ -1553,8 +1615,8 @@ SCOSSL_STATUS keysinuse_test_engine_decrypt(EVP_PKEY *pkeyBase, char abKeyId[KEY
         goto cleanup;
     }
 
-    cbPlainText = KEYSINUSE_TEST_DECRYPT_PLAINTEXT_SIZE;
-    if (EVP_PKEY_decrypt(ctx, pbPlainText, &cbPlainText, pbCipherText, cbCipherText) <= 0)
+    cbDecrypted = cbDecryptedMax;
+    if (EVP_PKEY_decrypt(ctx, pbDecrypted, &cbDecrypted, pbCipherText, cbCipherText) <= 0)
     {
         TEST_LOG_OPENSSL_ERROR("EVP_PKEY_decrypt failed")
         goto cleanup;
@@ -1576,9 +1638,216 @@ cleanup:
     EVP_PKEY_free(pkeyCopy);
     EVP_PKEY_free(pkeyCopyByRef);
     OPENSSL_free(pbCipherText);
+    OPENSSL_free(pbDecrypted);
 
     return ret;
 }
+
+// Sets abKeyId to the expected keyId for the encoded public key bytes
+SCOSSL_STATUS keysinuse_test_compute_key_id(PCBYTE pbEncodedKey, SIZE_T cbEncodedKey, char abKeyId[KEYSINUSE_KEYID_SIZE])
+{
+    unsigned char pbKeyHash[SYMCRYPT_SHA256_RESULT_SIZE];
+
+    if (EVP_Digest(pbEncodedKey, cbEncodedKey, pbKeyHash, NULL, EVP_sha256(), NULL) <= 0)
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_Digest failed")
+        return SCOSSL_FAILURE;
+    }
+
+    for (int j = 0; j < SYMCRYPT_SHA256_RESULT_SIZE / 2; j++)
+    {
+        sprintf(&abKeyId[j*2], "%02x", pbKeyHash[j]);
+    }
+    abKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
+
+    return SCOSSL_SUCCESS;
+}
+
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+// Gets the raw public key bytes of an ML-DSA or EC key. *ppbKey must be freed by the caller.
+static SCOSSL_STATUS keysinuse_test_get_public_key(EVP_PKEY *pkey, PBYTE *ppbKey, SIZE_T *pcbKey)
+{
+    *ppbKey = NULL;
+    *pcbKey = 0;
+
+    if (!EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, pcbKey) ||
+        (*ppbKey = (PBYTE)OPENSSL_malloc(*pcbKey)) == NULL ||
+        !EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, *ppbKey, *pcbKey, pcbKey))
+    {
+        TEST_LOG_OPENSSL_ERROR("EVP_PKEY_get_octet_string_param failed")
+        OPENSSL_free(*ppbKey);
+        *ppbKey = NULL;
+        return SCOSSL_FAILURE;
+    }
+
+    return SCOSSL_SUCCESS;
+}
+
+static const char *keysinuse_test_get_composite_mldsa_name(KEYSINUSE_TEST_KEY testKey)
+{
+    switch (testKey.keyType)
+    {
+    case EVP_PKEY_ML_DSA_44:
+        return testKey.keygenParams == NID_X9_62_prime256v1 ? "MLDSA44-ECDSA-P256-SHA256" : NULL;
+    case EVP_PKEY_ML_DSA_65:
+        return testKey.keygenParams == NID_X9_62_prime256v1 ? "MLDSA65-ECDSA-P256-SHA512" :
+               testKey.keygenParams == NID_secp384r1 ? "MLDSA65-ECDSA-P384-SHA512" : NULL;
+    case EVP_PKEY_ML_DSA_87:
+        return testKey.keygenParams == NID_secp384r1 ? "MLDSA87-ECDSA-P384-SHA512" : NULL;
+    }
+
+    return NULL;
+}
+
+// Composite ML-DSA keys are not supported by the default provider. The ML-DSA and
+// ECDSA component keys are generated by the default provider, and the composite
+// key is imported into the first loaded provider that supports it. The expected
+// keyId is computed from the component public keys to ensure any regressions in
+// the tested provider(s) key encoding logic are caught by the tests. This must be
+// called after the tested provider(s) are loaded.
+SCOSSL_STATUS keysinuse_test_generate_composite_mldsa_keys()
+{
+    const char *compositeName;
+    EVP_PKEY *mldsaPkey = NULL;
+    EVP_PKEY *ecPkey = NULL;
+    EC_KEY *ecKey = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    BYTE abSeed[KEYSINUSE_TEST_MLDSA_SEED_SIZE];
+    SIZE_T cbSeed = 0;
+    PBYTE pbMlDsaPublicKey = NULL;
+    SIZE_T cbMlDsaPublicKey = 0;
+    PBYTE pbEcPublicKey = NULL;
+    SIZE_T cbEcPublicKey = 0;
+    PBYTE pbEcPrivateKey = NULL;
+    int cbEcPrivateKey = 0;
+    PBYTE pbPrivateKey = NULL;
+    SIZE_T cbPrivateKey = 0;
+    OSSL_PARAM params[2];
+    SCOSSL_STATUS ret = SCOSSL_FAILURE;
+
+    for (int i = 0; i < sizeof(testKeys) / sizeof(testKeys[0]); i++)
+    {
+        if (!KEYSINUSE_TEST_IS_COMPOSITE_MLDSA(testKeys[i]))
+        {
+            continue;
+        }
+
+        compositeName = keysinuse_test_get_composite_mldsa_name(testKeys[i]);
+        if (compositeName == NULL)
+        {
+            TEST_LOG_ERROR("Unknown composite ML-DSA parameters")
+            goto cleanup;
+        }
+
+        if ((ctx = EVP_PKEY_CTX_new_from_name(NULL, compositeName, NULL)) == NULL)
+        {
+            printf("Skipping unsupported key type %s\n", compositeName);
+            ERR_clear_error();
+            continue;
+        }
+
+        if ((mldsaPkey = EVP_PKEY_Q_keygen(NULL, "provider=default", OBJ_nid2sn(testKeys[i].keyType))) == NULL ||
+            (ecPkey = EVP_PKEY_Q_keygen(NULL, "provider=default", "EC", OBJ_nid2sn(testKeys[i].keygenParams))) == NULL)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_Q_keygen failed")
+            goto cleanup;
+        }
+
+        if (!EVP_PKEY_get_octet_string_param(mldsaPkey, OSSL_PKEY_PARAM_ML_DSA_SEED, abSeed, sizeof(abSeed), &cbSeed) ||
+            cbSeed != sizeof(abSeed))
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_get_octet_string_param failed")
+            goto cleanup;
+        }
+
+        if (keysinuse_test_get_public_key(mldsaPkey, &pbMlDsaPublicKey, &cbMlDsaPublicKey) != SCOSSL_SUCCESS ||
+            keysinuse_test_get_public_key(ecPkey, &pbEcPublicKey, &cbEcPublicKey) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        // The ECDSA component private key is encoded as an ECPrivateKey without the public key
+        if ((ecKey = EVP_PKEY_get1_EC_KEY(ecPkey)) == NULL)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_get1_EC_KEY failed")
+            goto cleanup;
+        }
+
+        EC_KEY_set_enc_flags(ecKey, EC_PKEY_NO_PUBKEY);
+        if ((cbEcPrivateKey = i2d_ECPrivateKey(ecKey, &pbEcPrivateKey)) <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("i2d_ECPrivateKey failed")
+            goto cleanup;
+        }
+
+        // Composite private key is the ML-DSA seed followed by the ECDSA private key
+        cbPrivateKey = cbSeed + cbEcPrivateKey;
+        if ((pbPrivateKey = (PBYTE)OPENSSL_malloc(cbPrivateKey)) == NULL)
+        {
+            TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
+            goto cleanup;
+        }
+        memcpy(pbPrivateKey, abSeed, cbSeed);
+        memcpy(pbPrivateKey + cbSeed, pbEcPrivateKey, cbEcPrivateKey);
+
+        // Composite public key is the ML-DSA public key followed by the ECDSA public key
+        testKeys[i].cbEncodedKey = cbMlDsaPublicKey + cbEcPublicKey;
+        if ((testKeys[i].pbEncodedKey = (PBYTE)OPENSSL_malloc(testKeys[i].cbEncodedKey)) == NULL)
+        {
+            TEST_LOG_OPENSSL_ERROR("OPENSSL_malloc failed")
+            goto cleanup;
+        }
+        memcpy(testKeys[i].pbEncodedKey, pbMlDsaPublicKey, cbMlDsaPublicKey);
+        memcpy(testKeys[i].pbEncodedKey + cbMlDsaPublicKey, pbEcPublicKey, cbEcPublicKey);
+
+        params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, pbPrivateKey, cbPrivateKey);
+        params[1] = OSSL_PARAM_construct_end();
+
+        if (EVP_PKEY_fromdata_init(ctx) <= 0 ||
+            EVP_PKEY_fromdata(ctx, &testKeys[i].pkey, OSSL_KEYMGMT_SELECT_KEYPAIR, params) <= 0)
+        {
+            TEST_LOG_OPENSSL_ERROR("EVP_PKEY_fromdata failed")
+            goto cleanup;
+        }
+
+        if (keysinuse_test_compute_key_id(testKeys[i].pbEncodedKey, testKeys[i].cbEncodedKey, testKeys[i].abKeyId) != SCOSSL_SUCCESS)
+        {
+            goto cleanup;
+        }
+
+        EVP_PKEY_CTX_free(ctx);
+        EVP_PKEY_free(mldsaPkey);
+        EVP_PKEY_free(ecPkey);
+        EC_KEY_free(ecKey);
+        OPENSSL_free(pbMlDsaPublicKey);
+        OPENSSL_free(pbEcPublicKey);
+        OPENSSL_free(pbEcPrivateKey);
+        OPENSSL_clear_free(pbPrivateKey, cbPrivateKey);
+        ctx = NULL;
+        mldsaPkey = NULL;
+        ecPkey = NULL;
+        ecKey = NULL;
+        pbMlDsaPublicKey = NULL;
+        pbEcPublicKey = NULL;
+        pbEcPrivateKey = NULL;
+        pbPrivateKey = NULL;
+    }
+
+    ret = SCOSSL_SUCCESS;
+
+cleanup:
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(mldsaPkey);
+    EVP_PKEY_free(ecPkey);
+    EC_KEY_free(ecKey);
+    OPENSSL_free(pbMlDsaPublicKey);
+    OPENSSL_free(pbEcPublicKey);
+    OPENSSL_free(pbEcPrivateKey);
+    OPENSSL_clear_free(pbPrivateKey, cbPrivateKey);
+    OPENSSL_cleanse(abSeed, sizeof(abSeed));
+    return ret;
+}
+#endif
 
 // Generates a key with the specified parameters. *ppbKey is set to the encoded
 // public key bytes, and abKeyId is set to the expected keyId. The size of the
@@ -1587,13 +1856,18 @@ cleanup:
 // the tested provider(s) key encoding logic are caught by the tests.
 SCOSSL_STATUS keysinuse_test_generate_keys()
 {
-    unsigned char pbKeyHash[SYMCRYPT_SHA256_RESULT_SIZE];
     int cbPublicKey = 0;
     SCOSSL_STATUS ret = SCOSSL_FAILURE;
     EVP_PKEY_CTX *ctx = NULL;
 
     for (int i = 0; i < sizeof(testKeys) / sizeof(testKeys[0]); i++)
     {
+        if (KEYSINUSE_TEST_IS_COMPOSITE_MLDSA(testKeys[i]))
+        {
+            // Generated by keysinuse_test_generate_composite_mldsa_keys
+            continue;
+        }
+
 #if OPENSSL_VERSION_MAJOR == 3
         if ((ctx = EVP_PKEY_CTX_new_from_name(NULL, OBJ_nid2sn(testKeys[i].keyType), "provider=default")) == NULL)
         {
@@ -1624,6 +1898,18 @@ SCOSSL_STATUS keysinuse_test_generate_keys()
         }
         else if (testKeys[i].keyType == EVP_PKEY_EC)
         {
+            EC_GROUP *ecGroup = EC_GROUP_new_by_curve_name(testKeys[i].keygenParams);
+            if (ecGroup == NULL)
+            {
+                const char *curveName = OBJ_nid2sn(testKeys[i].keygenParams);
+                printf("Skipping unsupported curve %s\n", curveName != NULL ? curveName : "<unknown>");
+                ERR_clear_error();
+                EVP_PKEY_CTX_free(ctx);
+                ctx = NULL;
+                continue;
+            }
+            EC_GROUP_free(ecGroup);
+
             if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, testKeys[i].keygenParams) <= 0)
             {
                 TEST_LOG_OPENSSL_ERROR("EVP_PKEY_CTX_set_ec_paramgen_curve_nid failed")
@@ -1638,25 +1924,30 @@ SCOSSL_STATUS keysinuse_test_generate_keys()
         }
 
         // Encode the public key
-        cbPublicKey = i2d_PublicKey(testKeys[i].pkey, &testKeys[i].pbEncodedKey);
-        if (cbPublicKey <= 0)
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+        if (KEYSINUSE_TEST_IS_MLDSA(testKeys[i].keyType))
         {
-            TEST_LOG_OPENSSL_ERROR("i2d_PublicKey failed")
+            if (keysinuse_test_get_public_key(testKeys[i].pkey, &testKeys[i].pbEncodedKey, &testKeys[i].cbEncodedKey) != SCOSSL_SUCCESS)
+            {
+                goto cleanup;
+            }
+        }
+        else
+#endif
+        {
+            cbPublicKey = i2d_PublicKey(testKeys[i].pkey, &testKeys[i].pbEncodedKey);
+            if (cbPublicKey <= 0)
+            {
+                TEST_LOG_OPENSSL_ERROR("i2d_PublicKey failed")
+                goto cleanup;
+            }
+            testKeys[i].cbEncodedKey = cbPublicKey;
+        }
+
+        if (keysinuse_test_compute_key_id(testKeys[i].pbEncodedKey, testKeys[i].cbEncodedKey, testKeys[i].abKeyId) != SCOSSL_SUCCESS)
+        {
             goto cleanup;
         }
-        testKeys[i].cbEncodedKey = cbPublicKey;
-
-        if (EVP_Digest(testKeys[i].pbEncodedKey, testKeys[i].cbEncodedKey, pbKeyHash, NULL, EVP_sha256(), NULL) <= 0)
-        {
-            TEST_LOG_OPENSSL_ERROR("EVP_Digest failed")
-            goto cleanup;
-        }
-
-        for (int j = 0; j < SYMCRYPT_SHA256_RESULT_SIZE / 2; j++)
-        {
-            sprintf(&testKeys[i].abKeyId[j*2], "%02x", pbKeyHash[j]);
-        }
-        testKeys[i].abKeyId[SYMCRYPT_SHA256_RESULT_SIZE] = '\0';
 
         EVP_PKEY_CTX_free(ctx);
         ctx = NULL;
@@ -1705,6 +1996,12 @@ SCOSSL_STATUS keysinuse_test_run_tests(KEYSINUSE_TEST_KEY testKey, KEYSINUSE_OPE
 
     for (ENGINE *engine : engines)
     {
+        if (KEYSINUSE_TEST_IS_MLDSA(testKey.keyType))
+        {
+            // Engines do not support ML-DSA
+            break;
+        }
+
         printf("\tTesting engine (%s) functions\n", ENGINE_get_id(engine));
         if (operation == KEYSINUSE_SIGN)
         {
@@ -1830,9 +2127,14 @@ int main(int argc, char** argv)
     vector<PVOID> providers;
 
     char abKeyId[KEYSINUSE_KEYID_SIZE];
-    int ret = 0;
+    int ret = 1;
 
     keysinuse_test_cleanup();
+
+    // KeysInUse is disabled by default in the provider. Opt in through the
+    // environment since the test loads providers without a keysinuse config.
+    setenv("KEYSINUSE_ENABLED", "1", 1);
+    keysinuseStartTime = time(NULL);
 
     OPENSSL_init_crypto(0, NULL);
 
@@ -1943,11 +2245,19 @@ int main(int argc, char** argv)
 
     ERR_pop_to_mark();
 
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+    if (keysinuse_test_generate_composite_mldsa_keys() != SCOSSL_SUCCESS)
+    {
+        TEST_LOG_ERROR("Failed to generate composite ML-DSA keys")
+        goto cleanup;
+    }
+#endif
+
     keysinuse_set_logging_delay(KEYSINUSE_TEST_LOG_DELAY);
     keysinuse_init();
 
     processName = realpath(argv[0], NULL);
-    processStartTime = time(NULL);
+    testStartTime = time(NULL);
 
     if (keysinuse_test_create_fakeroot() == SCOSSL_FAILURE)
     {
@@ -1963,6 +2273,12 @@ int main(int argc, char** argv)
 
     for (KEYSINUSE_TEST_KEY testKey : testKeys)
     {
+        if (testKey.pkey == NULL)
+        {
+            // Key generation was skipped for this entry (unsupported curve or key type).
+            continue;
+        }
+
         if (testKey.keyType == EVP_PKEY_RSA)
         {
             printf("Testing RSA sign with size %d\n", testKey.keygenParams);
@@ -1971,6 +2287,16 @@ int main(int argc, char** argv)
         {
             printf("Testing ECDSA sign with curve %s\n", OBJ_nid2sn(testKey.keygenParams));
         }
+#if OPENSSL_VERSION_MAJOR == 3 && OPENSSL_VERSION_MINOR >= 5
+        else if (KEYSINUSE_TEST_IS_COMPOSITE_MLDSA(testKey))
+        {
+            printf("Testing composite ML-DSA sign with %s\n", keysinuse_test_get_composite_mldsa_name(testKey));
+        }
+        else if (KEYSINUSE_TEST_IS_MLDSA(testKey.keyType))
+        {
+            printf("Testing ML-DSA sign with parameter set %s\n", OBJ_nid2ln(testKey.keyType));
+        }
+#endif
 
         if (keysinuse_test_run_tests(testKey, KEYSINUSE_SIGN, engines, providers) != SCOSSL_SUCCESS)
         {
@@ -1994,7 +2320,7 @@ int main(int argc, char** argv)
     }
 
     printf("All tests passed\n");
-    ret = 1;
+    ret = 0;
 
 cleanup:
 #if OPENSSL_VERSION_MAJOR == 3

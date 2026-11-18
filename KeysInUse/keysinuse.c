@@ -1040,7 +1040,7 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
         // 2. File permissions are 0200
         // 3. Logging won't exceed maximum file size
         struct stat sb;
-        if (stat(log_path, &sb) != -1)
+        if (lstat(log_path, &sb) != -1)
         {
             BOOL isBadFile = FALSE;
             if (S_ISLNK(sb.st_mode))
@@ -1125,7 +1125,7 @@ static void keysinuse_log_common(int level, const char *message, va_list args)
         int fd;
         for (int i = 0; i < 3; i++)
         {
-            fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0200);
+            fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0200);
             if (fd >= 0 || errno != EACCES)
             {
                 break;

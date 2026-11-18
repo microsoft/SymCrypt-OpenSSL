@@ -112,8 +112,8 @@ SCOSSL_STATUS p_scossl_ecdh_derive(SCOSSL_ECDH_CTX *ctx,
         return SCOSSL_FAILURE;
     }
 
-    if (ctx->keyCtx == NULL ||
-        (secret != NULL && ctx->peerKeyCtx == NULL)) {
+    if (ctx->keyCtx == NULL || !ctx->keyCtx->initialized ||
+        (secret != NULL && (ctx->peerKeyCtx == NULL || !ctx->peerKeyCtx->initialized))) {
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_KEY);
         return SCOSSL_FAILURE;
     }
