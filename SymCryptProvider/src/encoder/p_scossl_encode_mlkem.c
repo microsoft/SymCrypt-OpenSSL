@@ -14,6 +14,11 @@
 extern "C" {
 #endif
 
+// seed [0] IMPLICIT OCTET STRING (RFC 9935)
+ASN1_ITEM_TEMPLATE(SCOSSL_MLKEM_SEED) =
+    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_IMPLICIT, 0, SCOSSL_MLKEM_SEED, ASN1_OCTET_STRING)
+static_ASN1_ITEM_TEMPLATE_END(SCOSSL_MLKEM_SEED)
+
 static ASN1_OBJECT *p_scossl_encode_mlkem_get_oid(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     int nid = p_scossl_mlkem_params_to_nid(keyCtx->mlkemParams);
@@ -28,6 +33,7 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
     unsigned char *pbDer = NULL;
     int cbDer = 0;
     ASN1_OCTET_STRING *p8Data = NULL;
+    const ASN1_ITEM *p8DataItem;
     PKCS8_PRIV_KEY_INFO *p8Info = NULL;
     ASN1_OBJECT *p8Obj;
     SCOSSL_STATUS status = SCOSSL_FAILURE;
@@ -57,9 +63,14 @@ static PKCS8_PRIV_KEY_INFO *p_scossl_mlkem_key_to_p8info(_In_ const SCOSSL_MLKEM
         goto cleanup;
     }
 
+    p8DataItem = keyCtx->format == SYMCRYPT_MLKEMKEY_FORMAT_PRIVATE_SEED ?
+        ASN1_ITEM_rptr(SCOSSL_MLKEM_SEED) :
+        ASN1_ITEM_rptr(ASN1_OCTET_STRING);
+
     if (!ASN1_OCTET_STRING_set(p8Data, pbKey, cbKey) ||
-        (cbDer = i2d_ASN1_OCTET_STRING(p8Data, &pbDer)) == 0)
+        (cbDer = ASN1_item_i2d((ASN1_VALUE *)p8Data, &pbDer, p8DataItem)) <= 0)
     {
+        cbDer = 0;
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
     }
@@ -96,6 +107,7 @@ cleanup:
 static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX *keyCtx)
 {
     PBYTE pbKey = NULL;
+    PBYTE pbPublicKey = NULL;
     SIZE_T cbKey = 0;
     X509_PUBKEY *pubKey = NULL;
     ASN1_OBJECT *p8Obj;
@@ -124,12 +136,19 @@ static X509_PUBKEY *p_scossl_mlkem_key_to_pubkey(_In_ const SCOSSL_MLKEM_KEY_CTX
         goto cleanup;
     }
 
-    if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbKey, cbKey))
+    // X509_PUBKEY takes ownership and uses OPENSSL_free, not OPENSSL_secure_free.
+    if ((pbPublicKey = OPENSSL_memdup(pbKey, cbKey)) == NULL)
+    {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto cleanup;
+    }
+
+    if (!X509_PUBKEY_set0_param(pubKey, p8Obj, V_ASN1_UNDEF, NULL, pbPublicKey, cbKey))
     {
         ERR_raise(ERR_LIB_PROV, ASN1_R_ENCODE_ERROR);
         goto cleanup;
     }
-    pbKey = NULL;
+    pbPublicKey = NULL;
 
     status = SCOSSL_SUCCESS;
 
@@ -141,6 +160,7 @@ cleanup:
     }
 
     OPENSSL_secure_free(pbKey);
+    OPENSSL_free(pbPublicKey);
 
     return pubKey;
 }
@@ -361,7 +381,7 @@ static SCOSSL_STATUS p_scossl_mlkem_to_text(ossl_unused SCOSSL_ENCODE_CTX *ctx, 
         pbKey = NULL;
         cbKey = 0;
 
-        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, OSSL_KEYMGMT_SELECT_PUBLIC_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
+        if (p_scossl_mlkem_keymgmt_get_encoded_key(keyCtx, SYMCRYPT_MLKEMKEY_FORMAT_ENCAPSULATION_KEY, &pbKey, &cbKey) != SCOSSL_SUCCESS)
         {
             goto cleanup;
         }

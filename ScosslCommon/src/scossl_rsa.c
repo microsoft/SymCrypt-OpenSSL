@@ -587,7 +587,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT8 padding,
             SYMCRYPT_NUMBER_FORMAT_MSB_FIRST,
             0,
             pbDst,
-            cbModulus - SCOSSL_MIN_PKCS1_PADDING,
+            SYMCRYPT_MIN(cbDst, cbModulus - SCOSSL_MIN_PKCS1_PADDING),
             &cbResult);
 
         // Constant-time error processing to avoid Bleichenbacher attack
@@ -624,7 +624,7 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT8 padding,
             cbLabel,
             0,
             pbDst,
-            cbModulus - SCOSSL_MIN_OAEP_PADDING,
+            SYMCRYPT_MIN(cbDst, cbModulus - SCOSSL_MIN_OAEP_PADDING),
             &cbResult);
         if (scError != SYMCRYPT_NO_ERROR)
         {
@@ -636,6 +636,11 @@ SCOSSL_STATUS scossl_rsa_decrypt(PSYMCRYPT_RSAKEY key, UINT8 padding,
     case RSA_NO_PADDING:
         SCOSSL_LOG_INFO(SCOSSL_ERR_F_RSA_ENCRYPT, SCOSSL_ERR_R_NOT_FIPS_ALGORITHM,
             "Using no padding for RSA decryption which is not FIPS compliant");
+
+        if (cbDst < cbModulus)
+        {
+            goto cleanup;
+        }
 
         scError = SymCryptRsaRawDecrypt(
             key,

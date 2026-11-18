@@ -807,6 +807,8 @@ static SCOSSL_STATUS p_scossl_get_capabilities(ossl_unused void *provctx, _In_ c
 }
 
 #ifdef KEYSINUSE_ENABLED
+static BOOL p_scossl_keysinuse_started = FALSE;
+
 static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
 {
     BOOL keysinuseEnabled = FALSE;
@@ -903,6 +905,15 @@ static void p_scossl_start_keysinuse(_In_ const OSSL_CORE_HANDLE *handle)
         }
 
         keysinuse_init();
+        p_scossl_keysinuse_started = TRUE;
+    }
+    else if (!p_scossl_keysinuse_started)
+    {
+        // KeysInUse initializes lazily on first use, so it must be explicitly
+        // disabled when not enabled by config or environment. Skip this if a
+        // previous provider instance in this process already enabled it, since
+        // the KeysInUse state is process-wide.
+        keysinuse_disable();
     }
 
     ERR_pop_to_mark();
