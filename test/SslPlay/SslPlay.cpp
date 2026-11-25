@@ -1825,6 +1825,58 @@ void TestAesGcmCipher(
     return;
 }
 
+void TestAesGcmContextLifetime(const EVP_CIPHER *cipher)
+{
+    unsigned char expected[sizeof(gcm_pt)], expectedTag[sizeof(gcm_tag)];
+    unsigned char ciphertext[sizeof(gcm_pt)], tag[sizeof(gcm_tag)];
+    int expectedLen = encrypt_gcm(cipher, gcm_pt, sizeof(gcm_pt), gcm_aad, sizeof(gcm_aad),
+                                 gcm_key, gcm_iv, expected, expectedTag);
+
+    for (int firstFree = 0; firstFree < 2; firstFree++)
+    {
+        EVP_CIPHER_CTX *contexts[] = {EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_new()};
+        int len, finalLen;
+
+        if (contexts[0] == NULL || contexts[1] == NULL ||
+            !EVP_EncryptInit_ex(contexts[0], cipher, NULL, gcm_key, gcm_iv) ||
+            !EVP_EncryptInit_ex(contexts[1], cipher, NULL, gcm_key, gcm_iv) ||
+            !EVP_EncryptUpdate(contexts[0], NULL, &len, gcm_aad, sizeof(gcm_aad)) ||
+            !EVP_CIPHER_CTX_copy(contexts[1], contexts[0]))
+        {
+            handleOpenSSLError("AES-GCM context copy failed");
+        }
+
+        EVP_CIPHER_CTX_free(contexts[firstFree]);
+        EVP_CIPHER_CTX *remaining = contexts[1 - firstFree];
+        if (!EVP_EncryptUpdate(remaining, ciphertext, &len, gcm_pt, sizeof(gcm_pt)) ||
+            !EVP_EncryptFinal_ex(remaining, ciphertext + len, &finalLen) ||
+            !EVP_CIPHER_CTX_ctrl(remaining, EVP_CTRL_GCM_GET_TAG, sizeof(tag), tag))
+        {
+            handleOpenSSLError("AES-GCM copied context failed after peer free");
+        }
+        if (len + finalLen != expectedLen ||
+            memcmp(ciphertext, expected, expectedLen) != 0 ||
+            memcmp(tag, expectedTag, sizeof(tag)) != 0)
+        {
+            handleError("AES-GCM copied context output mismatch");
+        }
+
+        if (!EVP_CIPHER_CTX_reset(remaining) ||
+            !EVP_CIPHER_CTX_reset(remaining) ||
+            !EVP_EncryptInit_ex(remaining, cipher, NULL, gcm_key, gcm_iv) ||
+            !EVP_EncryptInit_ex(remaining, NULL, NULL, NULL, gcm_iv))
+        {
+            handleOpenSSLError("AES-GCM context reset/reinitialization failed");
+        }
+        if (EVP_CIPHER_CTX_ctrl(remaining, EVP_CTRL_GCM_SET_IVLEN, 0, NULL) > 0)
+        {
+            handleError("AES-GCM accepted a zero-length IV");
+        }
+        ERR_clear_error();
+        EVP_CIPHER_CTX_free(remaining);
+    }
+}
+
 void
 TestAesGcmGeneric()
 {
@@ -1844,6 +1896,10 @@ TestAesGcmGeneric()
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), key, 32, iv, 12, aad, 16, plaintext, plaintext_len);
 
     TestAesGcmCipher("EVP_aes_256_gcm", EVP_aes_256_gcm(), gcm_key, 32, gcm_iv, 12, gcm_aad, 16, gcm_pt, 16, gcm_tag, 16);
+
+    TestAesGcmContextLifetime(EVP_aes_128_gcm());
+    TestAesGcmContextLifetime(EVP_aes_192_gcm());
+    TestAesGcmContextLifetime(EVP_aes_256_gcm());
 
     printf("%s", SeparatorLine);
     return;
