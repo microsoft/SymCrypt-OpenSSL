@@ -52,7 +52,7 @@ released publicly in the future.
 
 The AES-GCM tests also exercise copying over an initialized context, freeing
 either copy first, and resetting and reinitializing a context. Configure with
-`-DCMAKE_BUILD_TYPE=Sanitize` and run `./SslPlay/SslPlay` from the build
+`-DCMAKE_BUILD_TYPE=Sanitize` and run `./test/SslPlay/SslPlay` from the build
 directory with the engine enabled (the default) to check IV lifetime leaks
 and invalid frees as well as cipher output.
 
