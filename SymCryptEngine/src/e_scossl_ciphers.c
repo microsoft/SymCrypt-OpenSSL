@@ -226,6 +226,7 @@ SCOSSL_STATUS e_scossl_aes_gcm_init_key(
     _Inout_ EVP_CIPHER_CTX *ctx, _In_ const unsigned char *key, _In_ const unsigned char *iv, ossl_unused int enc);
 SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(
     _Inout_ EVP_CIPHER_CTX *ctx, _Out_ unsigned char *out, _In_reads_bytes_(inl) const unsigned char *in, size_t inl);
+static SCOSSL_STATUS e_scossl_aes_gcm_cleanup(_Inout_ EVP_CIPHER_CTX *ctx);
 static _Success_(return > 0) int e_scossl_aes_gcm_ctrl(_Inout_ EVP_CIPHER_CTX *ctx, int type, int arg, _Inout_ void *ptr);
 #define AES_GCM_FLAGS   (EVP_CIPH_FLAG_DEFAULT_ASN1|EVP_CIPH_GCM_MODE|EVP_CIPH_CUSTOM_COPY \
                         |EVP_CIPH_CUSTOM_IV|EVP_CIPH_CUSTOM_IV_LENGTH|EVP_CIPH_FLAG_CUSTOM_CIPHER \
@@ -241,6 +242,7 @@ static const EVP_CIPHER *e_scossl_aes_128_gcm(void)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_128_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_128_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_128_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_cleanup(_hidden_aes_128_gcm, e_scossl_aes_gcm_cleanup)
         || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_128_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_128_gcm, SCOSSL_ALIGNED_SIZEOF(SCOSSL_CIPHER_GCM_CTX)) )
     {
@@ -259,6 +261,7 @@ static const EVP_CIPHER *e_scossl_aes_192_gcm(void)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_192_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_192_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_192_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_cleanup(_hidden_aes_192_gcm, e_scossl_aes_gcm_cleanup)
         || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_192_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_192_gcm, SCOSSL_ALIGNED_SIZEOF(SCOSSL_CIPHER_GCM_CTX)) )
     {
@@ -277,6 +280,7 @@ static const EVP_CIPHER *e_scossl_aes_256_gcm(void)
         || !EVP_CIPHER_meth_set_flags(_hidden_aes_256_gcm, AES_GCM_FLAGS)
         || !EVP_CIPHER_meth_set_init(_hidden_aes_256_gcm, e_scossl_aes_gcm_init_key)
         || !EVP_CIPHER_meth_set_do_cipher(_hidden_aes_256_gcm, e_scossl_aes_gcm_cipher)
+        || !EVP_CIPHER_meth_set_cleanup(_hidden_aes_256_gcm, e_scossl_aes_gcm_cleanup)
         || !EVP_CIPHER_meth_set_ctrl(_hidden_aes_256_gcm, e_scossl_aes_gcm_ctrl)
         || !EVP_CIPHER_meth_set_impl_ctx_size(_hidden_aes_256_gcm, SCOSSL_ALIGNED_SIZEOF(SCOSSL_CIPHER_GCM_CTX)) )
     {
@@ -731,6 +735,17 @@ SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ u
     }
 
     return ret;
+}
+
+static SCOSSL_STATUS e_scossl_aes_gcm_cleanup(_Inout_ EVP_CIPHER_CTX *ctx)
+{
+    SCOSSL_CIPHER_GCM_CTX *cipherCtx = (SCOSSL_CIPHER_GCM_CTX *) SCOSSL_ALIGN_UP(EVP_CIPHER_CTX_get_cipher_data(ctx));
+    if (cipherCtx == NULL)
+        return SCOSSL_SUCCESS;
+
+    OPENSSL_free(cipherCtx->iv);
+    cipherCtx->iv = NULL;
+    return SCOSSL_SUCCESS;
 }
 
 // Allows various cipher specific parameters to be determined and set.
