@@ -740,6 +740,9 @@ SCOSSL_RETURNLENGTH e_scossl_aes_gcm_cipher(_Inout_ EVP_CIPHER_CTX *ctx, _Out_ u
 static SCOSSL_STATUS e_scossl_aes_gcm_cleanup(_Inout_ EVP_CIPHER_CTX *ctx)
 {
     SCOSSL_CIPHER_GCM_CTX *cipherCtx = (SCOSSL_CIPHER_GCM_CTX *) SCOSSL_ALIGN_UP(EVP_CIPHER_CTX_get_cipher_data(ctx));
+    if (cipherCtx == NULL)
+        return SCOSSL_SUCCESS;
+
     OPENSSL_free(cipherCtx->iv);
     cipherCtx->iv = NULL;
     return SCOSSL_SUCCESS;
